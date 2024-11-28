@@ -52,4 +52,14 @@ public class AddPartitionEvent extends PartitionEvent {
   public PartitionInfo createdPartitionInfo() {
     return createdPartitionInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ADD_PARTITION;
+  }
 }

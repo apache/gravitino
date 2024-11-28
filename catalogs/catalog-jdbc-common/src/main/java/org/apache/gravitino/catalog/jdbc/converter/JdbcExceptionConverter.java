@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.jdbc.converter;
 
 import java.sql.SQLException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -51,6 +52,10 @@ public class JdbcExceptionConverter {
       case 1051:
         return new NoSuchTableException(sqlException, sqlException.getMessage());
       default:
+        if (sqlException.getMessage() != null
+            && sqlException.getMessage().contains("Access denied")) {
+          return new ConnectionFailedException(sqlException, sqlException.getMessage());
+        }
         return new GravitinoRuntimeException(sqlException, sqlException.getMessage());
     }
   }

@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent an event after check Iceberg table exists successfully. */
 @DeveloperApi
 public class IcebergTableExistsEvent extends IcebergTableEvent {
-  private boolean isExists;
+  private final boolean isExists;
 
   public IcebergTableExistsEvent(
       IcebergRequestContext icebergRequestContext,
@@ -37,5 +37,10 @@ public class IcebergTableExistsEvent extends IcebergTableEvent {
 
   public boolean isExists() {
     return isExists;
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.TABLE_EXISTS;
   }
 }

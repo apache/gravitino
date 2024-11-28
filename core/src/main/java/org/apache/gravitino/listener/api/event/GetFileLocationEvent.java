@@ -77,4 +77,14 @@ public final class GetFileLocationEvent extends FilesetEvent {
   public Map<String, String> context() {
     return context;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_FILESET_LOCATION;
+  }
 }

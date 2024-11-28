@@ -44,7 +44,10 @@ public class GravitinoOptions {
   public static final String OWNER = "owner";
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
+  public static final String INDEX = "index";
   public static final String FORCE = "force";
+  public static final String DISTRIBUTION = "distribution";
+  public static final String PARTITION = "partition";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -63,6 +66,9 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption("x", INDEX, "Display index infromation"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));
@@ -113,5 +119,10 @@ public class GravitinoOptions {
    */
   public Option createArgOption(String shortName, String longName, String description) {
     return new Option(shortName, longName, true, description);
+  }
+
+  public Option createArgsOption(String shortName, String longName, String description) {
+    // Support multiple arguments
+    return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
   }
 }

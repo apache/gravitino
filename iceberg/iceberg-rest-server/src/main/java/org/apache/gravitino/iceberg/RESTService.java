@@ -28,9 +28,15 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
@@ -90,6 +96,15 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
     IcebergTableEventDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus, metalakeName);
+    IcebergViewOperationExecutor icebergViewOperationExecutor =
+        new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
+    IcebergViewEventDispatcher icebergViewEventDispatcher =
+        new IcebergViewEventDispatcher(icebergViewOperationExecutor, eventBus, metalakeName);
+    IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
+        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+    IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+        new IcebergNamespaceEventDispatcher(
+            icebergNamespaceOperationExecutor, eventBus, metalakeName);
 
     config.register(
         new AbstractBinder() {
@@ -98,6 +113,10 @@ public class RESTService implements GravitinoAuxiliaryService {
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
             bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
+            bind(icebergNamespaceEventDispatcher)
+                .to(IcebergNamespaceOperationDispatcher.class)
+                .ranked(1);
           }
         });
 

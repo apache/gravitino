@@ -48,4 +48,14 @@ public final class LoadTableEvent extends TableEvent {
   public TableInfo loadedTableInfo() {
     return loadedTableInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_TABLE;
+  }
 }
