@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -132,23 +131,6 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
     executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
-    if (new File(ITUtils.joinPath(testSetDirName, "catalog_cascading_precheck.sql")).exists()) {
-      Awaitility.await()
-          .atMost(30, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.SECONDS)
-          .until(
-              () -> {
-                try {
-                  executeSqlFile(
-                      testSetDirName, "catalog_cascading_precheck.sql", queryRunner, catalog);
-                  return true;
-                } catch (Exception e) {
-                  LOG.error("Failed to run query using trino cascading connector", e);
-                  return false;
-                }
-              });
-    }
-
     Arrays.sort(testerNames);
     for (String testerName : testerNames) {
       try {
@@ -180,7 +162,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     sqls = removeSqlComments(sqls);
 
     Matcher sqlMatcher =
-        Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
+        Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
     while (sqlMatcher.find()) {
       String sql = sqlMatcher.group(1);
       sql = resolveParameters(sql);
@@ -239,7 +221,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     String testResults = TrinoQueryITBase.readFileToString(resultFileName);
 
     Matcher sqlMatcher =
-        Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
+        Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
     Matcher resultMatcher =
         Pattern.compile("((\".*?\")\\n{2,})|((\\S.*?)\\n{2,})", Pattern.DOTALL | Pattern.UNIX_LINES)
             .matcher(testResults);

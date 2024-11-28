@@ -31,8 +31,10 @@ import java.net.URI;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import jodd.io.StringOutputStream;
 import okhttp3.logging.HttpLoggingInterceptor;
+import org.awaitility.Awaitility;
 import org.jline.terminal.Terminal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +67,29 @@ class TrinoQueryRunner {
   }
 
   String runQuery(String query) {
+    String retryFlag = "<RETRY WITH NOT EXISTS>";
+    if (!query.startsWith(retryFlag)) {
+      return runQueryOnce(query);
+    } else {
+      String finalQuery = query.replace(retryFlag, "");
+      AtomicReference<String> output = new AtomicReference<>("");
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                String result = runQueryOnce(finalQuery);
+                if (!result.contains("does not exist")) {
+                  output.set(result);
+                  return true;
+                }
+                return false;
+              });
+      return output.get();
+    }
+  }
+
+  String runQueryOnce(String query) {
     Query queryResult = queryRunner.startQuery(query);
     StringOutputStream outputStream = new StringOutputStream();
     queryResult.renderOutput(

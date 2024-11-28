@@ -231,7 +231,7 @@ public class TrinoQueryITBase {
             });
 
     metalake.disableCatalog(catalogName);
-    metalake.dropCatalog(catalogName,true);
+    metalake.dropCatalog(catalogName, true);
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 

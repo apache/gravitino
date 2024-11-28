@@ -113,3 +113,5 @@ WITH (
 );
 
 USE gt_iceberg1.gt_db2;
+
+<RETRY WITH NOT EXISTS> SELECT * FROM gt_iceberg1.gt_db2.tb03;

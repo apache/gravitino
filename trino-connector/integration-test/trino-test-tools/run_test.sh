@@ -35,7 +35,7 @@ GRAVITINO_HOME_DIR=`realpath $GRAVITINO_HOME_DIR`
 # Set the test set and test environment directories
 # Set the test arguments and parameters for the test TrinoQueryTestTools
 TRINO_TEST_DOCKER_HOME=trino-cascading-env
-TRINO_TEST_SETS_DIR=$GRAVITINO_HOME_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/trino-cascading-testsets
+TRINO_TEST_SETS_DIR=$GRAVITINO_HOME_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/trino-cascading-testsets/t2
 TRINO_TEST_ARGS=
 TRINO_TEST_PARAMS=
 

@@ -1,3 +1,11 @@
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 10 rows
+
+INSERT: 10 rows
+
 USE
 
 "Avram","Lawrence","8"
@@ -10,6 +18,29 @@ USE
 "Gregory","Smith","4"
 "Gregory","Smith","4"
 "Avram","Lawrence","2"
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 1500 rows
+
+INSERT: 15000 rows
+
+USE
+
+"gt_push_db1"
+
+"customer"
+
+"custkey","bigint","",""
+"name","varchar(25)","",""
+"address","varchar(40)","",""
+"nationkey","bigint","",""
+"phone","varchar(15)","",""
+"acctbal","decimal(12,2)","",""
+"mktsegment","varchar(10)","",""
+"comment","varchar(117)","",""
 
 "Trino version: %
 %

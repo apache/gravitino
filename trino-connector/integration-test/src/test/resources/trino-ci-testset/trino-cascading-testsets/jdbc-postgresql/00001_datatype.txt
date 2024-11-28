@@ -1,11 +1,21 @@
-USE
+INSERT: 1 row
+
+INSERT: 1 row
+
+INSERT: 2 rows
+
+CREATE TABLE
+
+INSERT: 4 rows
 
 "bob","14"
 "jerry","13"
 "sam","11"
 "tom","12"
 
-USE
+CREATE SCHEMA
+
+CREATE TABLE
 
 "CREATE TABLE gt_postgresql1.gt_varchar_db1.test_char01 (
    id integer,
@@ -13,11 +23,15 @@ USE
 )
 COMMENT ''"
 
+CREATE TABLE
+
 "CREATE TABLE gt_postgresql1.gt_varchar_db1.test_char02 (
    id integer,
    name char(65536)
 )
 COMMENT ''"
+
+CREATE TABLE
 
 "CREATE TABLE gt_postgresql1.gt_varchar_db1.test_char03 (
    id integer,
@@ -25,11 +39,16 @@ COMMENT ''"
 )
 COMMENT ''"
 
+CREATE TABLE
+
+
 "CREATE TABLE gt_postgresql1.gt_varchar_db1.test_varchar04 (
    id integer,
    name varchar(250)
 )
 COMMENT ''"
+
+CREATE TABLE
 
 "CREATE TABLE gt_postgresql1.gt_varchar_db1.test_varchar05 (
    id integer,
@@ -37,26 +56,14 @@ COMMENT ''"
 )
 COMMENT ''"
 
+CREATE TABLE
+
 "CREATE TABLE gt_postgresql1.gt_varchar_db1.test_varchar06 (
    id integer,
    name varchar
 )
 COMMENT ''"
 
+CREATE SCHEMA
 
 "CREATE SCHEMA gt_postgresql1.gt_push_db1"
-
-"gt_push_db1"
-
-USE
-
-"customer"
-
-"custkey","bigint","",""
-"name","varchar(25)","",""
-"address","varchar(40)","",""
-"nationkey","bigint","",""
-"phone","varchar(15)","",""
-"acctbal","decimal(12,2)","",""
-"mktsegment","varchar(10)","",""
-"comment","varchar(117)","",""

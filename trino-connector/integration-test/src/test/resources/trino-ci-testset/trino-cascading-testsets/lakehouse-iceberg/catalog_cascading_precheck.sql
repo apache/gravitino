@@ -1,1 +1,0 @@
-select * from lineitem order by orderkey, partkey limit 5;

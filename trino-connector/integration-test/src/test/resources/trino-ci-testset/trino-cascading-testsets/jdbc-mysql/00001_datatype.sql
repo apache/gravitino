@@ -1,19 +1,19 @@
-USE gt_mysql1.gt_db1;
+SELECT * FROM gt_mysql1.gt_db1.tb03;
 
-SELECT * FROM tb04;
+CREATE TABLE gt_mysql1_1.gt_db1.tb04 (id int, name char(255));
+SELECT * FROM gt_mysql1.gt_db1.tb04;
 
-SELECT * FROM tb05;
+CREATE TABLE gt_mysql1_1.gt_db1.tb05 (id int, name varchar(250));
+SELECT * FROM gt_mysql1.gt_db1.tb05;
 
-SELECT * FROM tb06;
 
-SELECT * FROM tb07;
+CREATE TABLE gt_mysql1_1.gt_db1.tb06 (id int, name varchar(256));
+SELECT * FROM gt_mysql1.gt_db1.tb06;
 
-SELECT * FROM tb08;
+CREATE TABLE gt_mysql1_1.gt_db1.tb07 (id int, name char);
+SELECT * FROM gt_mysql1.gt_db1.tb07;
+
+CREATE TABLE gt_mysql1_1.gt_db1.tb08 (id int, name varchar);
+SELECT * FROM gt_mysql1.gt_db1.tb08;
 
 SHOW CREATE SCHEMA gt_mysql1.gt_db1;
-
-SHOW SCHEMAS LIKE 'gt_%1';
-
-SHOW TABLES LIKE 'cus%';
-
-SHOW COLUMNS FROM gt_mysql1.gt_db1.customer;

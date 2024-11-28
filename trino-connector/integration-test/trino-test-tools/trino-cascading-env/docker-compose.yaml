@@ -71,6 +71,12 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - ./init/postgres:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+      start_period: 30s
 
   trino-remote:
     image: trinodb/trino:435
@@ -99,6 +105,8 @@ services:
       mysql:
         condition: service_healthy
       hive:
+        condition: service_healthy
+      postgresql:
         condition: service_healthy
 
   trino-local:
@@ -129,6 +137,8 @@ services:
       mysql:
         condition: service_healthy
       hive:
+        condition: service_healthy
+      postgresql:
         condition: service_healthy
 
 networks:
