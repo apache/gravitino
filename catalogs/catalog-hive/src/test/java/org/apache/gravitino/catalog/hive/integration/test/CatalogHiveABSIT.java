@@ -32,7 +32,9 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 // Apart from the following dependencies on environment, this test also needs hadoop3-common, please
-// refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts`
+// refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts` or
+// initFileSystem
+// method in this file will fail to run due to missing hadoop3-common.
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
