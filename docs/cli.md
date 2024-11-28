@@ -528,6 +528,26 @@ gcli tag update --tag tagA --rename newTag
 gcli tag update --tag tagA --comment "new comment"
 ```
 
+### Owners commands
+
+#### List an owner
+
+```bash
+gcli catalog details --owner --name postgres
+```
+
+#### Set an owner to a user
+
+```bash
+gcli catalog set --owner --user admin --name postgres
+```
+
+#### Set an owner to a group
+
+```bash
+gcli catalog set --owner --group groupA --name postgres
+```
+
 ### Role commands
 
 #### Display role details
