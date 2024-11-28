@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -187,5 +189,11 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
         String.format(
             "Expected write.metadata.path to be '%s', but was '%s'",
             writeMetaDataPath, propertiesMap.get(TableProperties.WRITE_METADATA_LOCATION)));
+
+    String value1 = "1";
+    String value2 = "2";
+    sql(String.format("INSERT INTO %s VALUES (%s), (%s);", tableName, value1, value2));
+    List<String> result = convertToStringList(sql(String.format("SELECT * FROM %s", tableName)), 0);
+    Assertions.assertEquals(result, ImmutableList.of((value1), (value2)));
   }
 }
