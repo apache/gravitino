@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -54,6 +55,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDisp
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -295,16 +297,17 @@ public class IcebergTableOperations {
               + CredentialConstants.CREDENTIAL_PROVIDER_TYPE
               + " to the catalog configurations");
     }
-    Credential credential =
-        CredentialUtils.vendCredential(
-            credentialProvider,
-            new String[] {
-              loadTableResponse.tableMetadata().location(),
-              loadTableResponse.tableMetadata().property(TableProperties.WRITE_DATA_LOCATION, ""),
-              loadTableResponse
-                  .tableMetadata()
-                  .property(TableProperties.WRITE_METADATA_LOCATION, "")
-            });
+
+    TableMetadata tableMetadata = loadTableResponse.tableMetadata();
+    String[] path =
+        Stream.of(
+                tableMetadata.location(),
+                tableMetadata.property(TableProperties.WRITE_DATA_LOCATION, ""),
+                tableMetadata.property(TableProperties.WRITE_METADATA_LOCATION, ""))
+            .filter(StringUtils::isNotBlank)
+            .toArray(String[]::new);
+
+    Credential credential = CredentialUtils.vendCredential(credentialProvider, path);
     if (credential == null) {
       throw new ServiceUnavailableException(
           "Couldn't generate credential for %s", credentialProvider.credentialType());
