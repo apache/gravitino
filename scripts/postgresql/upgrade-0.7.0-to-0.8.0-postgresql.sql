@@ -94,7 +94,6 @@ CREATE TABLE IF NOT EXISTS model_version_alias_rel (
     UNIQUE (model_id, model_version, model_version_alias, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_model_id on model_version_alias_rel (model_id);
 CREATE INDEX IF NOT EXISTS idx_model_version_alias on model_version_alias_rel (model_version_alias);
 COMMENT ON TABLE model_version_alias_rel IS 'model version alias relation';
 
