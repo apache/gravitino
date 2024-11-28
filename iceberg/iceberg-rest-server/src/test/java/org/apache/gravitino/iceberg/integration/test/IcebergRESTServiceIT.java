@@ -45,7 +45,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 @TestInstance(Lifecycle.PER_CLASS)
 public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
-  private static final String ICEBERG_REST_NS_PREFIX = "iceberg_rest_";
+  protected static final String ICEBERG_REST_NS_PREFIX = "iceberg_rest_";
 
   @BeforeAll
   void prepareSQLContext() {
