@@ -51,4 +51,14 @@ public final class CreateMetalakeEvent extends MetalakeEvent {
   public MetalakeInfo createdMetalakeInfo() {
     return createdMetalakeInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_METALAKE;
+  }
 }

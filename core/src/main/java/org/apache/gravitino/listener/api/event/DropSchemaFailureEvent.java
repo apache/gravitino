@@ -45,4 +45,14 @@ public final class DropSchemaFailureEvent extends SchemaFailureEvent {
   public boolean cascade() {
     return cascade;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_SCHEMA;
+  }
 }

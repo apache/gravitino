@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent a failure event when dropping Iceberg table failed. */
 @DeveloperApi
 public class IcebergDropTableFailureEvent extends IcebergTableFailureEvent {
-  private boolean purgeRequested;
+  private final boolean purgeRequested;
 
   public IcebergDropTableFailureEvent(
       IcebergRequestContext icebergRequestContext,
@@ -38,5 +38,10 @@ public class IcebergDropTableFailureEvent extends IcebergTableFailureEvent {
 
   public boolean purgeRequested() {
     return purgeRequested;
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_TABLE;
   }
 }

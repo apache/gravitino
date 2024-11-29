@@ -64,5 +64,22 @@ public class TestNamespaceUtil {
             IllegalNamespaceException.class, () -> NamespaceUtil.checkTable(abcd));
     Assertions.assertTrue(
         excep3.getMessage().contains("Table namespace must be non-null and have 3 levels"));
+
+    // Test model
+    Assertions.assertThrows(IllegalNamespaceException.class, () -> NamespaceUtil.checkModel(null));
+    Throwable excep4 =
+        Assertions.assertThrows(
+            IllegalNamespaceException.class, () -> NamespaceUtil.checkModel(abcd));
+    Assertions.assertTrue(
+        excep4.getMessage().contains("Model namespace must be non-null and have 3 levels"));
+
+    // Test model version
+    Assertions.assertThrows(
+        IllegalNamespaceException.class, () -> NamespaceUtil.checkModelVersion(null));
+    Throwable excep5 =
+        Assertions.assertThrows(
+            IllegalNamespaceException.class, () -> NamespaceUtil.checkModelVersion(ab));
+    Assertions.assertTrue(
+        excep5.getMessage().contains("Model version namespace must be non-null and have 4 levels"));
   }
 }

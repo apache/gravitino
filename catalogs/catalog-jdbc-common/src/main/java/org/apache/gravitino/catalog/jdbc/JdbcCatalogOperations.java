@@ -56,7 +56,6 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -521,20 +520,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
           metaData.getDriverMajorVersion(),
           metaData.getDriverMinorVersion());
     } catch (final SQLException se) {
-      throw new GravitinoRuntimeException(
-          se, "Failed to get JDBC driver information %s: ", se.getMessage());
+      throw exceptionConverter.toGravitinoException(se);
     }
   }
 
-  /**
-   * Check the version of JDBC driver can supported.
-   *
-   * @return Returns the result of checking the jdbc driver version. If success return true,
-   *     otherwise throw a RuntimeException
-   */
-  public boolean checkJDBCDriverVersion() {
-    return true;
-  }
+  /** Check if the JDBC driver version is supported. If not, throw an exception. */
+  public void checkJDBCDriverVersion() {}
 
   private Table internalAlterTable(NameIdentifier tableIdent, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
