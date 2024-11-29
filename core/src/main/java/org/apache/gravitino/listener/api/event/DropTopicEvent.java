@@ -52,4 +52,14 @@ public final class DropTopicEvent extends TopicEvent {
   public boolean isExists() {
     return isExists;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_TOPIC;
+  }
 }

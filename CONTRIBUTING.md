@@ -19,9 +19,9 @@
 
 # Contributing to Apache Gravitino
 
-Thank you for your interest in contributing to Apache Gravitino! You are welcome to contribute in any way you can to enhance the project. Gravitino appreciates your assistance in making it better, whether through code contributions, documentation, tests, best practices, graphic design, or any other means that have a positive impact.
+Thank you for your interest in contributing to Apache Gravitino! Your support is invaluable in enhancing the project, and we warmly welcome contributions of all kinds. Gravitino appreciates your assistance in making it better, whether through code contributions, documentation, tests, best practices, graphic design, or any other means that have a positive impact.
 
-Before you get started, please read and follow these guidelines to ensure a smooth and productive collaboration.
+To ensure a smooth and productive collaboration, please take a moment to review and follow our contribution guidelines before getting started.
 
 ## Table of contents
 
@@ -82,7 +82,7 @@ To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin
     which java
     ```
 
-IntelliJ IDEA is an integrated development environment (IDE) for Java development. Setting the project SDK ensures that IntelliJ uses the correct Java version for building and running the project.
+IntelliJ IDEA is an integrated development environment (IDE) for Java development. Setting the project SDK ensures that IntelliJ uses the correct Java version to build and run the project.
 
 You can open up WSL in the IntelliJ terminal. Find the down arrow and select ubuntu.
 
@@ -94,9 +94,9 @@ You can open up WSL in the IntelliJ terminal. Find the down arrow and select ubu
 
 1. Open VSCode extension marketplace, search for and install **WSL**.
 
-2. On Windows, press `Ctrl+Shift+P` to open the command palette, and run `Shell Command: Install 'code' command in PATH`.
+2. Press `Ctrl+Shift+P` to open the command palette, and run `Shell Command: Install 'code' command in PATH`.
 
-Installing the WSL extension in VSCode allows you to open and edit files in your WSL environment directly from VSCode. Adding the `code` command to your PATH enables you to open VSCode from the WSL terminal.
+Installing the WSL extension in VSCode allows you to open and edit files in your WSL environment directly from VSCode. Adding the `code` command to your PATH lets you open VSCode from the WSL terminal.
 
 #### Verify and Configure Environment Variables
 
@@ -116,7 +116,7 @@ Installing the WSL extension in VSCode allows you to open and edit files in your
     C:\Users\epic\AppData\Local\Programs\Microsoft VS Code\bin
     ```
 
-Adding VSCode to the environment variables ensures that you can open VSCode from any command prompt or terminal window.
+Adding VSCode to the environment variables ensures you can open VSCode from any command prompt or terminal window.
 
 **On Ubuntu (WSL):**
 
@@ -148,7 +148,7 @@ Running `code --version` verifies that the `code` command is available. Using `c
    code .
    ```
 
-  This command will open the current WSL directory in VSCode on Windows. If you haven't added `code` to your path, follow these steps:
+  This command will open the current WSL directory in VSCode. If you haven't added `code` to your path, follow these steps:
 
 - Open VSCode on Windows.
 
@@ -158,7 +158,7 @@ Running `code --version` verifies that the `code` command is available. Using `c
 
 3. **Ensure Remote - WSL is Active**
 
-   When VSCode opens, you should see a green bottom-left corner indicating that VSCode is connected to WSL. If it isn't, click on the green area and select `Remote-WSL: New Window` or `Remote-WSL: Reopen Folder in WSL`.
+   When VSCode opens, you should see a green bottom-left corner indicating that VSCode is connected to WSL. If not, click on the green area and select `Remote-WSL: New Window` or `Remote-WSL: Reopen Folder in WSL`.
 
 4. **Edit and Develop Your Project**
 
@@ -166,7 +166,7 @@ Running `code --version` verifies that the `code` command is available. Using `c
 
 ### Handling Memory Issues in WSL
 
-If you ran into a memory issue when using WSL, here are some solutions to resolve it.
+Here are some solutions if you encounter a memory issue when using WSL.
 
 1. **Shut down WSL**  
    If your WSL is open, you can shut it down in Windows PowerShell using the following command:  
@@ -177,7 +177,7 @@ If you ran into a memory issue when using WSL, here are some solutions to resolv
 
 2. **Navigate to user folder**  
 
-   Open up File Explorer and navigate to `C:\Users\<your-username>`.
+   Open File Explorer and navigate to `C:\Users\<your-username>`.
 
 3. **Create the `.wslconfig` file**  
 
@@ -207,7 +207,7 @@ For project management policies, refer to [GOVERNANCE.md](GOVERNANCE.md).
 
 ### Future Development Directions
 
-For future development directions, refer to the [ROADMAP.md](ROADMAP.md) document.
+Refer to the [ROADMAP.md](ROADMAP.md) document for future development directions.
 
 ## Contribution guidelines
 
@@ -217,7 +217,7 @@ Please read and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Gravitino prov
 
 ### Reporting bugs
 
-If you find a bug in Gravitino, please open an issue on GitHub. Be sure to include as much detail as possible, such as a clear description, steps to reproduce, and your environment. Please follow the template provided. If you encounter a security issue, please refer to [SECURITY.md](SECURITY.md).
+If you find a bug in Gravitino, please open an issue on GitHub. Include as much detail as possible, such as a clear description, reproduction steps, and your environment. Please follow the template provided. If you encounter a security issue, please refer to [SECURITY.md](SECURITY.md).
 
 ### Suggesting enhancements
 
@@ -259,32 +259,32 @@ For details on the review process, please refer to [MAINTAINERS.md](MAINTAINERS.
 
 ## Testing
 
-The CI infrastructure runs unit and integration tests on each pull request, please make sure these tests pass before making a pull request.
+The CI infrastructure runs unit and integration tests on each pull request. Please make sure these tests pass before making a pull request.
 
-The unit tests run on every build and integration tests run as needed. See [how to test](docs/how-to-test.md) for more information.
+The unit tests run on every build, and integration tests run as needed. See [how to test](docs/how-to-test.md) for more information.
 
-When adding new code or fixing a bug be sure to add unit tests to provide coverage.
+Add unit tests to provide coverage when adding new code or fixing a bug.
 
 ## Coding standards
 
-Spotless checks code formatting. If your code isn't correctly formatted, the build fails. To correctly format your code please use Spotless.
+Spotless checks code formatting. If your code is correctly formatted, the build succeeds. To format your code correctly, please use Spotless.
 
 ```bash
 ./gradlew spotlessApply
 ```
 
-All files must have a license header and the build fails if any files are missing license headers. If you are adding third-party code be sure to understand how to add the third-party license to Gravitino LICENSE and NOTICE files.
+All files must have a license header, and the build fails if any files are missing license headers. If you are adding third-party code, you may need to add the third-party license to Gravitino's LICENSE and NOTICE files. If you are unsure of how to do this, please ask for help.
 
-For any bugs or new code please add unit tests to provide coverage of the code. The project may not accept code without unit tests.
+Please add unit tests to provide code coverage for any bugs or new code. The project may not accept code without unit tests.
 
-All text files should use macOS/unix style line endings (LF) not windows style line endings (CRLF).
+All text files should use macOS/unix style line endings (LF), not Windows-style line endings (CRLF).
 
 ## Community and communication
 
-Join the [community mailing list](https://lists.apache.org/list.html?dev@gravitino.apache.org) to discuss ideas and seek help and are also encouraged to use GitHub discussions.
+Join the [community mailing list](https://lists.apache.org/list.html?dev@gravitino.apache.org) to discuss ideas and seek help. You are also encouraged to use GitHub discussions.
 
 ## License
 
-When contributing to this project, you agree that your contributions use the Apache License version 2. Please ensure you have permission to do this if required by your employer.
+When contributing to this project, you agree that your contributions use the Apache License version 2. Please ensure you have permission to do this if your employer requires it.
 
 Thank you for your contributions to Gravitino! The project appreciates your help in making it a success.

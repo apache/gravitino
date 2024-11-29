@@ -68,7 +68,7 @@ public class IcebergTableRenameOperations {
         renameTableRequest.destination());
     IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     tableOperationDispatcher.renameTable(context, renameTableRequest);
-    return IcebergRestUtils.okWithoutContent();
+    return IcebergRestUtils.noContent();
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.

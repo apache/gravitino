@@ -71,4 +71,14 @@ public final class AlterCatalogEvent extends CatalogEvent {
   public CatalogChange[] catalogChanges() {
     return catalogChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_CATALOG;
+  }
 }

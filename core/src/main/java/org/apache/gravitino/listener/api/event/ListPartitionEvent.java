@@ -34,4 +34,14 @@ public final class ListPartitionEvent extends PartitionEvent {
   public ListPartitionEvent(String user, NameIdentifier ident) {
     super(user, ident);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_PARTITION;
+  }
 }

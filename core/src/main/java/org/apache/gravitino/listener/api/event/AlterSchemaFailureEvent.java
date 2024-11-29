@@ -46,4 +46,14 @@ public final class AlterSchemaFailureEvent extends SchemaFailureEvent {
   public SchemaChange[] schemaChanges() {
     return schemaChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_SCHEMA;
+  }
 }

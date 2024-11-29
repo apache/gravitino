@@ -63,4 +63,14 @@ public final class DropPartitionEvent extends PartitionEvent {
   public String partitionName() {
     return partitionName;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_PARTITION;
+  }
 }
