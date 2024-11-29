@@ -37,10 +37,11 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ModelMetaService {
 
-  private static final Logger LOG = org.slf4j.LoggerFactory.getLogger(ModelMetaService.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ModelMetaService.class);
 
   private static final ModelMetaService INSTANCE = new ModelMetaService();
 
