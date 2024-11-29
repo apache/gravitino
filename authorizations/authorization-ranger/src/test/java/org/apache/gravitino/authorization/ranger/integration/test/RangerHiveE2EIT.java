@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
 public class RangerHiveE2EIT extends RangerBaseE2EIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveE2EIT.class);
 
-  private static final String provider = "hive";
+  private static final String provider = CatalogProvider.CatalogName.HIVE.getName();
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {

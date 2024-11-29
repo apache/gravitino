@@ -39,7 +39,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   /** @return The short name of the catalog. */
   @Override
   public String shortName() {
-    return "lakehouse-iceberg";
+    return CatalogName.LAKEHOUSE_ICEBERG.getName();
   }
 
   /**

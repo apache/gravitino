@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization.ranger;
 
 import java.util.Map;
+import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
@@ -31,10 +32,11 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
 
   @Override
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    switch (catalogProvider) {
-      case "hive":
-      case "lakehouse-iceberg":
-      case "lakehouse-paimon":
+    CatalogProvider.CatalogName catalogName = CatalogProvider.CatalogName.fromName(catalogProvider);
+    switch (catalogName) {
+      case HIVE:
+      case LAKEHOUSE_ICEBERG:
+      case LAKEHOUSE_PAIMON:
         return RangerAuthorizationHadoopSQLPlugin.getInstance(config);
       default:
         throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);

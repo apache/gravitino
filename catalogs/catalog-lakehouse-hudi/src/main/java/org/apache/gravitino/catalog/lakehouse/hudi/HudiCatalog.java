@@ -38,7 +38,7 @@ public class HudiCatalog extends BaseCatalog<HudiCatalog> {
   /** @return The short name of the catalog. */
   @Override
   public String shortName() {
-    return "lakehouse-hudi";
+    return CatalogName.LAKEHOUSE_HUDI.getName();
   }
 
   /**

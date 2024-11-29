@@ -45,7 +45,7 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   public String shortName() {
-    return "hive";
+    return CatalogName.HIVE.getName();
   }
 
   /**

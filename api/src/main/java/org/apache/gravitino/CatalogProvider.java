@@ -26,7 +26,36 @@ import org.apache.gravitino.annotation.Evolving;
  */
 @Evolving
 public interface CatalogProvider {
+  enum CatalogName {
+    HIVE("hive"),
+    HADOOP("hadoop"),
+    KAFKA("kafka"),
+    JDBC_DORIS("jdbc-doris"),
+    JDBC_MYSQL("jdbc-mysql"),
+    JDBC_OCEANBASE("jdbc-oceanbase"),
+    JDBC_POSTGRESQL("jdbc-postgresql"),
+    LAKEHOUSE_ICEBERG("lakehouse-iceberg"),
+    LAKEHOUSE_HUDI("lakehouse-hudi"),
+    LAKEHOUSE_PAIMON("lakehouse-paimon");
+    private final String name;
 
+    CatalogName(String name) {
+      this.name = name;
+    }
+
+    public String getName() {
+      return this.name;
+    }
+
+    public static CatalogName fromName(String name) {
+      for (CatalogName catalogName : CatalogName.values()) {
+        if (catalogName.getName().equals(name)) {
+          return catalogName;
+        }
+      }
+      throw new IllegalArgumentException("Unknown catalog provider: " + name);
+    }
+  }
   /**
    * The string that represents the catalog that this provider uses. This is overridden by children
    * to provide a nice alias for the catalog.
