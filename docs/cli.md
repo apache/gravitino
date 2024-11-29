@@ -28,7 +28,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
 
  ```bash
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
@@ -628,3 +628,28 @@ gcli topic delete --name kafka.default.topic3
 gcli topic update --name kafka.default.topic3 --comment new_comment
 ```
 
+### Fileset commands
+
+#### Create a fileset
+
+```bash
+gcli fileset create --name hadoop.schema.fileset --properties managed=true,location=file:/tmp/root/schema/example
+```
+
+#### List filesets
+
+```bash
+gcli fileset list --name hadoop.schema
+```
+
+#### Display a fileset's details
+
+```bash
+gcli fileset details --name hadoop.schema.fileset
+```
+
+#### Delete a fileset
+
+```bash
+gcli fileset delete --name hadoop.schema.fileset
+```

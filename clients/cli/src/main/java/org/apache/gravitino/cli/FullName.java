@@ -116,6 +116,15 @@ public class FullName {
   }
 
   /**
+   * Retrieves the fileset name from the third part of the full name option.
+   *
+   * @return The table name, or null if not found.
+   */
+  public String getFilesetName() {
+    return getNamePart(2);
+  }
+
+  /**
    * Helper method to retrieve a specific part of the full name based on the position of the part.
    *
    * @param position The position of the name part in the full name string.

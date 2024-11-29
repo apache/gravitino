@@ -27,6 +27,7 @@ import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.CreateCatalog;
+import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.CreateRole;
@@ -35,6 +36,7 @@ import org.apache.gravitino.cli.commands.CreateTag;
 import org.apache.gravitino.cli.commands.CreateTopic;
 import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
+import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
 import org.apache.gravitino.cli.commands.DeleteRole;
@@ -43,12 +45,14 @@ import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
+import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.ListEntityTags;
+import org.apache.gravitino.cli.commands.ListFilesets;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListIndexes;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
@@ -489,5 +493,38 @@ public class TestableCommandLine {
       String topic,
       String comment) {
     return new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment);
+  }
+
+  protected FilesetDetails newFilesetDetails(
+      String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
+    return new FilesetDetails(url, ignore, metalake, catalog, schema, fileset);
+  }
+
+  protected ListFilesets newListFilesets(
+      String url, boolean ignore, String metalake, String catalog, String schema) {
+    return new ListFilesets(url, ignore, metalake, catalog, schema);
+  }
+
+  protected CreateFileset newCreateFileset(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset,
+      String comment,
+      Map<String, String> propertyMap) {
+    return new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap);
+  }
+
+  protected DeleteFileset newDeleteFileset(
+      String url,
+      boolean ignore,
+      boolean force,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset) {
+    return new DeleteFileset(url, ignore, force, metalake, catalog, schema, fileset);
   }
 }
