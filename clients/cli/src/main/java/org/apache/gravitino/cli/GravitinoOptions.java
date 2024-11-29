@@ -54,6 +54,7 @@ public class GravitinoOptions {
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
   public static final String OUTPUT = "output";
+  public static final String SORTORDER = "sortorder";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -76,6 +77,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
     options.addOption(createSimpleOption(PARTITION, "display partition information"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+    options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));
