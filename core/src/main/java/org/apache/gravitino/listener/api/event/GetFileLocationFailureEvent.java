@@ -54,4 +54,14 @@ public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
   public String subPath() {
     return subPath;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_FILESET_LOCATION;
+  }
 }

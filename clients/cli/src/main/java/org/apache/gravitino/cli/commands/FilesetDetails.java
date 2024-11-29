@@ -61,6 +61,7 @@ public class FilesetDetails extends Command {
   }
 
   /** Displays the name and comments of fileset. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
     Fileset result = null;

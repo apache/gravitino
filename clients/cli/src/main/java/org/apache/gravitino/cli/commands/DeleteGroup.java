@@ -49,6 +49,7 @@ public class DeleteGroup extends Command {
   }
 
   /** Delete a group. */
+  @Override
   public void handle() {
     boolean deleted = false;
 

@@ -48,4 +48,14 @@ public final class LoadTopicEvent extends TopicEvent {
   public TopicInfo loadedTopicInfo() {
     return loadedTopicInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_TOPIC;
+  }
 }

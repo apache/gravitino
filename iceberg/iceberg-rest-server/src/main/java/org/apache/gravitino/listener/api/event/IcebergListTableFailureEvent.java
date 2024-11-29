@@ -29,4 +29,9 @@ public class IcebergListTableFailureEvent extends IcebergTableFailureEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
     super(icebergRequestContext, nameIdentifier, e);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TABLE;
+  }
 }
