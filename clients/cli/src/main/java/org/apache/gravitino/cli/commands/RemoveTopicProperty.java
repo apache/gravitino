@@ -65,6 +65,7 @@ public class RemoveTopicProperty extends Command {
   }
 
   /** Remove a property of a schema. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
 

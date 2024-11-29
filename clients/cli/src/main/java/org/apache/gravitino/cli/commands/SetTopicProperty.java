@@ -69,6 +69,7 @@ public class SetTopicProperty extends Command {
   }
 
   /** Set a property of a schema. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
 

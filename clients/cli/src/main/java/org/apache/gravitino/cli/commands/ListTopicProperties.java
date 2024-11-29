@@ -62,6 +62,7 @@ public class ListTopicProperties extends ListProperties {
   }
 
   /** List the properties of a catalog. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
     Topic gTopic = null;
