@@ -21,11 +21,12 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
+import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.Privilege;
 
 public class RangerPrivileges {
   /** Ranger Hive privileges enumeration. */
-  public enum RangerHadoopSQLPrivilege implements RangerPrivilege {
+  public enum RangerHadoopSQLPrivilege implements AuthorizationPrivilege {
     ALL("all"),
     SELECT("select"),
     UPDATE("update"),
@@ -61,12 +62,12 @@ public class RangerPrivileges {
     }
   }
 
-  public static class RangerHivePrivilegeImpl implements RangerPrivilege {
-    private RangerPrivilege rangerHivePrivilege;
+  public static class RangerHivePrivilegeImpl implements AuthorizationPrivilege {
+    private AuthorizationPrivilege rangerHivePrivilege;
     private Privilege.Condition condition;
 
     public RangerHivePrivilegeImpl(
-        RangerPrivilege rangerHivePrivilege, Privilege.Condition condition) {
+        AuthorizationPrivilege rangerHivePrivilege, Privilege.Condition condition) {
       this.rangerHivePrivilege = rangerHivePrivilege;
       this.condition = condition;
     }
@@ -88,7 +89,7 @@ public class RangerPrivileges {
   }
 
   /** Ranger HDFS privileges enumeration. */
-  public enum RangerHdfsPrivilege implements RangerPrivilege {
+  public enum RangerHdfsPrivilege implements AuthorizationPrivilege {
     READ("read"),
     WRITE("write"),
     EXECUTE("execute");
@@ -115,18 +116,18 @@ public class RangerPrivileges {
     }
   }
 
-  static List<Class<? extends Enum<? extends RangerPrivilege>>> allRangerPrivileges =
+  static List<Class<? extends Enum<? extends AuthorizationPrivilege>>> allRangerPrivileges =
       Lists.newArrayList(
           RangerHadoopSQLPrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
 
-  public static RangerPrivilege valueOf(String name) {
+  public static AuthorizationPrivilege valueOf(String name) {
     Preconditions.checkArgument(name != null, "Privilege name string cannot be null!");
 
     String strPrivilege = name.trim().toLowerCase();
-    for (Class<? extends Enum<? extends RangerPrivilege>> enumClass : allRangerPrivileges) {
-      for (Enum<? extends RangerPrivilege> privilege : enumClass.getEnumConstants()) {
-        if (((RangerPrivilege) privilege).equalsTo(strPrivilege)) {
-          return (RangerPrivilege) privilege;
+    for (Class<? extends Enum<? extends AuthorizationPrivilege>> enumClass : allRangerPrivileges) {
+      for (Enum<? extends AuthorizationPrivilege> privilege : enumClass.getEnumConstants()) {
+        if (((AuthorizationPrivilege) privilege).equalsTo(strPrivilege)) {
+          return (AuthorizationPrivilege) privilege;
         }
       }
     }

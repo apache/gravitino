@@ -16,15 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.catalog;
 
-import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.model.ModelCatalog;
 
-/** RangerPrivilege interface is used to define the Ranger privileges. */
-public interface RangerPrivilege {
-  String getName();
-
-  Privilege.Condition condition();
-
-  boolean equalsTo(String value);
-}
+public interface ModelDispatcher extends ModelCatalog {}

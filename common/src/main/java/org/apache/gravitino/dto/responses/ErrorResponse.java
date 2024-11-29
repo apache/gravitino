@@ -235,7 +235,7 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
-   * Create a new entity in use error instance of {@link ErrorResponse}.
+   * Create a new not in use error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.
    * @param message The message of the error.
@@ -295,7 +295,7 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
-   * Create a new unknown error instance of {@link ErrorResponse}.
+   * Create a new oauth error instance of {@link ErrorResponse}.
    *
    * @param code The code of the error.
    * @param type The type of the error.

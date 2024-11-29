@@ -68,6 +68,11 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.COLUMN,
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.MODEL,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL)));
   }
 
   @Test
@@ -112,6 +117,11 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityIdent(
             "metalake",
             MetadataObjects.of("catalog.schema", "fileset", MetadataObject.Type.FILESET)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "model"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake", MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog", "schema", "table", "column"),

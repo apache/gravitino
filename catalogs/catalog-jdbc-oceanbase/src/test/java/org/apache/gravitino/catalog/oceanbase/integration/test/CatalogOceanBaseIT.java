@@ -43,6 +43,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.oceanbase.integration.test.service.OceanBaseService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -320,6 +321,34 @@ public class CatalogOceanBaseIT extends BaseIT {
     schemaNames =
         Arrays.stream(oceanBaseNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
+  }
+
+  @Test
+  void testTestConnection() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        StringUtils.substring(
+            OCEANBASE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            OCEANBASE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), OCEANBASE_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), OCEANBASE_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), "wrong_password");
+
+    Exception exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("oceanbase_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    catalogProperties));
+    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
   }
 
   @Test
