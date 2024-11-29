@@ -40,7 +40,6 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
-  public static final String FILESET = "fileset";
   public static final String OWNER = "owner";
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
