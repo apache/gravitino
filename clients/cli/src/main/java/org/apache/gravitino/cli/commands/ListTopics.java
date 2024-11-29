@@ -19,65 +19,56 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the index of a table. */
-public class ListIndexes extends TableCommand {
+/** List the topics. */
+public class ListTopics extends Command {
 
+  protected final String metalake;
+  protected final String catalog;
   protected final String schema;
-  protected final String table;
 
   /**
-   * Displays the index of a table.
+   * List the names of all topics in a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
-   * @param table The name of the table.
    */
-  public ListIndexes(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
+  public ListTopics(
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
+    super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
     this.schema = schema;
-    this.table = table;
   }
 
-  /** Displays the details of a table's index. */
+  /** List the names of all topics in a schema. */
   @Override
   public void handle() {
-    Index[] indexes;
+    NameIdentifier[] topics = new NameIdentifier[0];
+    Namespace name = Namespace.of(schema);
 
     try {
-      NameIdentifier name = NameIdentifier.of(schema, table);
-      indexes = tableCatalog().loadTable(name).index();
+      GravitinoClient client = buildClient(metalake);
+      topics = client.loadCatalog(catalog).asTopicCatalog().listTopics(name);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (Index index : indexes) {
-      // Flatten nested field names into dot-separated strings (e.g., "a.b.c")
-      Arrays.stream(index.fieldNames())
-          // Convert nested fields to a single string
-          .map(nestedFieldName -> String.join(".", nestedFieldName))
-          .forEach(
-              fieldName ->
-                  all.append(fieldName)
-                      .append(",")
-                      .append(index.name())
-                      .append(System.lineSeparator()));
-    }
-
-    System.out.print(all);
+    String all = Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
+    System.out.println(all);
   }
 }

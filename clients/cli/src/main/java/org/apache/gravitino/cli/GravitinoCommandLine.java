@@ -124,6 +124,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.TOPIC)) {
+      handleTopicCommand();
     } else if (entity.equals(CommandEntities.FILESET)) {
       handleFilesetCommand();
     } else if (entity.equals(CommandEntities.USER)) {
@@ -492,7 +494,36 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   /**
-   * Handles the command execution for filesets based on command type and the command line options.
+   * Handles the command execution for topics based on command type and the command line options.
+   */
+  private void handleTopicCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String topic = name.getTopicName();
+
+    if (CommandActions.LIST.equals(command)) {
+      newListTopics(url, ignore, metalake, catalog, schema).handle();
+    } else if (CommandActions.DETAILS.equals(command)) {
+      newTopicDetails(url, ignore, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment).handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
+      }
+    }
+  }
+
+  /**
+   * Handles the command execution for Filesets based on command type and the command line options.
    */
   private void handleFilesetCommand() {
     String url = getUrl();

@@ -19,65 +19,71 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 
-/** Displays the index of a table. */
-public class ListIndexes extends TableCommand {
+/** Add a topic. */
+public class CreateTopic extends Command {
 
+  protected final String metalake;
+  protected final String catalog;
   protected final String schema;
-  protected final String table;
+  protected final String topic;
+  protected final String comment;
 
   /**
-   * Displays the index of a table.
+   * Add a topic.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
-   * @param table The name of the table.
+   * @param topic The name of the topic.
+   * @param comment The comment for the topic.
    */
-  public ListIndexes(
+  public CreateTopic(
       String url,
       boolean ignoreVersions,
       String metalake,
       String catalog,
       String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
+      String topic,
+      String comment) {
+    super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
     this.schema = schema;
-    this.table = table;
+    this.topic = topic;
+    this.comment = comment;
   }
 
-  /** Displays the details of a table's index. */
+  /** Add a topic. */
   @Override
   public void handle() {
-    Index[] indexes;
+    NameIdentifier name = NameIdentifier.of(schema, topic);
 
     try {
-      NameIdentifier name = NameIdentifier.of(schema, table);
-      indexes = tableCatalog().loadTable(name).index();
+      GravitinoClient client = buildClient(metalake);
+      client.loadCatalog(catalog).asTopicCatalog().createTopic(name, comment, null, null);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
+    } catch (TopicAlreadyExistsException err) {
+      System.err.println(ErrorMessages.TOPIC_EXISTS);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (Index index : indexes) {
-      // Flatten nested field names into dot-separated strings (e.g., "a.b.c")
-      Arrays.stream(index.fieldNames())
-          // Convert nested fields to a single string
-          .map(nestedFieldName -> String.join(".", nestedFieldName))
-          .forEach(
-              fieldName ->
-                  all.append(fieldName)
-                      .append(",")
-                      .append(index.name())
-                      .append(System.lineSeparator()));
-    }
-
-    System.out.print(all);
+    System.out.println(topic + " topic created.");
   }
 }
