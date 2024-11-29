@@ -24,12 +24,16 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
+// Apart from the following dependencies on environment, this test also needs hadoop3-common, please
+// refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts`, otherwise
+// initFileSystem method in this file will fail to run due to missing hadoop3-common.
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
@@ -61,7 +65,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
 
   @Override
   protected void initFileSystem() throws IOException {
-    // Use S3a file system
+    // Use Azure Blob Storage file system
     Configuration conf = new Configuration();
     conf.set(
         String.format("fs.azure.account.key.%s.dfs.core.windows.net", ABS_USER_ACCOUNT_NAME),
@@ -83,9 +87,10 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(
-                    "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
+                    "abfss://%s@%s.dfs.core.windows.net/%s",
+                    ABS_BUCKET_NAME,
+                    ABS_USER_ACCOUNT_NAME,
+                    GravitinoITUtils.genRandomName("CatalogFilesetIT")))
             .config(
                 String.format(
                     "spark.hadoop.fs.azure.account.key.%s.dfs.core.windows.net",
