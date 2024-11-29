@@ -124,6 +124,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.FILESET)) {
+      handleFilesetCommand();
     } else if (entity.equals(CommandEntities.USER)) {
       handleUserCommand();
     } else if (entity.equals(CommandEntities.GROUP)) {
@@ -486,6 +488,33 @@ public class GravitinoCommandLine extends TestableCommandLine {
       }
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+    }
+  }
+
+  /**
+   * Handles the command execution for filesets based on command type and the command line options.
+   */
+  private void handleFilesetCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String fileset = name.getFilesetName();
+
+    if (CommandActions.DETAILS.equals(command)) {
+      newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.LIST.equals(command)) {
+      newListFilesets(url, ignore, metalake, catalog, schema).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
+      Map<String, String> propertyMap = new Properties().parse(properties);
+      newCreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap)
+          .handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
     }
   }
 

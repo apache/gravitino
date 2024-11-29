@@ -28,10 +28,11 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
 
  ```bash
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
+ -d,--distribution       display distribution information
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
@@ -39,8 +40,10 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+ -o,--owner              entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
+    --partition          display partition information
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -48,6 +51,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
+ -x,--index              display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
  ```
@@ -590,4 +594,30 @@ gcli group grant --group groupA --role admin
 #### Remove a role from a group
 ```bash
 gcli group revoke  --group groupA --role admin
+```
+
+### Fileset commands
+
+#### Create a fileset
+
+```bash
+gcli fileset create --name hadoop.schema.fileset --properties managed=true,location=file:/tmp/root/schema/example
+```
+
+#### List filesets
+
+```bash
+gcli fileset list --name hadoop.schema
+```
+
+#### Display a fileset's details
+
+```bash
+gcli fileset details --name hadoop.schema.fileset
+```
+
+#### Delete a fileset
+
+```bash
+gcli fileset delete --name hadoop.schema.fileset
 ```

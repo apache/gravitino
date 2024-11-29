@@ -41,6 +41,8 @@ public class ErrorMessages {
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
       "Error: The current command only supports one --tag option.";
   public static final String TAG_EXISTS = "Tag already exists.";
+  public static final String UNKNOWN_FILESET = "Unknown fileset.";
+  public static final String FILESET_EXISTS = "Fileset already exists.";
   public static final String TAG_EMPTY = "Error: Must configure --tag option.";
   public static final String UNKNOWN_ROLE = "Unknown role.";
   public static final String ROLE_EXISTS = "Role already exists.";
