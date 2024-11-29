@@ -43,7 +43,7 @@ public class DorisCatalog extends JdbcCatalog {
 
   @Override
   public String shortName() {
-    return "jdbc-doris";
+    return CatalogName.JDBC_DORIS.name();
   }
 
   @Override

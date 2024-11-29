@@ -27,8 +27,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.mysql.TestMySQLAuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFSPlugin;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -83,10 +83,12 @@ public class TestChainAuthorization {
         .getPlugins()
         .forEach(
             plugin -> {
-              if (plugin instanceof TestRangerAuthorizationPlugin) {
-                Assertions.assertFalse(((TestRangerAuthorizationPlugin) plugin).callOnCreateRole1);
-              } else if (plugin instanceof TestMySQLAuthorizationPlugin) {
-                Assertions.assertFalse(((TestMySQLAuthorizationPlugin) plugin).callOnCreateRole2);
+              if (plugin instanceof TestRangerAuthorizationHadoopSQLPlugin) {
+                Assertions.assertFalse(
+                    ((TestRangerAuthorizationHadoopSQLPlugin) plugin).callOnCreateRole1);
+              } else if (plugin instanceof TestRangerAuthorizationHDFSPlugin) {
+                Assertions.assertFalse(
+                    ((TestRangerAuthorizationHDFSPlugin) plugin).callOnCreateRole2);
               }
             });
 
@@ -96,10 +98,12 @@ public class TestChainAuthorization {
         .getPlugins()
         .forEach(
             plugin -> {
-              if (plugin instanceof TestRangerAuthorizationPlugin) {
-                Assertions.assertTrue(((TestRangerAuthorizationPlugin) plugin).callOnCreateRole1);
-              } else if (plugin instanceof TestMySQLAuthorizationPlugin) {
-                Assertions.assertTrue(((TestMySQLAuthorizationPlugin) plugin).callOnCreateRole2);
+              if (plugin instanceof TestRangerAuthorizationHadoopSQLPlugin) {
+                Assertions.assertTrue(
+                    ((TestRangerAuthorizationHadoopSQLPlugin) plugin).callOnCreateRole1);
+              } else if (plugin instanceof TestRangerAuthorizationHDFSPlugin) {
+                Assertions.assertTrue(
+                    ((TestRangerAuthorizationHDFSPlugin) plugin).callOnCreateRole2);
               }
             });
   }

@@ -345,7 +345,7 @@ public class RangerHiveIT {
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
             RangerMetadataObject.Type.TABLE,
             ImmutableSet.of(
-                new RangerPrivileges.RangerHivePrivilegeImpl(
+                new RangerPrivileges.RangerHadoopSQLPrivilegeImpl(
                     RangerPrivileges.RangerHadoopSQLPrivilege.ALL, Privilege.Condition.ALLOW)));
     Assertions.assertNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
 

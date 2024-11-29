@@ -170,7 +170,8 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     sparkSession.sql(SQL_ALTER_TABLE);
   }
 
-  private static void createCatalog() {
+  @Override
+  public void createCatalog() {
     Map<String, String> properties =
         ImmutableMap.of(
             HiveConstants.METASTORE_URIS,

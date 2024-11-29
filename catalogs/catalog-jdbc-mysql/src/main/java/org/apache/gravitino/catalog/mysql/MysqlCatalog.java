@@ -41,7 +41,7 @@ public class MysqlCatalog extends JdbcCatalog {
 
   @Override
   public String shortName() {
-    return "jdbc-mysql";
+    return CatalogName.JDBC_MYSQL.name();
   }
 
   @Override

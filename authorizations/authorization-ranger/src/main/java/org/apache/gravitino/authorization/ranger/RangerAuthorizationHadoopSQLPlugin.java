@@ -49,16 +49,16 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
       LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
   private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
 
-  private RangerAuthorizationHadoopSQLPlugin(Map<String, String> config) {
-    super(config);
+  private RangerAuthorizationHadoopSQLPlugin(String catalogProvider, Map<String, String> config) {
+    super(catalogProvider, config);
   }
 
   public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
-      Map<String, String> config) {
+      String catalogProvider, Map<String, String> config) {
     if (instance == null) {
       synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
         if (instance == null) {
-          instance = new RangerAuthorizationHadoopSQLPlugin(config);
+          instance = new RangerAuthorizationHadoopSQLPlugin(catalogProvider, config);
         }
       }
     }
@@ -229,7 +229,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                   .forEach(
                       rangerPrivilege ->
                           rangerPrivileges.add(
-                              new RangerPrivileges.RangerHivePrivilegeImpl(
+                              new RangerPrivileges.RangerHadoopSQLPrivilegeImpl(
                                   rangerPrivilege, gravitinoPrivilege.condition())));
 
               switch (gravitinoPrivilege.name()) {

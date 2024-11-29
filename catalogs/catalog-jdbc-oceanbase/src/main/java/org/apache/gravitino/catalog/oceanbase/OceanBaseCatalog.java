@@ -37,7 +37,7 @@ public class OceanBaseCatalog extends JdbcCatalog {
 
   @Override
   public String shortName() {
-    return "jdbc-oceanbase";
+    return CatalogName.JDBC_OCEANBASE.name();
   }
 
   @Override

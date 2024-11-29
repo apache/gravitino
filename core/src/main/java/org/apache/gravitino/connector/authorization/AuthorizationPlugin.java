@@ -29,4 +29,5 @@ public interface AuthorizationPlugin
     extends UserGroupAuthorizationPlugin,
         RoleAuthorizationPlugin,
         MetadataAuthorizationPlugin,
+        AuthorizationPluginProvider,
         Closeable {}

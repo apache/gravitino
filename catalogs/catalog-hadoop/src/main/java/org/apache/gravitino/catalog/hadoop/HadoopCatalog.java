@@ -42,7 +42,7 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
   @Override
   public String shortName() {
-    return "hadoop";
+    return CatalogName.HADOOP.getName();
   }
 
   @Override

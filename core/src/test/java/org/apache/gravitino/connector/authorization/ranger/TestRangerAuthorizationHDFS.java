@@ -16,29 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.connector.authorization.ranger;
 
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.AuthorizationPluginProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-/** Implementation of a Ranger authorization in Gravitino. */
-public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> {
+public class TestRangerAuthorizationHDFS extends BaseAuthorization<TestRangerAuthorizationHDFS> {
+
+  public TestRangerAuthorizationHDFS() {}
+
   @Override
   public String shortName() {
-    return AuthorizationPluginProvider.Type.Ranger.getName();
+    return "test_ranger_hdfs";
   }
 
   @Override
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    switch (catalogProvider) {
-      case "hive":
-      case "lakehouse-iceberg":
-      case "lakehouse-paimon":
-        return RangerAuthorizationHadoopSQLPlugin.getInstance(catalogProvider, config);
-      default:
-        throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
-    }
+    return new TestRangerAuthorizationHDFSPlugin();
   }
 }

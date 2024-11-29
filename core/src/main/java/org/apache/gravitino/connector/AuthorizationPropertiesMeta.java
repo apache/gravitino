@@ -30,15 +30,27 @@ public class AuthorizationPropertiesMeta extends BasePropertiesMetadata {
   /** Ranger admin web URIs */
   private static final String RANGER_ADMIN_URL_KEY = "ranger.admin.url";
 
+  public static final String getRangerAdminUrlKey() {
+    return RANGER_ADMIN_URL_KEY;
+  }
+
   public static final String RANGER_ADMIN_URL = generatePluginKey(RANGER_ADMIN_URL_KEY);
   /** Ranger authentication type kerberos or simple */
   private static final String RANGER_AUTH_TYPE_KEY = "ranger.auth.type";
+
+  public static final String getRangerAuthTypeKey() {
+    return RANGER_AUTH_TYPE_KEY;
+  }
 
   public static final String RANGER_AUTH_TYPE = generatePluginKey(RANGER_AUTH_TYPE_KEY);
   /**
    * Ranger admin web login username(auth_type=simple), or kerberos principal(auth_type=kerberos)
    */
   private static final String RANGER_USERNAME_KEY = "ranger.username";
+
+  public static final String getRangerUsernameKey() {
+    return RANGER_USERNAME_KEY;
+  }
 
   public static final String RANGER_USERNAME = generatePluginKey(RANGER_USERNAME_KEY);
   /**
@@ -47,9 +59,18 @@ public class AuthorizationPropertiesMeta extends BasePropertiesMetadata {
    */
   private static final String RANGER_PASSWORD_KEY = "ranger.password";
 
+  public static final String getRangerPasswordKey() {
+    return RANGER_PASSWORD_KEY;
+  }
+
   public static final String RANGER_PASSWORD = generatePluginKey(RANGER_PASSWORD_KEY);
+
   /** Ranger service name */
   private static final String RANGER_SERVICE_NAME_KEY = "ranger.service.name";
+
+  public static final String getRangerServiceNameKey() {
+    return RANGER_SERVICE_NAME_KEY;
+  }
 
   public static final String RANGER_SERVICE_NAME = generatePluginKey(RANGER_SERVICE_NAME_KEY);
 

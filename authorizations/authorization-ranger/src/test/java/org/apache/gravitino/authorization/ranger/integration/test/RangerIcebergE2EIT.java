@@ -167,7 +167,8 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     sparkSession.sql(SQL_ALTER_TABLE_BACK);
   }
 
-  private static void createCatalog() {
+  @Override
+  public void createCatalog() {
     Map<String, String> properties =
         ImmutableMap.of(
             IcebergConstants.URI,

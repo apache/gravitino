@@ -51,6 +51,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.AuthorizationPluginProvider;
 import org.apache.gravitino.connector.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.connector.authorization.AuthorizationPrivilegesMappingProvider;
 import org.apache.gravitino.connector.authorization.AuthorizationSecurableObject;
@@ -84,8 +85,10 @@ public abstract class RangerAuthorizationPlugin
   protected final RangerClientExtension rangerClient;
   private final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
+  private final String catalogProviderName;
 
-  protected RangerAuthorizationPlugin(Map<String, String> config) {
+  protected RangerAuthorizationPlugin(String catalogProvider, Map<String, String> config) {
+    this.catalogProviderName = catalogProvider;
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
     String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
@@ -106,6 +109,16 @@ public abstract class RangerAuthorizationPlugin
             rangerServiceName,
             ownerMappingRule(),
             policyResourceDefinesRule());
+  }
+
+  @Override
+  public String catalogProviderName() {
+    return catalogProviderName;
+  }
+
+  @Override
+  public String pluginProviderName() {
+    return AuthorizationPluginProvider.Type.Ranger.getName();
   }
 
   /**

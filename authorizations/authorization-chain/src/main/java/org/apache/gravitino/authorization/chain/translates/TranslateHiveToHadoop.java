@@ -16,23 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.authorization.chain.translates;
 
-import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import java.util.List;
+import org.apache.gravitino.CatalogProvider;
+import org.apache.gravitino.authorization.SecurableObject;
 
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
-
-  public TestMySQLAuthorization() {}
-
-  @Override
-  public String shortName() {
-    return "test_mysql";
+/**
+ * The TranslateHiveToHadoop class provides translation from Hive to Hadoop.
+ * */
+public class TranslateHiveToHadoop
+    implements ChainTranslateMappingProvider.ChainTranslate {
+  static {
+    ChainTranslateEntity chainTranslateEntity =
+        new ChainTranslateEntity(CatalogProvider.CatalogName.HIVE, CatalogProvider.CatalogName.HADOOP);
+    ChainTranslateMappingProvider.put(chainTranslateEntity, new TranslateHiveToHadoop());
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
+  public List<SecurableObject> translate(List<SecurableObject> securableObjects) {
+    return null;
   }
 }

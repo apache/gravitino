@@ -16,30 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino;
-
-import org.apache.gravitino.annotation.Evolving;
+package org.apache.gravitino.connector.authorization;
 
 /**
- * A Catalog provider is a class that provides a short name for a catalog. This short name is used
- * when creating a catalog.
+ * An Authorization plugin provider is a class that provides a catalog name and plugin name for an
+ * authorization plugin. <br>
  */
-@Evolving
-public interface CatalogProvider {
-  enum CatalogName {
-    HIVE("hive"),
-    HADOOP("hadoop"),
-    KAFKA("kafka"),
-    JDBC_DORIS("jdbc-doris"),
-    JDBC_MYSQL("jdbc-mysql"),
-    JDBC_OCEANBASE("jdbc-oceanbase"),
-    JDBC_POSTGRESQL("jdbc-postgresql"),
-    LAKEHOUSE_ICEBERG("lakehouse-iceberg"),
-    LAKEHOUSE_HUDI("lakehouse-hudi"),
-    LAKEHOUSE_PAIMON("lakehouse-paimon");
+public interface AuthorizationPluginProvider {
+  enum Type {
+    Ranger("ranger"),
+    Chain("chain");
     private final String name;
 
-    CatalogName(String name) {
+    Type(String name) {
       this.name = name;
     }
 
@@ -47,11 +36,20 @@ public interface CatalogProvider {
       return this.name;
     }
   }
+
   /**
-   * The string that represents the catalog that this provider uses. This is overridden by children
-   * to provide a nice alias for the catalog.
+   * The string that represents the authorization that this provider uses. <br>
+   * This is overridden by children to provide a nice alias for the authorization.
    *
-   * @return The string that represents the catalog that this provider uses.
+   * @return The string that represents the authorization that this provider uses.
    */
-  String shortName();
+  String catalogProviderName();
+
+  /**
+   * The string that represents the authorization plugin that this provider uses. <br>
+   * This is overridden by children to provide a nice alias for the authorization.
+   *
+   * @return The string that represents the authorization plugin that this provider uses.
+   */
+  String pluginProviderName();
 }

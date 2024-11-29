@@ -20,14 +20,11 @@ package org.apache.gravitino.authorization.chain;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Streams;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
@@ -38,22 +35,23 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.AuthorizationProvider;
+import org.apache.gravitino.connector.authorization.AuthorizationPluginProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.MapUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Chain call authorization plugin. */
 public abstract class ChainAuthorizationBase implements AuthorizationPlugin {
-  private static final Logger LOG = LoggerFactory.getLogger(ChainAuthorizationBase.class);
-
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
+  private final String catalogProviderName;
 
   ChainAuthorizationBase(String catalogProvider, Map<String, String> config) {
-    String chainPlugins = config.get(AuthorizationPropertiesMeta.CHAIN_PLUGINS);
+    this.catalogProviderName = catalogProvider;
+    initPlugins(config);
+  }
 
+  private void initPlugins(Map<String, String> config) {
+    String chainPlugins = config.get(AuthorizationPropertiesMeta.CHAIN_PLUGINS);
     Map<String, String> chainConfig =
         MapUtils.getFilteredMap(
             config, key -> key.toString().startsWith(AuthorizationPropertiesMeta.getChainPrefix()));
@@ -65,9 +63,9 @@ public abstract class ChainAuthorizationBase implements AuthorizationPlugin {
                       pluginName, AuthorizationPropertiesMeta.getChainProviderKey());
               Preconditions.checkArgument(
                   config.containsKey(providerKey), "Missing provider for plugin: " + pluginName);
-              String provider = config.get(providerKey);
+              String authProvider = config.get(providerKey);
               Preconditions.checkArgument(
-                  !provider.isEmpty(), "Provider for plugin: " + pluginName + " is empty");
+                  !authProvider.isEmpty(), "Provider for plugin: " + pluginName + " is empty");
               // Convert chain config to plugin config
               Map<String, String> pluginConfig =
                   chainConfig.entrySet().stream()
@@ -87,41 +85,29 @@ public abstract class ChainAuthorizationBase implements AuthorizationPlugin {
                                       entry.getKey(), pluginName),
                               Map.Entry::getValue));
               AuthorizationPlugin authorizationPlugin =
-                  createAuthorizationPlug(provider).plugin(catalogProvider, pluginConfig);
+                  BaseAuthorization.createAuthorization(
+                          this.getClass().getClassLoader(), authProvider)
+                      .plugin(catalogProviderName, pluginConfig);
               plugins.add(authorizationPlugin);
             });
-  }
-
-  private BaseAuthorization<?> createAuthorizationPlug(String authorizationProvider) {
-    ClassLoader classLoader = this.getClass().getClassLoader();
-    try {
-      ServiceLoader<AuthorizationProvider> loader =
-          ServiceLoader.load(AuthorizationProvider.class, classLoader);
-
-      List<Class<? extends AuthorizationProvider>> providers =
-          Streams.stream(loader.iterator())
-              .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
-              .map(AuthorizationProvider::getClass)
-              .collect(Collectors.toList());
-      if (providers.isEmpty()) {
-        throw new IllegalArgumentException(
-            "No authorization provider found for: " + authorizationProvider);
-      } else if (providers.size() > 1) {
-        throw new IllegalArgumentException(
-            "Multiple authorization providers found for: " + authorizationProvider);
-      }
-      return (BaseAuthorization<?>)
-          Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      LOG.error("Failed to create authorization instance", e);
-      throw new RuntimeException(e);
-    }
   }
 
   @VisibleForTesting
   public final List<AuthorizationPlugin> getPlugins() {
     return plugins;
   }
+
+  @Override
+  public String catalogProviderName() {
+    return catalogProviderName;
+  }
+
+  @Override
+  public String pluginProviderName() {
+    return AuthorizationPluginProvider.Type.Chain.getName();
+  }
+
+  abstract Role translateRole(Role role, String toCatalogName, String toPluginName);
 
   @Override
   public void close() throws IOException {
@@ -145,7 +131,9 @@ public abstract class ChainAuthorizationBase implements AuthorizationPlugin {
   @Override
   public Boolean onRoleCreated(Role role) throws AuthorizationPluginException {
     for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRoleCreated(role);
+      Role pluginRole =
+          translateRole(role, plugin.catalogProviderName(), plugin.pluginProviderName());
+      Boolean result = plugin.onRoleCreated(pluginRole);
       if (Boolean.FALSE.equals(result)) {
         return Boolean.FALSE;
       }

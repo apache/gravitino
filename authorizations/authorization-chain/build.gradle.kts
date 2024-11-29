@@ -16,13 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "authorization-ranger"
+description = "authorization-chain"
 
 plugins {
   `maven-publish`
   id("java")
   id("idea")
 }
+
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark35.get()
+val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 
 dependencies {
   implementation(project(":api")) {
@@ -51,12 +56,51 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":authorizations:authorization-ranger"))
+  testImplementation(project(":authorizations:authorization-ranger", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.ranger.intg) {
+    exclude("org.apache.hadoop", "hadoop-common")
+    exclude("org.apache.hive", "hive-storage-api")
+    exclude("org.apache.lucene")
+    exclude("org.apache.solr")
+    exclude("org.apache.kafka")
+    exclude("org.elasticsearch")
+    exclude("org.elasticsearch.client")
+    exclude("org.elasticsearch.plugin")
+    exclude("org.apache.ranger", "ranger-plugins-audit")
+    exclude("org.apache.ranger", "ranger-plugins-cred")
+    exclude("org.apache.ranger", "ranger-plugin-classloader")
+    exclude("net.java.dev.jna")
+    exclude("javax.ws.rs")
+    exclude("org.eclipse.jetty")
+  }
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.apache.kyuubi:kyuubi-spark-authz-shaded_$scalaVersion:$kyuubiVersion") {
+    exclude("com.sun.jersey")
+  }
+  testImplementation(libs.hadoop3.client)
+  testImplementation(libs.hadoop3.common) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+  }
+  testImplementation(libs.hadoop3.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+    exclude("io.netty")
+  }
 }
 
 tasks {
@@ -85,7 +129,7 @@ tasks {
 }
 
 tasks.test {
-  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":authorizations:authorization-ranger:jar", ":authorizations:authorization-ranger:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {

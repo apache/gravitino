@@ -117,6 +117,10 @@ public class PropertiesMetadataHelpers {
                         "Wildcard property values cannot be set with `.` character in the `%s = %s`.",
                         wildcardConfigKey, properties.get(wildcardConfigKey)));
               });
+      Preconditions.checkArgument(
+          wildcardConfigValues.size() == wildcardConfigValues.stream().distinct().count(),
+          "Duplicate values in wildcard config: %s",
+          wildcardConfigValues);
 
       List<Pattern> patterns =
           wildcardProperties.stream()
@@ -131,9 +135,22 @@ public class PropertiesMetadataHelpers {
               .map(Pattern::compile)
               .collect(Collectors.toList());
 
+      List<String> wildcardPrefix =
+          wildcardProperties.stream()
+              .filter(s -> s.contains(AuthorizationPropertiesMeta.getChainPlugsWildcard()))
+              .map(
+                  s ->
+                      s.substring(
+                          0, s.indexOf(AuthorizationPropertiesMeta.getChainPlugsWildcard())))
+              .distinct()
+              .collect(Collectors.toList());
+
       for (String key :
           properties.keySet().stream()
-              .filter(k -> !k.equals(wildcardConfigKey))
+              .filter(
+                  k ->
+                      !k.equals(wildcardConfigKey)
+                          && wildcardPrefix.stream().anyMatch(k::startsWith))
               .collect(Collectors.toList())) {
         boolean matches =
             patterns.stream()

@@ -20,18 +20,14 @@ package org.apache.gravitino.authorization.chain;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.connector.authorization.AuthorizationMetadataObject;
-import org.apache.gravitino.connector.authorization.AuthorizationPrivilege;
-import org.apache.gravitino.connector.authorization.AuthorizationPrivilegesMappingProvider;
-import org.apache.gravitino.connector.authorization.AuthorizationSecurableObject;
+import org.apache.gravitino.authorization.chain.translates.ChainTranslateEntity;
+import org.apache.gravitino.authorization.chain.translates.ChainTranslateMappingProvider;
+import org.apache.gravitino.meta.RoleEntity;
 
 /** Chain authorization operations plugin class. <br> */
-public class ChainAuthorizationPlugin extends ChainAuthorizationBase
-    implements AuthorizationPrivilegesMappingProvider {
+public class ChainAuthorizationPlugin extends ChainAuthorizationBase {
   private static volatile ChainAuthorizationPlugin instance = null;
 
   public static synchronized ChainAuthorizationPlugin getInstance(
@@ -51,37 +47,24 @@ public class ChainAuthorizationPlugin extends ChainAuthorizationBase
   }
 
   @Override
-  public Map<Privilege.Name, Set<AuthorizationPrivilege>> privilegesMappingRule() {
-    return null;
-  }
+  Role translateRole(Role role, String toCatalogName, String toPluginName) {
+    ChainTranslateEntity chainMappingProvider =
+        new ChainTranslateEntity(catalogProviderName(), toCatalogName);
+    ChainTranslateMappingProvider.ChainTranslate translator =
+        ChainTranslateMappingProvider.getChainTranslator(chainMappingProvider);
+    if (translator == null) {
+      throw new UnsupportedOperationException(
+          "Translation not supported for " + chainMappingProvider);
+    }
+    List<SecurableObject> translateSecrableObjects = translator.translate(role.securableObjects());
 
-  @Override
-  public Set<AuthorizationPrivilege> ownerMappingRule() {
-    return null;
-  }
-
-  @Override
-  public Set<Privilege.Name> allowPrivilegesRule() {
-    return null;
-  }
-
-  @Override
-  public Set<MetadataObject.Type> allowMetadataObjectTypesRule() {
-    return null;
-  }
-
-  @Override
-  public List<AuthorizationSecurableObject> translatePrivilege(SecurableObject securableObject) {
-    return null;
-  }
-
-  @Override
-  public List<AuthorizationSecurableObject> translateOwner(MetadataObject metadataObject) {
-    return null;
-  }
-
-  @Override
-  public AuthorizationMetadataObject translateMetadataObject(MetadataObject metadataObject) {
-    return null;
+    RoleEntity roleEntity = (RoleEntity) role;
+    return RoleEntity.builder()
+        .withId(roleEntity.id())
+        .withName(roleEntity.name())
+        .withProperties(roleEntity.properties())
+        .withAuditInfo(roleEntity.auditInfo())
+        .withSecurableObjects(translateSecrableObjects)
+        .build();
   }
 }

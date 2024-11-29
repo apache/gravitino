@@ -20,13 +20,14 @@ package org.apache.gravitino.authorization.chain;
 
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.AuthorizationPluginProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
 /** Implementation of a Chain authorization in Gravitino. */
 public class ChainAuthorization extends BaseAuthorization<ChainAuthorization> {
   @Override
   public String shortName() {
-    return "chain";
+    return AuthorizationPluginProvider.Type.Chain.getName();
   }
 
   @Override

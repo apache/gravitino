@@ -37,7 +37,7 @@ public class PostgreSqlCatalog extends JdbcCatalog {
 
   @Override
   public String shortName() {
-    return "jdbc-postgresql";
+    return CatalogName.JDBC_POSTGRESQL.name();
   }
 
   @Override

@@ -169,6 +169,8 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake = loadMetalake;
   }
 
+  public abstract void createCatalog();
+
   protected static void waitForUpdatingPolicies() throws InterruptedException {
     // After Ranger authorization, Must wait a period of time for the Ranger Spark plugin to update
     // the policy Sleep time must be greater than the policy update interval

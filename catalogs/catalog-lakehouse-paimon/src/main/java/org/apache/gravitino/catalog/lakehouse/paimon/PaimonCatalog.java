@@ -42,7 +42,7 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   /** @return The short name of the catalog. */
   @Override
   public String shortName() {
-    return "lakehouse-paimon";
+    return CatalogName.LAKEHOUSE_PAIMON.getName();
   }
 
   /**

@@ -29,7 +29,7 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 
-public class TestRangerAuthorizationPlugin implements AuthorizationPlugin {
+public class TestRangerAuthorizationHadoopSQLPlugin implements AuthorizationPlugin {
   public boolean callOnCreateRole1 = false;
 
   @Override
@@ -114,6 +114,16 @@ public class TestRangerAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException {
+    return null;
+  }
+
+  @Override
+  public String catalogProviderName() {
+    return null;
+  }
+
+  @Override
+  public String pluginProviderName() {
     return null;
   }
 }

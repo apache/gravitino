@@ -39,7 +39,7 @@ public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
 
   @Override
   public String shortName() {
-    return "kafka";
+    return CatalogName.KAFKA.getName();
   }
 
   @Override
