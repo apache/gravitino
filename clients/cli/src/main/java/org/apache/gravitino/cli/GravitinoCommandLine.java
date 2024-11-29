@@ -494,7 +494,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   /**
-   * Handles the command execution for filesets based on command type and the command line options.
+   * Handles the command execution for topics based on command type and the command line options.
    */
   private void handleTopicCommand() {
     String url = getUrl();
