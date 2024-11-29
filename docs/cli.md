@@ -665,3 +665,21 @@ gcli fileset update --name hadoop.schema.fileset --comment new_comment
 ```bash
 gcli fileset update --name hadoop.schema.fileset --rename new_name
 ```
+
+#### Display a fileset's properties
+
+```bash
+gcli fileset properties --name hadoop.schema.fileset 
+```
+
+#### Set a fileset's property
+
+```bash
+gcli fileset set  --name hadoop.schema.fileset --property test --value value
+```
+
+#### Remove a fileset's property
+
+```bash
+gcli fileset remove --name hadoop.schema.fileset --property test
+```

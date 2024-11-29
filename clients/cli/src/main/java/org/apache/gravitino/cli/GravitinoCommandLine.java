@@ -523,7 +523,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   /**
-   * Handles the command execution for Filesets based on command type and the command line options.
+   * Handles the command execution for filesets based on command type and the command line options.
    */
   private void handleFilesetCommand() {
     String url = getUrl();
@@ -546,6 +546,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value)
+          .handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
