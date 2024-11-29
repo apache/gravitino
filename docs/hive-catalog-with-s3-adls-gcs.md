@@ -51,7 +51,7 @@ It's also applicable for Azure Blob Storage(ADSL) and GCS.
   <value>S3_BUCKET_PATH</value>
 </property>
 
-<!-- The following are for Azure Blob Storage(ADLS) -->
+<!-- The following two configurations are for Azure Blob Storage(ADLS) -->
 <property>
   <name>fs.abfss.impl</name>
   <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
@@ -62,7 +62,7 @@ It's also applicable for Azure Blob Storage(ADSL) and GCS.
   <value>ABS_ACCOUNT_KEY</value>
 </property>
 
-<!-- The following are only for Google Cloud Storage(gcs) -->
+<!-- The following two configurations are only for Google Cloud Storage(gcs) -->
 <property>
   <name>fs.gs.auth.service.account.enable</name>
   <value>true</value>

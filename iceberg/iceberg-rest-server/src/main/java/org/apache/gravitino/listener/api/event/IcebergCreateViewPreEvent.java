@@ -39,4 +39,9 @@ public class IcebergCreateViewPreEvent extends IcebergViewPreEvent {
   public CreateViewRequest createViewRequest() {
     return createViewRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_VIEW;
+  }
 }

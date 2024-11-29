@@ -31,6 +31,9 @@ import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.ModelOperationDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
@@ -97,6 +100,8 @@ public class GravitinoEnv {
   private FilesetDispatcher filesetDispatcher;
 
   private TopicDispatcher topicDispatcher;
+
+  private ModelDispatcher modelDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -205,6 +210,15 @@ public class GravitinoEnv {
    */
   public TableDispatcher tableDispatcher() {
     return tableDispatcher;
+  }
+
+  /**
+   * Get the ModelDispatcher associated with the Gravitino environment.
+   *
+   * @return The ModelDispatcher instance.
+   */
+  public ModelDispatcher modelDispatcher() {
+    return modelDispatcher;
   }
 
   /**
@@ -439,6 +453,13 @@ public class GravitinoEnv {
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
+
+    // TODO(jerryshao). Add Hook and event dispatcher support for Model.
+    ModelOperationDispatcher modelOperationDispatcher =
+        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+    ModelNormalizeDispatcher modelNormalizeDispatcher =
+        new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
+    this.modelDispatcher = modelNormalizeDispatcher;
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);

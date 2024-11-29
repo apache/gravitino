@@ -29,4 +29,9 @@ public class IcebergLoadTablePreEvent extends IcebergTablePreEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier tableIdentifier) {
     super(icebergRequestContext, tableIdentifier);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_TABLE;
+  }
 }

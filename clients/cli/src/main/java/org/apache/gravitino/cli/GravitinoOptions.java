@@ -40,6 +40,7 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String OWNER = "owner";
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String INDEX = "index";
@@ -64,9 +65,9 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
-    options.addOption(createSimpleOption("x", INDEX, "Display index infromation"));
-    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
-    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
+    options.addOption(createSimpleOption("x", INDEX, "display index information"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "display partition information"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));
@@ -79,6 +80,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("t", TAG, "tag name"));
+    options.addOption(createSimpleOption("o", OWNER, "entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
 
     // Properties option can have multiple values
@@ -114,5 +116,10 @@ public class GravitinoOptions {
    */
   public Option createArgOption(String shortName, String longName, String description) {
     return new Option(shortName, longName, true, description);
+  }
+
+  public Option createArgsOption(String shortName, String longName, String description) {
+    // Support multiple arguments
+    return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
   }
 }
