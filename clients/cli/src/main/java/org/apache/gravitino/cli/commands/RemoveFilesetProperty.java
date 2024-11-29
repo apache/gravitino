@@ -65,6 +65,7 @@ public class RemoveFilesetProperty extends Command {
   }
 
   /** Remove a property of a fileset. */
+  @Override
   public void handle() {
     try {
       NameIdentifier name = NameIdentifier.of(schema, fileset);

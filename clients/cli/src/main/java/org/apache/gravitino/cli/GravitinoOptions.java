@@ -40,13 +40,13 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
-  public static final String FILESET = "fileset";
-  public static final String MANAGED = "managed";
-  public static final String LOCATION = "location";
-  public static final String TOPIC = "topic";
   public static final String OWNER = "owner";
+  public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
+  public static final String INDEX = "index";
+  public static final String DISTRIBUTION = "distribution";
+  public static final String PARTITION = "partition";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -65,9 +65,13 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption("x", INDEX, "display index information"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "display partition information"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
 
     // Create/update options
-    options.addOption(createArgOption("r", RENAME, "new entity name"));
+    options.addOption(createArgOption(null, RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));
     options.addOption(createArgOption("V", VALUE, "property value"));
@@ -76,20 +80,14 @@ public class GravitinoOptions {
             "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgOption("a", TAG, "tag name"));
-    options.addOption(createArgOption("f", FILESET, "fileset name"));
-    options.addOption(createSimpleOption("m", MANAGED, "a managed fileset"));
-    options.addOption(createArgOption("l", LOCATION, "fieset location"));
-    options.addOption(createArgOption("t", TAG, "tag name"));
-    options.addOption(createArgOption("t", TOPIC, "topic name"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+    options.addOption(createArgOption("r", ROLE, "role name"));
 
-    // Properties option can have multiple values
-    Option properties =
-        Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
-    options.addOption(properties);
+    // Properties and tags can have multiple values
+    options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
+    options.addOption(createArgsOption("t", TAG, "tag name"));
 
-    // Force delete entity and rename metalake operations
+    // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
     return options;
@@ -117,5 +115,18 @@ public class GravitinoOptions {
    */
   public Option createArgOption(String shortName, String longName, String description) {
     return new Option(shortName, longName, true, description);
+  }
+
+  /**
+   * Helper method to create an Option that requires multiple argument.
+   *
+   * @param shortName The option name as a single letter
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
+  public Option createArgsOption(String shortName, String longName, String description) {
+    // Support multiple arguments
+    return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
   }
 }

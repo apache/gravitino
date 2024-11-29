@@ -61,6 +61,7 @@ public class ListFilesetProperties extends ListProperties {
   }
 
   /** List the properties of a catalog. */
+  @Override
   public void handle() {
     Fileset gFileset = null;
     try {

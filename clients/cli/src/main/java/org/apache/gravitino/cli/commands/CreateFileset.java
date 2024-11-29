@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -34,8 +35,7 @@ public class CreateFileset extends Command {
   protected final String schema;
   protected final String fileset;
   protected final String comment;
-  protected final boolean managed;
-  protected final String location;
+  protected final Map<String, String> properties;
 
   /**
    * Create a new fileset.
@@ -47,8 +47,7 @@ public class CreateFileset extends Command {
    * @param schema The name of the schema.
    * @param fileset The name of the fileset.
    * @param comment The fileset's comment.
-   * @param managed True if it is a managed fileset, false if it is an external fileset.
-   * @param location Location of the fileset.
+   * @param properties The catalog's properties.
    */
   public CreateFileset(
       String url,
@@ -58,21 +57,22 @@ public class CreateFileset extends Command {
       String schema,
       String fileset,
       String comment,
-      boolean managed,
-      String location) {
+      Map<String, String> properties) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.fileset = fileset;
     this.comment = comment;
-    this.managed = managed;
-    this.location = location;
+    this.properties = properties;
   }
 
   /** Create a new fileset. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
+    boolean managed = properties.get("managed").equals("true");
+    String location = properties.get("location");
     Fileset.Type filesetType = managed ? Fileset.Type.MANAGED : Fileset.Type.EXTERNAL;
 
     try {

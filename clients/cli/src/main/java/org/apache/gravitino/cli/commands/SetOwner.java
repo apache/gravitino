@@ -77,6 +77,7 @@ public class SetOwner extends Command {
   }
 
   /** Sets the owner of an entity. */
+  @Override
   public void handle() {
     MetadataObject metadata = MetadataObjects.parse(entity, entityType);
     Owner.Type ownerType = isGroup ? Owner.Type.GROUP : Owner.Type.USER;

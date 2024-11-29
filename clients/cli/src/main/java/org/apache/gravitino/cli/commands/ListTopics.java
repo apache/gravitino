@@ -52,6 +52,7 @@ public class ListTopics extends Command {
   }
 
   /** List the names of all topics in a schema. */
+  @Override
   public void handle() {
     NameIdentifier[] topics = new NameIdentifier[0];
     Namespace name = Namespace.of(schema);

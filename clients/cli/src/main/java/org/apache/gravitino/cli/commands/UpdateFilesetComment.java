@@ -65,6 +65,7 @@ public class UpdateFilesetComment extends Command {
   }
 
   /** Update the comment of a catalog. */
+  @Override
   public void handle() {
     try {
       NameIdentifier filesetName = NameIdentifier.of(schema, fileset);

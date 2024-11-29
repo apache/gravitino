@@ -69,6 +69,7 @@ public class SetFilesetProperty extends Command {
   }
 
   /** Set a property of a fileset. */
+  @Override
   public void handle() {
     try {
       NameIdentifier name = NameIdentifier.of(schema, fileset);

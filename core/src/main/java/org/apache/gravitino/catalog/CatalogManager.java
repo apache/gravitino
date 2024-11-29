@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Catalog.Type.FILESET;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
@@ -657,6 +658,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         }
       }
 
+      CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
+      if (includeManagedEntities(catalogEntity)) {
+        schemas.forEach(
+            schema -> {
+              try {
+                catalogWrapper.doWithSchemaOps(
+                    schemaOps -> schemaOps.dropSchema(schema.nameIdentifier(), true));
+              } catch (Exception e) {
+                LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
+                throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
+              }
+            });
+      }
       catalogCache.invalidate(ident);
       return store.delete(ident, EntityType.CATALOG, true);
 
@@ -666,6 +680,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private boolean includeManagedEntities(CatalogEntity catalogEntity) {
+    return catalogEntity.getType().equals(FILESET);
   }
 
   /**

@@ -46,7 +46,7 @@ import {
   updateSchemaApi,
   deleteSchemaApi
 } from '@/lib/api/schemas'
-import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
+import { getTablesApi, getTableDetailsApi, createTableApi, updateTableApi, deleteTableApi } from '@/lib/api/tables'
 import {
   getFilesetsApi,
   getFilesetDetailsApi,
@@ -799,6 +799,67 @@ export const getTableDetails = createAsyncThunk(
     )
 
     return resTable
+  }
+)
+
+export const createTable = createAsyncThunk(
+  'appMetalakes/createTable',
+  async ({ data, metalake, catalog, type, schema }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(createTableApi({ data, metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    const { table: tableItem } = res
+
+    const tableData = {
+      ...tableItem,
+      node: 'table',
+      id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+      key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+      path: `?${new URLSearchParams({ metalake, catalog, type, schema, table: tableItem.name }).toString()}`,
+      name: tableItem.name,
+      title: tableItem.name,
+      tables: [],
+      children: []
+    }
+
+    dispatch(fetchTables({ metalake, catalog, schema, type, init: true }))
+
+    return tableData
+  }
+)
+
+export const updateTable = createAsyncThunk(
+  'appMetalakes/updateTable',
+  async ({ metalake, catalog, type, schema, table, data }, { dispatch }) => {
+    const [err, res] = await to(updateTableApi({ metalake, catalog, schema, table, data }))
+    if (err || !res) {
+      return { err: true }
+    }
+    dispatch(fetchTables({ metalake, catalog, type, schema, init: true }))
+
+    return res.catalog
+  }
+)
+
+export const deleteTable = createAsyncThunk(
+  'appMetalakes/deleteTable',
+  async ({ metalake, catalog, type, schema, table }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteTableApi({ metalake, catalog, schema, table }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    dispatch(fetchTables({ metalake, catalog, type, schema, page: 'schemas', init: true }))
+
+    return res
   }
 )
 

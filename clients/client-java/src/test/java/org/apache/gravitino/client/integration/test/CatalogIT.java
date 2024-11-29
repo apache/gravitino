@@ -24,6 +24,9 @@ import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
@@ -37,6 +40,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -124,7 +128,7 @@ public class CatalogIT extends BaseIT {
   }
 
   @Test
-  public void testDropCatalog() {
+  public void testDropCatalog() throws IOException {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
     Assertions.assertFalse(metalake.catalogExists(catalogName));
 
@@ -153,6 +157,44 @@ public class CatalogIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.disableCatalog(catalogName));
     Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
     Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
+
+    // test drop catalog with managed entity
+    catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", null, ImmutableMap.of());
+
+    String schemaName = GravitinoITUtils.genRandomName("schema");
+    Path schemaDir = Files.createTempDirectory(schemaName);
+    catalog
+        .asSchemas()
+        .createSchema(schemaName, null, ImmutableMap.of("location", schemaDir.toString()));
+    Assertions.assertTrue(Files.exists(schemaDir));
+    Assertions.assertEquals(
+        schemaDir.toString(),
+        catalog.asSchemas().loadSchema(schemaName).properties().get("location"));
+
+    String filesetName = GravitinoITUtils.genRandomName("fileset");
+    Path filesetDir = Files.createTempDirectory(filesetName);
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            NameIdentifier.of(schemaName, filesetName),
+            null,
+            Fileset.Type.MANAGED,
+            filesetDir.toString(),
+            null);
+    Assertions.assertTrue(Files.exists(filesetDir));
+    Assertions.assertEquals(
+        "file:" + filesetDir,
+        catalog
+            .asFilesetCatalog()
+            .loadFileset(NameIdentifier.of(schemaName, filesetName))
+            .storageLocation());
+
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+    Assertions.assertFalse(metalake.dropCatalog(catalogName));
+    Assertions.assertFalse(Files.exists(schemaDir));
+    Assertions.assertFalse(Files.exists(filesetDir));
   }
 
   @Test
