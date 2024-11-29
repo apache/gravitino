@@ -546,6 +546,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment).handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        newUpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, newName).handle();
+      }
     }
   }
 

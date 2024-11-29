@@ -653,3 +653,15 @@ gcli fileset details --name hadoop.schema.fileset
 ```bash
 gcli fileset delete --name hadoop.schema.fileset
 ```
+
+#### Update a fileset's comment
+
+```bash
+gcli fileset update --name hadoop.schema.fileset --comment new_comment
+```
+
+#### Rename a fileset
+
+```bash
+gcli fileset update --name hadoop.schema.fileset --rename new_name
+```

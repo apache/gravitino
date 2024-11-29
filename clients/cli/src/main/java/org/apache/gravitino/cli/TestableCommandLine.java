@@ -92,6 +92,8 @@ import org.apache.gravitino.cli.commands.TopicDetails;
 import org.apache.gravitino.cli.commands.UntagEntity;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
+import org.apache.gravitino.cli.commands.UpdateFilesetComment;
+import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
@@ -526,5 +528,27 @@ public class TestableCommandLine {
       String schema,
       String fileset) {
     return new DeleteFileset(url, ignore, force, metalake, catalog, schema, fileset);
+  }
+
+  protected UpdateFilesetComment newUpdateFilesetComment(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset,
+      String comment) {
+    return new UpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment);
+  }
+
+  protected UpdateFilesetName newUpdateFilesetName(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset,
+      String rename) {
+    return new UpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, rename);
   }
 }

@@ -33,6 +33,8 @@ import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.ListFilesets;
+import org.apache.gravitino.cli.commands.UpdateFilesetComment;
+import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -171,5 +173,63 @@ class TestFilesetCommands {
             "fileset");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
+  }
+
+  @Test
+  void testUpdateFilesetCommentCommand() {
+    UpdateFilesetComment mockUpdateComment = mock(UpdateFilesetComment.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("new_comment");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.UPDATE));
+    doReturn(mockUpdateComment)
+        .when(commandLine)
+        .newUpdateFilesetComment(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "fileset",
+            "new_comment");
+    commandLine.handleCommandLine();
+    verify(mockUpdateComment).handle();
+  }
+
+  @Test
+  void testUpdateFilesetNameCommand() {
+    UpdateFilesetName mockUpdateName = mock(UpdateFilesetName.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.RENAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.RENAME)).thenReturn("new_name");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.UPDATE));
+    doReturn(mockUpdateName)
+        .when(commandLine)
+        .newUpdateFilesetName(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "fileset",
+            "new_name");
+    commandLine.handleCommandLine();
+    verify(mockUpdateName).handle();
   }
 }
