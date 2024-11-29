@@ -49,6 +49,7 @@ public class DeleteUser extends Command {
   }
 
   /** Delete a user. */
+  @Override
   public void handle() {
     boolean deleted = false;
 
