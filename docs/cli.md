@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users groups and tags. Future updates will expand on these capabilities to include roles, topics and filesets.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags and topics. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
@@ -28,7 +28,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
 
  ```bash
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
@@ -40,7 +40,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
- -o,--owner              entity owner
+ -o,--owner              display entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
     --partition          display partition information
@@ -451,7 +451,7 @@ gcli group list
 
 ```bash
 gcli group delete --group new_group
- ```
+```
 
 ### Tag commands
 
@@ -594,6 +594,38 @@ gcli group grant --group groupA --role admin
 #### Remove a role from a group
 ```bash
 gcli group revoke  --group groupA --role admin
+```
+
+### Topic commands
+
+#### Display a topic's details
+
+```bash
+gcli topic details --name kafka.default.topic3
+```
+
+#### Create a tag
+
+```bash
+gcli topic create --name kafka.default.topic3
+```
+
+#### List all topics
+
+```bash
+gcli topic list --name kafka.default
+```
+
+#### Delete a topic
+
+```bash
+gcli topic delete --name kafka.default.topic3
+```
+
+#### Change a topic's comment
+
+```bash
+gcli topic update --name kafka.default.topic3 --comment new_comment
 ```
 
 ### Fileset commands

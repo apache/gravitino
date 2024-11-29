@@ -107,6 +107,15 @@ public class FullName {
   }
 
   /**
+   * Retrieves the topic name from the third part of the full name option.
+   *
+   * @return The topic name, or null if not found.
+   */
+  public String getTopicName() {
+    return getNamePart(2);
+  }
+
+  /**
    * Retrieves the fileset name from the third part of the full name option.
    *
    * @return The table name, or null if not found.
