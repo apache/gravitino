@@ -5,6 +5,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Leverage log4j to write audit log. Users should configure separate appender and logger in log4j
+ * property file if they wish to write audit log to a separate file.
+ */
 public class Log4jAuditWriter implements AuditLogWriter {
 
   private Formatter formatter;
