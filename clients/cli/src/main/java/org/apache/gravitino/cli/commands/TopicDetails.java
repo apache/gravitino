@@ -61,11 +61,12 @@ public class TopicDetails extends Command {
   }
 
   /** Displays the details of a topic. */
+  @Override
   public void handle() {
-    NameIdentifier name = NameIdentifier.of(schema, topic);
     Topic gTopic = null;
 
     try {
+      NameIdentifier name = NameIdentifier.of(schema, topic);
       GravitinoClient client = buildClient(metalake);
       gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
     } catch (NoSuchMetalakeException err) {

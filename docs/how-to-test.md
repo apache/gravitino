@@ -105,6 +105,9 @@ public class CatalogHiveIT extends AbstractIT {
 :::note
 * Make sure that the `Docker server` is running before running all the
   integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-test` tag.
+* To run Docker-related tests, make sure you have installed Docker in your environment and either
+   set skipDockerTests=false in the gradle.properties file (or use `-PskipDockerTests=false` in the command) or
+  (2) export SKIP_DOCKER_TESTS=false in shell. Otherwise, all tests requiring Docker will be skipped.
 * On macOS, be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
   script before running the integration tests; or make sure that
   [OrbStack](https://orbstack.dev/) is running.

@@ -66,6 +66,7 @@ public class OwnerDetails extends Command {
   }
 
   /** Displays the owner of an entity. */
+  @Override
   public void handle() {
     Optional<Owner> owner = null;
     MetadataObject metadata = MetadataObjects.parse(entity, entityType);

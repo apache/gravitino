@@ -33,14 +33,19 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.DropCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.ListCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadCatalogPreEvent;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -68,6 +73,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
+    eventBus.dispatchEvent(new ListCatalogPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listCatalogs(namespace);
       eventBus.dispatchEvent(new ListCatalogEvent(PrincipalUtils.getCurrentUserName(), namespace));
@@ -81,6 +87,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    eventBus.dispatchEvent(new ListCatalogPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       Catalog[] catalogs = dispatcher.listCatalogsInfo(namespace);
       eventBus.dispatchEvent(new ListCatalogEvent(PrincipalUtils.getCurrentUserName(), namespace));
@@ -94,6 +101,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    eventBus.dispatchEvent(new LoadCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Catalog catalog = dispatcher.loadCatalog(ident);
       eventBus.dispatchEvent(
@@ -115,6 +123,10 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    CatalogInfo catalogInfo =
+        new CatalogInfo(ident.name(), type, provider, comment, properties, null);
+    eventBus.dispatchEvent(
+        new CreateCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident, catalogInfo));
     try {
       Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
       eventBus.dispatchEvent(
@@ -134,6 +146,8 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
+    eventBus.dispatchEvent(
+        new AlterCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Catalog catalog = dispatcher.alterCatalog(ident, changes);
       eventBus.dispatchEvent(
@@ -150,6 +164,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
+    eventBus.dispatchEvent(new DropCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       boolean isExists = dispatcher.dropCatalog(ident, force);
       eventBus.dispatchEvent(
