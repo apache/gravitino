@@ -68,6 +68,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("x", INDEX, "display index information"));
     options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
     options.addOption(createSimpleOption(null, PARTITION, "display partition information"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));
