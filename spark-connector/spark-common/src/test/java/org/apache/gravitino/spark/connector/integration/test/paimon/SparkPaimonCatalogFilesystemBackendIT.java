@@ -34,7 +34,6 @@ public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonC
         PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_BACKEND,
         PaimonPropertiesConstants.PAIMON_CATALOG_BACKEND_FILESYSTEM);
     catalogProperties.put(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_WAREHOUSE, warehouse);
-    catalogProperties.put(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_URI, hiveMetastoreUri);
     return catalogProperties;
   }
 }
