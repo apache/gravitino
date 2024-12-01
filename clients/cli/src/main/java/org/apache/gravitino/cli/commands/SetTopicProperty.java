@@ -39,7 +39,7 @@ public class SetTopicProperty extends Command {
   protected final String value;
 
   /**
-   * Set a property of a schema.
+   * Set a property of a topic.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -68,7 +68,7 @@ public class SetTopicProperty extends Command {
     this.value = value;
   }
 
-  /** Set a property of a schema. */
+  /** Set a property of a topic. */
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
