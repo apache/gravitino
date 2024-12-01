@@ -31,6 +31,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4spark.get()
+val paimonVersion: String = libs.versions.paimon.get()
 // kyuubi hive connector for Spark 3.3 doesn't support scala 2.13
 val kyuubiVersion: String = libs.versions.kyuubi4spark34.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
@@ -43,6 +44,7 @@ dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
 
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
@@ -114,6 +116,7 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
