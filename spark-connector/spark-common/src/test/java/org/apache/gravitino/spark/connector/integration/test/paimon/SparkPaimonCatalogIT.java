@@ -19,6 +19,15 @@
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
+import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.types.DataTypes;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
@@ -39,7 +48,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsPartition() {
-    return false;
+    return true;
   }
 
   @Override
@@ -49,6 +58,79 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsSchemaEvolution() {
-    return false;
+    return true;
+  }
+
+  @Test
+  void testPaimonPartitions() {
+    String partitionPathString = "name=a/address=beijing";
+
+    String tableName = "test_paimon_partition_table";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    createTableSQL =
+            createTableSQL + " PARTITIONED BY (name, address);";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getPaimonSimpleTableColumn())
+                    .withIdentifyPartition(Collections.singletonList("name"))
+                    .withIdentifyPartition(Collections.singletonList("address"));
+    checker.check(tableInfo);
+
+    String insertData =
+            String.format(
+                    "INSERT into %s values(2,'a','beijing');",
+                    tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertEquals("2,a,beijing", queryResult.get(0));
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionPathString);
+    checkDirExists(partitionPath);
+  }
+
+  @Test
+  void testPaimonPartitionManagement() {
+    testPaimonCreatePartition();
+    testPaimonReplacePartitionMetadata();
+    testPaimonLoadPartitionMetadata();
+    testPaimonListPartitionIdentifiers();
+    testPaimonCreatePartition();
+  }
+
+  private void testPaimonDropPartition() {
+
+  }
+
+  private void testPaimonReplacePartitionMetadata() {
+
+  }
+
+  private void testPaimonLoadPartitionMetadata() {
+
+  }
+
+  private void testPaimonListPartitionIdentifiers() {
+
+  }
+
+  private void testPaimonCreatePartition() {
+
+  }
+
+  private String getCreatePaimonSimpleTableString(String tableName) {
+    return String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING '') USING paimon",
+            tableName);
+  }
+
+  private List<SparkTableInfo.SparkColumnInfo> getPaimonSimpleTableColumn() {
+    return Arrays.asList(
+            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+            SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
+            SparkTableInfo.SparkColumnInfo.of("address", DataTypes.StringType, ""));
   }
 }
