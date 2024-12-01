@@ -86,12 +86,17 @@ public abstract class Command {
    * @param entity The entity to output.
    */
   protected <T> void output(T entity) {
-    if (outputFormat != null) {
-      if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
-        TableFormat.output(entity);
-      } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
-        PlainFormat.output(entity);
-      }
+    if (outputFormat == null) {
+      PlainFormat.output(entity);
+      return;
+    }
+
+    if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
+      TableFormat.output(entity);
+    } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
+      PlainFormat.output(entity);
+    } else {
+      throw new IllegalArgumentException("Unsupported output format");
     }
   }
 }
