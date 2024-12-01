@@ -47,6 +47,7 @@ public class GravitinoOptions {
   public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
+  public static final String OUTPUT = "output";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -89,6 +90,8 @@ public class GravitinoOptions {
 
     // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
+
+    options.addOption(createArgOption(null, OUTPUT, "output format (plain/table)"));
 
     return options;
   }

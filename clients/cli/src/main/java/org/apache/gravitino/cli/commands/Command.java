@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.cli.outputs.TableFormat;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -27,6 +29,9 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 public abstract class Command {
   private final String url;
   private final boolean ignoreVersions;
+  private final String outputFormat;
+  public static String OUTPUT_FORMAT_TABLE = "table";
+  public static String OUTPUT_FORMAT_PLAIN = "plain";
 
   /**
    * Command constructor.
@@ -35,8 +40,13 @@ public abstract class Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    */
   public Command(String url, boolean ignoreVersions) {
+    this(url, ignoreVersions, null);
+  }
+
+  public Command(String url, boolean ignoreVersions, String outputFormat) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
+    this.outputFormat = outputFormat;
   }
 
   /** All commands have a handle method to handle and run the required command. */
@@ -67,6 +77,21 @@ public abstract class Command {
       return GravitinoAdminClient.builder(url).withVersionCheckDisabled().build();
     } else {
       return GravitinoAdminClient.builder(url).build();
+    }
+  }
+
+  /**
+   * Outputs the entity to the console.
+   *
+   * @param entity The entity to output.
+   */
+  protected <T> void output(T entity) {
+    if (outputFormat != null) {
+      if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
+        TableFormat.output(entity);
+      } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
+        PlainFormat.output(entity);
+      }
     }
   }
 }
