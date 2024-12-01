@@ -37,4 +37,14 @@ public final class ListMetalakeFailureEvent extends MetalakeFailureEvent {
   public ListMetalakeFailureEvent(String user, Exception exception) {
     super(user, null, exception);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_METALAKE;
+  }
 }

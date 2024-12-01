@@ -27,14 +27,19 @@ import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.AlterTopicEvent;
 import org.apache.gravitino.listener.api.event.AlterTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterTopicPreEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateTopicPreEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DropTopicPreEvent;
 import org.apache.gravitino.listener.api.event.ListTopicEvent;
 import org.apache.gravitino.listener.api.event.ListTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.ListTopicPreEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadTopicPreEvent;
 import org.apache.gravitino.listener.api.info.TopicInfo;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
@@ -66,6 +71,8 @@ public class TopicEventDispatcher implements TopicDispatcher {
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
+    eventBus.dispatchEvent(
+        new AlterTopicPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Topic topic = dispatcher.alterTopic(ident, changes);
       eventBus.dispatchEvent(
@@ -81,6 +88,7 @@ public class TopicEventDispatcher implements TopicDispatcher {
 
   @Override
   public boolean dropTopic(NameIdentifier ident) {
+    eventBus.dispatchEvent(new DropTopicPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       boolean isExists = dispatcher.dropTopic(ident);
       eventBus.dispatchEvent(
@@ -95,6 +103,7 @@ public class TopicEventDispatcher implements TopicDispatcher {
 
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchTopicException {
+    eventBus.dispatchEvent(new ListTopicPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listTopics(namespace);
       eventBus.dispatchEvent(new ListTopicEvent(PrincipalUtils.getCurrentUserName(), namespace));
@@ -108,6 +117,7 @@ public class TopicEventDispatcher implements TopicDispatcher {
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
+    eventBus.dispatchEvent(new LoadTopicPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Topic topic = dispatcher.loadTopic(ident);
       eventBus.dispatchEvent(
@@ -129,13 +139,15 @@ public class TopicEventDispatcher implements TopicDispatcher {
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchTopicException, TopicAlreadyExistsException {
+    TopicInfo createTopicRequest = new TopicInfo(ident.name(), comment, properties, null);
+    eventBus.dispatchEvent(
+        new CreateTopicPreEvent(PrincipalUtils.getCurrentUserName(), ident, createTopicRequest));
     try {
       Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
       eventBus.dispatchEvent(
           new CreateTopicEvent(PrincipalUtils.getCurrentUserName(), ident, new TopicInfo(topic)));
       return topic;
     } catch (Exception e) {
-      TopicInfo createTopicRequest = new TopicInfo(ident.name(), comment, properties, null);
       eventBus.dispatchEvent(
           new CreateTopicFailureEvent(
               PrincipalUtils.getCurrentUserName(), ident, e, createTopicRequest));

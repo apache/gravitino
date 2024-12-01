@@ -296,6 +296,9 @@ public class JDBCBackend implements RelationalBackend {
         return TableColumnMetaService.getInstance()
             .deleteColumnsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
+      case MODEL:
+      case MODEL_VERSION:
+        // TODO (jerryshao): Implement hard delete logic for these entity types.
         return 0;
         // TODO: Implement hard delete logic for these entity types.
 
@@ -320,6 +323,8 @@ public class JDBCBackend implements RelationalBackend {
       case AUDIT:
       case ROLE:
       case TAG:
+      case MODEL:
+      case MODEL_VERSION:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 

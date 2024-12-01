@@ -48,4 +48,14 @@ public final class LoadFilesetEvent extends FilesetEvent {
   public FilesetInfo loadedFilesetInfo() {
     return loadedFilesetInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_FILESET;
+  }
 }

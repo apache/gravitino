@@ -45,6 +45,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestTopicEvent {
+
   private TopicEventDispatcher dispatcher;
   private TopicEventDispatcher failureDispatcher;
   private DummyEventListener dummyEventListener;
@@ -65,22 +66,41 @@ public class TestTopicEvent {
   void testCreateTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.createTopic(identifier, topic.comment(), null, topic.properties());
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateTopicPreEvent.class, preEvent.getClass());
+    TopicInfo topicInfo = ((CreateTopicPreEvent) preEvent).createTopicRequest();
+    checkTopicInfo(topicInfo, topic);
+    Assertions.assertEquals(OperationType.CREATE_TOPIC, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTopicEvent.class, event.getClass());
-    TopicInfo topicInfo = ((CreateTopicEvent) event).createdTopicInfo();
+    topicInfo = ((CreateTopicEvent) event).createdTopicInfo();
     checkTopicInfo(topicInfo, topic);
+    Assertions.assertEquals(OperationType.CREATE_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
 
   @Test
   void testLoadTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.loadTopic(identifier);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadTopicPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_TOPIC, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTopicEvent.class, event.getClass());
     TopicInfo topicInfo = ((LoadTopicEvent) event).loadedTopicInfo();
     checkTopicInfo(topicInfo, topic);
+    Assertions.assertEquals(OperationType.LOAD_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
 
   @Test
@@ -88,6 +108,15 @@ public class TestTopicEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     TopicChange topicChange = TopicChange.setProperty("a", "b");
     dispatcher.alterTopic(identifier, topicChange);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterTopicPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(1, ((AlterTopicPreEvent) preEvent).topicChanges().length);
+    Assertions.assertEquals(topicChange, ((AlterTopicPreEvent) preEvent).topicChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TOPIC, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTopicEvent.class, event.getClass());
@@ -95,26 +124,47 @@ public class TestTopicEvent {
     checkTopicInfo(topicInfo, topic);
     Assertions.assertEquals(1, ((AlterTopicEvent) event).topicChanges().length);
     Assertions.assertEquals(topicChange, ((AlterTopicEvent) event).topicChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
 
   @Test
   void testDropTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.dropTopic(identifier);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropTopicPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_TOPIC, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTopicEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropTopicEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
 
   @Test
   void testListTopicEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTopics(namespace);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListTopicPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListTopicPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_TOPIC, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTopicEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTopicEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
 
   @Test
@@ -129,6 +179,8 @@ public class TestTopicEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((CreateTopicFailureEvent) event).exception().getClass());
     checkTopicInfo(((CreateTopicFailureEvent) event).createTopicRequest(), topic);
+    Assertions.assertEquals(OperationType.CREATE_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -141,6 +193,8 @@ public class TestTopicEvent {
     Assertions.assertEquals(LoadTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadTopicFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -157,6 +211,8 @@ public class TestTopicEvent {
         GravitinoRuntimeException.class, ((AlterTopicFailureEvent) event).exception().getClass());
     Assertions.assertEquals(1, ((AlterTopicFailureEvent) event).topicChanges().length);
     Assertions.assertEquals(topicChange, ((AlterTopicFailureEvent) event).topicChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -169,6 +225,8 @@ public class TestTopicEvent {
     Assertions.assertEquals(DropTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropTopicFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DROP_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -182,6 +240,8 @@ public class TestTopicEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListTopicFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListTopicFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_TOPIC, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkTopicInfo(TopicInfo topicInfo, Topic topic) {

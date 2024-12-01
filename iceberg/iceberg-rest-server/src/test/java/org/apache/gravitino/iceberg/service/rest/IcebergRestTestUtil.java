@@ -36,9 +36,15 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -113,6 +119,16 @@ public class IcebergRestTestUtil {
       IcebergTableEventDispatcher icebergTableEventDispatcher =
           new IcebergTableEventDispatcher(
               icebergTableOperationExecutor, eventBus, configProvider.getMetalakeName());
+      IcebergViewOperationExecutor icebergViewOperationExecutor =
+          new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
+      IcebergViewEventDispatcher icebergViewEventDispatcher =
+          new IcebergViewEventDispatcher(
+              icebergViewOperationExecutor, eventBus, configProvider.getMetalakeName());
+      IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
+          new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+      IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+          new IcebergNamespaceEventDispatcher(
+              icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
@@ -122,6 +138,10 @@ public class IcebergRestTestUtil {
               bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
               bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(2);
+              bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(2);
+              bind(icebergNamespaceEventDispatcher)
+                  .to(IcebergNamespaceOperationDispatcher.class)
+                  .ranked(2);
             }
           });
     }
