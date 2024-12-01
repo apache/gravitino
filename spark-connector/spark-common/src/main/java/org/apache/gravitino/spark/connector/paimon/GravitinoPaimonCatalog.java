@@ -26,6 +26,7 @@ import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.paimon.spark.SparkCatalog;
+import org.apache.paimon.spark.SparkTable;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -53,8 +54,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    throw new UnsupportedOperationException(
-        "`createSparkTable` operation is unsupported for paimon spark connector now.");
+    return new SparkPaimonTable(
+        identifier,
+        gravitinoTable,
+        (SparkTable) sparkTable,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter);
   }
 
   @Override
