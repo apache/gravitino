@@ -38,7 +38,7 @@ public class ListTableProperties extends ListProperties {
   protected final String table;
 
   /**
-   * List the properties of a catalog.
+   * List the properties of a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -62,6 +62,7 @@ public class ListTableProperties extends ListProperties {
   }
 
   /** List the properties of a table. */
+  @Override
   public void handle() {
     Table gTable = null;
     try {
