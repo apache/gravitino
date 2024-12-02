@@ -61,6 +61,7 @@ import org.apache.gravitino.cli.commands.ListMetalakes;
 import org.apache.gravitino.cli.commands.ListRoles;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
+import org.apache.gravitino.cli.commands.ListTableProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
 import org.apache.gravitino.cli.commands.ListTopicProperties;
@@ -75,6 +76,7 @@ import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
+import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
 import org.apache.gravitino.cli.commands.RoleDetails;
@@ -86,6 +88,7 @@ import org.apache.gravitino.cli.commands.SetFilesetProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetOwner;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
+import org.apache.gravitino.cli.commands.SetTableProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.SetTopicProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
@@ -308,6 +311,34 @@ public class TestableCommandLine {
   protected TableDistribution newTableDistribution(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
     return new TableDistribution(url, ignore, metalake, catalog, schema, table);
+  }
+
+  protected SetTableProperty newSetTableProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String property,
+      String value) {
+    return new SetTableProperty(url, ignore, metalake, catalog, schema, table, property, value);
+  }
+
+  protected RemoveTableProperty newRemoveTableProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String property) {
+    return new RemoveTableProperty(url, ignore, metalake, catalog, schema, table, property);
+  }
+
+  protected ListTableProperties newListTableProperties(
+      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
+    return new ListTableProperties(url, ignore, metalake, catalog, schema, table);
   }
 
   protected UserDetails newUserDetails(String url, boolean ignore, String metalake, String user) {
