@@ -70,9 +70,9 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
     options.addOption(createSimpleOption(null, SIMPLE, "simple authentication"));
     options.addOption(createArgOption(null, LOGIN, "user name"));
-    options.addOption(createSimpleOption("x", INDEX, "Display index infromation"));
-    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
-    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
+    options.addOption(createSimpleOption("x", INDEX, "display index infromation"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "display partition information"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
 
     // Create/update options
