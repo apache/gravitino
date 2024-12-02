@@ -37,6 +37,8 @@ import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TableDistribution;
 import org.apache.gravitino.cli.commands.TablePartition;
+import org.apache.gravitino.cli.commands.UpdateTableComment;
+import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -298,5 +300,59 @@ class TestTableCommands {
             "property");
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testUpdateTableCommentsCommand() {
+    UpdateTableComment mockUpdate = mock(UpdateTableComment.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("New comment");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.UPDATE));
+    doReturn(mockUpdate)
+        .when(commandLine)
+        .newUpdateTableComment(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "New comment");
+    commandLine.handleCommandLine();
+    verify(mockUpdate).handle();
+  }
+
+  @Test
+  void testupdateTableNmeCommand() {
+    UpdateTableName mockUpdate = mock(UpdateTableName.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    when(mockCommandLine.hasOption(GravitinoOptions.RENAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.RENAME)).thenReturn("people");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.UPDATE));
+    doReturn(mockUpdate)
+        .when(commandLine)
+        .newUpdateTableName(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "people");
+    commandLine.handleCommandLine();
+    verify(mockUpdate).handle();
   }
 }
