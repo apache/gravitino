@@ -580,6 +580,18 @@ gcli catalog set --owner --group groupA --name postgres
 
 ### Role commands
 
+#### Display role details
+
+```bash
+gcli role details --role admin
+```
+
+#### List all roles
+
+```bash
+gcli role list
+```
+
 #### Create a role
 
 ```bash
