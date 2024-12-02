@@ -19,72 +19,58 @@ import unittest
 from datetime import date, time, datetime
 
 from gravitino.api.expressions.literals.literals import Literals
+from gravitino.api.types.types import Types
 
 
 class TestLiterals(unittest.TestCase):
     def test_null_literal(self):
         null_val = Literals.NULL
         self.assertEqual(null_val.value(), None)
-        self.assertEqual(null_val.data_type(), "NullType")
-        self.assertEqual(str(null_val), "LiteralImpl(value=None, data_type=NullType)")
+        self.assertEqual(null_val.data_type(), Types.NullType.get())
 
     def test_boolean_literal(self):
         bool_val = Literals.boolean_literal(True)
         self.assertEqual(bool_val.value(), True)
-        self.assertEqual(bool_val.data_type(), "Boolean")
-        self.assertEqual(str(bool_val), "LiteralImpl(value=True, data_type=Boolean)")
+        self.assertEqual(bool_val.data_type(), Types.BooleanType.get())
 
     def test_integer_literal(self):
         int_val = Literals.integer_literal(42)
         self.assertEqual(int_val.value(), 42)
-        self.assertEqual(int_val.data_type(), "Integer")
-        self.assertEqual(str(int_val), "LiteralImpl(value=42, data_type=Integer)")
+        self.assertEqual(int_val.data_type(), Types.IntegerType.get())
 
     def test_string_literal(self):
         str_val = Literals.string_literal("Hello World")
         self.assertEqual(str_val.value(), "Hello World")
-        self.assertEqual(str_val.data_type(), "String")
-        self.assertEqual(
-            str(str_val), "LiteralImpl(value=Hello World, data_type=String)"
-        )
+        self.assertEqual(str_val.data_type(), Types.StringType.get())
 
     def test_date_literal(self):
         date_val = Literals.date_literal(date(2023, 1, 1))
         self.assertEqual(date_val.value(), date(2023, 1, 1))
-        self.assertEqual(date_val.data_type(), "Date")
-        self.assertEqual(str(date_val), "LiteralImpl(value=2023-01-01, data_type=Date)")
+        self.assertEqual(date_val.data_type(), Types.DateType.get())
 
     def test_time_literal(self):
         time_val = Literals.time_literal(time(12, 30, 45))
         self.assertEqual(time_val.value(), time(12, 30, 45))
-        self.assertEqual(time_val.data_type(), "Time")
-        self.assertEqual(str(time_val), "LiteralImpl(value=12:30:45, data_type=Time)")
+        self.assertEqual(time_val.data_type(), Types.TimeType.get())
 
     def test_timestamp_literal(self):
         timestamp_val = Literals.timestamp_literal(datetime(2023, 1, 1, 12, 30, 45))
         self.assertEqual(timestamp_val.value(), datetime(2023, 1, 1, 12, 30, 45))
-        self.assertEqual(timestamp_val.data_type(), "Timestamp")
         self.assertEqual(
-            str(timestamp_val),
-            "LiteralImpl(value=2023-01-01 12:30:45, data_type=Timestamp)",
+            timestamp_val.data_type(), Types.TimestampType.without_time_zone()
         )
 
     def test_timestamp_literal_from_string(self):
         timestamp_val = Literals.timestamp_literal_from_string("2023-01-01T12:30:45")
         self.assertEqual(timestamp_val.value(), datetime(2023, 1, 1, 12, 30, 45))
-        self.assertEqual(timestamp_val.data_type(), "Timestamp")
         self.assertEqual(
-            str(timestamp_val),
-            "LiteralImpl(value=2023-01-01 12:30:45, data_type=Timestamp)",
+            timestamp_val.data_type(), Types.TimestampType.without_time_zone()
         )
 
     def test_varchar_literal(self):
         varchar_val = Literals.varchar_literal(10, "Test String")
         self.assertEqual(varchar_val.value(), "Test String")
-        self.assertEqual(varchar_val.data_type(), "Varchar(10)")
-        self.assertEqual(
-            str(varchar_val), "LiteralImpl(value=Test String, data_type=Varchar(10))"
-        )
+        self.assertEqual(varchar_val.data_type(), Types.VarCharType.of(10))
 
     def test_equality(self):
         int_val1 = Literals.integer_literal(42)

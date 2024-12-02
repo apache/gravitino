@@ -118,25 +118,25 @@ class Literals:
         )
 
     @staticmethod
-    def date_literal(value: date) -> Literal:
+    def date_literal(value: date) -> Literal[date]:
         return LiteralImpl(value, Types.DateType.get())
 
     @staticmethod
-    def time_literal(value: time) -> Literal:
-        return LiteralImpl(value, Types.TimeType.get())
+    def time_literal(value: time) -> Literal[time]:
+        return Literals.of(value, Types.TimeType.get())
 
     @staticmethod
-    def timestamp_literal(value: datetime) -> Literal:
-        return LiteralImpl(value, Types.TimestampType.get())
+    def timestamp_literal(value: datetime) -> Literal[datetime]:
+        return Literals.of(value, Types.TimestampType.without_time_zone())
 
     @staticmethod
-    def timestamp_literal_from_string(value: str) -> Literal:
+    def timestamp_literal_from_string(value: str) -> Literal[datetime]:
         return Literals.timestamp_literal(datetime.fromisoformat(value))
 
     @staticmethod
-    def string_literal(value: str) -> Literal:
+    def string_literal(value: str) -> Literal[str]:
         return LiteralImpl(value, Types.StringType.get())
 
     @staticmethod
-    def varchar_literal(length: int, value: str) -> Literal:
+    def varchar_literal(length: int, value: str) -> Literal[str]:
         return LiteralImpl(value, Types.VarCharType.of(length))
