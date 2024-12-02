@@ -547,31 +547,7 @@ gcli tag update --tag tagA --rename newTag
 gcli tag update --tag tagA --comment "new comment"
 ```
 
-### Fileset commands
-
-#### Create a fileset
-
-```bash
-gcli fileset create --name hadoop.fileset.schema --fileset example --properties managed=true,location=file:/tmp/root/schema/example
-```
-
-#### List filesets
-
-```bash
-gcli fileset list --name hadoop.fileset.schema
-```
-
-#### Display a fileset's details
-
-```bash
-gcli fileset create --name hadoop.fileset.schema --fileset example --properties managed=true,location=file:/tmp/root/schema/example
-```
-
-#### Delete a fileset
-
-```bash
-gcli fileset delete --name hadoop.fileset.schema --fileset example
-### Owners commands
+### Owner commands
 
 #### List an owner
 
