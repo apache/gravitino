@@ -19,45 +19,59 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
-import org.apache.gravitino.Schema;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.FilesetChange;
 
-/** List the properties of a schema. */
-public class ListSchemaProperties extends ListProperties {
+/** Remove a property of a fileset. */
+public class RemoveFilesetProperty extends Command {
 
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
+  protected final String fileset;
+  protected final String property;
 
   /**
-   * List the properties of a schema.
+   * Remove a property of a fileset.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
+   * @param fileset The name of the fileset.
+   * @param property The name of the property.
    */
-  public ListSchemaProperties(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
+  public RemoveFilesetProperty(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset,
+      String property) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
+    this.fileset = fileset;
+    this.property = property;
   }
 
-  /** List the properties of a schema. */
+  /** Remove a property of a fileset. */
   @Override
   public void handle() {
-    Schema gSchema = null;
     try {
+      NameIdentifier name = NameIdentifier.of(schema, fileset);
       GravitinoClient client = buildClient(metalake);
-      gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
+      FilesetChange change = FilesetChange.removeProperty(property);
+      client.loadCatalog(catalog).asFilesetCatalog().alterFileset(name, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -67,12 +81,14 @@ public class ListSchemaProperties extends ListProperties {
     } catch (NoSuchSchemaException err) {
       System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
+    } catch (NoSuchFilesetException err) {
+      System.err.println(ErrorMessages.UNKNOWN_FILESET);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    Map<String, String> properties = gSchema.properties();
-    printProperties(properties);
+    System.out.println(property + " property removed.");
   }
 }

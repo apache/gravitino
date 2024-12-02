@@ -52,6 +52,7 @@ import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.ListEntityTags;
+import org.apache.gravitino.cli.commands.ListFilesetProperties;
 import org.apache.gravitino.cli.commands.ListFilesets;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListIndexes;
@@ -62,26 +63,31 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
+import org.apache.gravitino.cli.commands.ListTopicProperties;
 import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
+import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
+import org.apache.gravitino.cli.commands.RemoveTopicProperty;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
+import org.apache.gravitino.cli.commands.SetFilesetProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetOwner;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
+import org.apache.gravitino.cli.commands.SetTopicProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TableDistribution;
@@ -497,6 +503,34 @@ public class TestableCommandLine {
     return new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment);
   }
 
+  protected SetTopicProperty newSetTopicProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String topic,
+      String property,
+      String value) {
+    return new SetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value);
+  }
+
+  protected RemoveTopicProperty newRemoveTopicProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String topic,
+      String property) {
+    return new RemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property);
+  }
+
+  protected ListTopicProperties newListTopicProperties(
+      String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
+    return new ListTopicProperties(url, ignore, metalake, catalog, schema, topic);
+  }
+
   protected FilesetDetails newFilesetDetails(
       String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
     return new FilesetDetails(url, ignore, metalake, catalog, schema, fileset);
@@ -550,5 +584,33 @@ public class TestableCommandLine {
       String fileset,
       String rename) {
     return new UpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, rename);
+  }
+
+  protected ListFilesetProperties newListFilesetProperties(
+      String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
+    return new ListFilesetProperties(url, ignore, metalake, catalog, schema, fileset);
+  }
+
+  protected SetFilesetProperty newSetFilesetProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset,
+      String property,
+      String value) {
+    return new SetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value);
+  }
+
+  protected RemoveFilesetProperty newRemoveFilesetProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String fileset,
+      String property) {
+    return new RemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property);
   }
 }
