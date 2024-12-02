@@ -72,6 +72,7 @@ public class UpdateColumnDatatype extends Command {
   }
 
   /** Update the data type of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
     Type convertedDatatype = ParseType.toType(datatype);

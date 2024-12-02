@@ -71,6 +71,7 @@ public class UpdateColumnPosition extends Command {
   }
 
   /** Update the position of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 

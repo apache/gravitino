@@ -75,6 +75,7 @@ public class UpdateColumnDefault extends Command {
   }
 
   /** Update the default type of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 

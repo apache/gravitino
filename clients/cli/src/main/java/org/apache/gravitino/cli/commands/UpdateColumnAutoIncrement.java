@@ -70,6 +70,7 @@ public class UpdateColumnAutoIncrement extends Command {
   }
 
   /** Update the auto increment of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 
