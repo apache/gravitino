@@ -94,31 +94,34 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   @Test
   void testPaimonPartitionManagement() {
-    testPaimonCreatePartition();
-    testPaimonReplacePartitionMetadata();
-    testPaimonLoadPartitionMetadata();
-    testPaimonListPartitionIdentifiers();
-    testPaimonCreatePartition();
+    testPaimonListAndDropPartition();
+    // TODO: replace, add and load partition operations are unsupported in Paimon now.
   }
 
-  private void testPaimonDropPartition() {
+  private void testPaimonListAndDropPartition() {
+    String tableName = "test_paimon_drop_partition";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    createTableSQL =
+            createTableSQL + " PARTITIONED BY (name);";
+    sql(createTableSQL);
 
-  }
+    String insertData =
+            String.format(
+                    "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
+                    tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult.size());
 
-  private void testPaimonReplacePartitionMetadata() {
+    List<String> partitions = getQueryData(String.format("show partitions %s", tableName));
+    Assertions.assertEquals(3, partitions.size());
+    Assertions.assertEquals("name=a;name=b;name=c", String.join(";", partitions));
 
-  }
-
-  private void testPaimonLoadPartitionMetadata() {
-
-  }
-
-  private void testPaimonListPartitionIdentifiers() {
-
-  }
-
-  private void testPaimonCreatePartition() {
-
+    sql(String.format("ALTER TABLE %s DROP PARTITION (`name`='a')", tableName));
+    partitions = getQueryData(String.format("show partitions %s", tableName));
+    Assertions.assertEquals(2, partitions.size());
+    Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
   }
 
   private String getCreatePaimonSimpleTableString(String tableName) {
