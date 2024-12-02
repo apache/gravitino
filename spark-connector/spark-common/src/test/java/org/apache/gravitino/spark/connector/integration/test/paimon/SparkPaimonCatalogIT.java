@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
@@ -25,9 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
@@ -68,22 +68,18 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     String tableName = "test_paimon_partition_table";
     dropTableIfExists(tableName);
     String createTableSQL = getCreatePaimonSimpleTableString(tableName);
-    createTableSQL =
-            createTableSQL + " PARTITIONED BY (name, address);";
+    createTableSQL = createTableSQL + " PARTITIONED BY (name, address);";
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-            SparkTableInfoChecker.create()
-                    .withName(tableName)
-                    .withColumns(getPaimonSimpleTableColumn())
-                    .withIdentifyPartition(Collections.singletonList("name"))
-                    .withIdentifyPartition(Collections.singletonList("address"));
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getPaimonSimpleTableColumn())
+            .withIdentifyPartition(Collections.singletonList("name"))
+            .withIdentifyPartition(Collections.singletonList("address"));
     checker.check(tableInfo);
 
-    String insertData =
-            String.format(
-                    "INSERT into %s values(2,'a','beijing');",
-                    tableName);
+    String insertData = String.format("INSERT into %s values(2,'a','beijing');", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
@@ -102,14 +98,13 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     String tableName = "test_paimon_drop_partition";
     dropTableIfExists(tableName);
     String createTableSQL = getCreatePaimonSimpleTableString(tableName);
-    createTableSQL =
-            createTableSQL + " PARTITIONED BY (name);";
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
     sql(createTableSQL);
 
     String insertData =
-            String.format(
-                    "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
-                    tableName);
+        String.format(
+            "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
+            tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(3, queryResult.size());
@@ -126,14 +121,14 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   private String getCreatePaimonSimpleTableString(String tableName) {
     return String.format(
-            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING '') USING paimon",
-            tableName);
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING '') USING paimon",
+        tableName);
   }
 
   private List<SparkTableInfo.SparkColumnInfo> getPaimonSimpleTableColumn() {
     return Arrays.asList(
-            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-            SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
-            SparkTableInfo.SparkColumnInfo.of("address", DataTypes.StringType, ""));
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkTableInfo.SparkColumnInfo.of("address", DataTypes.StringType, ""));
   }
 }
