@@ -39,7 +39,7 @@ public class SetTableProperty extends Command {
   protected final String value;
 
   /**
-   * Set a property of a schema.
+   * Set a property of a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -69,6 +69,7 @@ public class SetTableProperty extends Command {
   }
 
   /** Set a property of a table. */
+  @Override
   public void handle() {
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);

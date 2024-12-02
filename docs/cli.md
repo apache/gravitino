@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags and topics. Future updates will expand on these capabilities.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
@@ -27,9 +27,9 @@ Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash
+  usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+  Options
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
- Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
  -d,--distribution       display distribution information
@@ -208,13 +208,13 @@ gcli metalake delete
 #### Rename a metalake
 
 ```bash
-gcli metalake update  --rename demo
+gcli metalake update --rename demo
 ```
 
 #### Update a metalake's comment
 
 ```bash
-gcli metalake update  --comment "new comment"
+gcli metalake update --comment "new comment"
 ```
 
 #### Display a metalake's properties
@@ -226,13 +226,13 @@ gcli metalake properties
 #### Set a metalake's property
 
 ```bash
-gcli metalake set  --property test --value value
+gcli metalake set --property test --value value
 ```
 
 #### Remove a metalake's property
 
 ```bash
-gcli metalake remove  --property test
+gcli metalake remove --property test
 ```
 
 ### Catalog commands
@@ -401,6 +401,26 @@ gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 gcli table delete --name catalog_postgres.hr.salaries
 ```
 
+
+#### Display a tables's properties
+
+```bash
+gcli table properties --name catalog_postgres.hr.salaries
+```
+
+#### Set a tables's property
+
+```bash
+gcli table set --name catalog_postgres.hr.salaries --property test --value value
+```
+
+#### Remove a tables's property
+
+```bash
+gcli table remove --name catalog_postgres.hr.salaries --property test
+```
+
+
 ### User commands
 
 #### Create a user
@@ -527,31 +547,7 @@ gcli tag update --tag tagA --rename newTag
 gcli tag update --tag tagA --comment "new comment"
 ```
 
-### Fileset commands
-
-#### Create a fileset
-
-```bash
-gcli fileset create --name hadoop.fileset.schema --fileset example --properties managed=true,location=file:/tmp/root/schema/example
-```
-
-#### List filesets
-
-```bash
-gcli fileset list --name hadoop.fileset.schema
-```
-
-#### Display a fileset's details
-
-```bash
-gcli fileset create --name hadoop.fileset.schema --fileset example --properties managed=true,location=file:/tmp/root/schema/example
-```
-
-#### Delete a fileset
-
-```bash
-gcli fileset delete --name hadoop.fileset.schema --fileset example
-### Owners commands
+### Owner commands
 
 #### List an owner
 
@@ -617,7 +613,7 @@ gcli group grant --group groupA --role admin
 
 #### Remove a role from a group
 ```bash
-gcli group revoke  --group groupA --role admin
+gcli group revoke --group groupA --role admin
 ```
 
 ### Topic commands
