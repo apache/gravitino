@@ -4,7 +4,7 @@ slug: /how-to-install
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Apache Gravitino from scratch
+## Install Apache Gravitino from scratch
 
 ### Prerequisites
 
