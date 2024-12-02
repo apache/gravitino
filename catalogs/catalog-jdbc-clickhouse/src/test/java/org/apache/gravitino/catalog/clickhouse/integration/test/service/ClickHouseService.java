@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.integration.test.service;
+package org.apache.gravitino.catalog.clickhouse.integration.test.service;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -32,25 +32,25 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.meta.AuditInfo;
 
-public class MysqlService {
+public class ClickHouseService {
 
   private Connection connection;
 
-  public MysqlService(MySQLContainer mysqlContainer, TestDatabaseName testDBName) {
-    String username = mysqlContainer.getUsername();
-    String password = mysqlContainer.getPassword();
+  public ClickHouseService(ClickHouseContainer clickhouseContainer, TestDatabaseName testDBName) {
+    String username = clickhouseContainer.getUsername();
+    String password = clickhouseContainer.getPassword();
 
     try {
       connection =
           DriverManager.getConnection(
               StringUtils.substring(
-                  mysqlContainer.getJdbcUrl(testDBName),
+                  clickhouseContainer.getJdbcUrl(testDBName),
                   0,
-                  mysqlContainer.getJdbcUrl(testDBName).lastIndexOf("/")),
+                  clickhouseContainer.getJdbcUrl(testDBName).lastIndexOf("/")),
               username,
               password);
     } catch (Exception e) {

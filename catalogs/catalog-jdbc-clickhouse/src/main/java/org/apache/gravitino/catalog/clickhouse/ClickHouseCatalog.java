@@ -16,38 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql;
+package org.apache.gravitino.catalog.clickhouse;
 
 import java.util.Map;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
+import org.apache.gravitino.catalog.clickhouse.operation.ClickHouseDatabaseOperations;
+import org.apache.gravitino.catalog.clickhouse.operation.ClickHouseTableOperations;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
-import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
+import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
-import org.apache.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
-import org.apache.gravitino.catalog.mysql.operation.MysqlTableOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 
-/** Implementation of a Mysql catalog in Apache Gravitino. */
-public class MysqlCatalog extends JdbcCatalog {
+/** Implementation of a Clickhouse catalog in Apache Gravitino. */
+public class ClickHouseCatalog extends JdbcCatalog {
 
-  private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_META =
-      new MysqlTablePropertiesMetadata();
+  private static final ClickHouseTablePropertiesMetadata TABLE_PROPERTIES_META =
+      new ClickHouseTablePropertiesMetadata();
 
   @Override
   public String shortName() {
-    return "jdbc-mysql";
+    return "jdbc-clickhouse";
   }
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
-    return new MySQLProtocolCompatibleCatalogOperations(
+    return new JdbcCatalogOperations(
         createExceptionConverter(),
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
@@ -57,27 +57,27 @@ public class MysqlCatalog extends JdbcCatalog {
 
   @Override
   public Capability newCapability() {
-    return new MysqlCatalogCapability();
+    return new ClickHouseCatalogCapability();
   }
 
   @Override
   protected JdbcTypeConverter createJdbcTypeConverter() {
-    return new MysqlTypeConverter();
+    return new ClickHouseTypeConverter();
   }
 
   @Override
   protected JdbcDatabaseOperations createJdbcDatabaseOperations() {
-    return new MysqlDatabaseOperations();
+    return new ClickHouseDatabaseOperations();
   }
 
   @Override
   protected JdbcTableOperations createJdbcTableOperations() {
-    return new MysqlTableOperations();
+    return new ClickHouseTableOperations();
   }
 
   @Override
   protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
-    return new MysqlColumnDefaultValueConverter();
+    return new ClickHouseColumnDefaultValueConverter();
   }
 
   @Override

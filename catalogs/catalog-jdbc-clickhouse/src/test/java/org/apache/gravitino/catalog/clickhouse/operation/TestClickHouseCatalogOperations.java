@@ -16,22 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.operation;
+package org.apache.gravitino.catalog.clickhouse.operation;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Set;
-import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import java.sql.SQLException;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseCatalog;
+import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
-/** Database operations for MySQL. */
-public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
+//@Tag("gravitino-docker-test")
+public class TestClickHouseCatalogOperations extends TestClickHouse {
 
-  @Override
-  protected boolean supportSchemaComment() {
-    return false;
-  }
-
-  @Override
-  protected Set<String> createSysDatabaseNameSet() {
-    return ImmutableSet.of("information_schema", "mysql", "sys", "performance_schema");
+  @Test
+  public void testCheckJDBCDriver() throws SQLException {
+    JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
+    catalogOperations.initialize(getClickHouseCatalogProperties(), null, new ClickHouseCatalog());
   }
 }

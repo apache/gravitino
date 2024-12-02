@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.converter;
+package org.apache.gravitino.catalog.clickhouse.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
@@ -24,6 +24,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -32,7 +33,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Types;
 
-public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
   @Override
   public Expression toGravitino(
@@ -40,68 +41,95 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       String columnDefaultValue,
       boolean isExpression,
       boolean nullable) {
-    if (columnDefaultValue == null) {
+    if (columnDefaultValue == null || columnDefaultValue.isEmpty()) {
       return nullable ? Literals.NULL : DEFAULT_VALUE_NOT_SET;
     }
 
-    if (columnDefaultValue.equalsIgnoreCase(NULL)) {
-      return Literals.NULL;
+    String reallyType = type.getTypeName();
+    if (reallyType.startsWith("Nullable(")) {
+      reallyType = type.getTypeName().substring(9, type.getTypeName().length() - 1);
     }
+
+    if (reallyType.startsWith("Decimal(")) {
+      reallyType = "Decimal";
+    }
+
+    if (reallyType.startsWith("FixedString(")) {
+      reallyType = "FixedString";
+    }
+
+    if (nullable) {
+      if (columnDefaultValue.equals("NULL")) {
+        return Literals.NULL;
+      }
+    }
+
+//    if (!(reallyType.equals(ClickHouseTypeConverter.STRING) || reallyType.equals(
+//        ClickHouseTypeConverter.FIXEDSTRING))) {
+//      if (columnDefaultValue.isEmpty()) {
+//        return Literals.NULL;
+//      }
+//    }
 
     if (isExpression) {
       if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
-      // The parsing of MySQL expressions is complex, so we are not currently undertaking the
+      // The parsing of ClickHouse expressions is complex, so we are not currently undertaking the
       // parsing.
       return UnparsedExpression.of(columnDefaultValue);
     }
 
-    switch (type.getTypeName().toLowerCase()) {
-      case MysqlTypeConverter.TINYINT:
+
+    switch (reallyType) {
+      case ClickHouseTypeConverter.INT8:
         return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.TINYINT_UNSIGNED:
+      case ClickHouseTypeConverter.UINT8:
         return Literals.unsignedByteLiteral(Short.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.SMALLINT:
+      case ClickHouseTypeConverter.INT16:
         return Literals.shortLiteral(Short.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.SMALLINT_UNSIGNED:
+      case ClickHouseTypeConverter.UINT16:
         return Literals.unsignedShortLiteral(Integer.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.INT:
+      case ClickHouseTypeConverter.INT32:
         return Literals.integerLiteral(Integer.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.INT_UNSIGNED:
+      case ClickHouseTypeConverter.UINT32:
         return Literals.unsignedIntegerLiteral(Long.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.BIGINT:
+      case ClickHouseTypeConverter.INT64:
         return Literals.longLiteral(Long.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.BIGINT_UNSIGNED:
+      case ClickHouseTypeConverter.UINT64:
         return Literals.unsignedLongLiteral(Decimal.of(columnDefaultValue));
-      case MysqlTypeConverter.FLOAT:
+      case ClickHouseTypeConverter.FLOAT32:
         return Literals.floatLiteral(Float.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.DOUBLE:
+      case ClickHouseTypeConverter.FLOAT64:
         return Literals.doubleLiteral(Double.valueOf(columnDefaultValue));
-      case MysqlTypeConverter.DECIMAL:
+      case ClickHouseTypeConverter.DECIMAL:
+        if (columnDefaultValue.equals("0.")) {
+          columnDefaultValue = "0.0";
+        }
         return Literals.decimalLiteral(
             Decimal.of(
                 columnDefaultValue,
                 Integer.parseInt(type.getColumnSize()),
                 Integer.parseInt(type.getScale())));
-      case JdbcTypeConverter.DATE:
+      case ClickHouseTypeConverter.DATE:
+        if (columnDefaultValue.equals("")) {
+          return Literals.NULL;
+        }
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
-      case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
-      case JdbcTypeConverter.TIMESTAMP:
-      case MysqlTypeConverter.DATETIME:
+      case ClickHouseTypeConverter.DATETIME:
+        columnDefaultValue = columnDefaultValue.substring(1, columnDefaultValue.length() - 1);
         return CURRENT_TIMESTAMP.equals(columnDefaultValue)
             ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
             : Literals.timestampLiteral(
                 LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
-      case JdbcTypeConverter.VARCHAR:
+      case ClickHouseTypeConverter.STRING:
+        // need exclude begin and end "'"
+        return Literals.of(columnDefaultValue.substring(1, columnDefaultValue.length() - 1),
+            Types.StringType.get());
+      case ClickHouseTypeConverter.FIXEDSTRING:
         return Literals.of(
-            columnDefaultValue, Types.VarCharType.of(Integer.parseInt(type.getColumnSize())));
-      case MysqlTypeConverter.CHAR:
-        return Literals.of(
-            columnDefaultValue, Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
-      case JdbcTypeConverter.TEXT:
-        return Literals.stringLiteral(columnDefaultValue);
+            columnDefaultValue.substring(1, columnDefaultValue.length() - 1),
+            Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
       default:
         return UnparsedExpression.of(columnDefaultValue);
     }

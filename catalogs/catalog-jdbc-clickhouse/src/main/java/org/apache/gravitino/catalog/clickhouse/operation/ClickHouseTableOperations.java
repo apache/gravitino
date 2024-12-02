@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.operation;
+package org.apache.gravitino.catalog.clickhouse.operation;
 
-import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
-import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -51,18 +50,18 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 
-/** Table operations for MySQL. */
-public class MysqlTableOperations extends JdbcTableOperations {
+/** Table operations for ClickHouse. */
+public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String BACK_QUOTE = "`";
-  private static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
-  private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
-      "Mysql does not support nested column names.";
+  private static final String CLICKHOUSE_AUTO_INCREMENT = "AUTO_INCREMENT";
+  private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
+      "Clickhouse does not support nested column names.";
 
   @Override
   protected String generateCreateTableSql(
@@ -73,20 +72,32 @@ public class MysqlTableOperations extends JdbcTableOperations {
       Transform[] partitioning,
       Distribution distribution,
       Index[] indexes) {
+    throw new UnsupportedOperationException(
+        "generateCreateTableSql with out sortOrders in clickhouse is not supported");
+  }
+  @Override
+  protected String generateCreateTableSql(
+      String tableName,
+      JdbcColumn[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      Index[] indexes,
+      SortOrder[] sortOrders) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
-      throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
+      throw new UnsupportedOperationException(
+          "Currently we do not support Partitioning in clickhouse");
     }
 
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "MySQL does not support distribution");
+        Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
 
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("CREATE TABLE ")
-        .append(BACK_QUOTE)
         .append(tableName)
-        .append(BACK_QUOTE)
         .append(" (\n");
 
     // Add columns
@@ -95,11 +106,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
       sqlBuilder
           .append(SPACE)
           .append(SPACE)
-          .append(BACK_QUOTE)
-          .append(column.name())
-          .append(BACK_QUOTE);
+          .append(column.name());
 
-      appendColumnDefinition(column, sqlBuilder);
+      appendColumnDefinition(column, sqlBuilder, false);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
         sqlBuilder.append(",\n");
@@ -110,11 +119,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     sqlBuilder.append("\n)");
 
-    // Add table comment if specified
-    if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
-    }
-
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       sqlBuilder.append(
@@ -123,35 +127,41 @@ public class MysqlTableOperations extends JdbcTableOperations {
               .collect(Collectors.joining(",\n", "\n", "")));
     }
 
+    if (ArrayUtils.isNotEmpty(sortOrders)) {
+      if (sortOrders.length > 1 ) {
+        throw new UnsupportedOperationException(
+            "Currently we do not support sortOrders's length > 1");
+      } else if (sortOrders[0].nullOrdering() != null || sortOrders[0].direction() != null) {
+        //If no value is set earlier, some default values will be set.
+        // It is difficult to determine whether the user has set a value.
+        LOG.warn(
+            "clickhouse currently do not support nullOrdering: {} and direction: {} of sortOrders,and will ignore these",
+            sortOrders[0].nullOrdering(), sortOrders[0].direction());
+      }
+      sqlBuilder.append(" \n ORDER BY " + sortOrders[0].expression() + " \n");
+    }
+
+    // Add table comment if specified
+    if (StringUtils.isNotEmpty(comment)) {
+      sqlBuilder.append(" COMMENT '").append(comment).append("'");
+    }
+
     // Return the generated SQL statement
-    String result = sqlBuilder.append(";").toString();
+    String result = sqlBuilder.toString();
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
   }
 
   public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    if(indexes == null){
+      return;
+    }
+
     for (Index index : indexes) {
-      String fieldStr = getIndexFieldStr(index.fieldNames());
-      sqlBuilder.append(",\n");
       switch (index.type()) {
-        case PRIMARY_KEY:
-          if (null != index.name()
-              && !StringUtils.equalsIgnoreCase(
-                  index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
-            throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
-          }
-          sqlBuilder.append("CONSTRAINT ").append("PRIMARY KEY (").append(fieldStr).append(")");
-          break;
-        case UNIQUE_KEY:
-          sqlBuilder.append("CONSTRAINT ");
-          if (null != index.name()) {
-            sqlBuilder.append(BACK_QUOTE).append(index.name()).append(BACK_QUOTE);
-          }
-          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
-          break;
         default:
-          throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
+          throw new IllegalArgumentException("ClickHouse doesn't support index : " + index.type());
       }
     }
   }
@@ -164,23 +174,18 @@ public class MysqlTableOperations extends JdbcTableOperations {
   @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
-    // MySQL in CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci is case-insensitive, when the name is
-    // hello, the result can be 'HELLO', 'Hello', 'hello' and so on.
-    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
+    try (PreparedStatement statement = connection.prepareStatement(
+        "select * from system.tables where name = ? ")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
         while (resultSet.next()) {
-          String name = resultSet.getString("NAME");
+          String name = resultSet.getString("name");
           if (Objects.equals(name, tableName)) {
             return Collections.unmodifiableMap(
                 new HashMap<String, String>() {
                   {
                     put(COMMENT, resultSet.getString(COMMENT));
-                    put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                    String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                    if (StringUtils.isNotEmpty(autoIncrement)) {
-                      put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                    }
+                    put(CLICKHOUSE_ENGINE_KEY, resultSet.getString(CLICKHOUSE_ENGINE_KEY));
                   }
                 });
           }
@@ -192,13 +197,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
   }
 
+
   @Override
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
     if (StringUtils.isEmpty(tableBuilder.comment())) {
-      // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
-      LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
+      // In Clickhouse version 5.7, the comment field value cannot be obtained in the driver API.
+      LOG.warn("Not found comment in clickhouse driver api. Will try to get comment from sql");
       tableBuilder.withComment(
           tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
     }
@@ -207,7 +213,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
-        "MySQL does not support purge table in Gravitino, please use drop table");
+        "ClickHouse does not support purge table in Gravitino, please use drop table");
   }
 
   @Override
@@ -226,7 +232,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         // The set attribute needs to be added at the end.
         setProperties.add(((TableChange.SetProperty) change));
       } else if (change instanceof TableChange.RemoveProperty) {
-        // mysql does not support deleting table attributes, it can be replaced by Set Property
+        // clickhouse does not support deleting table attributes, it can be replaced by Set Property
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
@@ -235,7 +241,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.RenameColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
-        alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadTable));
+        alterSql.add(renameColumnFieldDefinition(renameColumn));
       } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
@@ -268,8 +274,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
-      } else if (change instanceof TableChange.AddIndex) {
-        alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
@@ -284,7 +288,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
     if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
+      alterSql.add(generateAlterTableProperties(setProperties));
     }
 
     // Last modified comment
@@ -302,7 +306,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
+      alterSql.add(generateAlterTableProperties(setProperties));
     }
 
     if (CollectionUtils.isEmpty(alterSql)) {
@@ -339,7 +343,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         + BACK_QUOTE
         + col
         + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+        + appendColumnDefinition(updateColumn, new StringBuilder(), true);
   }
 
   @VisibleForTesting
@@ -372,49 +376,27 @@ public class MysqlTableOperations extends JdbcTableOperations {
         + BACK_QUOTE
         + col
         + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+        + appendColumnDefinition(updateColumn, new StringBuilder(), true);
   }
 
-  @VisibleForTesting
-  static String addIndexDefinition(TableChange.AddIndex addIndex) {
-    StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("ADD ");
-    switch (addIndex.getType()) {
-      case PRIMARY_KEY:
-        if (null != addIndex.getName()
-            && !StringUtils.equalsIgnoreCase(
-                addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
-          throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
-        }
-        sqlBuilder.append("PRIMARY KEY ");
-        break;
-      case UNIQUE_KEY:
-        sqlBuilder
-            .append("UNIQUE INDEX ")
-            .append(BACK_QUOTE)
-            .append(addIndex.getName())
-            .append(BACK_QUOTE);
-        break;
-      default:
-        break;
+  private String generateAlterTableProperties(List<TableChange.SetProperty> setProperties) {
+    if (CollectionUtils.isNotEmpty(setProperties)) {
+      throw new UnsupportedOperationException("alter table properties in ck is not supported");
     }
-    sqlBuilder.append(" (").append(getIndexFieldStr(addIndex.getFieldNames())).append(")");
-    return sqlBuilder.toString();
-  }
 
-  private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
-    return setProperties.stream()
-        .map(
-            setProperty ->
-                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
-        .collect(Collectors.joining(",\n"));
+    return "";
+//    return setProperties.stream()
+//        .map(
+//            setProperty ->
+//                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+//        .collect(Collectors.joining(",\n"));
   }
 
   private String updateColumnCommentFieldDefinition(
       TableChange.UpdateColumnComment updateColumnComment, JdbcTable jdbcTable) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -431,13 +413,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
         + BACK_QUOTE
         + col
         + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+        + appendColumnDefinition(updateColumn, new StringBuilder(), true);
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
     String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = addColumn.fieldName()[0];
 
@@ -455,7 +437,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       Preconditions.checkArgument(
           Types.allowAutoIncrement(addColumn.getDataType()),
           "Auto increment is not allowed, type: " + addColumn.getDataType());
-      columnDefinition.append(MYSQL_AUTO_INCREMENT).append(SPACE);
+      columnDefinition.append(CLICKHOUSE_AUTO_INCREMENT).append(SPACE);
     }
 
     if (!addColumn.isNullable()) {
@@ -467,12 +449,18 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     // Append default value if available
+    //TODO clickhouse need expression, not only DEFAULT value
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
-      columnDefinition
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
-          .append(SPACE);
+      throw new UnsupportedOperationException(
+          "add colum default value of clickhouse not supported");
     }
+
+    //    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+//      columnDefinition
+//          .append("DEFAULT ")
+//          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+//          .append(SPACE);
+//    }
 
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
@@ -485,7 +473,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
           .append(afterPosition.getColumn())
           .append(BACK_QUOTE);
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
-      // do nothing, follow the default behavior of mysql
+      // do nothing, follow the default behavior of clickhouse
     } else {
       throw new IllegalArgumentException("Invalid column position.");
     }
@@ -493,46 +481,38 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String renameColumnFieldDefinition(
-      TableChange.RenameColumn renameColumn, JdbcTable jdbcTable) {
+      TableChange.RenameColumn renameColumn) {
     if (renameColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
 
     String oldColumnName = renameColumn.fieldName()[0];
     String newColumnName = renameColumn.getNewName();
-    JdbcColumn column = getJdbcColumnFromTable(jdbcTable, oldColumnName);
     StringBuilder sqlBuilder =
         new StringBuilder(
-            "CHANGE COLUMN "
+            "RENAME COLUMN "
                 + BACK_QUOTE
                 + oldColumnName
                 + BACK_QUOTE
                 + SPACE
+                + "TO"
+                + SPACE
                 + BACK_QUOTE
                 + newColumnName
                 + BACK_QUOTE);
-    JdbcColumn newColumn =
-        JdbcColumn.builder()
-            .withName(newColumnName)
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withDefaultValue(column.defaultValue())
-            .withNullable(column.nullable())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
-    return appendColumnDefinition(newColumn, sqlBuilder).toString();
+    return sqlBuilder.toString();
   }
 
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, JdbcTable jdbcTable) {
     if (updateColumnPosition.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append(MODIFY_COLUMN).append(quote(col));
-    appendColumnDefinition(column, columnDefinition);
+    appendColumnDefinition(column, columnDefinition, true);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
@@ -550,7 +530,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable jdbcTable) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists = true;
@@ -572,7 +552,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnDefaultValueFieldDefinition(
       TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
     if (updateColumnDefaultValue.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -585,13 +565,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
             .build();
-    return appendColumnDefinition(newColumn, sqlBuilder).toString();
+    return appendColumnDefinition(newColumn, sqlBuilder, true).toString();
   }
 
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -605,18 +585,21 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return appendColumnDefinition(newColumn, sqlBuilder).toString();
+    return appendColumnDefinition(newColumn, sqlBuilder, true).toString();
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder , boolean isUpdateCol) {
     // Add data type
     sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
-    // Add NOT NULL if the column is marked as such
-    if (column.nullable()) {
-      sqlBuilder.append("NULL ");
-    } else {
-      sqlBuilder.append("NOT NULL ");
+
+    //     ck no support alter table with set nullable
+    if (!isUpdateCol) {
+      if (column.nullable()) {
+        sqlBuilder.append("NULL ");
+      } else {
+        sqlBuilder.append("NOT NULL ");
+      }
     }
 
     // Add DEFAULT value if specified
@@ -629,7 +612,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {
-      sqlBuilder.append(MYSQL_AUTO_INCREMENT).append(" ");
+      sqlBuilder.append(CLICKHOUSE_AUTO_INCREMENT).append(" ");
     }
 
     // Add column comment if specified

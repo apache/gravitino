@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql;
+package org.apache.gravitino.catalog.clickhouse;
 
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
-public class MysqlCatalogCapability implements Capability {
+public class ClickHouseCatalogCapability implements Capability {
   /**
    * Regular expression explanation: ^[\w\p{L}-$/=]{1,64}$
    *
@@ -37,12 +37,12 @@ public class MysqlCatalogCapability implements Capability {
    *
    * <p>$ - End of the string
    */
-  public static final String MYSQL_NAME_PATTERN = "^[\\w\\p{L}-$/=]{1,64}$";
+  public static final String CLICKHOUSE_NAME_PATTERN = "^[\\w\\p{L}-$/=]{1,64}$";
 
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
     // TODO: Validate the name against reserved words
-    if (!name.matches(MYSQL_NAME_PATTERN)) {
+    if (!name.matches(CLICKHOUSE_NAME_PATTERN)) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is illegal.", scope, name));
     }

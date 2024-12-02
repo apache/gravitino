@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -59,7 +60,11 @@ public class JdbcColumnDefaultValueConverter {
       } else if (type instanceof Type.NumericType) {
         return literal.value().toString();
       } else {
-        return String.format("'%s'", literal.value());
+        Object value = literal.value();
+        if(value instanceof LocalDateTime){
+          value = ((LocalDateTime) value).format(DATE_TIME_FORMATTER);
+        }
+        return String.format("'%s'", value);
       }
     }
 

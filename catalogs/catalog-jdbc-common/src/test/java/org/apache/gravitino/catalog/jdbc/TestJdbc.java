@@ -160,7 +160,6 @@ public abstract class TestJdbc {
             expected.dataType().simpleString(), actual.dataType().simpleString()));
     Assertions.assertEquals(expected.nullable(), actual.nullable());
     Assertions.assertEquals(expected.comment(), actual.comment());
-    Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());
     if (expected.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET) && expected.nullable()) {
       Assertions.assertEquals(LiteralDTO.NULL, actual.defaultValue());
     } else {

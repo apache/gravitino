@@ -17,7 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.mysql.integration.test;
+package org.apache.gravitino.catalog.clickhouse.integration.test;
+
+
+import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseUtils.getSortOrders;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -31,34 +35,39 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
-import org.apache.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.types.Types;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
-public class AuditCatalogMysqlIT extends BaseIT {
+//@Tag("gravitino-docker-test")
+public class AuditCatalogClickHouseIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
+  public static final String metalakeName =
+      GravitinoITUtils.genRandomName("audit_clickhouse_metalake");
   private static final String expectUser = System.getProperty("user.name");
   protected static TestDatabaseName TEST_DB_NAME;
-  private static final String provider = "jdbc-mysql";
+  private static final String provider = "jdbc-clickhouse";
 
-  private static MysqlService mysqlService;
-  private static MySQLContainer MYSQL_CONTAINER;
+  private static ClickHouseService clickhouseService;
+  private static ClickHouseContainer CLICKHOUSE_CONTAINER;
   private static GravitinoMetalake metalake;
 
   @BeforeAll
@@ -68,23 +77,25 @@ public class AuditCatalogMysqlIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT);
-    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-    TEST_DB_NAME = TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT;
-    mysqlService = new MysqlService(containerSuite.getMySQLContainer(), TEST_DB_NAME);
+    containerSuite.startClickHouseContainer(
+        TestDatabaseName.CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT);
+    CLICKHOUSE_CONTAINER = containerSuite.getClickHouseContainer();
+    TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT;
+    clickhouseService =
+        new ClickHouseService(containerSuite.getClickHouseContainer(), TEST_DB_NAME);
     createMetalake();
   }
 
   @AfterAll
   public void stopIntegrationTest() throws IOException, InterruptedException {
     client.dropMetalake(metalakeName, true);
-    mysqlService.close();
+    clickhouseService.close();
     super.stopIntegrationTest();
   }
 
   @Test
   public void testAuditCatalog() throws Exception {
-    String catalogName = GravitinoITUtils.genRandomName("audit_mysql_catalog");
+    String catalogName = GravitinoITUtils.genRandomName("audit_clickhouse_catalog");
     Catalog catalog = createCatalog(catalogName);
 
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
@@ -100,8 +111,8 @@ public class AuditCatalogMysqlIT extends BaseIT {
 
   @Test
   public void testAuditSchema() throws Exception {
-    String catalogName = GravitinoITUtils.genRandomName("audit_mysql_schema_catalog");
-    String schemaName = GravitinoITUtils.genRandomName("audit_mysql_schema");
+    String catalogName = GravitinoITUtils.genRandomName("audit_clickhouse_schema_catalog");
+    String schemaName = GravitinoITUtils.genRandomName("audit_clickhouse_schema");
     Catalog catalog = createCatalog(catalogName);
     Map<String, String> prop = Maps.newHashMap();
     Schema schema = catalog.asSchemas().createSchema(schemaName, null, prop);
@@ -114,13 +125,14 @@ public class AuditCatalogMysqlIT extends BaseIT {
 
   @Test
   public void testAuditTable() throws Exception {
-    String catalogName = GravitinoITUtils.genRandomName("audit_mysql_table_catalog");
-    String schemaName = GravitinoITUtils.genRandomName("audit_mysql_table_schema");
-    String tableName = GravitinoITUtils.genRandomName("audit_mysql_table");
+    String catalogName = GravitinoITUtils.genRandomName("audit_clickhouse_table_catalog");
+    String schemaName = GravitinoITUtils.genRandomName("audit_clickhouse_table_schema");
+    String tableName = GravitinoITUtils.genRandomName("audit_clickhouse_table");
     Catalog catalog = createCatalog(catalogName);
     Map<String, String> properties = Maps.newHashMap();
 
-    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
+    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment", false, false,
+        DEFAULT_VALUE_NOT_SET);
 
     catalog.asSchemas().createSchema(schemaName, null, properties);
     Table table =
@@ -130,7 +142,11 @@ public class AuditCatalogMysqlIT extends BaseIT {
                 NameIdentifier.of(schemaName, tableName),
                 new Column[] {col1},
                 "comment",
-                properties);
+                properties,
+                null,
+                null,
+                getSortOrders("col_1")
+                );
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
     Assertions.assertNull(table.auditInfo().lastModifier());
     table =
@@ -153,13 +169,14 @@ public class AuditCatalogMysqlIT extends BaseIT {
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
             0,
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"))
+            + "/?compress_algorithm=none");
     catalogProperties.put(
-        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
-    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
-    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
+        JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), CLICKHOUSE_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), CLICKHOUSE_CONTAINER.getPassword());
 
     return metalake.createCatalog(
         catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);

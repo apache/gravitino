@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql;
+package org.apache.gravitino.catalog.clickhouse;
 
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
 import java.util.Collections;
@@ -30,23 +29,18 @@ import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
-  public static final String GRAVITINO_ENGINE_KEY = MysqlConstants.GRAVITINO_ENGINE_KEY;
-  public static final String MYSQL_ENGINE_KEY = MysqlConstants.MYSQL_ENGINE_KEY;
-  public static final String GRAVITINO_AUTO_INCREMENT_OFFSET_KEY =
-      MysqlConstants.GRAVITINO_AUTO_INCREMENT_OFFSET_KEY;
-  public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY =
-      MysqlConstants.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
+public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
+  public static final String GRAVITINO_ENGINE_KEY = ClickHouseConstants.GRAVITINO_ENGINE_KEY;
+  public static final String CLICKHOUSE_ENGINE_KEY = ClickHouseConstants.CLICKHOUSE_ENGINE_KEY;
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       createPropertiesMetadata();
 
-  public static final BidiMap<String, String> GRAVITINO_CONFIG_TO_MYSQL =
-      createGravitinoConfigToMysql();
+  public static final BidiMap<String, String> GRAVITINO_CONFIG_TO_CLICKHOUSE =
+      createGravitinoConfigToClickhouse();
 
-  private static BidiMap<String, String> createGravitinoConfigToMysql() {
+  private static BidiMap<String, String> createGravitinoConfigToClickhouse() {
     BidiMap<String, String> map = new TreeBidiMap<>();
-    map.put(GRAVITINO_ENGINE_KEY, MYSQL_ENGINE_KEY);
-    map.put(GRAVITINO_AUTO_INCREMENT_OFFSET_KEY, MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+    map.put(GRAVITINO_ENGINE_KEY, CLICKHOUSE_ENGINE_KEY);
     return map;
   }
 
@@ -60,34 +54,57 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
             "The table engine",
             false,
             ENGINE.class,
-            ENGINE.INNODB,
+            ENGINE.MERGE_TREE,
             false,
-            false));
-    // auto_increment properties can only be specified when creating and cannot be
-    // modified.
-    map.put(
-        GRAVITINO_AUTO_INCREMENT_OFFSET_KEY,
-        integerOptionalPropertyEntry(
-            GRAVITINO_AUTO_INCREMENT_OFFSET_KEY,
-            "The table auto increment offset",
-            true,
-            null,
             false));
     return Collections.unmodifiableMap(map);
   }
 
+  /** refer https://clickhouse.com/docs/en/engines/table-engines */
   public enum ENGINE {
-    NDBCLUSTER("ndbcluster"),
-    FEDERATED("FEDERATED"),
-    MEMORY("MEMORY"),
     INNODB("InnoDB"),
-    PERFORMANCE_SCHEMA("PERFORMANCE_SCHEMA"),
-    MYISAM("MyISAM"),
-    NDBINFO("ndbinfo"),
-    MRG_MYISAM("MRG_MYISAM"),
-    BLACKHOLE("BLACKHOLE"),
-    CSV("CSV"),
-    ARCHIVE("ARCHIVE");
+    //    MergeTree
+    MERGE_TREE("MergeTree"),
+    REPLACING_MERGE_TREE("ReplacingMergeTree"),
+    SUMMING_MERGE_TREE("SummingMergeTree"),
+    AGGREGATING_MERGE_TREE("AggregatingMergeTree"),
+    COLLAPSING_MERGE_TREE("CollapsingMergeTree"),
+    VERSIONED_COLLAPSING_MERGE_TREE("VersionedCollapsingMergeTree"),
+    GRAPHITE_MERGE_TREE("GraphiteMergeTree"),
+
+    //    Log
+    TINY_LOG("TinyLog"),
+    STRIPE_LOG("StripeLog"),
+    LOG("Log"),
+
+    //    Integration Engines
+    ODBC("ODBC"),
+    JDBC("JDBC"),
+    MySQL("MySQL"),
+    MONGODB("MongoDB"),
+    Redis("Redis"),
+    HDFS("HDFS"),
+    S3("S3"),
+    KAFKA("Kafka"),
+    EMBEDDED_ROCKSDB("EmbeddedRocksDB"),
+    RABBITMQ("RabbitMQ"),
+    POSTGRESQL("PostgreSQL"),
+    S3QUEUE("S3Queue"),
+    TIMESERIES("TimeSeries"),
+
+    // Special Engines
+    DISTRIBUTED("Distributed"),
+    DICTIONARY("Dictionary"),
+    MERGE("Merge"),
+    FILE("File"),
+    NULL("Null"),
+    SET("Set"),
+    JOIN("Join"),
+    URL("URL"),
+    VIEW("View"),
+    MEMORY("Memory"),
+    BUFFER("Buffer"),
+    KEEPER_MAP("KeeperMap");
 
     private final String value;
 
@@ -112,8 +129,8 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
           {
             properties.forEach(
                 (key, value) -> {
-                  if (GRAVITINO_CONFIG_TO_MYSQL.containsKey(key)) {
-                    put(GRAVITINO_CONFIG_TO_MYSQL.get(key), value);
+                  if (GRAVITINO_CONFIG_TO_CLICKHOUSE.containsKey(key)) {
+                    put(GRAVITINO_CONFIG_TO_CLICKHOUSE.get(key), value);
                   }
                 });
           }
@@ -122,14 +139,15 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   @Override
   public Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
-    BidiMap<String, String> mysqlConfigToGravitino = GRAVITINO_CONFIG_TO_MYSQL.inverseBidiMap();
+    BidiMap<String, String> clickhouseConfigToGravitino =
+        GRAVITINO_CONFIG_TO_CLICKHOUSE.inverseBidiMap();
     return Collections.unmodifiableMap(
         new HashMap<String, String>() {
           {
             properties.forEach(
                 (key, value) -> {
-                  if (mysqlConfigToGravitino.containsKey(key)) {
-                    put(mysqlConfigToGravitino.get(key), value);
+                  if (clickhouseConfigToGravitino.containsKey(key)) {
+                    put(clickhouseConfigToGravitino.get(key), value);
                   }
                 });
           }

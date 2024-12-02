@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.mysql.integration.test;
+package org.apache.gravitino.catalog.clickhouse.integration.test;
 
 import org.junit.jupiter.api.Tag;
 
-@Tag("gravitino-docker-test")
-public class CatalogMysqlDriverIT extends CatalogMysqlIT {
-  public CatalogMysqlDriverIT() {
+//@Tag("gravitino-docker-test")
+public class CatalogClickHouseDriverIT extends CatalogClickHouseIT {
+  public CatalogClickHouseDriverIT() {
     super();
   }
 }

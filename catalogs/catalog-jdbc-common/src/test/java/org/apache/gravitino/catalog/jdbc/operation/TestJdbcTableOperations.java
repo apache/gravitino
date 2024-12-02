@@ -156,7 +156,8 @@ public class TestJdbcTableOperations {
                 properties,
                 null,
                 Distributions.NONE,
-                Indexes.EMPTY_INDEXES));
+                Indexes.EMPTY_INDEXES,
+                null));
 
     // list table.
     List<String> allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);

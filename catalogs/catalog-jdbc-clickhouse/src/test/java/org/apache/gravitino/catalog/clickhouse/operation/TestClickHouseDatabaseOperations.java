@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.operation;
+package org.apache.gravitino.catalog.clickhouse.operation;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,30 +24,38 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
-public class TestMysqlDatabaseOperations extends TestMysql {
+
+//@Tag("gravitino-docker-test")
+public class TestClickHouseDatabaseOperations extends TestClickHouse {
 
   @Test
   public void testBaseOperationDatabase() {
     String databaseName = RandomNameUtils.genRandomName("ct_db");
     Map<String, String> properties = new HashMap<>();
-    // Mysql database creation does not support incoming comments.
+    // Clickhouse database creation does not support incoming comments.
     String comment = null;
     List<String> databases = DATABASE_OPERATIONS.listDatabases();
-    ((MysqlDatabaseOperations) DATABASE_OPERATIONS)
+    ((ClickHouseDatabaseOperations) DATABASE_OPERATIONS)
         .createSysDatabaseNameSet()
         .forEach(
-            sysMysqlDatabaseName ->
-                Assertions.assertFalse(databases.contains(sysMysqlDatabaseName)));
+            sysClickhouseDatabaseName ->
+                Assertions.assertFalse(databases.contains(sysClickhouseDatabaseName)));
     testBaseOperation(databaseName, properties, comment);
     testDropDatabase(databaseName);
   }
@@ -59,7 +67,7 @@ public class TestMysqlDatabaseOperations extends TestMysql {
     DATABASE_OPERATIONS.create(databaseName, null, properties);
     DATABASE_OPERATIONS.delete(databaseName, false);
 
-    databaseName = RandomNameUtils.genRandomName("ct_db") + "--------end";
+    databaseName = RandomNameUtils.genRandomName("ct_db") + "_end";
     DATABASE_OPERATIONS.create(databaseName, null, properties);
 
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
@@ -70,8 +78,22 @@ public class TestMysqlDatabaseOperations extends TestMysql {
             .withName("col_1")
             .withType(Types.VarCharType.of(100))
             .withComment("test_comment")
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.VarCharType.of(100))
+            .withComment("test_comment2")
             .withNullable(true)
             .build());
+
+    Index[] indexes = new Index[] {};
+
+    SortOrder[] sortOrders = new SortOrders.SortImpl[]{
+        SortOrders.of(
+            NamedReference.field("col_1"), null, null)
+    };
 
     TABLE_OPERATIONS.create(
         databaseName,
@@ -81,7 +103,8 @@ public class TestMysqlDatabaseOperations extends TestMysql {
         properties,
         new Transform[0],
         Distributions.NONE,
-        new Index[0]);
+        indexes,
+        sortOrders);
     DATABASE_OPERATIONS.delete(databaseName, true);
   }
 }

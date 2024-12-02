@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.integration.test;
+package org.apache.gravitino.catalog.clickhouse.integration.test;
 
-import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseUtils.getSortOrders;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -42,14 +44,14 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
-import org.apache.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -82,40 +84,40 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
 
-@Tag("gravitino-docker-test")
+//@Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class CatalogMysqlIT extends BaseIT {
+public class CatalogClickHouseIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static final String provider = "jdbc-mysql";
+  private static final String provider = "jdbc-clickhouse";
 
-  public String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
-  public String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
-  public String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
-  public String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
+  public String metalakeName = GravitinoITUtils.genRandomName("clickhouse_it_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("clickhouse_it_catalog");
+  public String schemaName = GravitinoITUtils.genRandomName("clickhouse_it_schema");
+  public String tableName = GravitinoITUtils.genRandomName("clickhouse_it_table");
   public String alertTableName = "alert_table_name";
   public String table_comment = "table_comment";
 
-  // MySQL doesn't support schema comment
+  // ClickHouse doesn't support schema comment
   public String schema_comment = null;
-  public String MYSQL_COL_NAME1 = "mysql_col_name1";
-  public String MYSQL_COL_NAME2 = "mysql_col_name2";
-  public String MYSQL_COL_NAME3 = "mysql_col_name3";
-  public String MYSQL_COL_NAME4 = "mysql_col_name4";
-  public String MYSQL_COL_NAME5 = "mysql_col_name5";
+  public String CLICKHOUSE_COL_NAME1 = "clickhouse_col_name1";
+  public String CLICKHOUSE_COL_NAME2 = "clickhouse_col_name2";
+  public String CLICKHOUSE_COL_NAME3 = "clickhouse_col_name3";
+  public String CLICKHOUSE_COL_NAME4 = "clickhouse_col_name4";
+  public String CLICKHOUSE_COL_NAME5 = "clickhouse_col_name5";
 
   private GravitinoMetalake metalake;
 
   protected Catalog catalog;
 
-  private MysqlService mysqlService;
+  private ClickHouseService clickhouseService;
 
-  private MySQLContainer MYSQL_CONTAINER;
+  private ClickHouseContainer CLICKHOUSE_CONTAINER;
 
   private TestDatabaseName TEST_DB_NAME;
 
-  public static final String defaultMysqlImageName = "mysql:8.0";
+  public static final String defaultClickhouseImageName = "clickhouse:8.0";
 
-  protected String mysqlImageName = defaultMysqlImageName;
+  protected String clickhouseImageName = defaultClickhouseImageName;
 
   boolean SupportColumnDefaultValueExpression() {
     return true;
@@ -123,17 +125,18 @@ public class CatalogMysqlIT extends BaseIT {
 
   @BeforeAll
   public void startup() throws IOException, SQLException {
-    TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
+    TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT;
 
-    if (mysqlImageName.equals("mysql:5.7")) {
-      containerSuite.startMySQLVersion5Container(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
-      MYSQL_CONTAINER = containerSuite.getMySQLVersion5Container();
-    } else {
-      containerSuite.startMySQLContainer(TEST_DB_NAME);
-      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-    }
+    //    if (clickhouseImageName.equals("clickhouse:5.7")) {
+    //
+    // containerSuite.startClickHouseVersion5Container(TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT);
+    //      CLICKHOUSE_CONTAINER = containerSuite.getClickHouseVersion5Container();
+    //    } else {
+    containerSuite.startClickHouseContainer(TEST_DB_NAME);
+    CLICKHOUSE_CONTAINER = containerSuite.getClickHouseContainer();
+    //    }
 
-    mysqlService = new MysqlService(MYSQL_CONTAINER, TEST_DB_NAME);
+    clickhouseService = new ClickHouseService(CLICKHOUSE_CONTAINER, TEST_DB_NAME);
     createMetalake();
     createCatalog();
     createSchema();
@@ -146,7 +149,7 @@ public class CatalogMysqlIT extends BaseIT {
     metalake.dropCatalog(catalogName);
     client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
-    mysqlService.close();
+    clickhouseService.close();
   }
 
   @AfterEach
@@ -181,13 +184,14 @@ public class CatalogMysqlIT extends BaseIT {
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
             0,
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")
+                )+"/?compress_algorithm=none");
     catalogProperties.put(
-        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
-    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
-    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
+        JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), CLICKHOUSE_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), CLICKHOUSE_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
@@ -208,9 +212,10 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   private Column[] createColumns() {
-    Column col1 = Column.of(MYSQL_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
-    Column col2 = Column.of(MYSQL_COL_NAME2, Types.DateType.get(), "col_2_comment");
-    Column col3 = Column.of(MYSQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
+    Column col1 = Column.of(CLICKHOUSE_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
+    Column col2 = Column.of(CLICKHOUSE_COL_NAME2, Types.DateType.get(), "col_2_comment");
+    Column col3 = Column.of(CLICKHOUSE_COL_NAME3, Types.StringType.get(), "col_3_comment", false,
+        false, DEFAULT_VALUE_NOT_SET);
 
     return new Column[] {col1, col2, col3};
   }
@@ -218,30 +223,35 @@ public class CatalogMysqlIT extends BaseIT {
   private Column[] createColumnsWithDefaultValue() {
     return new Column[] {
       Column.of(
-          MYSQL_COL_NAME1,
+          CLICKHOUSE_COL_NAME1,
           Types.FloatType.get(),
           "col_1_comment",
           false,
           false,
           Literals.of("1.23", Types.FloatType.get())),
       Column.of(
-          MYSQL_COL_NAME2,
+          CLICKHOUSE_COL_NAME2,
           Types.TimestampType.withoutTimeZone(),
           "col_2_comment",
           false,
           false,
           FunctionExpression.of("current_timestamp")),
       Column.of(
-          MYSQL_COL_NAME3, Types.VarCharType.of(255), "col_3_comment", true, false, Literals.NULL),
+          CLICKHOUSE_COL_NAME3,
+          Types.VarCharType.of(255),
+          "col_3_comment",
+          true,
+          false,
+          Literals.NULL),
       Column.of(
-          MYSQL_COL_NAME4,
+          CLICKHOUSE_COL_NAME4,
           Types.IntegerType.get(),
           "col_4_comment",
           false,
           false,
           Literals.of("1000", Types.IntegerType.get())),
       Column.of(
-          MYSQL_COL_NAME5,
+          CLICKHOUSE_COL_NAME5,
           Types.DecimalType.of(3, 2),
           "col_5_comment",
           true,
@@ -257,7 +267,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testOperationMysqlSchema() {
+  void testOperationClickhouseSchema() {
     SupportsSchemas schemas = catalog.asSchemas();
     Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
@@ -265,9 +275,9 @@ public class CatalogMysqlIT extends BaseIT {
     Set<String> schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
-    NameIdentifier[] mysqlNamespaces = mysqlService.listSchemas(namespace);
+    NameIdentifier[] clickhouseNamespaces = clickhouseService.listSchemas(namespace);
     schemaNames =
-        Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
+        Arrays.stream(clickhouseNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     // create schema check.
@@ -278,9 +288,9 @@ public class CatalogMysqlIT extends BaseIT {
     schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
-    mysqlNamespaces = mysqlService.listSchemas(namespace);
+    clickhouseNamespaces = clickhouseService.listSchemas(namespace);
     schemaNames =
-        Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
+        Arrays.stream(clickhouseNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     Map<String, String> emptyMap = Collections.emptyMap();
@@ -294,7 +304,7 @@ public class CatalogMysqlIT extends BaseIT {
     schemas.dropSchema(testSchemaName, false);
     Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(testSchemaName));
     Assertions.assertThrows(
-        NoSuchSchemaException.class, () -> mysqlService.loadSchema(schemaIdent));
+        NoSuchSchemaException.class, () -> clickhouseService.loadSchema(schemaIdent));
 
     nameIdentifiers = schemas.listSchemas();
     schemaNames = Sets.newHashSet(nameIdentifiers);
@@ -314,26 +324,24 @@ public class CatalogMysqlIT extends BaseIT {
                 createProperties(),
                 null,
                 Distributions.NONE,
-                null));
+                getSortOrders(CLICKHOUSE_COL_NAME3)));
     // drop schema failed check.
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
-    mysqlNamespaces = mysqlService.listSchemas(Namespace.empty());
+    clickhouseNamespaces = clickhouseService.listSchemas(Namespace.empty());
     schemaNames =
-        Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
+        Arrays.stream(clickhouseNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
   }
 
   @Test
-  void testCreateAndLoadMysqlTable() {
+  void testCreateAndLoadClickhouseTable() {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
-
-    final SortOrder[] sortOrders = new SortOrder[0];
 
     Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
 
@@ -346,7 +354,7 @@ public class CatalogMysqlIT extends BaseIT {
         properties,
         partitioning,
         distribution,
-        sortOrders);
+        getSortOrders(CLICKHOUSE_COL_NAME3));
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(tableName, loadTable.name());
@@ -398,13 +406,13 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  // MySQL support column default value expression after 8.0.13
-  // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
+  // ClickHouse support column default value expression after 8.0.13
+  // see https://dev.clickhouse.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("SupportColumnDefaultValueExpression")
   void testColumnDefaultValue() {
     Column col1 =
         Column.of(
-            MYSQL_COL_NAME1,
+            CLICKHOUSE_COL_NAME1,
             Types.IntegerType.get(),
             "col_1_comment",
             false,
@@ -412,7 +420,7 @@ public class CatalogMysqlIT extends BaseIT {
             FunctionExpression.of("rand"));
     Column col2 =
         Column.of(
-            MYSQL_COL_NAME2,
+            CLICKHOUSE_COL_NAME2,
             Types.TimestampType.withoutTimeZone(),
             "col_2_comment",
             false,
@@ -420,17 +428,18 @@ public class CatalogMysqlIT extends BaseIT {
             FunctionExpression.of("current_timestamp"));
     Column col3 =
         Column.of(
-            MYSQL_COL_NAME3,
+            CLICKHOUSE_COL_NAME3,
             Types.VarCharType.of(255),
             "col_3_comment",
             true,
             false,
             Literals.NULL);
     Column col4 =
-        Column.of(MYSQL_COL_NAME4, Types.StringType.get(), "col_4_comment", false, false, null);
+        Column.of(
+            CLICKHOUSE_COL_NAME4, Types.StringType.get(), "col_4_comment", false, false, null);
     Column col5 =
         Column.of(
-            MYSQL_COL_NAME5,
+            CLICKHOUSE_COL_NAME5,
             Types.VarCharType.of(255),
             "col_5_comment",
             true,
@@ -440,7 +449,7 @@ public class CatalogMysqlIT extends BaseIT {
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
     NameIdentifier tableIdent =
-        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table"));
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("clickhouse_it_table"));
     catalog.asTableCatalog().createTable(tableIdent, newColumns, null, ImmutableMap.of());
     Table createdTable = catalog.asTableCatalog().loadTable(tableIdent);
     Assertions.assertEquals(
@@ -448,18 +457,18 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(
         DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, createdTable.columns()[1].defaultValue());
     Assertions.assertEquals(Literals.NULL, createdTable.columns()[2].defaultValue());
-    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
+    Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
     Assertions.assertEquals(
         Literals.varcharLiteral(255, "current_timestamp"),
         createdTable.columns()[4].defaultValue());
   }
 
   @Test
-  // MySQL support column default value expression after 8.0.13
-  // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
+  // ClickHouse support column default value expression after 8.0.13
+  // see https://dev.clickhouse.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("SupportColumnDefaultValueExpression")
   void testColumnDefaultValueConverter() {
-    // test convert from MySQL to Gravitino
+    // test convert from ClickHouse to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
     String fullTableName = schemaName + "." + tableName;
     String sql =
@@ -493,7 +502,7 @@ public class CatalogMysqlIT extends BaseIT {
             + "  bit_col_1 bit default b'1'\n"
             + ");\n";
 
-    mysqlService.executeQuery(sql);
+    clickhouseService.executeQuery(sql);
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
 
@@ -593,7 +602,7 @@ public class CatalogMysqlIT extends BaseIT {
 
   @Test
   void testColumnTypeConverter() {
-    // test convert from MySQL to Gravitino
+    // test convert from ClickHouse to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_type_converter");
     String fullTableName = schemaName + "." + tableName;
     String sql =
@@ -617,7 +626,7 @@ public class CatalogMysqlIT extends BaseIT {
             + "  blob_col blob\n"
             + ");\n";
 
-    mysqlService.executeQuery(sql);
+    clickhouseService.executeQuery(sql);
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
 
@@ -675,7 +684,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testAlterAndDropMysqlTable() {
+  void testAlterAndDropClickhouseTable() {
     Column[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -702,20 +711,21 @@ public class CatalogMysqlIT extends BaseIT {
             NameIdentifier.of(schemaName, alertTableName),
             TableChange.updateComment(table_comment + "_new"),
             TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()),
-            TableChange.renameColumn(new String[] {MYSQL_COL_NAME2}, "col_2_new"),
-            TableChange.updateColumnType(new String[] {MYSQL_COL_NAME1}, Types.IntegerType.get()));
+            TableChange.renameColumn(new String[] {CLICKHOUSE_COL_NAME2}, "col_2_new"),
+            TableChange.updateColumnType(
+                new String[] {CLICKHOUSE_COL_NAME1}, Types.IntegerType.get()));
 
     Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
 
-    Assertions.assertEquals(MYSQL_COL_NAME1, table.columns()[0].name());
+    Assertions.assertEquals(CLICKHOUSE_COL_NAME1, table.columns()[0].name());
     Assertions.assertEquals(Types.IntegerType.get(), table.columns()[0].dataType());
 
     Assertions.assertEquals("col_2_new", table.columns()[1].name());
     Assertions.assertEquals(Types.DateType.get(), table.columns()[1].dataType());
     Assertions.assertEquals("col_2_comment", table.columns()[1].comment());
 
-    Assertions.assertEquals(MYSQL_COL_NAME3, table.columns()[2].name());
+    Assertions.assertEquals(CLICKHOUSE_COL_NAME3, table.columns()[2].name());
     Assertions.assertEquals(Types.StringType.get(), table.columns()[2].dataType());
     Assertions.assertEquals("col_3_comment", table.columns()[2].comment());
 
@@ -829,9 +839,9 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testDropMySQLDatabase() {
-    String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
-    String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
+  void testDropClickHouseDatabase() {
+    String schemaName = GravitinoITUtils.genRandomName("clickhouse_schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("clickhouse_table").toLowerCase();
 
     catalog
         .asSchemas()
@@ -843,7 +853,8 @@ public class CatalogMysqlIT extends BaseIT {
             NameIdentifier.of(schemaName, tableName),
             createColumns(),
             "Created by Gravitino client",
-            ImmutableMap.<String, String>builder().build());
+            ImmutableMap.<String, String>builder().build(),
+            getSortOrders(CLICKHOUSE_COL_NAME3));
 
     // Try to drop a database, and cascade equals to false, it should not be
     // allowed.
@@ -851,6 +862,8 @@ public class CatalogMysqlIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
     Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
+//    Assertions.assertTrue(
+//        excep.getMessage().contains("has sub-entities, you should remove sub-entities first"));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);
@@ -866,285 +879,6 @@ public class CatalogMysqlIT extends BaseIT {
         });
   }
 
-  @Test
-  void testCreateTableIndex() {
-    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
-    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
-    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
-    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
-
-    Index[] indexes =
-        new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
-          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
-          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}),
-        };
-
-    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
-
-    Map<String, String> properties = createProperties();
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            indexes);
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        createdTable);
-    Table table = tableCatalog.loadTable(tableIdentifier);
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    NameIdentifier id = NameIdentifier.of(schemaName, "test_failed");
-    Index[] indexes2 =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})};
-    SortOrder[] sortOrder = new SortOrder[0];
-    IllegalArgumentException illegalArgumentException =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              tableCatalog.createTable(
-                  id,
-                  newColumns,
-                  table_comment,
-                  properties,
-                  Transforms.EMPTY_TRANSFORM,
-                  Distributions.NONE,
-                  sortOrder,
-                  indexes2);
-            });
-    Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Index does not support complex fields in this Catalog"));
-
-    Index[] indexes3 = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
-    illegalArgumentException =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              tableCatalog.createTable(
-                  id,
-                  newColumns,
-                  table_comment,
-                  properties,
-                  Transforms.EMPTY_TRANSFORM,
-                  Distributions.NONE,
-                  sortOrder,
-                  indexes3);
-            });
-    Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Index does not support complex fields in this Catalog"));
-
-    NameIdentifier tableIdent = NameIdentifier.of(schemaName, "test_null_key");
-    tableCatalog.createTable(
-        tableIdent,
-        newColumns,
-        table_comment,
-        properties,
-        Transforms.EMPTY_TRANSFORM,
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[] {
-          Indexes.of(
-              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
-          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
-        });
-    table = tableCatalog.loadTable(tableIdent);
-
-    Assertions.assertEquals(2, table.index().length);
-    Assertions.assertNotNull(table.index()[0].name());
-    Assertions.assertNotNull(table.index()[1].name());
-  }
-
-  @Test
-  public void testAutoIncrement() {
-    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, true, null);
-    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
-    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
-    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
-
-    Index[] indexes =
-        new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
-        };
-
-    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
-
-    Map<String, String> properties = createProperties();
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            indexes);
-    // Test create auto increment key success.
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        createdTable);
-    Table table = tableCatalog.loadTable(tableIdentifier);
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // Test alter table. auto increment exist.
-    // UpdateColumnType
-    tableCatalog.alterTable(
-        tableIdentifier,
-        TableChange.updateColumnType(new String[] {"col_1"}, Types.IntegerType.get()));
-    table = tableCatalog.loadTable(tableIdentifier);
-    Column[] alterColumns =
-        new Column[] {
-          Column.of("col_1", Types.IntegerType.get(), "id", false, true, null),
-          col2,
-          col3,
-          col4,
-          col5
-        };
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(alterColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // UpdateColumnComment
-    tableCatalog.alterTable(
-        tableIdentifier, TableChange.updateColumnComment(new String[] {"col_1"}, "new_id_comment"));
-    table = tableCatalog.loadTable(tableIdentifier);
-    alterColumns =
-        new Column[] {
-          Column.of("col_1", Types.IntegerType.get(), "new_id_comment", false, true, null),
-          col2,
-          col3,
-          col4,
-          col5
-        };
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(alterColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // RenameColumn
-    tableCatalog.alterTable(
-        tableIdentifier, TableChange.renameColumn(new String[] {"col_1"}, "col_1_1"));
-    table = tableCatalog.loadTable(tableIdentifier);
-    alterColumns =
-        new Column[] {
-          Column.of("col_1_1", Types.IntegerType.get(), "new_id_comment", false, true, null),
-          col2,
-          col3,
-          col4,
-          col5
-        };
-    indexes =
-        new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
-        };
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(alterColumns),
-        properties,
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    tableCatalog.dropTable(tableIdentifier);
-
-    // Test create auto increment fail(No index)
-    RuntimeException runtimeException =
-        assertThrows(
-            RuntimeException.class,
-            () ->
-                tableCatalog.createTable(
-                    tableIdentifier,
-                    newColumns,
-                    table_comment,
-                    properties,
-                    Transforms.EMPTY_TRANSFORM,
-                    Distributions.NONE,
-                    new SortOrder[0],
-                    Indexes.EMPTY_INDEXES));
-    Assertions.assertTrue(
-        StringUtils.contains(
-            runtimeException.getMessage(),
-            "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
-
-    // Test create auto increment fail(Many index col)
-    ColumnImpl column = Column.of("col_6", Types.LongType.get(), "id2", false, true, null);
-    SortOrder[] sortOrder = new SortOrder[0];
-    Index[] index2 =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})};
-
-    runtimeException =
-        assertThrows(
-            RuntimeException.class,
-            () ->
-                tableCatalog.createTable(
-                    tableIdentifier,
-                    new Column[] {col1, col2, col3, col4, col5, column},
-                    table_comment,
-                    properties,
-                    Transforms.EMPTY_TRANSFORM,
-                    Distributions.NONE,
-                    sortOrder,
-                    index2));
-    Assertions.assertTrue(
-        StringUtils.contains(
-            runtimeException.getMessage(),
-            "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_6]"));
-  }
 
   @Test
   public void testSchemaComment() {
@@ -1183,7 +917,7 @@ public class CatalogMysqlIT extends BaseIT {
                 Collections.emptyMap(),
                 Transforms.EMPTY_TRANSFORM,
                 Distributions.NONE,
-                new SortOrder[0],
+                getSortOrders(CLICKHOUSE_COL_NAME3),
                 Indexes.EMPTY_INDEXES));
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.loadTable(tableIdentifier));
@@ -1205,7 +939,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testMySQLSpecialTableName() {
+  void testClickHouseSpecialTableName() {
     // Test create many indexes with name success.
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -1318,7 +1052,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testMySqlIllegalTableName() {
+  void testClickHouseIllegalTableName() {
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     String table_name = "t123";
@@ -1430,7 +1164,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testMySQLTableNameCaseSensitive() {
+  void testClickHouseTableNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
@@ -1438,11 +1172,7 @@ public class CatalogMysqlIT extends BaseIT {
     Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
-    Index[] indexes =
-        new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
-        };
+    Index[] indexes = new Index[0];
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "tableName");
     Map<String, String> properties = createProperties();
@@ -1505,10 +1235,10 @@ public class CatalogMysqlIT extends BaseIT {
 
   @Test
   void testNameSpec() {
-    // test operate illegal schema name from MySQL
+    // test operate illegal schema name from ClickHouse
     String testSchemaName = "//";
     String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
-    mysqlService.executeQuery(sql);
+    clickhouseService.executeQuery(sql);
 
     Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
     Assertions.assertEquals(testSchemaName, schema.name());
@@ -1519,11 +1249,11 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
     Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
 
-    // test operate illegal table name from MySQL
-    mysqlService.executeQuery(sql);
+    // test operate illegal table name from ClickHouse
+    clickhouseService.executeQuery(sql);
     String testTableName = "//";
     sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
-    mysqlService.executeQuery(sql);
+    clickhouseService.executeQuery(sql);
     NameIdentifier tableIdent = NameIdentifier.of(testSchemaName, testTableName);
 
     Table table = catalog.asTableCatalog().loadTable(tableIdent);
@@ -1600,7 +1330,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testMySQLSchemaNameCaseSensitive() {
+  void testClickHouseSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
     Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
@@ -1664,211 +1394,11 @@ public class CatalogMysqlIT extends BaseIT {
   @Test
   void testUnparsedTypeConverter() {
     String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
-    mysqlService.executeQuery(
+    clickhouseService.executeQuery(
         String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals(Types.ExternalType.of("BIT"), loadedTable.columns()[0].dataType());
-  }
-
-  @Test
-  void testOperationTableIndex() {
-    String tableName = GravitinoITUtils.genRandomName("test_add_index");
-    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
-    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
-    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
-    Column[] newColumns = new Column[] {col1, col2, col3};
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    tableCatalog.createTable(
-        NameIdentifier.of(schemaName, tableName),
-        newColumns,
-        table_comment,
-        createProperties(),
-        Transforms.EMPTY_TRANSFORM,
-        Distributions.NONE,
-        new SortOrder[0],
-        Indexes.EMPTY_INDEXES);
-
-    // add index test.
-    tableCatalog.alterTable(
-        NameIdentifier.of(schemaName, tableName),
-        TableChange.addIndex(
-            Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-        TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
-            new String[][] {{"col_1"}}));
-
-    Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
-    Index[] indexes =
-        new Index[] {
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}})
-        };
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        createProperties(),
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // delete index and add new column and index.
-    tableCatalog.alterTable(
-        NameIdentifier.of(schemaName, tableName),
-        TableChange.deleteIndex("u1_key", false),
-        TableChange.addColumn(
-            new String[] {"col_4"},
-            Types.VarCharType.of(255),
-            TableChange.ColumnPosition.defaultPos()),
-        TableChange.addIndex(Index.IndexType.UNIQUE_KEY, "u2_key", new String[][] {{"col_4"}}));
-
-    indexes =
-        new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_4"}})
-        };
-    table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
-    newColumns = new Column[] {col1, col2, col3, col4};
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        createProperties(),
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // Add a previously existing index
-    tableCatalog.alterTable(
-        NameIdentifier.of(schemaName, tableName),
-        TableChange.addIndex(
-            Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-        TableChange.addIndex(
-            Index.IndexType.UNIQUE_KEY, "u3_key", new String[][] {{"col_1"}, {"col_4"}}));
-
-    indexes =
-        new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_4"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}})
-        };
-    table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        createProperties(),
-        indexes,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-  }
-
-  @Test
-  void testAddColumnAutoIncrement() {
-    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", false, false, null);
-    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
-    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
-    String tableName = "auto_increment_table";
-    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
-
-    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
-    Map<String, String> properties = createProperties();
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    tableCatalog.createTable(
-        tableIdentifier,
-        newColumns,
-        table_comment,
-        properties,
-        Transforms.EMPTY_TRANSFORM,
-        Distributions.NONE,
-        new SortOrder[0],
-        Indexes.EMPTY_INDEXES);
-
-    // Test add auto increment ,but not insert index. will fail.
-    RuntimeException runtimeException =
-        assertThrows(
-            RuntimeException.class,
-            () ->
-                tableCatalog.alterTable(
-                    tableIdentifier,
-                    TableChange.addColumn(
-                        new String[] {"col_6"},
-                        Types.LongType.get(),
-                        "id",
-                        TableChange.ColumnPosition.defaultPos(),
-                        false,
-                        true)));
-    Assertions.assertTrue(
-        StringUtils.contains(
-            runtimeException.getMessage(),
-            "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
-
-    // Test add auto increment success.
-    tableCatalog.alterTable(
-        tableIdentifier,
-        TableChange.addColumn(
-            new String[] {"col_6"},
-            Types.LongType.get(),
-            "id",
-            TableChange.ColumnPosition.defaultPos(),
-            false,
-            true),
-        TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
-            new String[][] {{"col_6"}}));
-
-    Table table = tableCatalog.loadTable(tableIdentifier);
-
-    Column col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
-    Index[] indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
-    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indices,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // Test the auto-increment property of modified fields
-    tableCatalog.alterTable(
-        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, false));
-    table = tableCatalog.loadTable(tableIdentifier);
-    col6 = Column.of("col_6", Types.LongType.get(), "id", false, false, null);
-    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
-    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indices,
-        Transforms.EMPTY_TRANSFORM,
-        table);
-
-    // Add the auto-increment attribute to the field
-    tableCatalog.alterTable(
-        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, true));
-    table = tableCatalog.loadTable(tableIdentifier);
-    col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
-    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
-    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    ITUtils.assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(newColumns),
-        properties,
-        indices,
-        Transforms.EMPTY_TRANSFORM,
-        table);
   }
 
   @Test
@@ -1919,7 +1449,7 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  public void testMySqlIntegerTypes() {
+  public void testClickHouseIntegerTypes() {
     Column col1 = Column.of("col_1", Types.ByteType.get(), "byte type", true, false, null);
     Column col2 =
         Column.of("col_2", Types.ByteType.unsigned(), "byte unsigned type", true, false, null);
@@ -1965,19 +1495,19 @@ public class CatalogMysqlIT extends BaseIT {
   @Test
   void testAlterCatalogProperties() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
-    String testCatalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
+    String testCatalogName = GravitinoITUtils.genRandomName("clickhouse_it_catalog");
 
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
             0,
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
     catalogProperties.put(
-        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
-    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
+        JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), CLICKHOUSE_CONTAINER.getUsername());
 
-    String password = MYSQL_CONTAINER.getPassword();
+    String password = CLICKHOUSE_CONTAINER.getPassword();
     String wrongPassword = password + "wrong";
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
 

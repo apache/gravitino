@@ -816,6 +816,7 @@ tasks {
       "catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-clickhouse:copyLibAndConfig",
       ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
@@ -962,6 +963,8 @@ fun checkOrbStackStatus() {
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
       println("Current docker context is: $currentContext")
+      var localDefault =  Locale.getDefault()
+      println("Locale is: $localDefault")
       project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
     } else {
       println("checkOrbStackStatus Command execution failed with exit code $exitCode")

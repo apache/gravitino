@@ -16,22 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.mysql.operation;
+package org.apache.gravitino.catalog.clickhouse;
 
-import java.sql.SQLException;
-import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
-import org.apache.gravitino.catalog.mysql.MysqlCatalog;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-
-@Tag("gravitino-docker-test")
-public class TestMysqlCatalogOperations extends TestMysql {
-
-  @Test
-  public void testCheckJDBCDriver() throws SQLException {
-    MySQLProtocolCompatibleCatalogOperations catalogOperations =
-        new MySQLProtocolCompatibleCatalogOperations(
-            null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
-    catalogOperations.initialize(getMySQLCatalogProperties(), null, new MysqlCatalog());
-  }
+public class ClickHouseConstants {
+  public static final String GRAVITINO_ENGINE_KEY = "engine";
+  public static final String CLICKHOUSE_ENGINE_KEY = "ENGINE";
 }

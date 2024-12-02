@@ -132,7 +132,8 @@ public class TestDorisTableOperations extends TestDoris {
           createProperties(),
           null,
           distribution,
-          indexes);
+          indexes,
+          null);
       JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
       assertionsTableInfo(
           tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
