@@ -20,6 +20,8 @@
 package org.apache.gravitino.spark.connector.paimon;
 
 import com.google.common.base.Preconditions;
+
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
@@ -52,13 +54,11 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    throw new UnsupportedOperationException(
-        "`toGravitinoTableProperties` operation is unsupported now.");
+    return new HashMap<>(properties);
   }
 
   @Override
   public Map<String, String> toSparkTableProperties(Map<String, String> properties) {
-    throw new UnsupportedOperationException(
-        "`toSparkTableProperties` operation is unsupported now.");
+    return new HashMap<>(properties);
   }
 }
