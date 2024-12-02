@@ -75,6 +75,7 @@ class TestCatalogCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
     when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(false);
+
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -82,7 +83,7 @@ class TestCatalogCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newCatalogDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo", "catalog", null);
+            GravitinoCommandLine.DEFAULT_URL, false, null, null, null, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }

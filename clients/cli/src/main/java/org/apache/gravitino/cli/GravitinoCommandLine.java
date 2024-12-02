@@ -347,6 +347,18 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.PROPERTIES.equals(command)) {
       newListTableProperties(url, ignore, auth, userName, metalake, catalog, schema, table)
           .handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateTableComment(
+                url, ignore, auth, userName, metalake, catalog, schema, table, comment)
+            .handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        newUpdateTableName(url, ignore, auth, userName, metalake, catalog, schema, table, newName)
+            .handle();
+      }
     }
   }
 

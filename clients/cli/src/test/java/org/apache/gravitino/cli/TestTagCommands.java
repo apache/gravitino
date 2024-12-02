@@ -74,7 +74,7 @@ class TestTagCommands {
   }
 
   @Test
-  void testMetalakeDetailsCommand() {
+  void testTagDetailsCommand() {
     TagDetails mockDetails = mock(TagDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
