@@ -19,48 +19,74 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
+import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.Table;
 
-public class CatalogDetails extends Command {
+/** List the properties of a table. */
+public class ListTableProperties extends ListProperties {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String schema;
+  protected final String table;
 
   /**
-   * Displays the name and comment of a catalog.
+   * List the properties of a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param outputFormat The output format.
+   * @param schema The name of the schema.
+   * @param table The name of the table.
    */
-  public CatalogDetails(
-      String url, boolean ignoreVersions, String metalake, String catalog, String outputFormat) {
-    super(url, ignoreVersions, outputFormat);
+  public ListTableProperties(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String table) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.schema = schema;
+    this.table = table;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** List the properties of a table. */
   @Override
   public void handle() {
-    Catalog result = null;
-
+    Table gTable = null;
     try {
+      NameIdentifier name = NameIdentifier.of(schema, table);
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
-      output(result);
+      gTable = client.loadCatalog(catalog).asTableCatalog().loadTable(name);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
+    } catch (NoSuchTableException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TABLE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
+      return;
     }
+
+    Map<String, String> properties = gTable.properties();
+    printProperties(properties);
   }
 }
