@@ -23,4 +23,4 @@ CREATE TABLE gt_postgresql1_1.gt_datatype.tb01 (
     salary int
 );
 
-<RETRY WITH NOT EXISTS> SELECT * FROM gt_postgresql1.gt_datatype.tb01;
+<RETRY_WITH_NOT_EXISTS> SELECT * FROM gt_postgresql1.gt_datatype.tb01;

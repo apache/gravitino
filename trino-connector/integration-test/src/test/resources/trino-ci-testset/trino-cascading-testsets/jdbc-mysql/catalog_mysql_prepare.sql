@@ -20,4 +20,4 @@ CREATE SCHEMA gt_mysql1_1.gt_db1;
 
 CREATE TABLE gt_mysql1_1.gt_db1.tb03 (id int, name char(20));
 
-<RETRY WITH NOT EXISTS> SELECT * FROM gt_mysql1.gt_db1.tb03;
+<RETRY_WITH_NOT_EXISTS> SELECT * FROM gt_mysql1.gt_db1.tb03;

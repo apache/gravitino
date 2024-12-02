@@ -67,7 +67,7 @@ class TrinoQueryRunner {
   }
 
   String runQuery(String query) {
-    String retryFlag = "<RETRY WITH NOT EXISTS>";
+    String retryFlag = "<RETRY_WITH_NOT_EXISTS>";
     if (!query.startsWith(retryFlag)) {
       return runQueryOnce(query);
     } else {
