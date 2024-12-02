@@ -21,6 +21,7 @@
 package org.apache.gravitino.cli;
 
 import java.util.Map;
+import org.apache.gravitino.cli.commands.AddOptionalColumn;
 import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
@@ -36,6 +37,7 @@ import org.apache.gravitino.cli.commands.CreateTag;
 import org.apache.gravitino.cli.commands.CreateTopic;
 import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
+import org.apache.gravitino.cli.commands.DeleteColumn;
 import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
@@ -101,6 +103,13 @@ import org.apache.gravitino.cli.commands.TopicDetails;
 import org.apache.gravitino.cli.commands.UntagEntity;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
+import org.apache.gravitino.cli.commands.UpdateColumnAutoIncrement;
+import org.apache.gravitino.cli.commands.UpdateColumnComment;
+import org.apache.gravitino.cli.commands.UpdateColumnDatatype;
+import org.apache.gravitino.cli.commands.UpdateColumnDefault;
+import org.apache.gravitino.cli.commands.UpdateColumnName;
+import org.apache.gravitino.cli.commands.UpdateColumnNullability;
+import org.apache.gravitino.cli.commands.UpdateColumnPosition;
 import org.apache.gravitino.cli.commands.UpdateFilesetComment;
 import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
@@ -667,5 +676,136 @@ public class TestableCommandLine {
       String fileset,
       String property) {
     return new RemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property);
+  }
+
+  protected AddOptionalColumn newAddOptionalColumn(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      String datatype,
+      String comment,
+      String position,
+      boolean nullable,
+      boolean autoIncrement,
+      String defaultValue) {
+    return new AddOptionalColumn(
+        url,
+        ignore,
+        metalake,
+        catalog,
+        schema,
+        table,
+        column,
+        datatype,
+        comment,
+        position,
+        nullable,
+        autoIncrement,
+        defaultValue);
+  }
+
+  protected DeleteColumn newDeleteColumn(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column) {
+    return new DeleteColumn(url, ignore, metalake, catalog, schema, table, column);
+  }
+
+  protected UpdateColumnComment newUpdateColumnComment(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      String comment) {
+    return new UpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment);
+  }
+
+  protected UpdateColumnName newUpdateColumnName(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      String rename) {
+    return new UpdateColumnName(url, ignore, metalake, catalog, schema, table, column, rename);
+  }
+
+  protected UpdateColumnDatatype newUpdateColumnDatatype(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      String datatype) {
+    return new UpdateColumnDatatype(
+        url, ignore, metalake, catalog, schema, table, column, datatype);
+  }
+
+  protected UpdateColumnPosition newUpdateColumnPosition(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      String position) {
+    return new UpdateColumnPosition(
+        url, ignore, metalake, catalog, schema, table, column, position);
+  }
+
+  protected UpdateColumnNullability newUpdateColumnNullability(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      boolean nullable) {
+    return new UpdateColumnNullability(
+        url, ignore, metalake, catalog, schema, table, column, nullable);
+  }
+
+  protected UpdateColumnAutoIncrement newUpdateColumnAutoIncrement(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      boolean autoIncrement) {
+    return new UpdateColumnAutoIncrement(
+        url, ignore, metalake, catalog, schema, table, column, autoIncrement);
+  }
+
+  protected UpdateColumnDefault newUpdateColumnDefault(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column,
+      String defaultValue,
+      String dataType) {
+    return new UpdateColumnDefault(
+        url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType);
   }
 }

@@ -517,7 +517,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        new UpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment)
+        newUpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment)
             .handle();
       }
       if (line.hasOption(GravitinoOptions.RENAME)) {
