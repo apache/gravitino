@@ -146,7 +146,7 @@ public class GravitinoOptions {
    * @param description The option description.
    * @return The Option object.
    */
-  public Option createArgOption(SString longName, String description) {
+  public Option createArgOption(String longName, String description) {
     return new Option(null, longName, true, description);
   }
 
