@@ -26,10 +26,7 @@ public class SparkIcebergCatalogHiveBackendIT33 extends SparkIcebergCatalogHiveB
   @Test
   void testCatalogClassName() {
     String catalogClass =
-        getSparkSession()
-            .sessionState()
-            .conf()
-            .getConfString("spark.sql.catalog." + getCatalogName());
+        getSparkSession().sparkContext().conf().get("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoIcebergCatalogSpark33.class.getName(), catalogClass);
   }
 }
