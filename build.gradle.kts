@@ -551,6 +551,7 @@ tasks.rat {
     "clients/client-python/tests/integration/htmlcov/*",
     "clients/client-python/docs/build",
     "clients/client-python/docs/source/generated",
+    "clients/cli/src/main/resources/*.txt",
     "clients/filesystem-fuse/Cargo.lock"
   )
 
