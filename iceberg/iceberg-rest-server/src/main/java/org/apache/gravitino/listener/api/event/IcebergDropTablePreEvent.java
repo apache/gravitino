@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent a pre event before dropping Iceberg table. */
 @DeveloperApi
 public class IcebergDropTablePreEvent extends IcebergTablePreEvent {
-  private boolean purgeRequested;
+  private final boolean purgeRequested;
 
   public IcebergDropTablePreEvent(
       IcebergRequestContext icebergRequestContext,
@@ -37,5 +37,10 @@ public class IcebergDropTablePreEvent extends IcebergTablePreEvent {
 
   public boolean purgeRequested() {
     return purgeRequested;
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_TABLE;
   }
 }

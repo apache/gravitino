@@ -142,7 +142,9 @@ public class TestFulllName {
 
   @Test
   public void hasPartNameColumn() throws Exception {
-    String[] args = {"table", "details", "--name", "metalake.catalog.schema.table.column"};
+    String[] args = {
+      "table", "details", "--metalake", "metalake", "--name", "catalog.schema.table.column"
+    };
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
     assertTrue(fullName.hasCatalogName());

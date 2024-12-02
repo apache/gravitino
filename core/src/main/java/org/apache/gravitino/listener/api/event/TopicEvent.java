@@ -43,4 +43,9 @@ public abstract class TopicEvent extends Event {
   protected TopicEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

@@ -26,7 +26,7 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 /** Represent an event when rename Iceberg table failed. */
 @DeveloperApi
 public class IcebergRenameTableFailureEvent extends IcebergTableFailureEvent {
-  private RenameTableRequest renameTableRequest;
+  private final RenameTableRequest renameTableRequest;
 
   public IcebergRenameTableFailureEvent(
       IcebergRequestContext icebergRequestContext,
@@ -39,5 +39,10 @@ public class IcebergRenameTableFailureEvent extends IcebergTableFailureEvent {
 
   public RenameTableRequest renameTableRequest() {
     return renameTableRequest;
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.RENAME_TABLE;
   }
 }

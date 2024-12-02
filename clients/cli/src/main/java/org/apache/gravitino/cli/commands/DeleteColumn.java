@@ -65,6 +65,7 @@ public class DeleteColumn extends Command {
   }
 
   /** Delete a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 

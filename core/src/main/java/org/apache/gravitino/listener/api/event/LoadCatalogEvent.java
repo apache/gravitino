@@ -49,4 +49,14 @@ public final class LoadCatalogEvent extends CatalogEvent {
   public CatalogInfo loadedCatalogInfo() {
     return loadedCatalogInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_CATALOG;
+  }
 }

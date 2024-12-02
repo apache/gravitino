@@ -70,6 +70,7 @@ public class UpdateColumnComment extends Command {
   }
 
   /** Update the comment of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 

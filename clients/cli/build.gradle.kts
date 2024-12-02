@@ -35,7 +35,16 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-
+  testImplementation(project(":core")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":server")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":server-common")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

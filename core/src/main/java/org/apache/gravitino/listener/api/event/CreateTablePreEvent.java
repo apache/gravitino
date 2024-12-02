@@ -42,4 +42,8 @@ public class CreateTablePreEvent extends TablePreEvent {
   public TableInfo createTableRequest() {
     return createTableRequest;
   }
+
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
+  }
 }

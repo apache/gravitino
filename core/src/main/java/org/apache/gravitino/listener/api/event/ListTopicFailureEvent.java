@@ -51,4 +51,14 @@ public final class ListTopicFailureEvent extends TopicFailureEvent {
   public Namespace namespace() {
     return namespace;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TOPIC;
+  }
 }

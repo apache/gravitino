@@ -92,6 +92,7 @@ public class AddOptionalColumn extends Command {
   }
 
   /** Adds an optional column to a table. */
+  @Override
   public void handle() {
     String[] columns = {column};
     Type convertedDatatype = ParseType.toType(datatype);

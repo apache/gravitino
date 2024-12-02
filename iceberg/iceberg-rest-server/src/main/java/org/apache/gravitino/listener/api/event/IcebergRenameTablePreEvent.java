@@ -26,7 +26,7 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 /** Represent an pre event before rename an Iceberg table. */
 @DeveloperApi
 public class IcebergRenameTablePreEvent extends IcebergTablePreEvent {
-  private RenameTableRequest renameTableRequest;
+  private final RenameTableRequest renameTableRequest;
 
   public IcebergRenameTablePreEvent(
       IcebergRequestContext icebergRequestContext,
@@ -38,5 +38,10 @@ public class IcebergRenameTablePreEvent extends IcebergTablePreEvent {
 
   public RenameTableRequest renameTableRequest() {
     return renameTableRequest;
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.RENAME_TABLE;
   }
 }

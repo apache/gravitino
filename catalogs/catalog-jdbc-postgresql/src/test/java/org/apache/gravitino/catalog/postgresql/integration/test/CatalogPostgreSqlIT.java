@@ -44,6 +44,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -237,6 +238,32 @@ public class CatalogPostgreSqlIT extends BaseIT {
           false,
           Literals.NULL)
     };
+  }
+
+  @Test
+  void testTestConnection() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), "wrong_password");
+
+    Exception exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("postgresql_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    catalogProperties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("password authentication failed for user"));
   }
 
   @Test

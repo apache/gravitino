@@ -70,6 +70,7 @@ public class UpdateColumnNullability extends Command {
   }
 
   /** Update the nullability of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 

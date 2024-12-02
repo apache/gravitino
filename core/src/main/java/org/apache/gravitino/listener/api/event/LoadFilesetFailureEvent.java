@@ -36,4 +36,14 @@ public final class LoadFilesetFailureEvent extends FilesetFailureEvent {
   public LoadFilesetFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_FILESET;
+  }
 }

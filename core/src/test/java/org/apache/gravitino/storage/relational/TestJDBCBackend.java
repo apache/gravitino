@@ -27,6 +27,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -67,6 +68,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -297,6 +299,29 @@ public class TestJDBCBackend {
             auditInfo);
     backend.insert(topic, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(topicCopy, false));
+
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofModel("metalake", "catalog", "schema"),
+            "model",
+            "model comment",
+            1,
+            ImmutableMap.of("key", "value"),
+            auditInfo);
+    ModelEntity modelCopy =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofModel("metalake", "catalog", "schema"),
+            "model",
+            "model comment",
+            1,
+            ImmutableMap.of("key", "value"),
+            auditInfo);
+
+    assertDoesNotThrow(() -> backend.insert(model, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(modelCopy, false));
+    assertDoesNotThrow(() -> backend.insert(modelCopy, true));
   }
 
   @Test
@@ -575,6 +600,17 @@ public class TestJDBCBackend {
             auditInfo);
     backend.insert(topic, false);
 
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofModel("metalake", "catalog", "schema"),
+            "model",
+            "model comment",
+            1,
+            ImmutableMap.of("key", "value"),
+            auditInfo);
+    backend.insert(model, false);
+
     // update fileset properties and version
     FilesetEntity filesetV2 =
         createFilesetEntity(
@@ -736,6 +772,9 @@ public class TestJDBCBackend {
     List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC, true);
     assertTrue(topics.contains(topic));
 
+    List<ModelEntity> models = backend.list(model.namespace(), Entity.EntityType.MODEL, true);
+    assertTrue(models.contains(model));
+
     RoleEntity roleEntity = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
     assertEquals(role, roleEntity);
     assertEquals(1, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
@@ -830,6 +869,7 @@ public class TestJDBCBackend {
 
     assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
     assertFalse(backend.exists(topic.nameIdentifier(), Entity.EntityType.TOPIC));
+    assertFalse(backend.exists(model.nameIdentifier(), Entity.EntityType.MODEL));
 
     assertFalse(backend.exists(role.nameIdentifier(), Entity.EntityType.ROLE));
     assertEquals(0, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
@@ -861,6 +901,7 @@ public class TestJDBCBackend {
     assertTrue(legacyRecordExistsInDB(schema.id(), Entity.EntityType.SCHEMA));
     assertTrue(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
     assertTrue(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
+    assertTrue(legacyRecordExistsInDB(model.id(), Entity.EntityType.MODEL));
     assertTrue(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
     assertTrue(legacyRecordExistsInDB(role.id(), Entity.EntityType.ROLE));
     assertTrue(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
@@ -883,6 +924,7 @@ public class TestJDBCBackend {
     assertFalse(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
     assertFalse(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
     assertFalse(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
+    assertFalse(legacyRecordExistsInDB(model.id(), Entity.EntityType.MODEL));
     assertFalse(legacyRecordExistsInDB(role.id(), Entity.EntityType.ROLE));
     assertFalse(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
     assertFalse(legacyRecordExistsInDB(group.id(), Entity.EntityType.GROUP));
@@ -936,6 +978,10 @@ public class TestJDBCBackend {
       case TOPIC:
         tableName = "topic_meta";
         idColumnName = "topic_id";
+        break;
+      case MODEL:
+        tableName = "model_meta";
+        idColumnName = "model_id";
         break;
       case ROLE:
         tableName = "role_meta";
@@ -1325,5 +1371,48 @@ public class TestJDBCBackend {
         .withAuditInfo(auditInfo)
         .withSecurableObjects(securableObjects)
         .build();
+  }
+
+  public static ModelEntity createModelEntity(
+      Long id,
+      Namespace namespace,
+      String name,
+      String comment,
+      Integer latestVersion,
+      Map<String, String> properties,
+      AuditInfo auditInfo) {
+    return ModelEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withLatestVersion(latestVersion)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  protected void createParentEntities(
+      String metalakeName, String catalogName, String schemaName, AuditInfo auditInfo)
+      throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName),
+            catalogName,
+            auditInfo);
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name()),
+            schemaName,
+            auditInfo);
+    backend.insert(schema, false);
   }
 }

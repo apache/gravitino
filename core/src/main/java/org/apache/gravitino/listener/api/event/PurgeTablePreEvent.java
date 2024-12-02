@@ -28,4 +28,14 @@ public class PurgeTablePreEvent extends TablePreEvent {
   public PurgeTablePreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.PURGE_TABLE;
+  }
 }

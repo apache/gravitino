@@ -70,6 +70,7 @@ public class UpdateColumnName extends Command {
   }
 
   /** Update the name of a column. */
+  @Override
   public void handle() {
     String[] columns = {column};
 
