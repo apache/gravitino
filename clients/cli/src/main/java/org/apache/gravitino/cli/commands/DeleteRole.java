@@ -45,9 +45,9 @@ public class DeleteRole extends Command {
   public DeleteRole(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String authentication,
       String userName,
-      boolean force,
       String metalake,
       String role) {
     super(url, ignoreVersions, authentication, userName);

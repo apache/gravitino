@@ -45,9 +45,9 @@ public class DeleteCatalog extends Command {
   public DeleteCatalog(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String authentication,
       String userName,
-      boolean force,
       String metalake,
       String catalog) {
     super(url, ignoreVersions, authentication, userName);

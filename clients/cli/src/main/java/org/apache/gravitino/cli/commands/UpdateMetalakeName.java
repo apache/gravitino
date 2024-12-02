@@ -46,9 +46,9 @@ public class UpdateMetalakeName extends Command {
   public UpdateMetalakeName(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String authentication,
       String userName,
-      boolean force,
       String metalake,
       String name) {
     super(url, ignoreVersions, authentication, userName);

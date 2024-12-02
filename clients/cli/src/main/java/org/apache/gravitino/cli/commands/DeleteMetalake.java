@@ -41,9 +41,9 @@ public class DeleteMetalake extends Command {
   public DeleteMetalake(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String authentication,
       String userName,
-      boolean force,
       String metalake) {
     super(url, ignoreVersions, authentication, userName);
     this.force = force;

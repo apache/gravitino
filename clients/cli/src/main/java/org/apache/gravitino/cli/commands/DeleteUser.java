@@ -45,9 +45,9 @@ public class DeleteUser extends Command {
   public DeleteUser(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String authentication,
       String userName,
-      boolean force,
       String metalake,
       String user) {
     super(url, ignoreVersions, authentication, userName);

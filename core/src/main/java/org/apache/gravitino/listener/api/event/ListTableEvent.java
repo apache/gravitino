@@ -54,4 +54,14 @@ public final class ListTableEvent extends TableEvent {
   public Namespace namespace() {
     return namespace;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TABLE;
+  }
 }

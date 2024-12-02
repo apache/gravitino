@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -26,18 +29,18 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
 public class CreateTag extends Command {
   protected final String metalake;
-  protected final String tag;
+  protected final String[] tags;
   protected final String comment;
 
   /**
-   * Create a new tag.
+   * Create tags.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param authentication Authentication type i.e. "simple"
    * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
-   * @param tag The name of the tag.
+   * @param tags The names of the tags.
    * @param comment The comment of the tag.
    */
   public CreateTag(
@@ -46,20 +49,29 @@ public class CreateTag extends Command {
       String authentication,
       String userName,
       String metalake,
-      String tag,
+      String[] tags,
       String comment) {
     super(url, ignoreVersions, authentication, userName);
     this.metalake = metalake;
-    this.tag = tag;
+    this.tags = tags;
     this.comment = comment;
   }
 
-  /** Create a new tag. */
+  /** Create tags. */
   @Override
   public void handle() {
+    boolean hasOnlyOneTag = tags.length == 1;
+    if (hasOnlyOneTag) {
+      handleOnlyOneTag();
+    } else {
+      handleMultipleTags();
+    }
+  }
+
+  private void handleOnlyOneTag() {
     try {
       GravitinoClient client = buildClient(metalake);
-      client.createTag(tag, comment, null);
+      client.createTag(tags[0], comment, null);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -71,6 +83,34 @@ public class CreateTag extends Command {
       return;
     }
 
-    System.out.println(tag + " created");
+    System.out.println("Tag " + tags[0] + " created");
+  }
+
+  private void handleMultipleTags() {
+    List<String> created = new ArrayList<>();
+    try {
+      GravitinoClient client = buildClient(metalake);
+      for (String tag : tags) {
+        client.createTag(tag, comment, null);
+        created.add(tag);
+      }
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (TagAlreadyExistsException err) {
+      System.err.println(ErrorMessages.TAG_EXISTS);
+      return;
+    } catch (Exception exp) {
+      System.err.println(exp.getMessage());
+      return;
+    }
+    if (!created.isEmpty()) {
+      System.out.println("Tags " + String.join(",", created) + " created");
+    }
+    if (created.size() < tags.length) {
+      List<String> remaining = Arrays.asList(tags);
+      remaining.removeAll(created);
+      System.out.println("Tags " + String.join(",", remaining) + " not created");
+    }
   }
 }

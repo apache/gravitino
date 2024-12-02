@@ -19,75 +19,20 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Preconditions;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.CatalogAudit;
-import org.apache.gravitino.cli.commands.CatalogDetails;
-import org.apache.gravitino.cli.commands.ClientVersion;
-import org.apache.gravitino.cli.commands.CreateCatalog;
-import org.apache.gravitino.cli.commands.CreateGroup;
-import org.apache.gravitino.cli.commands.CreateMetalake;
-import org.apache.gravitino.cli.commands.CreateRole;
-import org.apache.gravitino.cli.commands.CreateSchema;
-import org.apache.gravitino.cli.commands.CreateTag;
-import org.apache.gravitino.cli.commands.CreateUser;
-import org.apache.gravitino.cli.commands.DeleteCatalog;
-import org.apache.gravitino.cli.commands.DeleteGroup;
-import org.apache.gravitino.cli.commands.DeleteMetalake;
-import org.apache.gravitino.cli.commands.DeleteRole;
-import org.apache.gravitino.cli.commands.DeleteSchema;
-import org.apache.gravitino.cli.commands.DeleteTable;
-import org.apache.gravitino.cli.commands.DeleteTag;
-import org.apache.gravitino.cli.commands.DeleteUser;
-import org.apache.gravitino.cli.commands.GroupDetails;
-import org.apache.gravitino.cli.commands.ListAllTags;
-import org.apache.gravitino.cli.commands.ListCatalogProperties;
-import org.apache.gravitino.cli.commands.ListCatalogs;
-import org.apache.gravitino.cli.commands.ListColumns;
-import org.apache.gravitino.cli.commands.ListEntityTags;
-import org.apache.gravitino.cli.commands.ListGroups;
-import org.apache.gravitino.cli.commands.ListIndexes;
-import org.apache.gravitino.cli.commands.ListMetalakeProperties;
-import org.apache.gravitino.cli.commands.ListMetalakes;
-import org.apache.gravitino.cli.commands.ListRoles;
-import org.apache.gravitino.cli.commands.ListSchema;
-import org.apache.gravitino.cli.commands.ListSchemaProperties;
-import org.apache.gravitino.cli.commands.ListTables;
-import org.apache.gravitino.cli.commands.ListTagProperties;
-import org.apache.gravitino.cli.commands.ListUsers;
-import org.apache.gravitino.cli.commands.MetalakeAudit;
-import org.apache.gravitino.cli.commands.MetalakeDetails;
-import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
-import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
-import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
-import org.apache.gravitino.cli.commands.RemoveTagProperty;
-import org.apache.gravitino.cli.commands.RoleDetails;
-import org.apache.gravitino.cli.commands.SchemaAudit;
-import org.apache.gravitino.cli.commands.SchemaDetails;
-import org.apache.gravitino.cli.commands.ServerVersion;
-import org.apache.gravitino.cli.commands.SetCatalogProperty;
-import org.apache.gravitino.cli.commands.SetMetalakeProperty;
-import org.apache.gravitino.cli.commands.SetSchemaProperty;
-import org.apache.gravitino.cli.commands.SetTagProperty;
-import org.apache.gravitino.cli.commands.TableAudit;
-import org.apache.gravitino.cli.commands.TableDetails;
-import org.apache.gravitino.cli.commands.TableDistribution;
-import org.apache.gravitino.cli.commands.TablePartition;
-import org.apache.gravitino.cli.commands.TagDetails;
-import org.apache.gravitino.cli.commands.TagEntity;
-import org.apache.gravitino.cli.commands.UntagEntity;
-import org.apache.gravitino.cli.commands.UpdateCatalogComment;
-import org.apache.gravitino.cli.commands.UpdateCatalogName;
-import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
-import org.apache.gravitino.cli.commands.UpdateMetalakeName;
-import org.apache.gravitino.cli.commands.UpdateTagComment;
-import org.apache.gravitino.cli.commands.UpdateTagName;
-import org.apache.gravitino.cli.commands.UserDetails;
 
 /* Gravitino Command line */
-public class GravitinoCommandLine {
+public class GravitinoCommandLine extends TestableCommandLine {
 
   private final CommandLine line;
   private final Options options;
@@ -154,11 +99,11 @@ public class GravitinoCommandLine {
     }
     /* Display Gravitino client version. */
     else if (line.hasOption(GravitinoOptions.VERSION)) {
-      new ClientVersion(getUrl(), ignore).handle();
+      newClientVersion(getUrl(), ignore).handle();
     }
     /* Display Gravitino server version. */
     else if (line.hasOption(GravitinoOptions.SERVER)) {
-      new ServerVersion(getUrl(), ignore).handle();
+      newServerVersion(getUrl(), ignore).handle();
     }
   }
 
@@ -174,7 +119,11 @@ public class GravitinoCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (entity.equals(CommandEntities.COLUMN)) {
+    if (command.equals(CommandActions.HELP)) {
+      handleHelpCommand();
+    } else if (line.hasOption(GravitinoOptions.OWNER)) {
+      handleOwnerCommand();
+    } else if (entity.equals(CommandEntities.COLUMN)) {
       handleColumnCommand();
     } else if (entity.equals(CommandEntities.TABLE)) {
       handleTableCommand();
@@ -184,6 +133,10 @@ public class GravitinoCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.TOPIC)) {
+      handleTopicCommand();
+    } else if (entity.equals(CommandEntities.FILESET)) {
+      handleFilesetCommand();
     } else if (entity.equals(CommandEntities.USER)) {
       handleUserCommand();
     } else if (entity.equals(CommandEntities.GROUP)) {
@@ -204,39 +157,40 @@ public class GravitinoCommandLine {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
-        new MetalakeAudit(url, ignore, auth, userName, metalake).handle();
+        newMetalakeAudit(url, ignore, auth, userName, metalake).handle();
       } else {
-        new MetalakeDetails(url, ignore, auth, userName, metalake).handle();
+        newMetalakeDetails(url, ignore, auth, userName, outputFormat, metalake).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
-      new ListMetalakes(url, ignore, auth, userName).handle();
+      newListMetalakes(url, ignore, auth, userName, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      new CreateMetalake(url, ignore, auth, userName, metalake, comment).handle();
+      newCreateMetalake(url, ignore, auth, userName, metalake, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteMetalake(url, ignore, auth, userName, force, metalake).handle();
+      newDeleteMetalake(url, ignore, force, auth, userName, metalake).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-      new SetMetalakeProperty(url, ignore, auth, userName, metalake, property, value).handle();
+      newSetMetalakeProperty(url, ignore, auth, userName, metalake, property, value).handle();
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-      new RemoveMetalakeProperty(url, ignore, auth, userName, metalake, property).handle();
+      newRemoveMetalakeProperty(url, ignore, auth, userName, metalake, property).handle();
     } else if (CommandActions.PROPERTIES.equals(command)) {
-      new ListMetalakeProperties(url, ignore, auth, userName, metalake).handle();
+      newListMetalakeProperties(url, ignore, auth, userName, metalake).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        new UpdateMetalakeComment(url, ignore, auth, userName, metalake, comment).handle();
+        newUpdateMetalakeComment(url, ignore, auth, userName, metalake, comment).handle();
       }
       if (line.hasOption(GravitinoOptions.RENAME)) {
         String newName = line.getOptionValue(GravitinoOptions.RENAME);
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        new UpdateMetalakeName(url, ignore, auth, userName, force, metalake, newName).handle();
+        newUpdateMetalakeName(url, ignore, force, auth, userName, metalake, newName).handle();
       }
     }
   }
@@ -250,9 +204,10 @@ public class GravitinoCommandLine {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.LIST.equals(command)) {
-      new ListCatalogs(url, ignore, auth, userName, metalake).handle();
+      newListCatalogs(url, ignore, auth, userName, metalake).handle();
       return;
     }
 
@@ -260,39 +215,39 @@ public class GravitinoCommandLine {
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
-        new CatalogAudit(url, ignore, auth, userName, metalake, catalog).handle();
+        newCatalogAudit(url, ignore, auth, userName, metalake, catalog).handle();
       } else {
-        new CatalogDetails(url, ignore, auth, userName, metalake, catalog).handle();
+        newCatalogDetails(url, ignore, auth, userName, outputFormat, metalake, catalog).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
       String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
       Map<String, String> propertyMap = new Properties().parse(properties);
-      new CreateCatalog(
+      newCreateCatalog(
               url, ignore, auth, userName, metalake, catalog, provider, comment, propertyMap)
           .handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteCatalog(url, ignore, auth, userName, force, metalake, catalog).handle();
+      newDeleteCatalog(url, ignore, force, auth, userName, metalake, catalog).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-      new SetCatalogProperty(url, ignore, auth, userName, metalake, catalog, property, value)
+      newSetCatalogProperty(url, ignore, auth, userName, metalake, catalog, property, value)
           .handle();
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-      new RemoveCatalogProperty(url, ignore, auth, userName, metalake, catalog, property).handle();
+      newRemoveCatalogProperty(url, ignore, auth, userName, metalake, catalog, property).handle();
     } else if (CommandActions.PROPERTIES.equals(command)) {
-      new ListCatalogProperties(url, ignore, auth, userName, metalake, catalog).handle();
+      newListCatalogProperties(url, ignore, auth, userName, metalake, catalog).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        new UpdateCatalogComment(url, ignore, auth, userName, metalake, catalog, comment).handle();
+        newUpdateCatalogComment(url, ignore, auth, userName, metalake, catalog, comment).handle();
       }
       if (line.hasOption(GravitinoOptions.RENAME)) {
         String newName = line.getOptionValue(GravitinoOptions.RENAME);
-        new UpdateCatalogName(url, ignore, auth, userName, metalake, catalog, newName).handle();
+        newUpdateCatalogName(url, ignore, auth, userName, metalake, catalog, newName).handle();
       }
     }
   }
@@ -309,7 +264,7 @@ public class GravitinoCommandLine {
     String catalog = name.getCatalogName();
 
     if (CommandActions.LIST.equals(command)) {
-      new ListSchema(url, ignore, auth, userName, metalake, catalog).handle();
+      newListSchema(url, ignore, auth, userName, metalake, catalog).handle();
       return;
     }
 
@@ -317,27 +272,27 @@ public class GravitinoCommandLine {
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
-        new SchemaAudit(url, ignore, auth, userName, metalake, catalog, schema).handle();
+        newSchemaAudit(url, ignore, auth, userName, metalake, catalog, schema).handle();
       } else {
-        new SchemaDetails(url, ignore, auth, userName, metalake, catalog, schema).handle();
+        newSchemaDetails(url, ignore, auth, userName, metalake, catalog, schema).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      new CreateSchema(url, ignore, auth, userName, metalake, catalog, schema, comment).handle();
+      newCreateSchema(url, ignore, auth, userName, metalake, catalog, schema, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteSchema(url, ignore, auth, userName, force, metalake, catalog, schema).handle();
+      newDeleteSchema(url, ignore, force, auth, userName, metalake, catalog, schema).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-      new SetSchemaProperty(url, ignore, auth, userName, metalake, catalog, schema, property, value)
+      newSetSchemaProperty(url, ignore, auth, userName, metalake, catalog, schema, property, value)
           .handle();
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-      new RemoveSchemaProperty(url, ignore, auth, userName, metalake, catalog, schema, property)
+      newRemoveSchemaProperty(url, ignore, auth, userName, metalake, catalog, schema, property)
           .handle();
     } else if (CommandActions.PROPERTIES.equals(command)) {
-      new ListSchemaProperties(url, ignore, auth, userName, metalake, catalog, schema).handle();
+      newListSchemaProperties(url, ignore, auth, userName, metalake, catalog, schema).handle();
     }
   }
 
@@ -354,7 +309,7 @@ public class GravitinoCommandLine {
     String schema = name.getSchemaName();
 
     if (CommandActions.LIST.equals(command)) {
-      new ListTables(url, ignore, auth, userName, metalake, catalog, schema).handle();
+      newListTables(url, ignore, auth, userName, metalake, catalog, schema).handle();
       return;
     }
 
@@ -362,22 +317,35 @@ public class GravitinoCommandLine {
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
-        new TableAudit(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
+        newTableAudit(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
       } else if (line.hasOption(GravitinoOptions.INDEX)) {
-        new ListIndexes(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
+        newListIndexes(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
       } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
-        new TableDistribution(url, ignore, auth, userName, metalake, catalog, schema, table)
+        newTableDistribution(url, ignore, auth, userName, metalake, catalog, schema, table)
             .handle();
       } else if (line.hasOption(GravitinoOptions.PARTITION)) {
-        new TablePartition(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
+        newTablePartition(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
       } else {
-        new TableDetails(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
+        newTableDetails(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       // TODO
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteTable(url, ignore, auth, userName, force, metalake, catalog, schema, table)
+      newDeleteTable(url, ignore, force, auth, userName, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTableProperty(
+              url, ignore, auth, userName, metalake, catalog, schema, table, property, value)
+          .handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTableProperty(
+              url, ignore, auth, userName, metalake, catalog, schema, table, property)
+          .handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTableProperties(url, ignore, auth, userName, metalake, catalog, schema, table)
           .handle();
     }
   }
@@ -392,14 +360,26 @@ public class GravitinoCommandLine {
     String user = line.getOptionValue(GravitinoOptions.USER);
 
     if (CommandActions.DETAILS.equals(command)) {
-      new UserDetails(url, ignore, auth, userName, metalake, user).handle();
+      newUserDetails(url, ignore, auth, userName, metalake, user).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListUsers(url, ignore, auth, userName, metalake).handle();
+      newListUsers(url, ignore, auth, userName, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      new CreateUser(url, ignore, auth, userName, metalake, user).handle();
+      newCreateUser(url, ignore, auth, userName, metalake, user).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteUser(url, ignore, auth, userName, force, metalake, user).handle();
+      newDeleteUser(url, ignore, force, auth, userName, metalake, user).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        newRemoveRoleFromUser(url, ignore, auth, userName, metalake, user, role).handle();
+      }
+    } else if (CommandActions.GRANT.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        newAddRoleToUser(url, ignore, auth, userName, metalake, user, role).handle();
+      }
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
   }
 
@@ -413,14 +393,26 @@ public class GravitinoCommandLine {
     String group = line.getOptionValue(GravitinoOptions.GROUP);
 
     if (CommandActions.DETAILS.equals(command)) {
-      new GroupDetails(url, ignore, auth, userName, metalake, group).handle();
+      newGroupDetails(url, ignore, auth, userName, metalake, group).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListGroups(url, ignore, auth, userName, metalake).handle();
+      newListGroups(url, ignore, auth, userName, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      new CreateGroup(url, ignore, auth, userName, metalake, group).handle();
+      newCreateGroup(url, ignore, auth, userName, metalake, group).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteGroup(url, ignore, auth, userName, force, metalake, group).handle();
+      newDeleteGroup(url, ignore, force, auth, userName, metalake, group).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        newRemoveRoleFromGroup(url, ignore, auth, userName, metalake, group, role).handle();
+      }
+    } else if (CommandActions.GRANT.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        newAddRoleToGroup(url, ignore, auth, userName, metalake, group, role).handle();
+      }
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
   }
 
@@ -431,54 +423,60 @@ public class GravitinoCommandLine {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
-    String tag = line.getOptionValue(GravitinoOptions.TAG);
 
+    String[] tags = line.getOptionValues(GravitinoOptions.TAG);
+    if (tags != null) {
+      tags = Arrays.stream(tags).distinct().toArray(String[]::new);
+    }
     if (CommandActions.DETAILS.equals(command)) {
-      new TagDetails(url, ignore, auth, userName, metalake, tag).handle();
+      newTagDetails(url, ignore, auth, userName, metalake, getOneTag(tags)).handle();
     } else if (CommandActions.LIST.equals(command)) {
       if (!name.hasCatalogName()) {
-        new ListAllTags(url, ignore, auth, userName, metalake).handle();
+        newListTags(url, ignore, auth, userName, metalake).handle();
       } else {
-        new ListEntityTags(url, ignore, auth, userName, metalake, name).handle();
+        newListEntityTags(url, ignore, auth, userName, metalake, name).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      new CreateTag(url, ignore, auth, userName, metalake, tag, comment).handle();
+      newCreateTags(url, ignore, auth, userName, metalake, tags, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteTag(url, ignore, auth, userName, force, metalake, tag).handle();
+      newDeleteTag(url, ignore, force, auth, userName, metalake, tags).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-
-      if (name == null && property != null && value != null) {
-        new SetTagProperty(url, ignore, auth, userName, metalake, tag, property, value).handle();
-      } else if (name != null && property == null && value == null) {
-        new TagEntity(url, ignore, auth, userName, metalake, name, tag).handle();
-      } else {
-        System.err.println(ErrorMessages.INVALID_SET_COMMAND);
+      if (property != null && value != null) {
+        newSetTagProperty(url, ignore, auth, userName, metalake, getOneTag(tags), property, value)
+            .handle();
+      } else if (property == null && value == null) {
+        newTagEntity(url, ignore, auth, userName, metalake, name, tags).handle();
       }
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       if (property != null) {
-        new RemoveTagProperty(url, ignore, auth, userName, metalake, tag, property).handle();
-      } else if (name != null) {
-        new UntagEntity(url, ignore, auth, userName, metalake, name, tag).handle();
+        newRemoveTagProperty(url, ignore, auth, userName, metalake, getOneTag(tags), property)
+            .handle();
       } else {
-        System.err.println(ErrorMessages.INVALID_REMOVE_COMMAND);
+        newUntagEntity(url, ignore, auth, userName, metalake, name, tags).handle();
       }
     } else if (CommandActions.PROPERTIES.equals(command)) {
-      new ListTagProperties(url, ignore, auth, userName, metalake, tag).handle();
+      newListTagProperties(url, ignore, auth, userName, metalake, getOneTag(tags)).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        new UpdateTagComment(url, ignore, auth, userName, metalake, tag, comment).handle();
+        newUpdateTagComment(url, ignore, auth, userName, metalake, getOneTag(tags), comment)
+            .handle();
       }
       if (line.hasOption(GravitinoOptions.RENAME)) {
         String newName = line.getOptionValue(GravitinoOptions.RENAME);
-        new UpdateTagName(url, ignore, auth, userName, metalake, tag, newName).handle();
+        newUpdateTagName(url, ignore, auth, userName, metalake, getOneTag(tags), newName).handle();
       }
     }
+  }
+
+  private String getOneTag(String[] tags) {
+    Preconditions.checkArgument(tags.length <= 1, ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
+    return tags[0];
   }
 
   /** Handles the command execution for Roles based on command type and the command line options. */
@@ -491,14 +489,14 @@ public class GravitinoCommandLine {
     String role = line.getOptionValue(GravitinoOptions.ROLE);
 
     if (CommandActions.DETAILS.equals(command)) {
-      new RoleDetails(url, ignore, auth, userName, metalake, role).handle();
+      newRoleDetails(url, ignore, auth, userName, metalake, role).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListRoles(url, ignore, auth, userName, metalake).handle();
+      newListRoles(url, ignore, auth, userName, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      new CreateRole(url, ignore, auth, userName, metalake, role).handle();
+      newCreateRole(url, ignore, auth, userName, metalake, role).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteRole(url, ignore, auth, userName, force, metalake, role).handle();
+      newDeleteRole(url, ignore, force, auth, userName, metalake, role).handle();
     }
   }
 
@@ -516,7 +514,161 @@ public class GravitinoCommandLine {
     String table = name.getTableName();
 
     if (CommandActions.LIST.equals(command)) {
-      new ListColumns(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
+      newListColumns(url, ignore, auth, userName, metalake, catalog, schema, table).handle();
+    }
+  }
+
+  private void handleHelpCommand() {
+    String helpFile = entity.toLowerCase() + "_help.txt";
+
+    try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(helpFile);
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      StringBuilder helpMessage = new StringBuilder();
+      String helpLine;
+      while ((helpLine = reader.readLine()) != null) {
+        helpMessage.append(helpLine).append(System.lineSeparator());
+      }
+      System.err.print(helpMessage.toString());
+    } catch (IOException e) {
+      System.err.println("Failed to load help message: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Handles the command execution for Objects based on command type and the command line options.
+   */
+  private void handleOwnerCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String entityName = line.getOptionValue(GravitinoOptions.NAME);
+
+    if (CommandActions.DETAILS.equals(command)) {
+      newOwnerDetails(url, ignore, auth, userName, metalake, entityName, entity).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String owner = line.getOptionValue(GravitinoOptions.USER);
+      String group = line.getOptionValue(GravitinoOptions.GROUP);
+
+      if (owner != null && group == null) {
+        newSetOwner(url, ignore, auth, userName, metalake, entityName, entity, owner, false)
+            .handle();
+      } else if (owner == null && group != null) {
+        newSetOwner(url, ignore, auth, userName, metalake, entityName, entity, group, true)
+            .handle();
+      } else {
+        System.err.println(ErrorMessages.INVALID_SET_COMMAND);
+      }
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+    }
+  }
+
+  /**
+   * Handles the command execution for topics based on command type and the command line options.
+   */
+  private void handleTopicCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String topic = name.getTopicName();
+
+    if (CommandActions.LIST.equals(command)) {
+      newListTopics(url, ignore, auth, userName, metalake, catalog, schema).handle();
+    } else if (CommandActions.DETAILS.equals(command)) {
+      newTopicDetails(url, ignore, auth, userName, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      newCreateTopic(url, ignore, auth, userName, metalake, catalog, schema, topic, comment)
+          .handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      newDeleteTopic(url, ignore, force, auth, userName, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateTopicComment(
+                url, ignore, auth, userName, metalake, catalog, schema, topic, comment)
+            .handle();
+      }
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTopicProperty(
+              url, ignore, auth, userName, metalake, catalog, schema, topic, property, value)
+          .handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTopicProperty(
+              url, ignore, auth, userName, metalake, catalog, schema, topic, property)
+          .handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTopicProperties(url, ignore, auth, userName, metalake, catalog, schema, topic)
+          .handle();
+    }
+  }
+
+  /**
+   * Handles the command execution for filesets based on command type and the command line options.
+   */
+  private void handleFilesetCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String fileset = name.getFilesetName();
+
+    if (CommandActions.DETAILS.equals(command)) {
+      newFilesetDetails(url, ignore, auth, userName, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.LIST.equals(command)) {
+      newListFilesets(url, ignore, auth, userName, metalake, catalog, schema).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
+      Map<String, String> propertyMap = new Properties().parse(properties);
+      newCreateFileset(
+              url, ignore, auth, userName, metalake, catalog, schema, fileset, comment, propertyMap)
+          .handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      newDeleteFileset(url, ignore, force, auth, userName, metalake, catalog, schema, fileset)
+          .handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetFilesetProperty(
+              url, ignore, auth, userName, metalake, catalog, schema, fileset, property, value)
+          .handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveFilesetProperty(
+              url, ignore, auth, userName, metalake, catalog, schema, fileset, property)
+          .handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListFilesetProperties(url, ignore, auth, userName, metalake, catalog, schema, fileset)
+          .handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateFilesetComment(
+                url, ignore, auth, userName, metalake, catalog, schema, fileset, comment)
+            .handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        newUpdateFilesetName(
+                url, ignore, auth, userName, metalake, catalog, schema, fileset, newName)
+            .handle();
+      }
     }
   }
 

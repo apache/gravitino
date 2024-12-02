@@ -56,6 +56,7 @@ public class ListIndexes extends TableCommand {
   }
 
   /** Displays the details of a table's index. */
+  @Override
   public void handle() {
     Index[] indexes;
 

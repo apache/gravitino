@@ -40,4 +40,14 @@ public final class DropMetalakeFailureEvent extends MetalakeFailureEvent {
   public DropMetalakeFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_METALAKE;
+  }
 }

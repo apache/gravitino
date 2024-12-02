@@ -29,4 +29,9 @@ public class IcebergListViewFailureEvent extends IcebergViewFailureEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier viewIdentifier, Exception e) {
     super(icebergRequestContext, viewIdentifier, e);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_VIEW;
+  }
 }

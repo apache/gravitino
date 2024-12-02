@@ -45,4 +45,9 @@ public abstract class FilesetEvent extends Event {
   protected FilesetEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

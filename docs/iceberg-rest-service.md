@@ -20,6 +20,7 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 - Supports credential vending for `S3` and `GCS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS` and provides the capability to support other storages.
 - Supports event listener.
+- Supports Audit log.
 - Supports OAuth2 and HTTPS.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 
@@ -316,6 +317,10 @@ The `clients` property for example:
 ### Event listener
 
 Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, please refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
+
+### Audit log
+
+Gravitino provides a pluggable audit log mechanism, please refer to [Audit log configuration](gravitino-server-config.md#audit-log-configuration).
 
 ### Apache Iceberg metrics store configuration
 

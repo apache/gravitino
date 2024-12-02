@@ -44,6 +44,8 @@ public class TestCommandActions {
     assertTrue(
         CommandActions.isValidCommand(CommandActions.PROPERTIES),
         "PROPERTIES should be a valid command");
+    assertTrue(
+        CommandActions.isValidCommand(CommandActions.HELP), "HELP should be a valid command");
   }
 
   @Test

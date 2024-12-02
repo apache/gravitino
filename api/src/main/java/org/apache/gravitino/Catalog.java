@@ -24,6 +24,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
+import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -46,6 +47,9 @@ public interface Catalog extends Auditable {
     /** Catalog Type for Message Queue, like Kafka://topic */
     MESSAGING,
 
+    /** Catalog Type for ML model */
+    MODEL,
+
     /** Catalog Type for test only. */
     UNSUPPORTED;
 
@@ -63,6 +67,8 @@ public interface Catalog extends Auditable {
           return FILESET;
         case "messaging":
           return MESSAGING;
+        case "model":
+          return MODEL;
         default:
           throw new IllegalArgumentException("Unknown catalog type: " + type);
       }
@@ -176,6 +182,14 @@ public interface Catalog extends Auditable {
    */
   default TopicCatalog asTopicCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support topic operations");
+  }
+
+  /**
+   * @return the {@link ModelCatalog} if the catalog supports model operations.
+   * @throws UnsupportedOperationException if the catalog does not support model operations.
+   */
+  default ModelCatalog asModelCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support model operations");
   }
 
   /**

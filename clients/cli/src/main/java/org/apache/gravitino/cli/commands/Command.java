@@ -21,6 +21,8 @@ package org.apache.gravitino.cli.commands;
 
 import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
+import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.cli.outputs.TableFormat;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -31,6 +33,9 @@ public abstract class Command {
   private final boolean ignoreVersions;
   private final String authentication;
   private final String userName;
+  private final String outputFormat;
+  public static String OUTPUT_FORMAT_TABLE = "table";
+  public static String OUTPUT_FORMAT_PLAIN = "plain";
 
   /**
    * Command constructor.
@@ -41,10 +46,29 @@ public abstract class Command {
    * @param userName User name for simple authentication.
    */
   public Command(String url, boolean ignoreVersions, String authentication, String userName) {
+    this(url, ignoreVersions, authentication, userName, null);
+  }
+
+  /**
+   * Command constructor.
+   *
+   * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param authentication Authentication type i.e. "simple"
+   * @param userName User name for simple authentication.
+   * @param outputFormat output format used in some commands
+   */
+  public Command(
+      String url,
+      boolean ignoreVersions,
+      String authentication,
+      String userName,
+      String outputFormat) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
     this.authentication = authentication;
     this.userName = userName;
+    this.outputFormat = outputFormat;
   }
 
   /** All commands have a handle method to handle and run the required command. */
@@ -98,5 +122,25 @@ public abstract class Command {
     }
 
     return client.build();
+  }
+
+  /**
+   * Outputs the entity to the console.
+   *
+   * @param entity The entity to output.
+   */
+  protected <T> void output(T entity) {
+    if (outputFormat == null) {
+      PlainFormat.output(entity);
+      return;
+    }
+
+    if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
+      TableFormat.output(entity);
+    } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
+      PlainFormat.output(entity);
+    } else {
+      throw new IllegalArgumentException("Unsupported output format");
+    }
   }
 }

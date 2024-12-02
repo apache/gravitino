@@ -48,9 +48,9 @@ public class DeleteSchema extends Command {
   public DeleteSchema(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String authentication,
       String userName,
-      boolean force,
       String metalake,
       String catalog,
       String schema) {
