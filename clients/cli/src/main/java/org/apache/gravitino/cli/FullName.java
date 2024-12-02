@@ -124,7 +124,7 @@ public class FullName {
     return getNamePart(2);
   }
 
-    /**
+  /**
    * Retrieves the column name from the fourth part of the full name option.
    *
    * @return The column name, or null if not found.

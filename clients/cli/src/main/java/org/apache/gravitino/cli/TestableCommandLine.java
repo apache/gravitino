@@ -140,12 +140,13 @@ public class TestableCommandLine {
     return new MetalakeAudit(url, ignore, metalake);
   }
 
-  protected MetalakeDetails newMetalakeDetails(String url, boolean ignore, String metalake) {
-    return new MetalakeDetails(url, ignore, metalake);
+  protected MetalakeDetails newMetalakeDetails(
+      String url, boolean ignore, String metalake, String outputFormat) {
+    return new MetalakeDetails(url, ignore, metalake, outputFormat);
   }
 
-  protected ListMetalakes newListMetalakes(String url, boolean ignore) {
-    return new ListMetalakes(url, ignore);
+  protected ListMetalakes newListMetalakes(String url, boolean ignore, String outputFormat) {
+    return new ListMetalakes(url, ignore, outputFormat);
   }
 
   protected CreateMetalake newCreateMetalake(
@@ -189,8 +190,8 @@ public class TestableCommandLine {
   }
 
   protected CatalogDetails newCatalogDetails(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new CatalogDetails(url, ignore, metalake, catalog);
+      String url, boolean ignore, String metalake, String catalog, String outputFormat) {
+    return new CatalogDetails(url, ignore, metalake, catalog, outputFormat);
   }
 
   protected ListCatalogs newListCatalogs(String url, boolean ignore, String metalake) {

@@ -153,15 +153,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newMetalakeAudit(url, ignore, metalake).handle();
       } else {
-        newMetalakeDetails(url, ignore, metalake).handle();
+        newMetalakeDetails(url, ignore, metalake, outputFormat).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
-      newListMetalakes(url, ignore).handle();
+      newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
@@ -197,6 +198,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.LIST.equals(command)) {
       newListCatalogs(url, ignore, metalake).handle();
@@ -209,7 +211,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newCatalogAudit(url, ignore, metalake, catalog).handle();
       } else {
-        newCatalogDetails(url, ignore, metalake, catalog).handle();
+        newCatalogDetails(url, ignore, metalake, catalog, outputFormat).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
