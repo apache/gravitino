@@ -63,6 +63,7 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
+import org.apache.gravitino.cli.commands.ListTopicProperties;
 import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
@@ -75,6 +76,7 @@ import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
+import org.apache.gravitino.cli.commands.RemoveTopicProperty;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
@@ -85,6 +87,7 @@ import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetOwner;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
+import org.apache.gravitino.cli.commands.SetTopicProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TableDistribution;
@@ -498,6 +501,34 @@ public class TestableCommandLine {
       String topic,
       String comment) {
     return new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment);
+  }
+
+  protected SetTopicProperty newSetTopicProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String topic,
+      String property,
+      String value) {
+    return new SetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value);
+  }
+
+  protected RemoveTopicProperty newRemoveTopicProperty(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String topic,
+      String property) {
+    return new RemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property);
+  }
+
+  protected ListTopicProperties newListTopicProperties(
+      String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
+    return new ListTopicProperties(url, ignore, metalake, catalog, schema, topic);
   }
 
   protected FilesetDetails newFilesetDetails(

@@ -628,6 +628,24 @@ gcli topic delete --name kafka.default.topic3
 gcli topic update --name kafka.default.topic3 --comment new_comment
 ```
 
+#### Display a topics's properties
+
+```bash
+gcli topic properties --name kafka.default.topic3
+```
+
+#### Set a topics's property
+
+```bash
+gcli topic set --name kafka.default.topic3 --property test --value value
+```
+
+#### Remove a topics's property
+
+```bash
+gcli topic remove --name kafka.default.topic3 --property test
+```
+
 ### Fileset commands
 
 #### Create a fileset

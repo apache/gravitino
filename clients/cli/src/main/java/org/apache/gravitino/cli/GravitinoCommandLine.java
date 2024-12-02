@@ -519,6 +519,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
         newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
       }
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTopicProperties(url, ignore, metalake, catalog, schema, topic).handle();
     }
   }
 

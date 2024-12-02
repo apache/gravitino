@@ -29,7 +29,10 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateTopic;
 import org.apache.gravitino.cli.commands.DeleteTopic;
+import org.apache.gravitino.cli.commands.ListTopicProperties;
 import org.apache.gravitino.cli.commands.ListTopics;
+import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.SetTopicProperty;
 import org.apache.gravitino.cli.commands.TopicDetails;
 import org.apache.gravitino.cli.commands.UpdateTopicComment;
 import org.junit.jupiter.api.BeforeEach;
@@ -188,5 +191,84 @@ class TestTopicCommands {
             "new comment");
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
+  }
+
+  @Test
+  void testListTopicPropertiesCommand() {
+    ListTopicProperties mockListProperties = mock(ListTopicProperties.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TOPIC, CommandActions.PROPERTIES));
+    doReturn(mockListProperties)
+        .when(commandLine)
+        .newListTopicProperties(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
+    commandLine.handleCommandLine();
+    verify(mockListProperties).handle();
+  }
+
+  @Test
+  void testSetTopicPropertyCommand() {
+    SetTopicProperty mockSetProperties = mock(SetTopicProperty.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TOPIC, CommandActions.SET));
+    doReturn(mockSetProperties)
+        .when(commandLine)
+        .newSetTopicProperty(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "topic",
+            "property",
+            "value");
+    commandLine.handleCommandLine();
+    verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testRemoveTopicPropertyCommand() {
+    RemoveTopicProperty mockSetProperties = mock(RemoveTopicProperty.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TOPIC, CommandActions.REMOVE));
+    doReturn(mockSetProperties)
+        .when(commandLine)
+        .newRemoveTopicProperty(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "topic",
+            "property");
+    commandLine.handleCommandLine();
+    verify(mockSetProperties).handle();
   }
 }
