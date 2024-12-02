@@ -105,6 +105,8 @@ import org.apache.gravitino.cli.commands.UpdateFilesetComment;
 import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
+import org.apache.gravitino.cli.commands.UpdateTableComment;
+import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
 import org.apache.gravitino.cli.commands.UpdateTagName;
 import org.apache.gravitino.cli.commands.UpdateTopicComment;
@@ -311,6 +313,28 @@ public class TestableCommandLine {
   protected TableDistribution newTableDistribution(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
     return new TableDistribution(url, ignore, metalake, catalog, schema, table);
+  }
+
+  protected UpdateTableComment newUpdateTableComment(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String comment) {
+    return new UpdateTableComment(url, ignore, metalake, catalog, schema, table, comment);
+  }
+
+  protected UpdateTableName newUpdateTableName(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String rename) {
+    return new UpdateTableName(url, ignore, metalake, catalog, schema, table, rename);
   }
 
   protected SetTableProperty newSetTableProperty(
