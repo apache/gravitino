@@ -14,30 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from abc import abstractmethod
-from typing import List, TypeVar, Generic
-
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.types.type import Type
-
-T = TypeVar("T")
-
-
-class Literal(Generic[T], Expression):
-    """
-    Represents a constant literal value in the public expression API.
-    """
-
-    @abstractmethod
-    def value(self) -> T:
-        """The literal value."""
-        raise NotImplementedError("Subclasses must implement the `value` method.")
-
-    @abstractmethod
-    def data_type(self) -> Type:
-        """The data type of the literal."""
-        raise NotImplementedError("Subclasses must implement the `data_type` method.")
-
-    def children(self) -> List[Expression]:
-        return Expression.EMPTY_EXPRESSION

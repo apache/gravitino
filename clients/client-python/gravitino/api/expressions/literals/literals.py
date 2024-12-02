@@ -15,44 +15,35 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from decimal import Decimal
-from typing import Union
+from typing import TypeVar
 from datetime import date, time, datetime
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.types import Types
+from gravitino.api.types.decimal import Decimal
+from gravitino.api.types.type import Type
+from gravitino.api.types.types import Types
+
+T = TypeVar("T")
 
 
-class LiteralImpl(Literal):
+class LiteralImpl(Literal[T]):
     """Creates a literal with the given type value."""
 
-    _value: Union[int, float, Decimal, str, date, time, datetime, bool, None]
-    _data_type: Union[
-        Types.IntegerType,
-        Types.LongType,
-        Types.FloatType,
-        Types.DoubleType,
-        Types.DecimalType,
-        Types.StringType,
-        Types.DateType,
-        Types.TimeType,
-        Types.TimestampType,
-        Types.BooleanType,
-        Types.NullType,
-    ]
+    _value: T
+    _data_type: Type
 
     def __init__(
         self,
-        value: Union[int, float, str, datetime, time, date, bool, Decimal, None],
-        data_type: str,
+        value: T,
+        data_type: Type,
     ):
         self._value = value
         self._data_type = data_type
 
-    def value(self) -> Union[int, float, str, datetime, time, date, bool]:
+    def value(self) -> T:
         return self._value
 
-    def data_type(self) -> str:
+    def data_type(self) -> Type:
         return self._data_type
 
     def __eq__(self, other: object) -> bool:
@@ -70,71 +61,73 @@ class LiteralImpl(Literal):
 class Literals:
     """The helper class to create literals to pass into Apache Gravitino."""
 
-    NULL = LiteralImpl(None, "NullType")
+    NULL = LiteralImpl(None, Types.NullType.get())
 
     @staticmethod
-    def of(value, data_type) -> Literal:
+    def of(value: T, data_type: Type) -> Literal[T]:
         return LiteralImpl(value, data_type)
 
     @staticmethod
-    def boolean_literal(value: bool) -> Literal:
-        return LiteralImpl(value, "Boolean")
+    def boolean_literal(value: bool) -> LiteralImpl[bool]:
+        return LiteralImpl(value, Types.BooleanType.get())
 
     @staticmethod
-    def byte_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Byte")
+    def byte_literal(value: str) -> LiteralImpl[str]:
+        return LiteralImpl(value, Types.ByteType.get())
 
     @staticmethod
-    def unsigned_byte_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Unsigned Byte")
+    def unsigned_byte_literal(value: str) -> LiteralImpl[str]:
+        return LiteralImpl(value, Types.ByteType.unsigned())
 
     @staticmethod
-    def short_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Short")
+    def short_literal(value: int) -> LiteralImpl[int]:
+        return LiteralImpl(value, Types.ShortType.get())
 
     @staticmethod
-    def unsigned_short_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Unsigned Short")
+    def unsigned_short_literal(value: int) -> LiteralImpl[int]:
+        return LiteralImpl(value, Types.ShortType.unsigned())
 
     @staticmethod
-    def integer_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Integer")
+    def integer_literal(value: int) -> LiteralImpl[int]:
+        return LiteralImpl(value, Types.IntegerType.get())
 
     @staticmethod
-    def unsigned_integer_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Unsigned Integer")
+    def unsigned_integer_literal(value: int) -> LiteralImpl[int]:
+        return LiteralImpl(value, Types.IntegerType.unsigned())
 
     @staticmethod
-    def long_literal(value: int) -> Literal:
-        return LiteralImpl(value, "Long")
+    def long_literal(value: int) -> LiteralImpl[int]:
+        return LiteralImpl(value, Types.LongType.get())
 
     @staticmethod
-    def unsigned_long_literal(value: Decimal) -> Literal:
-        return LiteralImpl(value, "Unsigned Long")
+    def unsigned_long_literal(value: int) -> LiteralImpl[int]:
+        return LiteralImpl(value, Types.LongType.unsigned())
 
     @staticmethod
-    def float_literal(value: float) -> Literal:
-        return LiteralImpl(value, "Float")
+    def float_literal(value: float) -> LiteralImpl[float]:
+        return LiteralImpl(value, Types.FloatType.get())
 
     @staticmethod
-    def double_literal(value: float) -> Literal:
-        return LiteralImpl(value, "Double")
+    def double_literal(value: float) -> LiteralImpl[float]:
+        return LiteralImpl(value, Types.DoubleType.get())
 
     @staticmethod
-    def decimal_literal(value: float) -> Literal:
-        return LiteralImpl(value, "Decimal")
+    def decimal_literal(value: Decimal) -> LiteralImpl[Decimal]:
+        return LiteralImpl(
+            value, Types.DecimalType.of(value.precision(), value.scale())
+        )
 
     @staticmethod
     def date_literal(value: date) -> Literal:
-        return LiteralImpl(value, "Date")
+        return LiteralImpl(value, Types.DateType.get())
 
     @staticmethod
     def time_literal(value: time) -> Literal:
-        return LiteralImpl(value, "Time")
+        return LiteralImpl(value, Types.TimeType.get())
 
     @staticmethod
     def timestamp_literal(value: datetime) -> Literal:
-        return LiteralImpl(value, "Timestamp")
+        return LiteralImpl(value, Types.TimestampType.get())
 
     @staticmethod
     def timestamp_literal_from_string(value: str) -> Literal:
@@ -142,8 +135,8 @@ class Literals:
 
     @staticmethod
     def string_literal(value: str) -> Literal:
-        return LiteralImpl(value, "String")
+        return LiteralImpl(value, Types.StringType.get())
 
     @staticmethod
     def varchar_literal(length: int, value: str) -> Literal:
-        return LiteralImpl(value, f"Varchar({length})")
+        return LiteralImpl(value, Types.VarCharType.of(length))
