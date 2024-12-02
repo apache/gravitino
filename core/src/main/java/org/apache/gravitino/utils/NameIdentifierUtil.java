@@ -140,6 +140,37 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the model {@link NameIdentifier} with the given metalake, catalog, schema and model
+   * name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param model The model name
+   * @return The created model {@link NameIdentifier}
+   */
+  public static NameIdentifier ofModel(
+      String metalake, String catalog, String schema, String model) {
+    return NameIdentifier.of(metalake, catalog, schema, model);
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given metalake, catalog, schema, model
+   * and version.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param model The model name
+   * @param version The model version
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier ofModelVersion(
+      String metalake, String catalog, String schema, String model, int version) {
+    return NameIdentifier.of(metalake, catalog, schema, model, String.valueOf(version));
+  }
+
+  /**
    * Try to get the catalog {@link NameIdentifier} from the given {@link NameIdentifier}.
    *
    * @param ident The {@link NameIdentifier} to check.
@@ -246,6 +277,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a model identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The model {@link NameIdentifier} to check.
+   */
+  public static void checkModel(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Model identifier must not be null");
+    NamespaceUtil.checkModel(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a model version identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The model version {@link NameIdentifier} to check.
+   */
+  public static void checkModelVersion(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Model version identifier must not be null");
+    NamespaceUtil.checkModelVersion(ident.namespace());
+  }
+
+  /**
    * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
    *
    * @param expression The expression to check.
@@ -308,6 +361,11 @@ public class NameIdentifierUtil {
         checkTopic(ident);
         String topicParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(topicParent, ident.name(), MetadataObject.Type.TOPIC);
+
+      case MODEL:
+        checkModel(ident);
+        String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
 
       case ROLE:
         AuthorizationUtils.checkRole(ident);

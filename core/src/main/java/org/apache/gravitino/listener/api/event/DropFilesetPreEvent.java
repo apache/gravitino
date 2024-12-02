@@ -10,19 +10,32 @@
  *  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
+ * distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
 
-import java.util.List;
+package org.apache.gravitino.listener.api.event;
 
-/** Different underlying datasource have different Ranger metadata object rules */
-interface RangerMetadataObjectRule {
-  /** Validate different underlying datasource Ranger metadata object */
-  void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
-      throws IllegalArgumentException;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
+
+/** Represents an event that is triggered before dropping a fileset. */
+@DeveloperApi
+public final class DropFilesetPreEvent extends FilesetPreEvent {
+  public DropFilesetPreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_FILESET;
+  }
 }

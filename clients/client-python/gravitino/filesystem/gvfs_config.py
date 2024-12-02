@@ -41,3 +41,6 @@ class GVFSConfig:
     GVFS_FILESYSTEM_OSS_ACCESS_KEY = "oss_access_key_id"
     GVFS_FILESYSTEM_OSS_SECRET_KEY = "oss_secret_access_key"
     GVFS_FILESYSTEM_OSS_ENDPOINT = "oss_endpoint"
+
+    GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME = "abs_account_name"
+    GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY = "abs_account_key"

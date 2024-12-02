@@ -25,7 +25,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-/* Entry point for teh Gravitino command line. */
+/* Entry point for the Gravitino command line. */
 public class Main {
 
   public static void main(String[] args) {
