@@ -45,6 +45,7 @@ dependencies {
   }
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(project(":catalogs:catalog-jdbc-postgresql"))
 }
 
 tasks.build {
@@ -66,4 +67,14 @@ tasks.jar {
     .map(::zipTree)
   from(dependencies)
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    // Exclude integration tests
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(tasks.jar)
+  }
 }
