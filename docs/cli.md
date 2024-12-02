@@ -547,7 +547,7 @@ gcli tag update --tag tagA --rename newTag
 gcli tag update --tag tagA --comment "new comment"
 ```
 
-### Owners commands
+### Owner commands
 
 #### List an owner
 
