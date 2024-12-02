@@ -83,8 +83,9 @@ public class MetadataObjects {
         names.size() != 3
             || type == MetadataObject.Type.FILESET
             || type == MetadataObject.Type.TABLE
-            || type == MetadataObject.Type.TOPIC,
-        "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
+            || type == MetadataObject.Type.TOPIC
+            || type == MetadataObject.Type.MODEL,
+        "If the length of names is 3, it must be FILESET, TABLE, TOPIC or MODEL");
 
     Preconditions.checkArgument(
         names.size() != 4 || type == MetadataObject.Type.COLUMN,

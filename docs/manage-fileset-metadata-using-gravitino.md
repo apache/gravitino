@@ -49,7 +49,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "file:/tmp/root"
+    "location": "file:///tmp/root"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 
@@ -83,7 +83,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 Map<String, String> properties = ImmutableMap.<String, String>builder()
-    .put("location", "file:/tmp/root")
+    .put("location", "file:///tmp/root")
     // Property "location" is optional. If specified, a managed fileset without
     // a storage location will be stored under this location.
     .build();
@@ -205,7 +205,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "schema",
   "comment": "comment",
   "properties": {
-    "location": "file:/tmp/root/schema"
+    "location": "file:///tmp/root/schema"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
@@ -227,7 +227,7 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     // Property "location" is optional, if specified all the managed fileset without
     // specifying storage location will be stored under this location.
-    .put("location", "file:/tmp/root/schema")
+    .put("location", "file:///tmp/root/schema")
     .build();
 Schema schema = supportsSchemas.createSchema("schema",
     "This is a schema",
@@ -308,7 +308,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "example_fileset",
   "comment": "This is an example fileset",
   "type": "MANAGED",
-  "storageLocation": "file:/tmp/root/schema/example_fileset",
+  "storageLocation": "file:///tmp/root/schema/example_fileset",
   "properties": {
     "k1": "v1"
   }
@@ -335,7 +335,7 @@ filesetCatalog.createFileset(
   NameIdentifier.of("schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
-  "file:/tmp/root/schema/example_fileset",
+  "file:///tmp/root/schema/example_fileset",
   propertiesMap,
 );
 ```
@@ -373,7 +373,7 @@ when creating a fileset, or follow the rules of the catalog/schema location if n
 The value of `storageLocation` depends on the configuration settings of the catalog:
 - If this is a S3 fileset catalog, the `storageLocation` should be in the format of `s3a://bucket-name/path/to/fileset`.
 - If this is an OSS fileset catalog, the `storageLocation` should be in the format of `oss://bucket-name/path/to/fileset`.
-- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:/path/to/fileset`.
+- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
 - If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
 - If this is a GCS fileset catalog, the `storageLocation` should be in the format of `gs://bucket-name/path/to/fileset`.
 

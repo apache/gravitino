@@ -39,4 +39,9 @@ public abstract class PartitionEvent extends Event {
   protected PartitionEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

@@ -49,4 +49,14 @@ public final class LoadMetalakeEvent extends MetalakeEvent {
   public MetalakeInfo loadedMetalakeInfo() {
     return loadedMetalakeInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_METALAKE;
+  }
 }

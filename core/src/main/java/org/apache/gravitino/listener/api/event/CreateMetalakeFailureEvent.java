@@ -49,4 +49,14 @@ public final class CreateMetalakeFailureEvent extends MetalakeFailureEvent {
   public MetalakeInfo createMetalakeRequest() {
     return createMetalakeRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_METALAKE;
+  }
 }
