@@ -29,7 +29,10 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.ListIndexes;
+import org.apache.gravitino.cli.commands.ListTableProperties;
 import org.apache.gravitino.cli.commands.ListTables;
+import org.apache.gravitino.cli.commands.RemoveTableProperty;
+import org.apache.gravitino.cli.commands.SetTableProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TableDistribution;
@@ -216,5 +219,84 @@ class TestTableCommands {
             "users");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
+  }
+
+  @Test
+  void testListTablePropertiesCommand() {
+    ListTableProperties mockListProperties = mock(ListTableProperties.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.PROPERTIES));
+    doReturn(mockListProperties)
+        .when(commandLine)
+        .newListTableProperties(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    commandLine.handleCommandLine();
+    verify(mockListProperties).handle();
+  }
+
+  @Test
+  void testSetFilesetPropertyCommand() {
+    SetTableProperty mockSetProperties = mock(SetTableProperty.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.user");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.SET));
+    doReturn(mockSetProperties)
+        .when(commandLine)
+        .newSetTableProperty(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "user",
+            "property",
+            "value");
+    commandLine.handleCommandLine();
+    verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testRemoveTablePropertyCommand() {
+    RemoveTableProperty mockSetProperties = mock(RemoveTableProperty.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.REMOVE));
+    doReturn(mockSetProperties)
+        .when(commandLine)
+        .newRemoveTableProperty(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "property");
+    commandLine.handleCommandLine();
+    verify(mockSetProperties).handle();
   }
 }

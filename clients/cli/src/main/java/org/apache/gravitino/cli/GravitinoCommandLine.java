@@ -578,55 +578,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   /**
-   * Handles the command execution for filesets based on command type and the command line options.
-   */
-  private void handleFilesetCommand() {
-    String url = getUrl();
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-    String schema = name.getSchemaName();
-    String fileset = line.getOptionValue(GravitinoOptions.FILESET);
-
-    if (CommandActions.DETAILS.equals(command)) {
-      new FilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();
-    } else if (CommandActions.LIST.equals(command)) {
-      new ListFilesets(url, ignore, metalake, catalog, schema).handle();
-    } else if (CommandActions.CREATE.equals(command)) {
-      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
-      Map<String, String> propertyMap = new Properties().parse(properties);
-      new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap)
-          .handle();
-    } else if (CommandActions.DELETE.equals(command)) {
-      boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
-    }
-  }
-
-  /**
-   * Handles the command execution for Objects based on command type and the command line options.
-   */
-  private void handleOwnerCommand() {
-    String url = getUrl();
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String entityName = line.getOptionValue(GravitinoOptions.NAME);
-
-    if (CommandActions.DETAILS.equals(command)) {
-      new OwnerDetails(url, ignore, metalake, entityName, entity).handle();
-    } else if (CommandActions.UPDATE.equals(command)) {
-      String owner = line.getOptionValue(GravitinoOptions.USER);
-      String group = line.getOptionValue(GravitinoOptions.GROUP);
-      if (owner != null) {
-        new SetOwner(url, ignore, metalake, entityName, entity, owner, false).handle();
-      } else if (group != null) {
-        new SetOwner(url, ignore, metalake, entityName, entity, group, true).handle();
-      }
-    }
-  }
-
-  /**
    * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
    * variable or the Gravitio config file.
    *

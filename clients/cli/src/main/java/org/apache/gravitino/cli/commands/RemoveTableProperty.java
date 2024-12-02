@@ -65,6 +65,7 @@ public class RemoveTableProperty extends Command {
   }
 
   /** Remove a property of a table. */
+  @Override
   public void handle() {
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
