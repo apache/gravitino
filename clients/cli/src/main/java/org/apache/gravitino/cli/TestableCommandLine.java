@@ -315,7 +315,7 @@ public class TestableCommandLine {
     return new TableDistribution(url, ignore, metalake, catalog, schema, table);
   }
 
-  protected TableDetails newUpdateTableComment(
+  protected UpdateTableComment newUpdateTableComment(
       String url,
       boolean ignore,
       String metalake,
@@ -326,7 +326,7 @@ public class TestableCommandLine {
     return new UpdateTableComment(url, ignore, metalake, catalog, schema, table, comment);
   }
 
-  protected TableDetails newUpdateTableName(
+  protected UpdateTableName newUpdateTableName(
       String url,
       boolean ignore,
       String metalake,
