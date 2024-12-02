@@ -20,6 +20,11 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Preconditions;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
@@ -112,7 +117,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (line.hasOption(GravitinoOptions.OWNER)) {
+    if (command.equals(CommandActions.HELP)) {
+      handleHelpCommand();
+    } else if (line.hasOption(GravitinoOptions.OWNER)) {
       handleOwnerCommand();
     } else if (entity.equals(CommandEntities.COLUMN)) {
       handleColumnCommand();
@@ -484,6 +491,23 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
+  private void handleHelpCommand() {
+    String helpFile = entity.toLowerCase() + "_help.txt";
+
+    try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(helpFile);
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      StringBuilder helpMessage = new StringBuilder();
+      String helpLine;
+      while ((helpLine = reader.readLine()) != null) {
+        helpMessage.append(helpLine).append(System.lineSeparator());
+      }
+      System.err.print(helpMessage.toString());
+    } catch (IOException e) {
+      System.err.println("Failed to load help message: " + e.getMessage());
+    }
+  }
+
   /**
    * Handles the command execution for Objects based on command type and the command line options.
    */
@@ -537,11 +561,20 @@ public class GravitinoCommandLine extends TestableCommandLine {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
         newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
       }
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTopicProperties(url, ignore, metalake, catalog, schema, topic).handle();
     }
   }
 
   /**
-   * Handles the command execution for Filesets based on command type and the command line options.
+   * Handles the command execution for filesets based on command type and the command line options.
    */
   private void handleFilesetCommand() {
     String url = getUrl();
@@ -564,6 +597,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value)
+          .handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);

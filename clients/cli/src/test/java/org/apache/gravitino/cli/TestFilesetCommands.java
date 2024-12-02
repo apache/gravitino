@@ -32,7 +32,10 @@ import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.FilesetDetails;
+import org.apache.gravitino.cli.commands.ListFilesetProperties;
 import org.apache.gravitino.cli.commands.ListFilesets;
+import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
+import org.apache.gravitino.cli.commands.SetFilesetProperty;
 import org.apache.gravitino.cli.commands.UpdateFilesetComment;
 import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.junit.jupiter.api.BeforeEach;
@@ -231,5 +234,92 @@ class TestFilesetCommands {
             "new_name");
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
+  }
+
+  @Test
+  void testListFilesetPropertiesCommand() {
+    ListFilesetProperties mockListProperties = mock(ListFilesetProperties.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.PROPERTIES));
+    doReturn(mockListProperties)
+        .when(commandLine)
+        .newListFilesetProperties(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "fileset");
+    commandLine.handleCommandLine();
+    verify(mockListProperties).handle();
+  }
+
+  @Test
+  void testSetFilesetPropertyCommand() {
+    SetFilesetProperty mockSetProperties = mock(SetFilesetProperty.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.SET));
+    doReturn(mockSetProperties)
+        .when(commandLine)
+        .newSetFilesetProperty(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "fileset",
+            "property",
+            "value");
+    commandLine.handleCommandLine();
+    verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testRemoveFilesetPropertyCommand() {
+    RemoveFilesetProperty mockSetProperties = mock(RemoveFilesetProperty.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.REMOVE));
+    doReturn(mockSetProperties)
+        .when(commandLine)
+        .newRemoveFilesetProperty(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "fileset",
+            "property");
+    commandLine.handleCommandLine();
+    verify(mockSetProperties).handle();
   }
 }

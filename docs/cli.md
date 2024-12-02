@@ -652,6 +652,24 @@ gcli topic delete --name kafka.default.topic3
 gcli topic update --name kafka.default.topic3 --comment new_comment
 ```
 
+#### Display a topics's properties
+
+```bash
+gcli topic properties --name kafka.default.topic3
+```
+
+#### Set a topics's property
+
+```bash
+gcli topic set --name kafka.default.topic3 --property test --value value
+```
+
+#### Remove a topics's property
+
+```bash
+gcli topic remove --name kafka.default.topic3 --property test
+```
+
 ### Fileset commands
 
 #### Create a fileset
@@ -688,4 +706,22 @@ gcli fileset update --name hadoop.schema.fileset --comment new_comment
 
 ```bash
 gcli fileset update --name hadoop.schema.fileset --rename new_name
+```
+
+#### Display a fileset's properties
+
+```bash
+gcli fileset properties --name hadoop.schema.fileset 
+```
+
+#### Set a fileset's property
+
+```bash
+gcli fileset set  --name hadoop.schema.fileset --property test --value value
+```
+
+#### Remove a fileset's property
+
+```bash
+gcli fileset remove --name hadoop.schema.fileset --property test
 ```
