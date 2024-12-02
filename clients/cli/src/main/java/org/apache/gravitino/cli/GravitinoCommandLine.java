@@ -315,6 +315,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteTable(url, ignore, force, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTableProperty(url, ignore, metalake, catalog, schema, table, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTableProperties(url, ignore, metalake, catalog, schema, table).handle();
     }
   }
 
