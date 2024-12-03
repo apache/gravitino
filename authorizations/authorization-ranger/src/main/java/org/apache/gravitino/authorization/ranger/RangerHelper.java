@@ -445,7 +445,10 @@ public class RangerHelper {
     List<String> nsMetadataObject = metadataObject.names();
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
-          new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
+          new RangerPolicy.RangerPolicyResource(
+              nsMetadataObject.get(i),
+              false,
+              metadataObject.type().equals(RangerMetadataObject.Type.PATH));
       policy.getResources().put(policyResourceDefines.get(i), policyResource);
     }
     return policy;

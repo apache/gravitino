@@ -41,7 +41,9 @@ public interface RangerMetadataObject {
     /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
     TABLE(MetadataObject.Type.TABLE),
     /** A column is a sub-collection of the table that represents a group of same type data. */
-    COLUMN(MetadataObject.Type.COLUMN);
+    COLUMN(MetadataObject.Type.COLUMN),
+
+    PATH(MetadataObject.Type.FILESET);
 
     private final MetadataObject.Type metadataType;
 
