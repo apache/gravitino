@@ -46,4 +46,6 @@ public class PaimonPropertiesConstants {
 
   public static final String PAIMON_CATALOG_BACKEND_FILESYSTEM = "filesystem";
   static final String GRAVITINO_PAIMON_CATALOG_BACKEND_FILESYSTEM = "filesystem";
+
+  public static final String PAIMON_TABLE_LOCATION = "path";
 }

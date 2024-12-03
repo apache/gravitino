@@ -48,8 +48,8 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   @VisibleForTesting
   public static final String GRAVITINO_CATALOG_BACKEND = PaimonConstants.CATALOG_BACKEND;
 
-  public static final String PAIMON_METASTORE = PaimonConstants.CATALOG_BACKEND;
-  public static final String WAREHOUSE = PaimonConstants.METASTORE;
+  public static final String PAIMON_METASTORE = PaimonConstants.METASTORE;
+  public static final String WAREHOUSE = PaimonConstants.WAREHOUSE;
   public static final String URI = PaimonConstants.URI;
   public static final String GRAVITINO_JDBC_USER = PaimonConstants.GRAVITINO_JDBC_USER;
   public static final String PAIMON_JDBC_USER = PaimonConstants.PAIMON_JDBC_USER;

@@ -155,6 +155,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
     dependsOn(":iceberg:iceberg-rest-server:jar")
+    dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
   }
 }
 

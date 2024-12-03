@@ -27,7 +27,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-/** List the properties of a catalog. */
+/** List the properties of a schema. */
 public class ListSchemaProperties extends ListProperties {
 
   protected final String metalake;
@@ -35,7 +35,7 @@ public class ListSchemaProperties extends ListProperties {
   protected final String schema;
 
   /**
-   * List the properties of a catalog.
+   * List the properties of a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -51,7 +51,7 @@ public class ListSchemaProperties extends ListProperties {
     this.schema = schema;
   }
 
-  /** List the properties of a catalog. */
+  /** List the properties of a schema. */
   @Override
   public void handle() {
     Schema gSchema = null;

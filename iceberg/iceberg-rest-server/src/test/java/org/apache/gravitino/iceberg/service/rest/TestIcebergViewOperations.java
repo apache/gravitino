@@ -69,7 +69,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
+public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   private static final Schema viewSchema =
       new Schema(Types.NestedField.of(1, false, "foo_string", Types.StringType.get()));
 
@@ -87,7 +87,7 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
         IcebergRestTestUtil.getIcebergResourceConfig(
             MockIcebergViewOperations.class, true, Arrays.asList(dummyEventListener));
     // create namespace before each view test
-    resourceConfig.register(IcebergNamespaceOperations.class);
+    resourceConfig.register(MockIcebergNamespaceOperations.class);
     resourceConfig.register(MockIcebergViewRenameOperations.class);
 
     return resourceConfig;

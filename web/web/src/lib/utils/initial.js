@@ -49,6 +49,34 @@ export const messagingProviders = [
 
 export const providers = [
   {
+    label: 'Apache Doris',
+    value: 'jdbc-doris',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:9030'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
     label: 'Apache Hive',
     value: 'hive',
     defaultProps: [
@@ -57,6 +85,26 @@ export const providers = [
         value: '',
         required: true,
         description: 'The Apache Hive metastore URIs'
+      }
+    ]
+  },
+  {
+    label: 'Apache Hudi',
+    value: 'lakehouse-hudi',
+    defaultProps: [
+      {
+        key: 'catalog-backend',
+        value: 'hms',
+        defaultValue: 'hms',
+        required: true,
+        select: ['hms'],
+        description: 'Apache Hudi catalog type choose properties'
+      },
+      {
+        key: 'uri',
+        value: '',
+        required: true,
+        description: 'Apache Hudi catalog uri config'
       }
     ]
   },
@@ -136,95 +184,6 @@ export const providers = [
     ]
   },
   {
-    label: 'MySQL',
-    value: 'jdbc-mysql',
-    defaultProps: [
-      {
-        key: 'jdbc-driver',
-        value: '',
-        required: true,
-        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
-      },
-      {
-        key: 'jdbc-url',
-        value: '',
-        required: true,
-        description: 'e.g. jdbc:mysql://localhost:3306'
-      },
-      {
-        key: 'jdbc-user',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-password',
-        value: '',
-        required: true
-      }
-    ]
-  },
-  {
-    label: 'PostgreSQL',
-    value: 'jdbc-postgresql',
-    defaultProps: [
-      {
-        key: 'jdbc-driver',
-        value: '',
-        required: true,
-        description: 'e.g. org.postgresql.Driver'
-      },
-      {
-        key: 'jdbc-url',
-        value: '',
-        required: true,
-        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
-      },
-      {
-        key: 'jdbc-user',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-password',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-database',
-        value: '',
-        required: true
-      }
-    ]
-  },
-  {
-    label: 'Apache Doris',
-    value: 'jdbc-doris',
-    defaultProps: [
-      {
-        key: 'jdbc-driver',
-        value: '',
-        required: true,
-        description: 'e.g. com.mysql.jdbc.Driver'
-      },
-      {
-        key: 'jdbc-url',
-        value: '',
-        required: true,
-        description: 'e.g. jdbc:mysql://localhost:9030'
-      },
-      {
-        key: 'jdbc-user',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-password',
-        value: '',
-        required: true
-      }
-    ]
-  },
-  {
     label: 'Apache Paimon',
     value: 'lakehouse-paimon',
     defaultProps: [
@@ -300,22 +259,30 @@ export const providers = [
     ]
   },
   {
-    label: 'Apache Hudi',
-    value: 'lakehouse-hudi',
+    label: 'MySQL',
+    value: 'jdbc-mysql',
     defaultProps: [
       {
-        key: 'catalog-backend',
-        value: 'hms',
-        defaultValue: 'hms',
-        required: true,
-        select: ['hms'],
-        description: 'Apache Hudi catalog type choose properties'
-      },
-      {
-        key: 'uri',
+        key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'Apache Hudi catalog uri config'
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:3306'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
       }
     ]
   },
@@ -342,6 +309,39 @@ export const providers = [
       },
       {
         key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
+    label: 'PostgreSQL',
+    value: 'jdbc-postgresql',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. org.postgresql.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-database',
         value: '',
         required: true
       }
@@ -455,7 +455,7 @@ const parameterizedColumnTypes = {
 }
 
 export const getParameterizedColumnType = type => {
-  if (Object.keys(parameterizedColumnTypes).includes(type)) {
+  if (Object.hasOwn(parameterizedColumnTypes, type)) {
     return parameterizedColumnTypes[type]
   }
 }
@@ -477,7 +477,6 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'uuid'
   ],
-
   hive: [
     'binary',
     'boolean',
@@ -496,7 +495,6 @@ const relationalColumnTypeMap = {
     'timestamp',
     'varchar'
   ],
-
   'jdbc-mysql': [
     'binary',
     'byte',
@@ -534,7 +532,6 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'varchar'
   ],
-
   'jdbc-doris': [
     'boolean',
     'byte',
@@ -550,7 +547,6 @@ const relationalColumnTypeMap = {
     'timestamp',
     'varchar'
   ],
-
   'lakehouse-paimon': [
     'binary',
     'boolean',
@@ -572,10 +568,99 @@ const relationalColumnTypeMap = {
   ]
 }
 
-export const getRelationalColumnTypeMap = catalog => {
-  if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
+export const getRelationalColumnType = catalog => {
+  if (Object.hasOwn(relationalColumnTypeMap, catalog)) {
     return relationalColumnTypeMap[catalog]
   }
 
   return []
+}
+
+const relationalTablePropInfoMap = {
+  hive: {
+    reserved: ['comment', 'EXTERNAL', 'numFiles', 'totalSize', 'transient_lastDdlTime'],
+    immutable: [
+      'format',
+      'input-format',
+      'location',
+      'output-format',
+      'serde-name',
+      'serde-lib',
+      'serde.parameter',
+      'table-type'
+    ],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'jdbc-doris': {
+    reserved: [],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'jdbc-mysql': {
+    reserved: [],
+    immutable: ['auto-increment-offset', 'engine'],
+    allowDelete: false,
+    allowAdd: true
+  },
+  'jdbc-oceanbase': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'jdbc-postgresql': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'lakehouse-hudi': {
+    reserved: [],
+    immutable: [],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'lakehouse-iceberg': {
+    reserved: [
+      'cherry-pick-snapshot-id',
+      'comment',
+      'creator',
+      'current-snapshot-id',
+      'identifier-fields',
+      'sort-order',
+      'write.distribution-mode'
+    ], // Can't be set or modified
+    immutable: ['location', 'provider', 'format', 'format-version'], // Can't be modified after creation
+    allowDelete: true,
+    allowAdd: true
+  },
+  'lakehouse-paimon': {
+    reserved: [
+      'bucket-key',
+      'comment',
+      'merge-engine',
+      'owner',
+      'partition',
+      'primary-key',
+      'rowkind.field',
+      'sequence.field'
+    ],
+    immutable: ['merge-engine', 'rowkind.field', 'sequence.field'],
+    allowDelete: true,
+    allowAdd: true
+  }
+}
+
+export const getRelationalTablePropInfo = catalog => {
+  if (Object.hasOwn(relationalTablePropInfoMap, catalog)) {
+    return relationalTablePropInfoMap[catalog]
+  }
+
+  return {
+    reserved: [],
+    immutable: [],
+    allowDelete: true,
+    allowAdd: true
+  }
 }

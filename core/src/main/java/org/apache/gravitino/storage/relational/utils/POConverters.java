@@ -45,6 +45,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -64,6 +65,7 @@ import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -1282,6 +1284,41 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeleteAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static ModelEntity fromModelPO(ModelPO modelPO, Namespace namespace) {
+    try {
+      return ModelEntity.builder()
+          .withId(modelPO.getModelId())
+          .withName(modelPO.getModelName())
+          .withNamespace(namespace)
+          .withComment(modelPO.getModelComment())
+          .withLatestVersion(modelPO.getModelLatestVersion())
+          .withProperties(
+              JsonUtils.anyFieldMapper().readValue(modelPO.getModelProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(modelPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static ModelPO initializeModelPO(ModelEntity modelEntity, ModelPO.Builder builder) {
+    try {
+      return builder
+          .withModelId(modelEntity.id())
+          .withModelName(modelEntity.name())
+          .withModelComment(modelEntity.comment())
+          .withModelLatestVersion(modelEntity.latestVersion())
+          .withModelProperties(
+              JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);

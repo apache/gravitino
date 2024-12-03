@@ -620,6 +620,7 @@ public class CatalogHiveIT extends BaseIT {
     NameIdentifier icebergTable = NameIdentifier.of(schemaName, "iceberg_table");
     NameIdentifier paimonTable = NameIdentifier.of(schemaName, "paimon_table");
     NameIdentifier hudiTable = NameIdentifier.of(schemaName, "hudi_table");
+    NameIdentifier hiveTable = NameIdentifier.of(schemaName, "hive_table");
     catalog
         .asTableCatalog()
         .createTable(icebergTable, createColumns(), null, ImmutableMap.of("table_type", "ICEBERG"));
@@ -629,8 +630,11 @@ public class CatalogHiveIT extends BaseIT {
     catalog
         .asTableCatalog()
         .createTable(hudiTable, createColumns(), null, ImmutableMap.of("provider", "hudi"));
+    catalog
+        .asTableCatalog()
+        .createTable(hiveTable, createColumns(), null, ImmutableMap.of("provider", "hive"));
     NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of(schemaName));
-    Assertions.assertEquals(0, tables.length);
+    Assertions.assertEquals(1, tables.length);
   }
 
   @Test
