@@ -21,7 +21,7 @@
 package org.apache.gravitino.cli;
 
 import java.util.Map;
-import org.apache.gravitino.cli.commands.AddOptionalColumn;
+import org.apache.gravitino.cli.commands.AddColumn;
 import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
@@ -680,7 +680,7 @@ public class TestableCommandLine {
     return new RemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property);
   }
 
-  protected AddOptionalColumn newAddOptionalColumn(
+  protected AddColumn newAddColumn(
       String url,
       boolean ignore,
       String metalake,
@@ -694,7 +694,7 @@ public class TestableCommandLine {
       boolean nullable,
       boolean autoIncrement,
       String defaultValue) {
-    return new AddOptionalColumn(
+    return new AddColumn(
         url,
         ignore,
         metalake,

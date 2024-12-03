@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.AddOptionalColumn;
+import org.apache.gravitino.cli.commands.AddColumn;
 import org.apache.gravitino.cli.commands.DeleteColumn;
 import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.UpdateColumnAutoIncrement;
@@ -71,8 +71,8 @@ class TestColumnCommands {
   }
 
   @Test
-  void testAddOptionalColumn() {
-    AddOptionalColumn mockAddColumn = mock(AddOptionalColumn.class);
+  void testAddColumn() {
+    AddColumn mockAddColumn = mock(AddColumn.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -91,7 +91,7 @@ class TestColumnCommands {
                 mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.CREATE));
     doReturn(mockAddColumn)
         .when(commandLine)
-        .newAddOptionalColumn(
+        .newAddColumn(
             GravitinoCommandLine.DEFAULT_URL,
             false,
             "metalake_demo",

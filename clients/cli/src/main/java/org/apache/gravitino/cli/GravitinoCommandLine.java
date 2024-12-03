@@ -509,7 +509,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
         autoIncrement = line.getOptionValue(GravitinoOptions.AUTO).equals("true");
       }
 
-      newAddOptionalColumn(
+      newAddColumn(
               url,
               ignore,
               metalake,

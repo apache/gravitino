@@ -29,7 +29,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
   usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
   Options
- [options]
+ usage: gcli
  -a,--audit              display audit information
     --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
