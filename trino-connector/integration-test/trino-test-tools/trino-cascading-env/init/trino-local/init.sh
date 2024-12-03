@@ -27,6 +27,7 @@ cp "$trino_conf_dir/config/jvm.config" /etc/trino/jvm.config
 cp "$trino_conf_dir/config/log4j2.properties" /etc/trino/log4j2.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
 cp "$trino_conf_dir/config/catalog/trino.properties" /etc/trino/catalog/trino.properties
+cp /usr/lib/trino/plugin/mysql/mysql-connector-j-8.2.0.jar /usr/lib/trino/plugin/iceberg
 
 #start the gravitino server
 gravitino_server_dir=/tmp/gravitino-server
