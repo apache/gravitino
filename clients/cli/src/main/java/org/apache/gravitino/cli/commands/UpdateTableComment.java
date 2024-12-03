@@ -65,6 +65,7 @@ public class UpdateTableComment extends Command {
   }
 
   /** Update the comment of a table. */
+  @Override
   public void handle() {
     try {
       NameIdentifier tableName = NameIdentifier.of(schema, table);

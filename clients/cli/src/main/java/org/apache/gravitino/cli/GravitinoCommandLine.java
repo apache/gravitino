@@ -487,9 +487,89 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String table = name.getTableName();
+    String column = name.getColumnName();
 
     if (CommandActions.LIST.equals(command)) {
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      String position = line.getOptionValue(GravitinoOptions.POSITION);
+      boolean nullable = true;
+      boolean autoIncrement = false;
+      String defaultValue = line.getOptionValue(GravitinoOptions.DEFAULT);
+
+      if (line.hasOption(GravitinoOptions.NULL)) {
+        nullable = line.getOptionValue(GravitinoOptions.NULL).equals("true");
+      }
+
+      if (line.hasOption(GravitinoOptions.AUTO)) {
+        autoIncrement = line.getOptionValue(GravitinoOptions.AUTO).equals("true");
+      }
+
+      newAddColumn(
+              url,
+              ignore,
+              metalake,
+              catalog,
+              schema,
+              table,
+              column,
+              datatype,
+              comment,
+              position,
+              nullable,
+              autoIncrement,
+              defaultValue)
+          .handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      newDeleteColumn(url, ignore, metalake, catalog, schema, table, column).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment)
+            .handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        newUpdateColumnName(url, ignore, metalake, catalog, schema, table, column, newName)
+            .handle();
+      }
+      if (line.hasOption(GravitinoOptions.DATATYPE)) {
+        String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
+        newUpdateColumnDatatype(url, ignore, metalake, catalog, schema, table, column, datatype)
+            .handle();
+      }
+      if (line.hasOption(GravitinoOptions.POSITION)) {
+        String position = line.getOptionValue(GravitinoOptions.POSITION);
+        newUpdateColumnPosition(url, ignore, metalake, catalog, schema, table, column, position)
+            .handle();
+      }
+      if (line.hasOption(GravitinoOptions.NULL)) {
+        if (line.getOptionValue(GravitinoOptions.NULL).equals("true")) {
+          newUpdateColumnNullability(url, ignore, metalake, catalog, schema, table, column, true)
+              .handle();
+        } else if (line.getOptionValue(GravitinoOptions.NULL).equals("false")) {
+          newUpdateColumnNullability(url, ignore, metalake, catalog, schema, table, column, false)
+              .handle();
+        }
+      }
+      if (line.hasOption(GravitinoOptions.AUTO)) {
+        if (line.getOptionValue(GravitinoOptions.AUTO).equals("true")) {
+          newUpdateColumnAutoIncrement(url, ignore, metalake, catalog, schema, table, column, true)
+              .handle();
+        } else if (line.getOptionValue(GravitinoOptions.AUTO).equals("false")) {
+          newUpdateColumnAutoIncrement(url, ignore, metalake, catalog, schema, table, column, false)
+              .handle();
+        }
+      }
+      if (line.hasOption(GravitinoOptions.DEFAULT)) {
+        String defaultValue = line.getOptionValue(GravitinoOptions.DEFAULT);
+        String dataType = line.getOptionValue(GravitinoOptions.DATATYPE);
+        newUpdateColumnDefault(
+                url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType)
+            .handle();
+      }
     }
   }
 

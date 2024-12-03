@@ -20,25 +20,34 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.DefaultConverter;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.ParseType;
+import org.apache.gravitino.cli.PositionConverter;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.types.Type;
 
-/** Update the name of a table. */
-public class UpdateTableName extends Command {
+public class AddColumn extends Command {
 
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String table;
-  protected final String name;
+  protected final String column;
+  protected final String datatype;
+  protected final String comment;
+  protected final String position;
+  protected final boolean nullable;
+  protected final boolean autoIncrement;
+  protected final String defaultValue;
 
   /**
-   * Update the name of a table.
+   * Adds an optional column to a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -46,33 +55,62 @@ public class UpdateTableName extends Command {
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param table The name of the table.
-   * @param name The new metalake name.
+   * @param column The name of the new column.
+   * @param datatype The data type of the new column.
+   * @param comment The comment for the column (optional).
+   * @param position The position of the column (optional).
+   * @param nullable True if the column can be null, false if it cannot be (optional).
+   * @param autoIncrement True if the column auto increments (optional).
+   * @param defaultValue Default value of the column (optional).
    */
-  public UpdateTableName(
+  public AddColumn(
       String url,
       boolean ignoreVersions,
       String metalake,
       String catalog,
       String schema,
       String table,
-      String name) {
+      String column,
+      String datatype,
+      String comment,
+      String position,
+      boolean nullable,
+      boolean autoIncrement,
+      String defaultValue) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.table = table;
-    this.name = name;
+    this.column = column;
+    this.datatype = datatype;
+    this.comment = comment;
+    this.position = position;
+    this.nullable = nullable;
+    this.autoIncrement = autoIncrement;
+    this.defaultValue = defaultValue;
   }
 
-  /** Update the name of a table. */
+  /** Adds an optional column to a table. */
   @Override
   public void handle() {
-    try {
-      NameIdentifier tableName = NameIdentifier.of(schema, table);
-      GravitinoClient client = buildClient(metalake);
-      TableChange change = TableChange.rename(name);
+    String[] columns = {column};
+    Type convertedDatatype = ParseType.toType(datatype);
 
-      client.loadCatalog(catalog).asTableCatalog().alterTable(tableName, change);
+    try {
+      GravitinoClient client = buildClient(metalake);
+      NameIdentifier name = NameIdentifier.of(schema, table);
+      TableChange change =
+          TableChange.addColumn(
+              columns,
+              convertedDatatype,
+              comment,
+              PositionConverter.convert(position),
+              nullable,
+              autoIncrement,
+              DefaultConverter.convert(defaultValue, datatype));
+
+      client.loadCatalog(catalog).asTableCatalog().alterTable(name, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -90,6 +128,6 @@ public class UpdateTableName extends Command {
       return;
     }
 
-    System.out.println(table + " name changed.");
+    System.out.println(column + " added to table " + table + ".");
   }
 }
