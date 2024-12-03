@@ -250,7 +250,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ModelVersionAliasRelMapper.class,
-                    mapper -> mapper.softDeleteModelVersionAliasRelsByMetalakeId(metalakeId)),
+                    mapper -> mapper.softDeleteModelVersionAliasRelByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     ModelVersionMetaMapper.class,

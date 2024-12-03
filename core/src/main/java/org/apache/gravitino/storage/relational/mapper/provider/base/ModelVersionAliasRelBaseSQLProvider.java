@@ -105,7 +105,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
+  public String softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -116,7 +116,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteModelVersionAliasRelByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -127,7 +127,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteModelVersionAliasRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -138,7 +138,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
-  public String deleteModelVersionAliasRelsByLegacyTimeline(
+  public String deleteModelVersionAliasRelByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
