@@ -43,6 +43,41 @@ services:
       timeout: 60s
       retries: 5
 
+  hive:
+    image: apache/gravitino-playground:hive-2.7.3
+    container_name: trino-ci-hive
+    networks:
+      - trino-net
+    environment:
+      - HADOOP_USER_NAME=root
+    entrypoint: /bin/bash /tmp/hive/init.sh
+    volumes:
+      - ./init/hive:/tmp/hive
+    healthcheck:
+      test: [ "CMD", "/tmp/check-status.sh" ]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+      start_period: 20s
+
+  postgresql:
+    image: postgres:16
+    container_name: trino-ci-postgresql
+    networks:
+      - trino-net
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ./init/postgres:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+      start_period: 30s
+
   trino-remote:
     image: trinodb/trino:435
     networks:
@@ -68,6 +103,10 @@ services:
       retries: 5
     depends_on:
       mysql:
+        condition: service_healthy
+      hive:
+        condition: service_healthy
+      postgresql:
         condition: service_healthy
 
   trino-local:
@@ -96,6 +135,10 @@ services:
       retries: 5
     depends_on:
       mysql:
+        condition: service_healthy
+      hive:
+        condition: service_healthy
+      postgresql:
         condition: service_healthy
 
 networks:

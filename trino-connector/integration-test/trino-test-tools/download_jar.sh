@@ -51,12 +51,14 @@ download_mysql_jar() {
   download_jar "mysql-connector-java-8.0.26.jar" \
   "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar" \
   "$GRAVITINO_SERVER_DIR/catalogs/jdbc-mysql/libs"
+  cp -rp $GRAVITINO_SERVER_DIR/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.26.jar $GRAVITINO_SERVER_DIR/catalogs/lakehouse-iceberg/libs
 }
 
 download_postgresql_jar() {
   download_jar "postgresql-42.7.0.jar" \
   "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar" \
   "$GRAVITINO_SERVER_DIR/catalogs/jdbc-postgresql/libs"
+  cp -rp $GRAVITINO_SERVER_DIR/catalogs/jdbc-postgresql/libs/postgresql-42.7.0.jar $GRAVITINO_SERVER_DIR/catalogs/lakehouse-iceberg/libs
 }
 
 download_iceberg_aws_bundle() {
