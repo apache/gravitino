@@ -33,7 +33,15 @@ dependencies {
   compileOnly(libs.hadoop3.common)
 
   implementation(libs.azure.identity)
-  implementation(libs.azure.storage)
+  {
+    exclude(group = "com.azure", module = "azure-core-http-netty")
+  }
+  implementation(libs.azure.storage.file.datalake)
+  {
+    exclude(group = "com.azure", module = "azure-core-http-netty")
+  }
+  implementation(libs.azure.core.http.okhttp)
+
   implementation(libs.commons.lang3)
   // runtime used
   implementation(libs.commons.logging)

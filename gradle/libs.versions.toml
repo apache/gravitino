@@ -19,7 +19,8 @@
 [versions]
 awssdk = "2.28.3"
 azure-identity = "1.13.1"
-azure-storage-file-datalake="12.20.0"
+azure-storage-file-datalake = "12.20.0"
+azure-core-http-okhttp = "1.12.0"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
@@ -124,7 +125,8 @@ aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk"
 aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "awssdk" }
 aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssdk" }
 azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "azure-identity"}
-azure-storage = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
+azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
+azure-core-http-okhttp = { group = "com.azure", name = "azure-core-http-okhttp", version.ref = "azure-core-http-okhttp"}
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }

@@ -60,7 +60,8 @@ public class ADLSCredentialConfig extends Config {
 
   public static final ConfigEntry<Integer> ADLS_TOKEN_EXPIRE_IN_SECS =
       new ConfigBuilder(CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS)
-          .doc("The expiration time (in seconds) for the Azure Active Directory (AAD) authentication token.")
+          .doc(
+              "The expiration time (in seconds) for the Azure Active Directory (AAD) authentication token.")
           .version(ConfigConstants.VERSION_0_7_0)
           .intConf()
           .createWithDefault(3600);

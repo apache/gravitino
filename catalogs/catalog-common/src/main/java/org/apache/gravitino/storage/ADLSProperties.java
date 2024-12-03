@@ -27,10 +27,12 @@ public class ADLSProperties {
   // Configuration key for specifying the Azure Active Directory (AAD) tenant ID.
   public static final String GRAVITINO_ADLS_TENANT_ID = "adls-tenant-id";
 
-  // Configuration key for specifying the Azure Active Directory (AAD) client ID used for authentication.
+  // Configuration key for specifying the Azure Active Directory (AAD) client ID used for
+  // authentication.
   public static final String GRAVITINO_ADLS_CLIENT_ID = "adls-client-id";
 
-  // Configuration key for specifying the Azure Active Directory (AAD) client secret used for authentication.
+  // Configuration key for specifying the Azure Active Directory (AAD) client secret used for
+  // authentication.
   public static final String GRAVITINO_ADLS_CLIENT_SECRET = "adls-client-secret";
 
   private ADLSProperties() {}
