@@ -45,7 +45,6 @@ dependencies {
   }
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testRuntimeOnly(libs.junit.jupiter.engine)
-  testImplementation(project(":catalogs:catalog-jdbc-postgresql"))
 }
 
 tasks.build {
@@ -76,5 +75,6 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
+    dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
   }
 }
