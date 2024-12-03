@@ -17,30 +17,9 @@
  * under the License.
  */
 mod memory_filesystem;
-mod fuse_server;
+pub mod fuse_server;
 mod fuse_api_handle;
 mod filesystem;
 mod filesystem_metadata;
+mod log_filesystem;
 mod file_handle_manager;
-
-use std::sync::Arc;
-use fuse3::Result;
-use log::info;
-use crate::fuse_server::FuseServer;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_env_filter("debug").init();
-
-    let server = Arc::new(FuseServer::new());
-    let clone_server = server.clone();
-    let v = tokio::spawn(async move {
-        clone_server.start().await
-    });
-
-    tokio::signal::ctrl_c().await?;
-    info!("Received Ctrl+C, stopping server...");
-    server.stop();
-    v.await.ok();
-    Ok(())
-}

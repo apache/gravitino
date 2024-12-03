@@ -29,8 +29,13 @@ repository = "https://github.com/apache/gravitino"
 name = "gvfs-fuse"
 path = "src/main.rs"
 
+[lib]
+name="gvfs_fuse"
+
 [dependencies]
+dashmap = "5.5.3"
 futures-util = "0.3.30"
+fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }
 libc = "0.2.164"
 log = "0.4.22"
 tokio = { version = "1.38.0", features = ["full"] }
