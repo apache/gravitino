@@ -33,6 +33,8 @@ public class PlainFormat {
       new MetalakesStringFormat().output((Metalake[]) object);
     } else if (object instanceof Catalog) {
       new CatalogStringFormat().output((Catalog) object);
+    } else if (object instanceof Catalog[]) {
+      new CatalogsStringFormat().output((Catalog[]) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -66,6 +68,16 @@ public class PlainFormat {
               + catalog.provider()
               + ","
               + catalog.comment());
+    }
+  }
+
+  static final class CatalogsStringFormat implements OutputFormat<Catalog[]> {
+    @Override
+    public void output(Catalog[] catalogs) {
+      List<String> catalogNames =
+          Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
+      String all = String.join(System.lineSeparator(), catalogNames);
+      System.out.println(all);
     }
   }
 }

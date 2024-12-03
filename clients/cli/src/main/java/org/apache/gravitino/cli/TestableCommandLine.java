@@ -197,8 +197,9 @@ public class TestableCommandLine {
     return new CatalogDetails(url, ignore, outputFormat, metalake, catalog);
   }
 
-  protected ListCatalogs newListCatalogs(String url, boolean ignore, String metalake) {
-    return new ListCatalogs(url, ignore, metalake);
+  protected ListCatalogs newListCatalogs(
+      String url, boolean ignore, String metalake, String outputFormat) {
+    return new ListCatalogs(url, ignore, metalake, outputFormat);
   }
 
   protected CreateCatalog newCreateCatalog(

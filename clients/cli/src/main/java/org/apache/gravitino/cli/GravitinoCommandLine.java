@@ -215,7 +215,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, metalake).handle();
+      newListCatalogs(url, ignore, metalake, outputFormat).handle();
       return;
     }
 
