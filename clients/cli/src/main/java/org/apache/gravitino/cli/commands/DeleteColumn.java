@@ -23,22 +23,22 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
 
-/** Update the name of a table. */
-public class UpdateTableName extends Command {
+public class DeleteColumn extends Command {
 
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String table;
-  protected final String name;
+  protected final String column;
 
   /**
-   * Update the name of a table.
+   * Delete a column.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -46,33 +46,34 @@ public class UpdateTableName extends Command {
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param table The name of the table.
-   * @param name The new metalake name.
+   * @param column The name of the column.
    */
-  public UpdateTableName(
+  public DeleteColumn(
       String url,
       boolean ignoreVersions,
       String metalake,
       String catalog,
       String schema,
       String table,
-      String name) {
+      String column) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.table = table;
-    this.name = name;
+    this.column = column;
   }
 
-  /** Update the name of a table. */
+  /** Delete a column. */
   @Override
   public void handle() {
-    try {
-      NameIdentifier tableName = NameIdentifier.of(schema, table);
-      GravitinoClient client = buildClient(metalake);
-      TableChange change = TableChange.rename(name);
+    String[] columns = {column};
 
-      client.loadCatalog(catalog).asTableCatalog().alterTable(tableName, change);
+    try {
+      GravitinoClient client = buildClient(metalake);
+      TableChange change = TableChange.deleteColumn(columns, false);
+      NameIdentifier name = NameIdentifier.of(schema, table);
+      client.loadCatalog(catalog).asTableCatalog().alterTable(name, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -85,11 +86,14 @@ public class UpdateTableName extends Command {
     } catch (NoSuchTableException err) {
       System.err.println(ErrorMessages.UNKNOWN_TABLE);
       return;
+    } catch (NoSuchColumnException err) {
+      System.err.println(ErrorMessages.UNKNOWN_COLUMN);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(table + " name changed.");
+    System.out.println(column + " deleted.");
   }
 }

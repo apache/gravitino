@@ -43,7 +43,7 @@ public class TestFulllName {
 
   @Test
   public void entityFromFullNameOption() throws Exception {
-    String[] args = {"--metalake", "metalakeA", "--name", "catalogB.schemaC.tableD"};
+    String[] args = {"--metalake", "metalakeA", "--name", "catalogB.schemaC.tableD.columnE"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
@@ -55,6 +55,8 @@ public class TestFulllName {
     assertEquals("schemaC", schemaName);
     String tableName = fullName.getTableName();
     assertEquals("tableD", tableName);
+    String columnName = fullName.getColumnName();
+    assertEquals("columnE", columnName);
   }
 
   @Test
@@ -100,6 +102,7 @@ public class TestFulllName {
     assertFalse(fullName.hasCatalogName());
     assertFalse(fullName.hasSchemaName());
     assertFalse(fullName.hasTableName());
+    assertFalse(fullName.hasColumnName());
   }
 
   @Test
@@ -110,6 +113,7 @@ public class TestFulllName {
     assertTrue(fullName.hasCatalogName());
     assertFalse(fullName.hasSchemaName());
     assertFalse(fullName.hasTableName());
+    assertFalse(fullName.hasColumnName());
   }
 
   @Test
@@ -120,6 +124,7 @@ public class TestFulllName {
     assertTrue(fullName.hasCatalogName());
     assertTrue(fullName.hasSchemaName());
     assertFalse(fullName.hasTableName());
+    assertFalse(fullName.hasColumnName());
   }
 
   @Test
@@ -132,5 +137,19 @@ public class TestFulllName {
     assertTrue(fullName.hasCatalogName());
     assertTrue(fullName.hasSchemaName());
     assertTrue(fullName.hasTableName());
+    assertFalse(fullName.hasColumnName());
+  }
+
+  @Test
+  public void hasPartNameColumn() throws Exception {
+    String[] args = {
+      "table", "details", "--metalake", "metalake", "--name", "catalog.schema.table.column"
+    };
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasCatalogName());
+    assertTrue(fullName.hasSchemaName());
+    assertTrue(fullName.hasTableName());
+    assertTrue(fullName.hasColumnName());
   }
 }

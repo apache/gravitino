@@ -29,10 +29,13 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
   usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
   Options
- [options]
+ usage: gcli
  -a,--audit              display audit information
+    --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
  -d,--distribution       display distribution information
+    --datatype <arg>     column data type
+    --default <arg>      default column value
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
@@ -40,10 +43,13 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+    --null <arg>         column value can be null (true/false)
  -o,--owner              display entity owner
+    --output <arg>       output format (plain/table)
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
     --partition          display partition information
+    --position <arg>     position of column
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -720,4 +726,37 @@ gcli fileset set  --name hadoop.schema.fileset --property test --value value
 
 ```bash
 gcli fileset remove --name hadoop.schema.fileset --property test
+```
+
+### column commands
+
+Note that some commands are not supported depending on what the database supports.
+
+When setting the datatype of a column the following basic types are currently supported:
+null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
+
+In addition decimal(precision,scale) and varchar(length).
+
+#### Add a column
+
+```bash
+gcli column create --name catalog_postgres.hr.departments.value --datatype long
+gcli column create --name catalog_postgres.hr.departments.money --datatype "decimal(10,2)"
+gcli column create --name catalog_postgres.hr.departments.name --datatype "varchar(100)"
+gcli column create --name catalog_postgres.hr.departments.fullname --datatype "varchar(250)" --default "Fred Smith" --null=false
+```
+
+#### Delete a column
+
+```bash
+gcli  column delete --name catalog_postgres.hr.departments.money
+```
+
+#### Update a column
+
+```bash
+gcli column update --name catalog_postgres.hr.departments.value --rename values
+gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
+gcli column update --name catalog_postgres.hr.departments.values --position name
+gcli column update --name catalog_postgres.hr.departments.name --null=true
 ```
