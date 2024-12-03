@@ -44,7 +44,7 @@ public interface SupportsCredentials {
   Credential[] getCredentials() throws NoSuchCredentialException;
 
   /**
-   * Retrieves an {@link Credential} object based on the specified credential type,
+   * Retrieves an {@link Credential} object based on the specific credential type.
    *
    * @param credentialType The type of the credential like s3-token, s3-secret-key which defined in
    *     the specific credentials.
