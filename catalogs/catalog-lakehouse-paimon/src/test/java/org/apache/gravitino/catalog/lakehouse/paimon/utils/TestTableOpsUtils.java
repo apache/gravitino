@@ -19,7 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.buildSchemaChange;
-import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.getfieldName;
+import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.getFieldName;
 import static org.apache.gravitino.rel.TableChange.ColumnPosition.after;
 import static org.apache.gravitino.rel.TableChange.ColumnPosition.defaultPos;
 import static org.apache.gravitino.rel.TableChange.addColumn;
@@ -78,7 +78,7 @@ public class TestTableOpsUtils {
   void testAddColumnFirst() {
     assertTableChange(
         addColumn(
-            TableOpsUtils.getFieldName("col_1"),
+            getFieldName("col_1"),
             IntegerType.get(),
             AddColumn.class.getSimpleName(),
             TableChange.ColumnPosition.first(),
@@ -102,7 +102,7 @@ public class TestTableOpsUtils {
   void testAddColumnAfter() {
     assertTableChange(
         addColumn(
-            TableOpsUtils.getFieldName("col_2"),
+            getFieldName("col_2"),
             FloatType.get(),
             AddColumn.class.getSimpleName(),
             after("col_1"),
@@ -126,7 +126,7 @@ public class TestTableOpsUtils {
   void testAddColumnDefaultPosition() {
     assertTableChange(
         addColumn(
-            TableOpsUtils.getFieldName("col_3"),
+            getFieldName("col_3"),
             ListType.of(StringType.get(), false),
             AddColumn.class.getSimpleName(),
             defaultPos(),
@@ -147,7 +147,7 @@ public class TestTableOpsUtils {
   void testAddColumnWitNullPosition() {
     assertTableChange(
         addColumn(
-            TableOpsUtils.getFieldName("col_4"),
+            getFieldName("col_4"),
             MapType.of(StringType.get(), IntegerType.get(), true),
             AddColumn.class.getSimpleName(),
             null,
@@ -167,12 +167,11 @@ public class TestTableOpsUtils {
   @Test
   void testupdateColumnComment() {
     assertTableChange(
-        updateColumnComment(
-            TableOpsUtils.getFieldName("col_1"), UpdateColumnComment.class.getSimpleName()),
+        updateColumnComment(getFieldName("col_1"), UpdateColumnComment.class.getSimpleName()),
         UpdateColumnComment.class,
         schemaChange -> {
           UpdateColumnComment updateColumnComment = (UpdateColumnComment) schemaChange;
-          assertEquals("col_1", getfieldName(updateColumnComment.fieldNames()));
+          assertEquals("col_1", getFieldName(updateColumnComment.fieldNames()));
           assertEquals(
               UpdateColumnComment.class.getSimpleName(), updateColumnComment.newDescription());
         });
@@ -181,11 +180,11 @@ public class TestTableOpsUtils {
   @Test
   void testUpdateColumnNullability() {
     assertTableChange(
-        updateColumnNullability(X.getFieldName("col_2"), false),
+        updateColumnNullability(getFieldName("col_2"), false),
         UpdateColumnNullability.class,
         schemaChange -> {
           UpdateColumnNullability updateColumnNullability = (UpdateColumnNullability) schemaChange;
-          assertEquals("col_2", getfieldName(updateColumnNullability.fieldNames()));
+          assertEquals("col_2", getFieldName(updateColumnNullability.fieldNames()));
           assertFalse(updateColumnNullability.newNullability());
         });
   }
@@ -193,7 +192,7 @@ public class TestTableOpsUtils {
   @Test
   void testUpdateColumnType() {
     assertTableChange(
-        updateColumnType(getfieldName("col_4"), DoubleType.get()),
+        updateColumnType(getFieldName("col_4"), DoubleType.get()),
         UpdateColumnType.class,
         schemaChange -> {
           UpdateColumnType updateColumnType = (UpdateColumnType) schemaChange;
@@ -205,7 +204,7 @@ public class TestTableOpsUtils {
   @Test
   void testRenameColumn() {
     assertTableChange(
-        renameColumn(getfieldName("col_1"), "col_5"),
+        renameColumn(getFieldName("col_1"), "col_5"),
         RenameColumn.class,
         schemaChange -> {
           RenameColumn renameColumn = (RenameColumn) schemaChange;
@@ -217,7 +216,7 @@ public class TestTableOpsUtils {
   @Test
   void testDeleteColumn() {
     assertTableChange(
-        deleteColumn(getfieldName("col_2"), true),
+        deleteColumn(getFieldName("col_2"), true),
         DropColumn.class,
         schemaChange -> {
           DropColumn dropColumn = (DropColumn) schemaChange;
@@ -262,7 +261,7 @@ public class TestTableOpsUtils {
   @Test
   void testUpdateColumnPosition() {
     assertTableChange(
-        updateColumnPosition(getfieldName("col_3"), after("col_1")),
+        updateColumnPosition(getFieldName("col_3"), after("col_1")),
         UpdateColumnPosition.class,
         schemaChange -> {
           UpdateColumnPosition updateColumnPosition = (UpdateColumnPosition) schemaChange;
@@ -279,16 +278,16 @@ public class TestTableOpsUtils {
             addIndex(IndexType.UNIQUE_KEY, "uk", new String[][] {{"col_5"}}),
             deleteIndex("uk", true),
             rename("tb_1"),
-            updateColumnAutoIncrement(getfieldName("col_5"), true),
+            updateColumnAutoIncrement(getFieldName("col_5"), true),
             updateColumnDefaultValue(
-                getfieldName("col_5"), Literals.of("default", Types.VarCharType.of(255))))
+                getFieldName("col_5"), Literals.of("default", Types.VarCharType.of(255))))
         .forEach(this::assertUnsupportedTableChange);
 
     // Test IllegalArgumentException with AddColumn default value and auto increment.
     Arrays.asList(
             Pair.of(
                 addColumn(
-                    getfieldName("col_1"),
+                    getFieldName("col_1"),
                     IntegerType.get(),
                     AddColumn.class.getSimpleName(),
                     TableChange.ColumnPosition.first(),
@@ -298,7 +297,7 @@ public class TestTableOpsUtils {
                 "Paimon set column default value through table properties instead of column info. Illegal column: col_1."),
             Pair.of(
                 addColumn(
-                    getfieldName("col_1"),
+                    getFieldName("col_1"),
                     IntegerType.get(),
                     AddColumn.class.getSimpleName(),
                     TableChange.ColumnPosition.first(),
