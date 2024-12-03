@@ -49,7 +49,9 @@ impl FuseServer {
     /// Starts the FUSE filesystem and blocks until it is stopped.
     pub async fn start(&self) -> Result<()> {
         let fs = Box::new(MemoryFileSystem::new());
-        let fs_context = crate::filesystem::FileSystemContext { uid: 1000, gid: 1000 };
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+        let fs_context = crate::filesystem::FileSystemContext { uid: uid, gid: gid};
         let fuse_fs = FuseApiHandle::new(fs, fs_context);
         let mount_path = "gvfs";
 
