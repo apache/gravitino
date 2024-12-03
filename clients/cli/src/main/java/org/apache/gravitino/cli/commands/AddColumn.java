@@ -32,7 +32,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Type;
 
-public class AddOptionalColumn extends Command {
+public class AddColumn extends Command {
 
   protected final String metalake;
   protected final String catalog;
@@ -63,7 +63,7 @@ public class AddOptionalColumn extends Command {
    * @param autoIncrement True if the column auto increments (optional).
    * @param defaultValue Default value of the column (optional).
    */
-  public AddOptionalColumn(
+  public AddColumn(
       String url,
       boolean ignoreVersions,
       String metalake,
