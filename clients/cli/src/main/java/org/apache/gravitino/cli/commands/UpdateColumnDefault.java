@@ -107,6 +107,6 @@ public class UpdateColumnDefault extends Command {
       return;
     }
 
-    System.out.println(column + " name changed.");
+    System.out.println(column + " default changed.");
   }
 }
