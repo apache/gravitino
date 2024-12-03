@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users groups and tags. Future updates will expand on these capabilities to include roles, topics and filesets.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
@@ -27,9 +27,9 @@ Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash
+  usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+  Options
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
- Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
  -d,--distribution       display distribution information
@@ -40,7 +40,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
- -o,--owner              entity owner
+ -o,--owner              display entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
     --partition          display partition information
@@ -208,13 +208,13 @@ gcli metalake delete
 #### Rename a metalake
 
 ```bash
-gcli metalake update  --rename demo
+gcli metalake update --rename demo
 ```
 
 #### Update a metalake's comment
 
 ```bash
-gcli metalake update  --comment "new comment"
+gcli metalake update --comment "new comment"
 ```
 
 #### Display a metalake's properties
@@ -226,13 +226,13 @@ gcli metalake properties
 #### Set a metalake's property
 
 ```bash
-gcli metalake set  --property test --value value
+gcli metalake set --property test --value value
 ```
 
 #### Remove a metalake's property
 
 ```bash
-gcli metalake remove  --property test
+gcli metalake remove --property test
 ```
 
 ### Catalog commands
@@ -401,6 +401,26 @@ gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 gcli table delete --name catalog_postgres.hr.salaries
 ```
 
+
+#### Display a tables's properties
+
+```bash
+gcli table properties --name catalog_postgres.hr.salaries
+```
+
+#### Set a tables's property
+
+```bash
+gcli table set --name catalog_postgres.hr.salaries --property test --value value
+```
+
+#### Remove a tables's property
+
+```bash
+gcli table remove --name catalog_postgres.hr.salaries --property test
+```
+
+
 ### User commands
 
 #### Create a user
@@ -451,7 +471,7 @@ gcli group list
 
 ```bash
 gcli group delete --group new_group
- ```
+```
 
 ### Tag commands
 
@@ -527,7 +547,7 @@ gcli tag update --tag tagA --rename newTag
 gcli tag update --tag tagA --comment "new comment"
 ```
 
-### Owners commands
+### Owner commands
 
 #### List an owner
 
@@ -593,7 +613,57 @@ gcli group grant --group groupA --role admin
 
 #### Remove a role from a group
 ```bash
-gcli group revoke  --group groupA --role admin
+gcli group revoke --group groupA --role admin
+```
+
+### Topic commands
+
+#### Display a topic's details
+
+```bash
+gcli topic details --name kafka.default.topic3
+```
+
+#### Create a tag
+
+```bash
+gcli topic create --name kafka.default.topic3
+```
+
+#### List all topics
+
+```bash
+gcli topic list --name kafka.default
+```
+
+#### Delete a topic
+
+```bash
+gcli topic delete --name kafka.default.topic3
+```
+
+#### Change a topic's comment
+
+```bash
+gcli topic update --name kafka.default.topic3 --comment new_comment
+```
+
+#### Display a topics's properties
+
+```bash
+gcli topic properties --name kafka.default.topic3
+```
+
+#### Set a topics's property
+
+```bash
+gcli topic set --name kafka.default.topic3 --property test --value value
+```
+
+#### Remove a topics's property
+
+```bash
+gcli topic remove --name kafka.default.topic3 --property test
 ```
 
 ### Fileset commands
@@ -620,4 +690,34 @@ gcli fileset details --name hadoop.schema.fileset
 
 ```bash
 gcli fileset delete --name hadoop.schema.fileset
+```
+
+#### Update a fileset's comment
+
+```bash
+gcli fileset update --name hadoop.schema.fileset --comment new_comment
+```
+
+#### Rename a fileset
+
+```bash
+gcli fileset update --name hadoop.schema.fileset --rename new_name
+```
+
+#### Display a fileset's properties
+
+```bash
+gcli fileset properties --name hadoop.schema.fileset 
+```
+
+#### Set a fileset's property
+
+```bash
+gcli fileset set  --name hadoop.schema.fileset --property test --value value
+```
+
+#### Remove a fileset's property
+
+```bash
+gcli fileset remove --name hadoop.schema.fileset --property test
 ```

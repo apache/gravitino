@@ -20,6 +20,11 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Preconditions;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
@@ -112,7 +117,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (line.hasOption(GravitinoOptions.OWNER)) {
+    if (command.equals(CommandActions.HELP)) {
+      handleHelpCommand();
+    } else if (line.hasOption(GravitinoOptions.OWNER)) {
       handleOwnerCommand();
     } else if (entity.equals(CommandEntities.COLUMN)) {
       handleColumnCommand();
@@ -124,6 +131,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.TOPIC)) {
+      handleTopicCommand();
     } else if (entity.equals(CommandEntities.FILESET)) {
       handleFilesetCommand();
     } else if (entity.equals(CommandEntities.USER)) {
@@ -144,15 +153,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newMetalakeAudit(url, ignore, metalake).handle();
       } else {
-        newMetalakeDetails(url, ignore, metalake).handle();
+        newMetalakeDetails(url, ignore, metalake, outputFormat).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
-      newListMetalakes(url, ignore).handle();
+      newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
@@ -188,6 +198,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.LIST.equals(command)) {
       newListCatalogs(url, ignore, metalake).handle();
@@ -200,7 +211,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newCatalogAudit(url, ignore, metalake, catalog).handle();
       } else {
-        newCatalogDetails(url, ignore, metalake, catalog).handle();
+        newCatalogDetails(url, ignore, metalake, catalog, outputFormat).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
@@ -306,6 +317,24 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteTable(url, ignore, force, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTableProperty(url, ignore, metalake, catalog, schema, table, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTableProperties(url, ignore, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateTableComment(url, ignore, metalake, catalog, schema, table, comment).handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        newUpdateTableName(url, ignore, metalake, catalog, schema, table, newName).handle();
+      }
     }
   }
 
@@ -464,6 +493,23 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
+  private void handleHelpCommand() {
+    String helpFile = entity.toLowerCase() + "_help.txt";
+
+    try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(helpFile);
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      StringBuilder helpMessage = new StringBuilder();
+      String helpLine;
+      while ((helpLine = reader.readLine()) != null) {
+        helpMessage.append(helpLine).append(System.lineSeparator());
+      }
+      System.err.print(helpMessage.toString());
+    } catch (IOException e) {
+      System.err.println("Failed to load help message: " + e.getMessage());
+    }
+  }
+
   /**
    * Handles the command execution for Objects based on command type and the command line options.
    */
@@ -492,6 +538,44 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   /**
+   * Handles the command execution for topics based on command type and the command line options.
+   */
+  private void handleTopicCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String topic = name.getTopicName();
+
+    if (CommandActions.LIST.equals(command)) {
+      newListTopics(url, ignore, metalake, catalog, schema).handle();
+    } else if (CommandActions.DETAILS.equals(command)) {
+      newTopicDetails(url, ignore, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment).handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
+      }
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListTopicProperties(url, ignore, metalake, catalog, schema, topic).handle();
+    }
+  }
+
+  /**
    * Handles the command execution for filesets based on command type and the command line options.
    */
   private void handleFilesetCommand() {
@@ -515,6 +599,25 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      newSetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value)
+          .handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      newRemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        newUpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment).handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        newUpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, newName).handle();
+      }
     }
   }
 
