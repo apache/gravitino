@@ -22,17 +22,29 @@ use std::collections::HashMap;
 
 /// IFileSystemMetadata is an interface that defines the operations to manage file metadata.
 pub trait IFileSystemMetadata {
+
     fn add_file(&mut self, parent_inode: u64, name :&str) -> FileStat;
+
     fn add_file_with_name(&mut self, name :&str, parent: &str) -> FileStat;
+
     fn add_root_dir(&mut self) -> FileStat;
+
     fn add_dir(&mut self, parent_inode: u64, name :&str) -> FileStat;
+
     fn add_dir_with_name(&mut self, parent :&str, name: &str) -> FileStat;
+
     fn get_file(&self, inode: u64) -> Option<FileStat>;
+
     fn get_file_from_dir(&self, parent_inode:u64,  name: &str) -> Option<FileStat>;
+
     fn get_dir_childs(&self, inode: u64) -> Vec<FileStat>;
+
     fn update_file_stat(&mut self, file_id: u64, file_stat: &FileStat);
+
     fn remove_file(&mut self, parent_file_id: u64, name: &str) -> Result<(), Errno>;
+
     fn remove_dir(&mut self, parent_file_id: u64, name: &str) -> Result<(), Errno>;
+
     fn get_file_path(&self, file_id: u64) -> String;
 }
 
