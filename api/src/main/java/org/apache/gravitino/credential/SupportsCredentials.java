@@ -33,22 +33,22 @@ public interface SupportsCredentials {
    * Retrieves an array of {@link Credential} objects.
    *
    * @return An array of {@link Credential} objects. In most cases the array only contains one
-   *     credential. If the object like {@link org.apache.gravitino.file.Fileset} contains multi
-   *     locations for different storages like HDFS, S3, the array will contain multi credentials.
-   *     The array could be empty if you request a credential for a catalog but the credential
-   *     provider couldn't generate the credential for the catalog, like S3 token credential
-   *     provider only generate credential for the specific object like {@link
+   *     credential. If the object like {@link org.apache.gravitino.file.Fileset} contains multiple
+   *     locations for different storages like HDFS, S3, the array will contain multiple
+   *     credentials. The array could be empty if you request a credential for a catalog but the
+   *     credential provider couldn't generate the credential for the catalog, like S3 token
+   *     credential provider only generate credential for the specific object like {@link
    *     org.apache.gravitino.file.Fileset}, {@link org.apache.gravitino.rel.Table}. There will be
    *     at most one credential for one credential type.
    */
   Credential[] getCredentials() throws NoSuchCredentialException;
 
   /**
-   * Retrieves an {@link Credential} object based on the specific credential type.
+   * Retrieves an {@link Credential} object based on the specified credential type.
    *
    * @param credentialType The type of the credential like s3-token, s3-secret-key which defined in
    *     the specific credentials.
-   * @return An {@link Credential} object with the specific credential type.
+   * @return An {@link Credential} object with the specified credential type.
    * @throws NoSuchCredentialException If the specific credential cannot be found.
    */
   default Credential getCredential(String credentialType) throws NoSuchCredentialException {
