@@ -46,7 +46,9 @@ impl FuseTest {
     }
 
     pub fn shutdown(&self) {
-        self.server.stop();
+        self.runtime.block_on(async {
+            let _ = self.server.stop().await;
+        }) ;
     }
 
     fn wait_for_fuse_server_ready(path: &str, timeout: Duration) -> bool {
@@ -54,7 +56,7 @@ impl FuseTest {
         let start_time = Instant::now();
 
         while start_time.elapsed() < timeout {
-            if let Ok(mut exists) = fs::exists(&test_file) {
+            if let Ok(exists) = fs::exists(&test_file) {
                 if exists {
                     return true;
                 }
@@ -114,6 +116,7 @@ fn test_fuse_filesystem() {
     //test delete directory
     fs::remove_dir_all(test_dir).expect("Failed to delete directory");
     assert!(!fs::exists(test_dir).expect("Directory is not deleted"));
+
     info!("Success test")
 }
 

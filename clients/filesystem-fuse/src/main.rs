@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     tokio::signal::ctrl_c().await?;
     info!("Received Ctrl+C, stopping server...");
-    server.stop();
+    server.stop().await?;
     v.await.ok();
     Ok(())
 }
