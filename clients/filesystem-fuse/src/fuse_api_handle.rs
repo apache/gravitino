@@ -280,15 +280,15 @@ impl Filesystem for FuseApiHandle {
 
         let mut relative_paths = stream::iter([
             Ok(DirectoryEntry {
-                inode: current.inode, // 当前目录 inode
+                inode: current.inode,
                 name: ".".into(),
-                kind: FileType::Directory,
+                kind: Directory,
                 offset: 1,
             }),
             Ok(DirectoryEntry {
-                inode: current.parent_inode, // 父目录 inode
+                inode: current.parent_inode,
                 name: "..".into(),
-                kind: FileType::Directory,
+                kind: Directory,
                 offset: 2,
             }),
         ]);
