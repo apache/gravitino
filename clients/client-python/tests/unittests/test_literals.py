@@ -14,9 +14,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+import decimal
 import unittest
 from datetime import date, time, datetime
+from decimal import Decimal
 
 from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.types.types import Types
@@ -42,6 +43,11 @@ class TestLiterals(unittest.TestCase):
         str_val = Literals.string_literal("Hello World")
         self.assertEqual(str_val.value(), "Hello World")
         self.assertEqual(str_val.data_type(), Types.StringType.get())
+
+    def test_decimal_literal(self):
+        decimal_val = Literals.decimal_literal(Decimal("0.00"))
+        self.assertEqual(decimal_val.value(), Decimal("0.00"))
+        self.assertEqual(decimal_val.data_type(), Types.DecimalType.of(2, 2))
 
     def test_date_literal(self):
         date_val = Literals.date_literal(date(2023, 1, 1))

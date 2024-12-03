@@ -14,12 +14,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+import decimal
 from typing import TypeVar
 from datetime import date, time, datetime
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.types.decimal import Decimal
 from gravitino.api.types.type import Type
 from gravitino.api.types.types import Types
 
@@ -112,9 +111,11 @@ class Literals:
         return LiteralImpl(value, Types.DoubleType.get())
 
     @staticmethod
-    def decimal_literal(value: Decimal) -> LiteralImpl[Decimal]:
+    def decimal_literal(value: decimal.Decimal) -> LiteralImpl[decimal.Decimal]:
+        precision: int = len(value.as_tuple().digits)
+        scale: int = -value.as_tuple().exponent
         return LiteralImpl(
-            value, Types.DecimalType.of(value.precision(), value.scale())
+            value, Types.DecimalType.of(max(precision, scale), scale)
         )
 
     @staticmethod
