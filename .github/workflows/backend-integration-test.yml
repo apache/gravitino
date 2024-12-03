@@ -28,6 +28,7 @@ jobs:
               - clients/client-java/**
               - clients/client-java-runtime/**
               - clients/filesystem-hadoop3/**
+              - clients/cli/**
               - common/**
               - conf/**
               - core/**
