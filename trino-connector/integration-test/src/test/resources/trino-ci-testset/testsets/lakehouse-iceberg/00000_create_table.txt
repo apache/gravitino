@@ -74,6 +74,8 @@ WITH (
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/%/gt_db2/tb06'
 )"
 
+CREATE TABLE
+
 DROP TABLE
 
 DROP TABLE

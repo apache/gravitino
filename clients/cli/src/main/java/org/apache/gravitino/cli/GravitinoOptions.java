@@ -43,10 +43,11 @@ public class GravitinoOptions {
   public static final String OWNER = "owner";
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
-  public static final String INDEX = "index";
   public static final String FORCE = "force";
+  public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
+  public static final String OUTPUT = "output";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -68,6 +69,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("x", INDEX, "display index information"));
     options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
     options.addOption(createSimpleOption(null, PARTITION, "display partition information"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));
@@ -79,17 +81,17 @@ public class GravitinoOptions {
             "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgOption("t", TAG, "tag name"));
-    options.addOption(createSimpleOption("o", OWNER, "entity owner"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
 
-    // Properties option can have multiple values
-    Option properties =
-        Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
-    options.addOption(properties);
+    // Properties and tags can have multiple values
+    options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
+    options.addOption(createArgsOption("t", TAG, "tag name"));
 
-    // Force delete entity and rename metalake operations
+    // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
+
+    options.addOption(createArgOption(null, OUTPUT, "output format (plain/table)"));
 
     return options;
   }
@@ -118,6 +120,14 @@ public class GravitinoOptions {
     return new Option(shortName, longName, true, description);
   }
 
+  /**
+   * Helper method to create an Option that requires multiple argument.
+   *
+   * @param shortName The option name as a single letter
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
   public Option createArgsOption(String shortName, String longName, String description) {
     // Support multiple arguments
     return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
