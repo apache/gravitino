@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -26,6 +27,8 @@ import org.slf4j.LoggerFactory;
 public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHDFSPlugin.class);
 
+  private static final Pattern pattern = Pattern.compile("^hdfs://[^/]*");
+
   private RangerAuthorizationHDFSPlugin(Map<String, String> config) {
     super(config);
   }
@@ -37,14 +40,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   public void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
       throws IllegalArgumentException {
+    LOG.info("validateRangerMetadataObject {}", names);
     Preconditions.checkArgument(
         names != null && !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
     Preconditions.checkArgument(
-        names.size() != 1,
-        "Cannot create a Ranger metadata object with the name length which is greater than 3");
+        names.size() == 1,
+        "Cannot create a Ranger metadata object with the name length which is not equal 1");
     Preconditions.checkArgument(
-        type != RangerMetadataObject.Type.PATH,
-        "Cannot create a Ranger metadata object with no type");
+        type == RangerMetadataObject.Type.PATH,
+        String.format("Cannot create a Ranger metadata object with %s type", type));
 
     for (String name : names) {
       RangerMetadataObjects.checkName(name);
@@ -112,6 +116,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 case READ_FILESET:
                 case WRITE_FILESET:
                   switch (securableObject.type()) {
+                    case METALAKE:
+                    case CATALOG:
+                    case SCHEMA:
+                      break;
                     case FILESET:
                       rangerSecurableObjects.add(
                           generateRangerSecurableObject(
@@ -139,8 +147,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   public List<RangerSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
     List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
-
     switch (gravitinoMetadataObject.type()) {
+      case METALAKE:
+      case CATALOG:
+      case SCHEMA:
+        return rangerSecurableObjects;
       case FILESET:
         rangerSecurableObjects.add(
             generateRangerSecurableObject(
@@ -177,10 +188,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
-    NameIdentifier identifier = NameIdentifier.of(metadataObject.parent(), metadataObject.name());
+    //TODO how to get metalake ?
+    NameIdentifier identifier = NameIdentifier.parse("metalake." + metadataObject.fullName());
     Fileset fileset = GravitinoEnv.getInstance().filesetDispatcher().loadFileset(identifier);
     Preconditions.checkArgument(
         fileset != null, String.format("Fileset %s is not found", identifier));
-    return fileset.storageLocation();
+    String filesetLocation = fileset.storageLocation();
+    LOG.warn("getFileSetPath filesetLocation {}", filesetLocation);
+    Preconditions.checkArgument(
+        filesetLocation != null, String.format("Fileset %s location is not found", identifier));
+    return pattern.matcher(filesetLocation).replaceAll("");
   }
 }

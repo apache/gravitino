@@ -375,6 +375,7 @@ public abstract class RangerAuthorizationPlugin
         break;
       case SCHEMA:
       case TABLE:
+      case FILESET:
         // The schema and table use user/group to manage the owner
         rangerSecurableObjects.stream()
             .forEach(
