@@ -69,7 +69,7 @@ public interface SupportsCredentials {
           "No credential found for the credential type: %s", credentialType);
     } else if (credentials.length > 1) {
       throw new IllegalStateException(
-          "Multi credentials found for the credential type:" + credentialType);
+          "Multiple credentials found for the credential type:" + credentialType);
     }
 
     return filteredCredentials.get(0);
