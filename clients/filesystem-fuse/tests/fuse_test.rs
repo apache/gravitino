@@ -75,7 +75,9 @@ impl Drop for FuseTest {
 
 #[test]
 fn test_fuse_system_with_auto() {
-    tracing_subscriber::fmt().with_env_filter("gvfs_fuse=debug, info").init();
+    tracing_subscriber::fmt()
+        .with_env_filter("gvfs_fuse=debug,info")
+        .init();
 
     let mount_point = "build/gvfs";
     let _ = fs::create_dir_all(mount_point);
