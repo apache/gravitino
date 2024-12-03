@@ -804,7 +804,7 @@ tasks {
         it.name != "bundled-catalog" &&
         it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
         it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "docs"
+        it.name != "docs" && it.name != "web"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
