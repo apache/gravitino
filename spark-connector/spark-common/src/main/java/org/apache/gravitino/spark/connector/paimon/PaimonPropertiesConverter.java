@@ -20,10 +20,10 @@
 package org.apache.gravitino.spark.connector.paimon;
 
 import com.google.common.base.Preconditions;
-
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 
@@ -54,7 +54,10 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    return new HashMap<>(properties);
+    HashMap<String, String> gravitinoTableProperties = new HashMap<>(properties);
+    // The owner property of Paimon is a reserved property, so we need to remove it.
+    gravitinoTableProperties.remove(PaimonConstants.OWNER);
+    return gravitinoTableProperties;
   }
 
   @Override

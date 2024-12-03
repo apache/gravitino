@@ -21,9 +21,11 @@ package org.apache.gravitino.spark.connector.integration.test.paimon;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
+import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -61,6 +63,20 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     return true;
   }
 
+  @Override
+  protected boolean supportsReplaceColumns() {
+    // Paimon doesn't support replace columns, because it doesn't support drop all fields in table.
+    // And `ALTER TABLE REPLACE COLUMNS` statement will removes all existing columns at first and
+    // then adds the new set of columns.
+    return false;
+  }
+
+  @Override
+  protected String getTableLocation(SparkTableInfo table) {
+    Map<String, String> tableProperties = table.getTableProperties();
+    return tableProperties.get(PaimonPropertiesConstants.PAIMON_TABLE_LOCATION);
+  }
+
   @Test
   void testPaimonPartitions() {
     String partitionPathString = "name=a/address=beijing";
@@ -90,7 +106,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   private String getCreatePaimonSimpleTableString(String tableName) {
     return String.format(
-        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING '') USING paimon",
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
         tableName);
   }
 

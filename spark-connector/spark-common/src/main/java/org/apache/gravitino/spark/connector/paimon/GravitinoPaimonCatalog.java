@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.paimon;
 
 import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
@@ -71,5 +72,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(true);
+  }
+
+  @Override
+  public boolean dropTable(Identifier ident) {
+    sparkCatalog.invalidateTable(ident);
+    return gravitinoCatalogClient
+        .asTableCatalog()
+        .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
 }

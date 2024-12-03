@@ -21,11 +21,6 @@ package org.apache.gravitino.spark.connector.integration.test;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
@@ -116,6 +111,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected abstract boolean supportsDelete();
 
   protected abstract boolean supportsSchemaEvolution();
+
+  protected abstract boolean supportsReplaceColumns();
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
@@ -550,6 +547,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsReplaceColumns")
   protected void testAlterTableReplaceColumns() {
     String tableName = "test_replace_columns_table";
     dropTableIfExists(tableName);
@@ -563,7 +561,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "ALTER TABLE %S REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
+            "ALTER TABLE %s REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
             tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>();
     // change comment for id
