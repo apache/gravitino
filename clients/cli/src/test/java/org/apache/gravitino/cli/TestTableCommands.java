@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.CreateTable;
 import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.ListIndexes;
 import org.apache.gravitino.cli.commands.ListTableProperties;
@@ -354,5 +355,35 @@ class TestTableCommands {
             "people");
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
+  }
+
+  @Test
+  void testCreateTable() {
+    CreateTable mockCreate = mock(CreateTable.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    when(mockCommandLine.hasOption(GravitinoOptions.COLUMNFILE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COLUMNFILE)).thenReturn("users.csv");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.CREATE));
+    doReturn(mockCreate)
+        .when(commandLine)
+        .newCreateTable(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "users.csv",
+            "comment");
+    commandLine.handleCommandLine();
+    verify(mockCreate).handle();
   }
 }
