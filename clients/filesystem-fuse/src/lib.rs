@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-mod memory_filesystem;
-pub mod fuse_server;
-mod fuse_api_handle;
+mod file_handle_manager;
 mod filesystem;
 mod filesystem_metadata;
+mod fuse_api_handle;
+pub mod fuse_server;
 mod log_filesystem;
-mod file_handle_manager;
+mod memory_filesystem;

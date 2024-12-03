@@ -23,7 +23,7 @@ use std::sync::atomic::AtomicU64;
 // FileHandleManager is a manager for opened files.
 pub(crate) struct FileHandleManager {
     // file_handle_map is a map of file_handle_id to opned file.
-    file_handle_map : HashMap<u64, OpenedFile>,
+    file_handle_map: HashMap<u64, OpenedFile>,
 
     // file_handle_id_generator is used to generate unique file handle IDs.
     handle_id_generator: AtomicU64,
@@ -38,7 +38,8 @@ impl FileHandleManager {
     }
 
     pub(crate) fn next_handle_id(&self) -> u64 {
-        self.handle_id_generator.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        self.handle_id_generator
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
     pub(crate) fn open_file(&mut self, file: &FileStat) -> OpenedFile {
@@ -47,7 +48,8 @@ impl FileHandleManager {
             handle_id: self.next_handle_id(),
             size: file.size,
         };
-        self.file_handle_map.insert(file_handle.handle_id, file_handle.clone());
+        self.file_handle_map
+            .insert(file_handle.handle_id, file_handle.clone());
         file_handle
     }
 

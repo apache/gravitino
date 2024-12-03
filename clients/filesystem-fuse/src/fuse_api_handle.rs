@@ -99,7 +99,12 @@ impl Filesystem for FuseApiHandle {
 
     async fn destroy(&self, _req: Request) {}
 
-    async fn lookup(&self, _req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<ReplyEntry> {
+    async fn lookup(
+        &self,
+        _req: Request,
+        parent: Inode,
+        name: &OsStr,
+    ) -> fuse3::Result<ReplyEntry> {
         let file_stat = self.local_fs.lookup(parent, name.to_str().unwrap());
 
         match file_stat {
@@ -333,12 +338,26 @@ impl Filesystem for FuseApiHandle {
         }
     }
 
-    async fn release(&self, req: Request, inode: Inode, fh: u64, flags: u32, lock_owner: u64, flush: bool) -> fuse3::Result<()> {
+    async fn release(
+        &self,
+        req: Request,
+        inode: Inode,
+        fh: u64,
+        flags: u32,
+        lock_owner: u64,
+        flush: bool,
+    ) -> fuse3::Result<()> {
         self.local_fs.close_file(inode, fh);
         Ok(())
     }
 
-    async fn releasedir(&self, req: Request, inode: Inode, fh: u64, flags: u32) -> fuse3::Result<()> {
+    async fn releasedir(
+        &self,
+        req: Request,
+        inode: Inode,
+        fh: u64,
+        flags: u32,
+    ) -> fuse3::Result<()> {
         self.local_fs.close_file(inode, fh);
         Ok(())
     }

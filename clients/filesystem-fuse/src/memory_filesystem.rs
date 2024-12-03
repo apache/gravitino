@@ -16,31 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::file_handle_manager::FileHandleManager;
 use crate::filesystem::{FileReader, FileStat, FileWriter, IFileSystem, OpenedFile};
 use crate::filesystem_metadata::{DefaultFileSystemMetadata, IFileSystemMetadata};
 use dashmap::DashMap;
 use fuse3::Errno;
 use std::sync::{Arc, Mutex, RwLock};
-use crate::file_handle_manager::FileHandleManager;
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
 // It is used for testing purposes
 pub(crate) struct MemoryFileSystem {
     // meta is the metadata of the filesystem
-    meta : RwLock<DefaultFileSystemMetadata>,
+    meta: RwLock<DefaultFileSystemMetadata>,
 
     file_handle_manager: RwLock<FileHandleManager>,
 
     // file_data_map is a map of file data
-    file_data_map : DashMap<u64, Arc<Mutex<Vec<u8>>>>,
-
+    file_data_map: DashMap<u64, Arc<Mutex<Vec<u8>>>>,
 }
 
 impl MemoryFileSystem {
-
     const ROOT_DIR_PARENT_FILE_ID: u64 = 0;
     const ROOT_DIR_FILE_ID: u64 = 1;
-    const FS_META_FILE_NAME: & 'static str = ".gvfs_meta";
+    const FS_META_FILE_NAME: &'static str = ".gvfs_meta";
 
     pub fn new() -> Self {
         let fs = Self {
@@ -49,12 +47,19 @@ impl MemoryFileSystem {
             file_data_map: Default::default(),
         };
 
-        FileStat::new_dir("/".into(), MemoryFileSystem::ROOT_DIR_FILE_ID, MemoryFileSystem::ROOT_DIR_PARENT_FILE_ID);
+        FileStat::new_dir(
+            "/".into(),
+            MemoryFileSystem::ROOT_DIR_FILE_ID,
+            MemoryFileSystem::ROOT_DIR_PARENT_FILE_ID,
+        );
 
         {
             let mut meta = fs.meta.write().unwrap();
             meta.add_root_dir();
-            meta.add_file(MemoryFileSystem::ROOT_DIR_FILE_ID, MemoryFileSystem::FS_META_FILE_NAME);
+            meta.add_file(
+                MemoryFileSystem::ROOT_DIR_FILE_ID,
+                MemoryFileSystem::FS_META_FILE_NAME,
+            );
         }
         fs
     }
@@ -95,7 +100,7 @@ impl IFileSystem for MemoryFileSystem {
                 let file_handle = file_handle_map.open_file(&file_stat);
                 Ok(file_handle)
             }
-            None => {Err(libc::ENOENT.into())}
+            None => Err(libc::ENOENT.into()),
         }
     }
 
@@ -106,7 +111,8 @@ impl IFileSystem for MemoryFileSystem {
         let mut file_handle_map = self.file_handle_manager.write().unwrap();
         let file_handle = file_handle_map.open_file(&file_stat);
 
-        self.file_data_map.insert(file_stat.inode, Arc::new(Mutex::new(Vec::new())));
+        self.file_data_map
+            .insert(file_stat.inode, Arc::new(Mutex::new(Vec::new())));
         Ok(file_handle)
     }
 
@@ -129,14 +135,12 @@ impl IFileSystem for MemoryFileSystem {
     }
 
     fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader> {
-        let file= {
+        let file = {
             let file_handle_map = self.file_handle_manager.read().unwrap();
             file_handle_map.get_file(fh).unwrap()
         };
 
-        let data = {
-            self.file_data_map.get(&file_id).unwrap().clone()
-        };
+        let data = { self.file_data_map.get(&file_id).unwrap().clone() };
 
         Box::new(MemoryFileReader {
             file: file.clone(),
@@ -145,14 +149,12 @@ impl IFileSystem for MemoryFileSystem {
     }
 
     fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter> {
-        let file= {
+        let file = {
             let file_handle_map = self.file_handle_manager.read().unwrap();
             file_handle_map.get_file(fh).unwrap()
         };
 
-        let data = {
-            self.file_data_map.get(&file_id).unwrap().clone()
-        };
+        let data = { self.file_data_map.get(&file_id).unwrap().clone() };
 
         Box::new(MemoryFileWriter {
             file: file.clone(),
@@ -172,14 +174,14 @@ impl IFileSystem for MemoryFileSystem {
     }
 
     fn close_file(&self, _file_id: u64, fh: u64) -> Result<(), Errno> {
-       let mut file_handle_manager = self.file_handle_manager.write().unwrap();
+        let mut file_handle_manager = self.file_handle_manager.write().unwrap();
         file_handle_manager.remove_file(fh);
         Ok(())
     }
 }
 
 pub(crate) struct MemoryFileReader {
-    pub(crate) file : OpenedFile,
+    pub(crate) file: OpenedFile,
     pub(crate) data: Arc<Mutex<Vec<u8>>>,
 }
 
@@ -200,7 +202,7 @@ impl FileReader for MemoryFileReader {
 }
 
 pub(crate) struct MemoryFileWriter {
-    pub(crate) file : OpenedFile,
+    pub(crate) file: OpenedFile,
     pub(crate) data: Arc<Mutex<Vec<u8>>>,
 }
 
@@ -209,11 +211,11 @@ impl FileWriter for MemoryFileWriter {
         &self.file
     }
 
-    fn write(&mut self, offset: u64, data: &[u8]) -> u32{
+    fn write(&mut self, offset: u64, data: &[u8]) -> u32 {
         let mut v = self.data.lock().unwrap();
         let start = offset as usize;
         let end = start + data.len();
-        if end> self.file.size as usize {
+        if end > self.file.size as usize {
             self.file.size = end as u64;
         }
         if v.len() < end {

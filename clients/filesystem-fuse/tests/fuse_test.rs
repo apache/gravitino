@@ -17,19 +17,18 @@
  * under the License.
  */
 
-
+use gvfs_fuse::fuse_server::FuseServer;
+use log::info;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use log::info;
 use tokio::runtime::Runtime;
-use gvfs_fuse::fuse_server::FuseServer;
 
 struct FuseTest {
-    server : Arc<FuseServer>,
+    server: Arc<FuseServer>,
     runtime: Arc<Runtime>,
 }
 
@@ -37,18 +36,16 @@ impl FuseTest {
     pub fn setup(&self) {
         info!("Start gvfs fuse server");
         let svr = self.server.clone();
-        self.runtime.spawn( async move{
-            svr.start().await
-        });
+        self.runtime.spawn(async move { svr.start().await });
 
-        let success= Self::wait_for_fuse_server_ready("gvfs", Duration::from_secs(15));
+        let success = Self::wait_for_fuse_server_ready("gvfs", Duration::from_secs(15));
         assert!(success, "Fuse server cannot start up at 15 seconds");
     }
 
     pub fn shutdown(&self) {
         self.runtime.block_on(async {
             let _ = self.server.stop().await;
-        }) ;
+        });
     }
 
     fn wait_for_fuse_server_ready(path: &str, timeout: Duration) -> bool {
@@ -132,5 +129,3 @@ fn test_fuse_system_with_auto() {
 
     test_fuse_filesystem();
 }
-
-

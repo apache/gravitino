@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::filesystem::FileSystemContext;
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::memory_filesystem::MemoryFileSystem;
 use fuse3::raw::{MountHandle, Session};
@@ -26,7 +27,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, Notify};
 use tokio::time::timeout;
-use crate::filesystem::FileSystemContext;
 
 /// Represents a FUSE server capable of starting and stopping the FUSE filesystem.
 pub struct FuseServer {
@@ -51,7 +51,7 @@ impl FuseServer {
         let fs = Box::new(MemoryFileSystem::new());
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
-        let fs_context = crate::filesystem::FileSystemContext { uid: uid, gid: gid};
+        let fs_context = crate::filesystem::FileSystemContext { uid: uid, gid: gid };
         let fuse_fs = FuseApiHandle::new(fs, fs_context);
         let mount_path = "gvfs";
 

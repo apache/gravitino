@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-mod memory_filesystem;
-mod fuse_server;
-mod fuse_api_handle;
+mod file_handle_manager;
 mod filesystem;
 mod filesystem_metadata;
-mod file_handle_manager;
+mod fuse_api_handle;
+mod fuse_server;
+mod memory_filesystem;
 
-use std::sync::Arc;
+use crate::fuse_server::FuseServer;
 use fuse3::Result;
 use log::info;
-use crate::fuse_server::FuseServer;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,9 +34,7 @@ async fn main() -> Result<()> {
 
     let server = Arc::new(FuseServer::new());
     let clone_server = server.clone();
-    let v = tokio::spawn(async move {
-        clone_server.start().await
-    });
+    let v = tokio::spawn(async move { clone_server.start().await });
 
     tokio::signal::ctrl_c().await?;
     info!("Received Ctrl+C, stopping server...");

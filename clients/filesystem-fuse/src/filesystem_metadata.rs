@@ -22,20 +22,19 @@ use std::collections::HashMap;
 
 /// IFileSystemMetadata is an interface that defines the operations to manage file metadata.
 pub trait IFileSystemMetadata {
+    fn add_file(&mut self, parent_inode: u64, name: &str) -> FileStat;
 
-    fn add_file(&mut self, parent_inode: u64, name :&str) -> FileStat;
-
-    fn add_file_with_name(&mut self, name :&str, parent: &str) -> FileStat;
+    fn add_file_with_name(&mut self, name: &str, parent: &str) -> FileStat;
 
     fn add_root_dir(&mut self) -> FileStat;
 
-    fn add_dir(&mut self, parent_inode: u64, name :&str) -> FileStat;
+    fn add_dir(&mut self, parent_inode: u64, name: &str) -> FileStat;
 
-    fn add_dir_with_name(&mut self, parent :&str, name: &str) -> FileStat;
+    fn add_dir_with_name(&mut self, parent: &str, name: &str) -> FileStat;
 
     fn get_file(&self, inode: u64) -> Option<FileStat>;
 
-    fn get_file_from_dir(&self, parent_inode:u64,  name: &str) -> Option<FileStat>;
+    fn get_file_from_dir(&self, parent_inode: u64, name: &str) -> Option<FileStat>;
 
     fn get_dir_childs(&self, inode: u64) -> Vec<FileStat>;
 
@@ -51,7 +50,6 @@ pub trait IFileSystemMetadata {
 /// DefaultFileSystemMetadata is a simple implementation of FileSystemMetadata
 /// that stores file metadata in memory.
 pub struct DefaultFileSystemMetadata {
-
     // file_stat_map stores the metadata of all files.
     file_stat_map: HashMap<u64, FileStat>,
 
@@ -65,7 +63,7 @@ pub struct DefaultFileSystemMetadata {
     inode_id_generator: u64,
 }
 
-impl DefaultFileSystemMetadata{
+impl DefaultFileSystemMetadata {
     pub fn new() -> Self {
         Self {
             file_stat_map: Default::default(),
@@ -81,47 +79,58 @@ impl DefaultFileSystemMetadata{
     }
 }
 
-impl IFileSystemMetadata for DefaultFileSystemMetadata{
-
+impl IFileSystemMetadata for DefaultFileSystemMetadata {
     fn get_file_path(&self, file_id: u64) -> String {
-        self.file_stat_map.get(&file_id).map(|x| x.path.clone()).unwrap_or_else(|| "".to_string())
+        self.file_stat_map
+            .get(&file_id)
+            .map(|x| x.path.clone())
+            .unwrap_or_else(|| "".to_string())
     }
 
-    fn add_file_with_name(&mut self, name :&str, parent: &str) -> FileStat {
+    fn add_file_with_name(&mut self, name: &str, parent: &str) -> FileStat {
         let parent_inode = self.dir_name_map.get(parent).unwrap();
         self.add_file(*parent_inode, name)
     }
 
-    fn add_file(&mut self, parent_inode: u64, name :&str) -> FileStat {
+    fn add_file(&mut self, parent_inode: u64, name: &str) -> FileStat {
         let file_stat = FileStat::new_file(name, self.next_inode_id(), parent_inode);
-        self.file_stat_map.insert(file_stat.inode, FileStat::clone(&file_stat));
-        self.dir_child_map.entry(parent_inode).or_insert(HashMap::new()).insert(name.to_string(), file_stat.inode);
+        self.file_stat_map
+            .insert(file_stat.inode, FileStat::clone(&file_stat));
+        self.dir_child_map
+            .entry(parent_inode)
+            .or_insert(HashMap::new())
+            .insert(name.to_string(), file_stat.inode);
         file_stat
     }
 
     fn add_root_dir(&mut self) -> FileStat {
         let file_stat = FileStat::new_dir("", 1, 0);
-        self.file_stat_map.insert(file_stat.inode, FileStat::clone(&file_stat));
+        self.file_stat_map
+            .insert(file_stat.inode, FileStat::clone(&file_stat));
         self.dir_child_map.insert(file_stat.inode, HashMap::new());
 
-        self.dir_name_map.insert(file_stat.name.clone(), file_stat.inode);
+        self.dir_name_map
+            .insert(file_stat.name.clone(), file_stat.inode);
         file_stat
     }
 
-    fn add_dir(&mut self, parent_inode: u64, name :&str) -> FileStat {
+    fn add_dir(&mut self, parent_inode: u64, name: &str) -> FileStat {
         let file_stat = FileStat::new_dir(name, self.next_inode_id(), parent_inode);
-        self.file_stat_map.insert(file_stat.inode, FileStat::clone(&file_stat));
+        self.file_stat_map
+            .insert(file_stat.inode, FileStat::clone(&file_stat));
         self.dir_child_map.insert(file_stat.inode, HashMap::new());
-        self.dir_child_map.get_mut(&parent_inode).unwrap().insert(name.to_string(), file_stat.inode);
-
+        self.dir_child_map
+            .get_mut(&parent_inode)
+            .unwrap()
+            .insert(name.to_string(), file_stat.inode);
 
         let parent = self.file_stat_map.get(&parent_inode).unwrap().clone();
-        let full_name= format!("{}/{}", parent.path, name);
+        let full_name = format!("{}/{}", parent.path, name);
         self.dir_name_map.insert(full_name, file_stat.inode);
         file_stat
     }
 
-    fn add_dir_with_name(&mut self, parent :&str, name: &str) -> FileStat {
+    fn add_dir_with_name(&mut self, parent: &str, name: &str) -> FileStat {
         let parent_inode = self.dir_name_map.get(parent).unwrap().clone();
         self.add_dir(parent_inode, name)
     }
@@ -130,8 +139,11 @@ impl IFileSystemMetadata for DefaultFileSystemMetadata{
         self.file_stat_map.get(&inode).map(|x| FileStat::clone(x))
     }
 
-    fn get_file_from_dir(&self, parent_inode:u64,  name: &str) -> Option<FileStat> {
-        self.dir_child_map.get(&parent_inode).and_then(|x| x.get(name)).and_then(|x| self.get_file(*x))
+    fn get_file_from_dir(&self, parent_inode: u64, name: &str) -> Option<FileStat> {
+        self.dir_child_map
+            .get(&parent_inode)
+            .and_then(|x| x.get(name))
+            .and_then(|x| self.get_file(*x))
     }
 
     fn get_dir_childs(&self, inode: u64) -> Vec<FileStat> {
@@ -140,21 +152,18 @@ impl IFileSystemMetadata for DefaultFileSystemMetadata{
             .map(|child_map| {
                 child_map
                     .iter()
-                    .filter_map(|entry| {
-                        self.file_stat_map
-                            .get(entry.1)
-                            .map(|stat| stat.clone())
-                    })
+                    .filter_map(|entry| self.file_stat_map.get(entry.1).map(|stat| stat.clone()))
                     .collect()
             })
             .unwrap_or_else(Vec::new)
     }
 
     fn update_file_stat(&mut self, file_id: u64, file_stat: &FileStat) {
-        self.file_stat_map.insert(file_id, FileStat::clone(file_stat));
+        self.file_stat_map
+            .insert(file_id, FileStat::clone(file_stat));
     }
 
-    fn remove_file(&mut self, parent_file_id: u64, name: &str) -> Result<(), Errno>{
+    fn remove_file(&mut self, parent_file_id: u64, name: &str) -> Result<(), Errno> {
         let dir_map = self.dir_child_map.get_mut(&parent_file_id);
         if let Some(dir_map) = dir_map {
             if let Some(file_id) = dir_map.remove(name) {

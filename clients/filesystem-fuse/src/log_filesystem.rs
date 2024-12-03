@@ -47,9 +47,7 @@ pub(crate) struct LogFileSystem {
 
 impl LogFileSystem {
     pub fn new(fs: Box<dyn IFileSystem>) -> Self {
-        Self {
-            inner_fs: fs,
-        }
+        Self { inner_fs: fs }
     }
 }
 
@@ -115,7 +113,6 @@ impl IFileSystem for LogFileSystem {
     }
 }
 
-
 pub(crate) struct LogFileReader {
     pub(crate) inner_reader: Box<dyn FileReader>,
 }
@@ -139,8 +136,7 @@ impl FileWriter for LogFileWriter {
         &self.inner_writer.file()
     }
 
-    fn write(&mut self, offset: u64, data: &[u8]) -> u32{
+    fn write(&mut self, offset: u64, data: &[u8]) -> u32 {
         self.inner_writer.write(offset, data)
     }
 }
-

@@ -23,14 +23,13 @@ use std::time::SystemTime;
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system, it is used to identify the file or directory
 /// the `fh` it is the file handle, it is used to identify the opened file, it is used to read or write the file content
 pub trait IFileSystem: Send + Sync {
-
     fn get_file_path(&self, file_id: u64) -> String;
 
     fn get_opened_file(&self, file_id: u64, fh: u64) -> Option<OpenedFile>;
 
     fn stat(&self, file_id: u64) -> Option<FileStat>;
 
-    fn lookup(&self, parent_file_id: u64, name :&str) -> Option<FileStat>;
+    fn lookup(&self, parent_file_id: u64, name: &str) -> Option<FileStat>;
 
     fn read_dir(&self, dir_file_id: u64) -> Vec<FileStat>;
 
@@ -65,10 +64,7 @@ pub struct FileSystemContext {
 
 impl FileSystemContext {
     pub(crate) fn new(uid: u32, gid: u32) -> Self {
-        FileSystemContext {
-            uid,
-            gid,
-        }
+        FileSystemContext { uid, gid }
     }
 }
 
@@ -118,12 +114,12 @@ impl FileStat {
             name: name.into(),
             path: "".to_string(),
             size: 0,
-            kind : FileType::RegularFile,
-            perm : 0o664,
+            kind: FileType::RegularFile,
+            perm: 0o664,
             atime: atime,
-            mtime : atime,
+            mtime: atime,
             ctime: atime,
-            nlink : 1,
+            nlink: 1,
         }
     }
 
@@ -135,12 +131,12 @@ impl FileStat {
             name: name.into(),
             path: "".to_string(),
             size: 0,
-            kind : FileType::Directory,
-            perm : 0o755,
+            kind: FileType::Directory,
+            perm: 0o755,
             atime: atime,
-            mtime : atime,
+            mtime: atime,
             ctime: atime,
-            nlink : 1,
+            nlink: 1,
         }
     }
 }
