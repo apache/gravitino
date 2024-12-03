@@ -201,7 +201,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, metalake).handle();
+      newListCatalogs(url, ignore, metalake, outputFormat).handle();
       return;
     }
 
