@@ -78,7 +78,7 @@ public class TestTableOpsUtils {
   void testAddColumnFirst() {
     assertTableChange(
         addColumn(
-            getfieldName("col_1"),
+            TableOpsUtils.getFieldName("col_1"),
             IntegerType.get(),
             AddColumn.class.getSimpleName(),
             TableChange.ColumnPosition.first(),
@@ -102,7 +102,7 @@ public class TestTableOpsUtils {
   void testAddColumnAfter() {
     assertTableChange(
         addColumn(
-            getfieldName("col_2"),
+            TableOpsUtils.getFieldName("col_2"),
             FloatType.get(),
             AddColumn.class.getSimpleName(),
             after("col_1"),
@@ -126,7 +126,7 @@ public class TestTableOpsUtils {
   void testAddColumnDefaultPosition() {
     assertTableChange(
         addColumn(
-            getfieldName("col_3"),
+            TableOpsUtils.getFieldName("col_3"),
             ListType.of(StringType.get(), false),
             AddColumn.class.getSimpleName(),
             defaultPos(),
@@ -147,7 +147,7 @@ public class TestTableOpsUtils {
   void testAddColumnWitNullPosition() {
     assertTableChange(
         addColumn(
-            getfieldName("col_4"),
+            TableOpsUtils.getFieldName("col_4"),
             MapType.of(StringType.get(), IntegerType.get(), true),
             AddColumn.class.getSimpleName(),
             null,
@@ -167,7 +167,8 @@ public class TestTableOpsUtils {
   @Test
   void testupdateColumnComment() {
     assertTableChange(
-        updateColumnComment(getfieldName("col_1"), UpdateColumnComment.class.getSimpleName()),
+        updateColumnComment(
+            TableOpsUtils.getFieldName("col_1"), UpdateColumnComment.class.getSimpleName()),
         UpdateColumnComment.class,
         schemaChange -> {
           UpdateColumnComment updateColumnComment = (UpdateColumnComment) schemaChange;
@@ -180,7 +181,7 @@ public class TestTableOpsUtils {
   @Test
   void testUpdateColumnNullability() {
     assertTableChange(
-        updateColumnNullability(getfieldName("col_2"), false),
+        updateColumnNullability(X.getFieldName("col_2"), false),
         UpdateColumnNullability.class,
         schemaChange -> {
           UpdateColumnNullability updateColumnNullability = (UpdateColumnNullability) schemaChange;

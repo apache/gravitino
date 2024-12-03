@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.ops;
 
-import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.getfieldName;
+import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.getFieldName;
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TypeUtils.toPaimonType;
 import static org.apache.gravitino.rel.TableChange.ColumnPosition.after;
 import static org.apache.gravitino.rel.TableChange.ColumnPosition.defaultPos;
@@ -190,9 +190,9 @@ public class TestPaimonCatalogOps {
           assertEquals("col_1", dataField.name());
           assertEquals(UpdateColumnComment.class.getSimpleName(), dataField.description());
         },
-        updateColumnComment(getfieldName("col_1"), UpdateColumnComment.class.getSimpleName()));
+        updateColumnComment(getFieldName("col_1"), UpdateColumnComment.class.getSimpleName()));
     assertColumnNotExist(
-        updateColumnComment(getfieldName("col_10"), UpdateComment.class.getSimpleName()));
+        updateColumnComment(getFieldName("col_10"), UpdateComment.class.getSimpleName()));
   }
 
   @Test
@@ -203,8 +203,8 @@ public class TestPaimonCatalogOps {
           assertEquals("col_2", dataField.name());
           assertFalse(dataField.type().isNullable());
         },
-        updateColumnNullability(getfieldName("col_2"), false));
-    assertColumnNotExist(updateColumnNullability(getfieldName("col_5"), true));
+        updateColumnNullability(getFieldName("col_2"), false));
+    assertColumnNotExist(updateColumnNullability(getFieldName("col_5"), true));
   }
 
   @Test
@@ -229,18 +229,18 @@ public class TestPaimonCatalogOps {
           assertEquals("col_1", dataField.name());
           assertEquals(DataTypes.BIGINT(), dataField.type());
         },
-        updateColumnType(getfieldName("col_1"), Types.LongType.get()));
-    assertColumnNotExist(updateColumnType(getfieldName("col_5"), Types.ShortType.get()));
+        updateColumnType(getFieldName("col_1"), Types.LongType.get()));
+    assertColumnNotExist(updateColumnType(getFieldName("col_5"), Types.ShortType.get()));
     assertThrowsExactly(
         IllegalStateException.class,
         () ->
             assertAlterTable(
-                table -> {}, updateColumnType(getfieldName("col_1"), Types.DateType.get())));
+                table -> {}, updateColumnType(getFieldName("col_1"), Types.DateType.get())));
     assertThrowsExactly(
         IllegalStateException.class,
         () ->
             assertAlterTable(
-                table -> {}, updateColumnType(getfieldName("col_4"), Types.LongType.get())));
+                table -> {}, updateColumnType(getFieldName("col_4"), Types.LongType.get())));
   }
 
   @Test
@@ -252,11 +252,11 @@ public class TestPaimonCatalogOps {
           assertEquals("col_5", fieldNames.get(1));
           assertEquals(4, fieldNames.size());
         },
-        renameColumn(getfieldName("col_2"), "col_5"));
-    assertColumnNotExist(renameColumn(getfieldName("col_6"), "col_7"));
+        renameColumn(getFieldName("col_2"), "col_5"));
+    assertColumnNotExist(renameColumn(getFieldName("col_6"), "col_7"));
     assertThrowsExactly(
         ColumnAlreadyExistException.class,
-        () -> assertAlterTable(table -> {}, renameColumn(getfieldName("col_1"), "col_4")));
+        () -> assertAlterTable(table -> {}, renameColumn(getFieldName("col_1"), "col_4")));
   }
 
   @Test
@@ -268,9 +268,9 @@ public class TestPaimonCatalogOps {
           assertEquals("col_3", fieldNames.get(1));
           assertEquals(3, fieldNames.size());
         },
-        deleteColumn(getfieldName("col_2"), true));
-    assertColumnNotExist(deleteColumn(getfieldName("col_5"), true));
-    assertColumnNotExist(deleteColumn(getfieldName("col_5"), false));
+        deleteColumn(getFieldName("col_2"), true));
+    assertColumnNotExist(deleteColumn(getFieldName("col_5"), true));
+    assertColumnNotExist(deleteColumn(getFieldName("col_5"), false));
   }
 
   @Test
@@ -326,8 +326,8 @@ public class TestPaimonCatalogOps {
           assertTrue(options.containsKey("test_property_key"));
           assertEquals("test_property_value", options.get("test_property_key"));
         },
-        renameColumn(getfieldName("col_1"), "col_5"),
-        deleteColumn(getfieldName("col_2"), true),
+        renameColumn(getFieldName("col_1"), "col_5"),
+        deleteColumn(getFieldName("col_2"), true),
         setProperty("test_property_key", "test_property_value"));
   }
 
@@ -342,7 +342,7 @@ public class TestPaimonCatalogOps {
           assertEquals("col_3", fieldNames.get(fields[2]));
           assertEquals("col_4", fieldNames.get(fields[3]));
         },
-        updateColumnPosition(getfieldName(columnName), columnPosition));
+        updateColumnPosition(getFieldName(columnName), columnPosition));
   }
 
   private void assertAddColumn(int column, Type type, ColumnPosition columnPosition, Integer field)
@@ -357,7 +357,7 @@ public class TestPaimonCatalogOps {
           assertTrue(dataField.type().isNullable());
         },
         addColumn(
-            getfieldName(columnName),
+            getFieldName(columnName),
             type,
             SchemaChange.AddColumn.class.getSimpleName(),
             columnPosition,
