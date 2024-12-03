@@ -57,7 +57,7 @@ public interface SupportsCredentials {
     Credential[] credentials = getCredentials();
     if (credentials.length == 0) {
       throw new NoSuchCredentialException(
-          "No credential found for the credential type: " + credentialType);
+          "No credential found for the credential type: %s", credentialType);
     }
 
     List<Credential> filteredCredentials =
@@ -66,7 +66,7 @@ public interface SupportsCredentials {
             .collect(Collectors.toList());
     if (filteredCredentials.isEmpty()) {
       throw new NoSuchCredentialException(
-          "No credential found for the credential type: " + credentialType);
+          "No credential found for the credential type: %s", credentialType);
     } else if (credentials.length > 1) {
       throw new IllegalStateException(
           "Multi credentials found for the credential type:" + credentialType);
