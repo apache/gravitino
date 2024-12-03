@@ -90,8 +90,8 @@ public class GravitinoOptions {
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption(DATATYPE, "column data type"));
     options.addOption(createArgOption(POSITION, "position of column"));
-    options.addOption(createSimpleOption(NULL, "column value can be null"));
-    options.addOption(createSimpleOption(AUTO, "column value auto-increments"));
+    options.addOption(createArgOption(NULL, "column value can be null (true/false)"));
+    options.addOption(createArgOption(AUTO, "column value auto-increments (true/false)"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));

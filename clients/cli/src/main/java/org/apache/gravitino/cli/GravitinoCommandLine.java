@@ -497,9 +497,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
       String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       String position = line.getOptionValue(GravitinoOptions.POSITION);
-      boolean nullable = line.hasOption(GravitinoOptions.NULL);
-      boolean autoIncrement = line.hasOption(GravitinoOptions.AUTO);
+      boolean nullable = true;
+      boolean autoIncrement = false;
       String defaultValue = line.getOptionValue(GravitinoOptions.DEFAULT);
+
+      if (line.hasOption(GravitinoOptions.NULL)) {
+        nullable = line.getOptionValue(GravitinoOptions.NULL).equals("true");
+      }
+
+      if (line.hasOption(GravitinoOptions.AUTO)) {
+        autoIncrement = line.getOptionValue(GravitinoOptions.AUTO).equals("true");
+      }
 
       newAddOptionalColumn(
               url,
@@ -540,18 +548,22 @@ public class GravitinoCommandLine extends TestableCommandLine {
             .handle();
       }
       if (line.hasOption(GravitinoOptions.NULL)) {
-        newUpdateColumnNullability(url, ignore, metalake, catalog, schema, table, column, true)
-            .handle();
-      } else {
-        newUpdateColumnNullability(url, ignore, metalake, catalog, schema, table, column, false)
-            .handle();
+        if (line.getOptionValue(GravitinoOptions.NULL).equals("true")) {
+          newUpdateColumnNullability(url, ignore, metalake, catalog, schema, table, column, true)
+              .handle();
+        } else if (line.getOptionValue(GravitinoOptions.NULL).equals("false")) {
+          newUpdateColumnNullability(url, ignore, metalake, catalog, schema, table, column, false)
+              .handle();
+        }
       }
       if (line.hasOption(GravitinoOptions.AUTO)) {
-        newUpdateColumnAutoIncrement(url, ignore, metalake, catalog, schema, table, column, true)
-            .handle();
-      } else {
-        newUpdateColumnAutoIncrement(url, ignore, metalake, catalog, schema, table, column, false)
-            .handle();
+        if (line.getOptionValue(GravitinoOptions.AUTO).equals("true")) {
+          newUpdateColumnAutoIncrement(url, ignore, metalake, catalog, schema, table, column, true)
+              .handle();
+        } else if (line.getOptionValue(GravitinoOptions.AUTO).equals("false")) {
+          newUpdateColumnAutoIncrement(url, ignore, metalake, catalog, schema, table, column, false)
+              .handle();
+        }
       }
       if (line.hasOption(GravitinoOptions.DEFAULT)) {
         String defaultValue = line.getOptionValue(GravitinoOptions.DEFAULT);
