@@ -8,7 +8,8 @@ license: "This software is licensed under the Apache License version 2."
 
 ### Prerequisites
 
-If you have not installed Java, install it and configure the `JAVA_HOME` environment variable. After installation, you can run the `${JAVA_HOME}/bin/java -version` command to check the Java version.
+If you have not installed Java, install it and configure the `JAVA_HOME` environment variable.
+After installation, you can run the `${JAVA_HOME}/bin/java -version` command to check the Java version.
 
 :::note
 Gravitino supports running on Java 8, 11, and 17.
@@ -16,7 +17,8 @@ Gravitino supports running on Java 8, 11, and 17.
 
 ### Get the Gravitino package
 
-The Gravitino package comprises the Gravitino server and the Gravitino Iceberg REST server. You can manage these servers independently or run them concurrently on a single server.
+The Gravitino package comprises the Gravitino server and the Gravitino Iceberg REST server.
+You can manage these servers independently or run them concurrently on a single server.
 
 1. Download the latest Gravitino package from [GitHub](https://github.com/apache/gravitino/releases).
 
@@ -59,23 +61,33 @@ The Gravitino package comprises the Gravitino server and the Gravitino Iceberg R
 
 ### Initialize the RDBMS (Optional)
 
-If you want to use the relational backend storage, you need to initialize the RDBMS. For details on initializing the RDBMS, see [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
+If you want to use the `relational` backend storage, you need to initialize the RDBMS.
+For details on initializing the RDBMS, see [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
 ### Configure the Gravitino server
 
-The `conf/gravitino.conf` file provides basic configurations of the Gravitino server. To configure the Gravitino server, you can update this file. For a full list of the Gravitino server configurations, see [Gravitino Server Configurations](./gravitino-server-config.md).
+The `conf/gravitino.conf` file provides basic configurations for the Gravitino server.
+To configure the Gravitino server, you can update this file.
+For a full list of the Gravitino server configurations, see [Gravitino Server Configurations](./gravitino-server-config.md).
 
 ### Configure the Gravitino server log
 
-Gravitino uses [Log4j2](https://logging.apache.org/log4j/2.x/) as the logging system. The `conf/log4j2.properties` file provides the Gravitino server log configurations. To configure the Gravitino server log, you can update this file.
+Gravitino uses [Log4j2](https://logging.apache.org/log4j/2.x/) as the logging system.
+The `conf/log4j2.properties` file provides the Gravitino server log configurations.
+To configure the Gravitino server log, you can update this file.
 
 ### Configure the Gravitino server environment variables
 
-Gravitino exposes several environment variables through the `conf/gravitino-env.sh` file. To configure these environment variables, you can update this file.
+Gravitino exposes several environment variables through the `conf/gravitino-env.sh` file.
+To configure these environment variables, you can update this file.
 
 ### Configure the Gravitino catalogs
 
-Gravitino supports multiple catalogs. You can configure the catalog-level configurations by updating the related configuration file in the `catalogs/<catalog-provider>/conf` directory. For example, the `catalogs/hive/conf/hive.conf` file provides configurations for the Hive catalog. The configurations you set in the catalog configuration file will apply to all the catalogs of the same type that you created. For detailed configurations about each catalog, see related catalog documentation.
+Gravitino supports multiple catalogs.
+You can configure the catalog-level configurations by updating the related configuration file in the `catalogs/<catalog-provider>/conf` directory.
+For example, the `catalogs/hive/conf/hive.conf` file provides configurations for the Hive catalog.
+The configurations you set in the catalog configuration file will apply to all the catalogs of the same type that you created.
+For detailed configurations about each catalog, see related catalog documentation.
 
 :::note
 Gravitino takes the catalog configurations in the following order of precedence:
@@ -86,36 +98,41 @@ Gravitino takes the catalog configurations in the following order of precedence:
 The catalog `properties` overrides the catalog configurations specified in the configuration file.
 :::
 
-Gravitino supports passing in catalog-specific configurations by adding the `gravitino.bypass.` prefix to the specific catalog configurations. For example, you can pass in the HMS-specific configuration `hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog if you add the `gravitino.bypass.` prefix to the configuration.
+Gravitino supports passing in catalog-specific configurations by adding the `gravitino.bypass.` prefix to the specific catalog configurations.
+For example, you can pass in the HMS-specific configuration `hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog if you add the `gravitino.bypass.` prefix to the configuration.
 
-Gravitino also supports loading catalog-specific configurations from external files. You just need to put your `hive-site.xml` file in the `catalogs/hive/conf` directory, and Gravitino will load it automatically.
+Gravitino also supports loading catalog-specific configurations from external files.
+You just need to put your `hive-site.xml` file in the `catalogs/hive/conf` directory, and Gravitino will load it automatically.
 
 ### Start the Gravitino server
 
 - Start the Gravitino server
 
-    After configuring the Gravitino server, run the following command to start the Gravitino server:
+  After configuring the Gravitino server, run the following command to start the Gravitino server:
 
-    ```shell
-    ./bin/gravitino.sh start
-    ```
+  ```shell
+  ./bin/gravitino.sh start
+  ```
 
-- Start the Gravitino server with the Web-based GUI
+- Start the Gravitino server with the Web UI
 
-    By default, the Gravitino server also provides a Web-based GUI on port `8090`. Run the following command to start the Gravitino server with the Web-based GUI:
+  By default, the Gravitino server also provides a Web UI on port `8090`.
+  Run the following command to start the Gravitino server with the Web UI:
 
-    ```shell
-    ./bin/gravitino.sh run
-    ```
+  ```shell
+  ./bin/gravitino.sh run
+  ```
 
-After starting the Gravitino server with the Web-based GUI, visit `http://localhost:8090` in your browser to access the Gravitino server through the Web-based GUI. Or, you can run the following command to verify that the Gravitino server is running:
+After starting the Gravitino server with the Web UI, visit `http://localhost:8090` in your browser to access the Gravitino server through the Web UI.
+Or, you can run the following command to verify that the Gravitino server is running:
 
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/version
 ```
 
 :::info
-If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment variable in the `conf/gravitino-env.sh` file. Then create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
+If you need to debug the Gravitino server, configure the `GRAVITINO_DEBUG_OPTS` environment variable in the `conf/gravitino-env.sh` file.
+Then create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 :::
 
 ### Start the Gravitino Iceberg REST server
@@ -129,7 +146,8 @@ For details about the Gravitino Iceberg REST server, see the [Gravitino Iceberg 
 
 ## Install Apache Gravitino using Docker
 
-Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/apache/gravitino/tags). The published Gravitino Docker image only contains the Gravitino server with basic configurations.
+Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/apache/gravitino/tags).
+The published Gravitino Docker image only contains the Gravitino server with basic configurations.
 
 ### Prerequisites
 
@@ -143,7 +161,8 @@ If you have not installed Docker, download and install it by following the [inst
     docker run -d -i -p 8090:8090 apache/gravitino:<version>
     ```
 
-2. Visit `http://localhost:8090` in your browser to access the Gravitino server through the Web-based GUI. Or, you can run the following command to verify that THE Gravitino server is running.
+2. Visit `http://localhost:8090` in your browser to access the Gravitino server through the Web UI.
+Or, you can run the following command to verify that THE Gravitino server is running.
 
     ```shell
     curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/version
@@ -151,6 +170,6 @@ If you have not installed Docker, download and install it by following the [inst
 
 ## Install Apache Gravitino using Docker Compose
 
-If you want to experience the whole Gravitino system with other components, use the Docker Compose.
+If you want to try out the whole Gravitino system with other components, use the Docker Compose.
 
 For details, see [Gravitino playground repository](https://github.com/apache/gravitino-playground) and [playground example](./how-to-use-the-playground.md).
