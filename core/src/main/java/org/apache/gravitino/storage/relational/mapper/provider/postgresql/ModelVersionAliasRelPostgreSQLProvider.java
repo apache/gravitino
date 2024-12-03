@@ -64,7 +64,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
+  public String softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
@@ -76,7 +76,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteModelVersionAliasRelByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
@@ -88,7 +88,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteModelVersionAliasRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"

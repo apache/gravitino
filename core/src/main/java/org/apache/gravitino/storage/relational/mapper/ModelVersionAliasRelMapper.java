@@ -73,22 +73,22 @@ public interface ModelVersionAliasRelMapper {
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsBySchemaId")
-  Integer softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteModelVersionAliasRelBySchemaId")
+  Integer softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsByCatalogId")
-  Integer softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId);
+      method = "softDeleteModelVersionAliasRelByCatalogId")
+  Integer softDeleteModelVersionAliasRelByCatalogId(@Param("catalogId") Long catalogId);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsByMetalakeId")
-  Integer softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteModelVersionAliasRelByMetalakeId")
+  Integer softDeleteModelVersionAliasRelByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @DeleteProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "deleteModelVersionAliasRelsByLegacyTimeline")
-  Integer deleteModelVersionAliasRelsByLegacyTimeline(
+      method = "deleteModelVersionAliasRelByLegacyTimeline")
+  Integer deleteModelVersionAliasRelByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

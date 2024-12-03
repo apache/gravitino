@@ -281,7 +281,7 @@ public class ModelVersionMetaService {
                 SessionUtils.doWithoutCommitAndFetchResult(
                     ModelVersionAliasRelMapper.class,
                     mapper ->
-                        mapper.deleteModelVersionAliasRelsByLegacyTimeline(legacyTimeline, limit)));
+                        mapper.deleteModelVersionAliasRelByLegacyTimeline(legacyTimeline, limit)));
 
     return modelVersionDeletedCount[0] + modelVersionAliasRelDeletedCount[0];
   }
