@@ -22,42 +22,42 @@ You can manage these servers independently or run them concurrently on a single 
 
 1. Download the latest Gravitino package from [GitHub](https://github.com/apache/gravitino/releases).
 
-    :::note
-    You can also build Gravitino by following the instructions in [How to Build Gravitino](./how-to-build.md).
+   :::note
+   You can also build Gravitino by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
-      - If you build Gravitino using the `./gradlew compileDistribution` command, you can find the Gravitino package in the `distribution/package` directory.
+   - If you build Gravitino using the `./gradlew compileDistribution` command, you can find the Gravitino package in the `distribution/package` directory.
 
-      - If you build Gravitino using the `./gradlew assembleDistribution` command, you can get the compressed Gravitino package with the name `gravitino-<version>-bin.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
-    :::
+   - If you build Gravitino using the `./gradlew assembleDistribution` command, you can get the compressed Gravitino package with the name `gravitino-<version>-bin.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
+   :::
 
 2. Extract the Gravitino package and you should have these directories and files:
 
-    ```text
-    |── ...
-    └── distribution/package
-        |── bin/
-        |   ├── gravitino.sh                        # Gravitino server Launching scripts.
-        |   └── gravitino-iceberg-rest-server.sh    # Gravitino Iceberg REST server Launching scripts.
-        |── catalogs
-        |   └── hadoop/                             # Apache Hadoop catalog dependencies and configurations.
-        |   └── hive/                               # Apache Hive catalog dependencies and configurations.
-        |   └── jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
-        |   └── jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
-        |   └── jdbc-postgresql/                    # JDBC PostgreSQL catalog dependencies and configurations.
-        |   └── kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
-        |   └── lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
-        |   └── lakehouse-paimon/                   # Apache Paimon catalog dependencies and configurations.
-        |── conf/                                   # All configurations for Gravitino.
-        |   ├── gravitino.conf                      # Gravitino server and Gravitino Iceberg REST server configuration.
-        |   ├── gravitino-iceberg-rest-server.conf  # Gravitino server configuration.
-        |   ├── gravitino-env.sh                    # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-        |   └── log4j2.properties                   # log4j configuration for the Gravitino server and Gravitino Iceberg REST server.
-        |── libs/                                   # Gravitino server dependencies libraries.
-        |── logs/                                   # Gravitino server and Gravitino Iceberg REST server logs. Automatically created after the server starts.
-        |── data/                                   # Default directory for the Gravitino server to store data.
-        |── iceberg-rest-server/                    # Gravitino Iceberg REST server package and dependencies libraries.
-        └── scripts/                                # Extra scripts for Gravitino.
-    ```
+   ```text
+   |── ...
+   └── distribution/package
+      |── bin/
+      |   ├── gravitino.sh                        # Gravitino server Launching scripts.
+      |   └── gravitino-iceberg-rest-server.sh    # Gravitino Iceberg REST server Launching scripts.
+      |── catalogs
+      |   └── hadoop/                             # Apache Hadoop catalog dependencies and configurations.
+      |   └── hive/                               # Apache Hive catalog dependencies and configurations.
+      |   └── jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
+      |   └── jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
+      |   └── jdbc-postgresql/                    # JDBC PostgreSQL catalog dependencies and configurations.
+      |   └── kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
+      |   └── lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
+      |   └── lakehouse-paimon/                   # Apache Paimon catalog dependencies and configurations.
+      |── conf/                                   # All configurations for Gravitino.
+      |   ├── gravitino.conf                      # Gravitino server and Gravitino Iceberg REST server configuration.
+      |   ├── gravitino-iceberg-rest-server.conf  # Gravitino server configuration.
+      |   ├── gravitino-env.sh                    # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
+      |   └── log4j2.properties                   # log4j configuration for the Gravitino server and Gravitino Iceberg REST server.
+      |── libs/                                   # Gravitino server dependencies libraries.
+      |── logs/                                   # Gravitino server and Gravitino Iceberg REST server logs. Automatically created after the server starts.
+      |── data/                                   # Default directory for the Gravitino server to store data.
+      |── iceberg-rest-server/                    # Gravitino Iceberg REST server package and dependencies libraries.
+      └── scripts/                                # Extra scripts for Gravitino.
+   ```
 
 ### Initialize the RDBMS (Optional)
 
@@ -110,18 +110,18 @@ You just need to put your `hive-site.xml` file in the `catalogs/hive/conf` direc
 
   After configuring the Gravitino server, run the following command to start the Gravitino server:
 
-  ```shell
-  ./bin/gravitino.sh start
-  ```
+   ```shell
+   ./bin/gravitino.sh start
+   ```
 
 - Start the Gravitino server with the Web UI
 
   By default, the Gravitino server also provides a Web UI on port `8090`.
   Run the following command to start the Gravitino server with the Web UI:
 
-  ```shell
-  ./bin/gravitino.sh run
-  ```
+   ```shell
+   ./bin/gravitino.sh run
+   ```
 
 After starting the Gravitino server with the Web UI, visit `http://localhost:8090` in your browser to access the Gravitino server through the Web UI.
 Or, you can run the following command to verify that the Gravitino server is running:
@@ -157,16 +157,16 @@ If you have not installed Docker, download and install it by following the [inst
 
 1. Start the Gravitino server.
 
-    ```shell
-    docker run -d -i -p 8090:8090 apache/gravitino:<version>
-    ```
+   ```shell
+   docker run -d -i -p 8090:8090 apache/gravitino:<version>
+   ```
 
 2. Visit `http://localhost:8090` in your browser to access the Gravitino server through the Web UI.
 Or, you can run the following command to verify that THE Gravitino server is running.
 
-    ```shell
-    curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/version
-    ```
+   ```shell
+   curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/version
+   ```
 
 ## Install Apache Gravitino using Docker Compose
 
