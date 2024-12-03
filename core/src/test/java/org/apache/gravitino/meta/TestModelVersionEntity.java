@@ -23,6 +23,8 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +39,7 @@ public class TestModelVersionEntity {
 
     ModelVersionEntity modelVersionEntity =
         ModelVersionEntity.builder()
+            .withModelIdentifier(NameIdentifier.of("m1", "c1", "s1", "model1"))
             .withVersion(1)
             .withComment("test comment")
             .withAliases(aliases)
@@ -45,15 +48,22 @@ public class TestModelVersionEntity {
             .withAuditInfo(auditInfo)
             .build();
 
+    Assertions.assertEquals(
+        NameIdentifier.of("m1", "c1", "s1", "model1"), modelVersionEntity.modelIdentifier());
     Assertions.assertEquals(1, modelVersionEntity.version());
     Assertions.assertEquals("test comment", modelVersionEntity.comment());
     Assertions.assertEquals(aliases, modelVersionEntity.aliases());
     Assertions.assertEquals(properties, modelVersionEntity.properties());
     Assertions.assertEquals("test_uri", modelVersionEntity.uri());
     Assertions.assertEquals(auditInfo, modelVersionEntity.auditInfo());
+    Assertions.assertEquals(
+        Namespace.of("m1", "c1", "s1", "model1"), modelVersionEntity.namespace());
+    Assertions.assertEquals("1", modelVersionEntity.name());
+    Assertions.assertThrows(UnsupportedOperationException.class, modelVersionEntity::id);
 
     ModelVersionEntity modelVersionEntity2 =
         ModelVersionEntity.builder()
+            .withModelIdentifier(NameIdentifier.of("m1", "c1", "s1", "model1"))
             .withVersion(1)
             .withAliases(aliases)
             .withProperties(properties)
@@ -64,6 +74,7 @@ public class TestModelVersionEntity {
 
     ModelVersionEntity modelVersionEntity3 =
         ModelVersionEntity.builder()
+            .withModelIdentifier(NameIdentifier.of("m1", "c1", "s1", "model1"))
             .withVersion(1)
             .withComment("test comment")
             .withAliases(aliases)
@@ -74,13 +85,14 @@ public class TestModelVersionEntity {
 
     ModelVersionEntity modelVersionEntity4 =
         ModelVersionEntity.builder()
+            .withModelIdentifier(NameIdentifier.of("m1", "c1", "s1", "model1"))
             .withVersion(1)
             .withComment("test comment")
             .withProperties(properties)
             .withUri("test_uri")
             .withAuditInfo(auditInfo)
             .build();
-    Assertions.assertNull(modelVersionEntity4.aliases());
+    Assertions.assertTrue(modelVersionEntity4.aliases().isEmpty());
   }
 
   @Test
