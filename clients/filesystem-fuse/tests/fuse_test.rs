@@ -73,6 +73,23 @@ impl Drop for FuseTest {
     }
 }
 
+#[test]
+fn test_fuse_system_with_auto() {
+    tracing_subscriber::fmt().with_env_filter("gvfs_fuse=debug, info").init();
+
+    let mount_point = "build/gvfs";
+    let _ = fs::create_dir_all(mount_point);
+
+    let test = FuseTest {
+        server: Arc::new(FuseServer::new(mount_point)),
+        runtime: Arc::new(Runtime::new().expect("")),
+        mount_point: mount_point.to_string(),
+    };
+    test.setup();
+
+    test_fuse_filesystem(mount_point);
+}
+
 fn test_fuse_filesystem(mount_point: &str) {
     let base_path = Path::new(mount_point);
 
@@ -119,21 +136,4 @@ fn test_fuse_filesystem(mount_point: &str) {
     assert!(!fs::exists(&test_dir).expect("Directory is not deleted"));
 
     info!("Success test")
-}
-
-#[test]
-fn test_fuse_system_with_auto() {
-    tracing_subscriber::fmt().with_env_filter("debug").init();
-
-    let mount_point = "build/gvfs";
-    let _ = fs::create_dir_all(mount_point);
-
-    let test = FuseTest {
-        server: Arc::new(FuseServer::new(mount_point)),
-        runtime: Arc::new(Runtime::new().expect("")),
-        mount_point: mount_point.to_string(),
-    };
-    test.setup();
-
-    test_fuse_filesystem(mount_point);
 }
