@@ -96,7 +96,8 @@ public class TypeConverter {
     } else if (typeName.toLowerCase().startsWith("char")) {
       return Types.FixedCharType.of(length);
     } else {
-      throw new IllegalArgumentException("Unknown or unsupported variable length type: " + typeName);
+      throw new IllegalArgumentException(
+          "Unknown or unsupported variable length type: " + typeName);
     }
   }
 
@@ -113,7 +114,8 @@ public class TypeConverter {
     if (typeName.toLowerCase().startsWith("decimal")) {
       return Types.DecimalType.of(precision, scale);
     } else {
-      throw new IllegalArgumentException("Unknown or unsupported precision and scale type: " + typeName);
+      throw new IllegalArgumentException(
+          "Unknown or unsupported precision and scale type: " + typeName);
     }
   }
 }
