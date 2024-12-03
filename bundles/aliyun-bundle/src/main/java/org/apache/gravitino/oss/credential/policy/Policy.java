@@ -61,19 +61,13 @@ public class Policy {
     }
   }
 
+  @SuppressWarnings("unused")
   public String getVersion() {
     return version;
   }
 
-  public void setVersion(String version) {
-    this.version = version;
-  }
-
+  @SuppressWarnings("unused")
   public List<Statement> getStatements() {
     return statements;
-  }
-
-  public void setStatements(List<Statement> statements) {
-    this.statements = statements;
   }
 }

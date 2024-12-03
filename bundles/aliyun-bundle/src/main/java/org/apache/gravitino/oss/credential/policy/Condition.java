@@ -49,11 +49,8 @@ public class Condition {
     }
   }
 
+  @SuppressWarnings("unused")
   public StringLike getStringLike() {
     return stringLike;
-  }
-
-  public void setStringLike(StringLike stringLike) {
-    this.stringLike = stringLike;
   }
 }

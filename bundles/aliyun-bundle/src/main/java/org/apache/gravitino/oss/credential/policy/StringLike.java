@@ -51,11 +51,8 @@ public class StringLike {
     }
   }
 
+  @SuppressWarnings("unused")
   public List<String> getPrefix() {
     return prefix;
-  }
-
-  public void setPrefix(List<String> prefix) {
-    this.prefix = prefix;
   }
 }

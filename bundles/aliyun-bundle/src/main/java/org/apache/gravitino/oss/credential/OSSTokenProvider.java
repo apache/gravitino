@@ -122,12 +122,14 @@ public class OSSTokenProvider implements CredentialProvider {
     }
     config.setRoleSessionExpiration(tokenExpireSecs);
     config.setPolicy(createPolicy(readLocations, writeLocations));
-    return new Client(config).getCredential();
+    // Local object and client is a simple proxy that does not require manual release
+    Client client = new Client(config);
+    return client.getCredential();
   }
 
   // reference:
-  // https://help.aliyun.com/zh/oss/user-guide/tutorial-use-ram-policies-to-control-access-to-oss?spm=a2c4g.11186623.help-menu-31815.d_2_4_6_1.76901df8T7gfl8
-  public String createPolicy(Set<String> readLocations, Set<String> writeLocations) {
+  // https://www.alibabacloud.com/help/en/oss/user-guide/tutorial-use-ram-policies-to-control-access-to-oss?spm=a2c63.p38356.help-menu-31815.d_2_4_5_1.5536471b56XPRQ
+  private String createPolicy(Set<String> readLocations, Set<String> writeLocations) {
     Policy.Builder policyBuilder = Policy.builder().version("1");
 
     // Allow read and write access to the specified locations
@@ -248,20 +250,10 @@ public class OSSTokenProvider implements CredentialProvider {
     return path.startsWith("/") ? path.substring(1) : path;
   }
 
-  private static String getRoleName(String userName) {
+  private String getRoleName(String userName) {
     return "gravitino_" + userName;
   }
 
-  /**
-   * Closes this stream and releases any system resources associated with it. If the stream is
-   * already closed then invoking this method has no effect.
-   *
-   * <p>As noted in {@link AutoCloseable#close()}, cases where the close may fail require careful
-   * attention. It is strongly advised to relinquish the underlying resources and to internally
-   * <em>mark</em> the {@code Closeable} as closed, prior to throwing the {@code IOException}.
-   *
-   * @throws IOException if an I/O error occurs
-   */
   @Override
   public void close() throws IOException {}
 }

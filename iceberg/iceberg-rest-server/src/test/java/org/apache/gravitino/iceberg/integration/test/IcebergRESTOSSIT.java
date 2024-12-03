@@ -53,7 +53,7 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     this.accessKey = getFromEnvOrDefault("GRAVITINO_OSS_ACCESS_KEY", "{ACCESS_KEY}");
     this.secretKey = getFromEnvOrDefault("GRAVITINO_OSS_SECRET_KEY", "{SECRET_KEY}");
     this.endpoint = getFromEnvOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
-    this.region = getFromEnvOrDefault("GRAVITINO_OSS_REGION", "{GRAVITINO_OSS_REGION}");
+    this.region = getFromEnvOrDefault("GRAVITINO_OSS_REGION", "oss-cn-hangzhou");
     this.roleArn = getFromEnvOrDefault("GRAVITINO_OSS_ROLE_ARN", "{ROLE_ARN}");
     this.externalId = getFromEnvOrDefault("GRAVITINO_OSS_EXTERNAL_ID", "");
 
@@ -63,7 +63,7 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     try {
       downloadIcebergForAliyunJar();
     } catch (IOException e) {
-      LOG.warn("Download Iceberg AWS bundle jar failed,", e);
+      LOG.warn("Download Iceberg Aliyun bundle jar failed,", e);
       throw new RuntimeException(e);
     }
     copyAliyunOSSJar();
@@ -125,7 +125,7 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
   private void copyAliyunOSSJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aws-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
   }
 
   private String getFromEnvOrDefault(String envVar, String defaultValue) {

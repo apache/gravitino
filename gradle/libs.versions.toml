@@ -113,7 +113,6 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
-aliyun-kms = "2.16.0"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -267,7 +266,6 @@ google-auth-http = { group = "com.google.auth", name = "google-auth-library-oaut
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
-aliyun-kms-sdk = { group='com.aliyun', name='aliyun-java-sdk-kms', version.ref = 'aliyun-kms' }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]

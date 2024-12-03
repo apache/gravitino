@@ -81,35 +81,23 @@ public class Statement {
     }
   }
 
+  @SuppressWarnings("unused")
   public String getEffect() {
     return effect;
   }
 
-  public void setEffect(String effect) {
-    this.effect = effect;
-  }
-
+  @SuppressWarnings("unused")
   public List<String> getActions() {
     return actions;
   }
 
-  public void setActions(List<String> actions) {
-    this.actions = actions;
-  }
-
+  @SuppressWarnings("unused")
   public List<String> getResources() {
     return resources;
   }
 
-  public void setResources(List<String> resources) {
-    this.resources = resources;
-  }
-
+  @SuppressWarnings("unused")
   public Condition getCondition() {
     return condition;
-  }
-
-  public void setCondition(Condition condition) {
-    this.condition = condition;
   }
 }

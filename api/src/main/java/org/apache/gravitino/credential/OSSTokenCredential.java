@@ -29,11 +29,11 @@ public class OSSTokenCredential implements Credential {
 
   /** OSS token credential type. */
   public static final String OSS_TOKEN_CREDENTIAL_TYPE = "oss-token";
-  /** OSS session access key ID used to access OSS data. */
+  /** OSS access key ID used to access OSS data. */
   public static final String GRAVITINO_OSS_SESSION_ACCESS_KEY_ID = "oss-access-key-id";
-  /** OSS session secret access key used to access OSS data. */
+  /** OSS secret access key used to access OSS data. */
   public static final String GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY = "oss-secret-access-key";
-  /** OSS session token. */
+  /** OSS security token. */
   public static final String GRAVITINO_OSS_TOKEN = "oss-security-token";
 
   private final String accessKeyId;
@@ -42,12 +42,12 @@ public class OSSTokenCredential implements Credential {
   private final long expireTimeInMS;
 
   /**
-   * Constructs an instance of {@link OSSTokenCredential} with session secret key and token.
+   * Constructs an instance of {@link OSSTokenCredential} with secret key and token.
    *
-   * @param accessKeyId The oss session access key ID.
-   * @param secretAccessKey The oss session secret access key.
+   * @param accessKeyId The oss access key ID.
+   * @param secretAccessKey The oss secret access key.
    * @param securityToken The oss security token.
-   * @param expireTimeInMS The oss session token expire time in ms.
+   * @param expireTimeInMS The oss token expire time in ms.
    */
   public OSSTokenCredential(
       String accessKeyId, String secretAccessKey, String securityToken, long expireTimeInMS) {
@@ -84,7 +84,7 @@ public class OSSTokenCredential implements Credential {
   }
 
   /**
-   * Get oss session access key ID.
+   * Get oss access key ID.
    *
    * @return The oss access key ID.
    */
@@ -93,7 +93,7 @@ public class OSSTokenCredential implements Credential {
   }
 
   /**
-   * Get oss session secret access key.
+   * Get oss secret access key.
    *
    * @return The oss secret access key.
    */
@@ -102,9 +102,9 @@ public class OSSTokenCredential implements Credential {
   }
 
   /**
-   * Get oss session token.
+   * Get oss security token.
    *
-   * @return The oss session token.
+   * @return The oss security token.
    */
   public String securityToken() {
     return securityToken;
