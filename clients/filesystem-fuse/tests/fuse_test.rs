@@ -22,6 +22,7 @@ use log::info;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -30,6 +31,7 @@ use tokio::runtime::Runtime;
 struct FuseTest {
     server: Arc<FuseServer>,
     runtime: Arc<Runtime>,
+    mount_point: String,
 }
 
 impl FuseTest {
@@ -38,7 +40,7 @@ impl FuseTest {
         let svr = self.server.clone();
         self.runtime.spawn(async move { svr.start().await });
 
-        let success = Self::wait_for_fuse_server_ready("gvfs", Duration::from_secs(15));
+        let success = Self::wait_for_fuse_server_ready(&self.mount_point, Duration::from_secs(15));
         assert!(success, "Fuse server cannot start up at 15 seconds");
     }
 
@@ -71,48 +73,50 @@ impl Drop for FuseTest {
     }
 }
 
-fn test_fuse_filesystem() {
+fn test_fuse_filesystem(mount_point: &str) {
+    let base_path = Path::new(mount_point);
+
     //test create file
-    let test_file = "gvfs/test_create";
-    let file = File::create(test_file).expect("Failed to create file");
+    let test_file = base_path.join("test_create");
+    let file = File::create(&test_file).expect("Failed to create file");
     assert!(file.metadata().is_ok(), "Failed to get file metadata");
-    assert!(fs::exists(test_file).expect("File is not created"));
+    assert!(fs::exists(&test_file).expect("File is not created"));
 
     //test write file
-    fs::write(test_file, "read test").expect("Failed to write file");
+    fs::write(&test_file, "read test").expect("Failed to write file");
 
     //test read file
-    let content = fs::read_to_string(test_file).expect("Failed to read file");
+    let content = fs::read_to_string(test_file.clone()).expect("Failed to read file");
     assert_eq!(content, "read test", "File content mismatch");
 
     //test delete file
-    fs::remove_file(test_file).expect("Failed to delete file");
+    fs::remove_file(test_file.clone()).expect("Failed to delete file");
     assert!(!fs::exists(test_file).expect("File is not deleted"));
 
     //test create directory
-    let test_dir = "gvfs/test_dir";
-    fs::create_dir(test_dir).expect("Failed to create directory");
+    let test_dir = base_path.join("test_dir");
+    fs::create_dir(&test_dir).expect("Failed to create directory");
 
     //test create file in directory
-    let test_file = "gvfs/test_dir/test_file";
-    let file = File::create(test_file).expect("Failed to create file");
+    let test_file = base_path.join("test_dir/test_file");
+    let file = File::create(&test_file).expect("Failed to create file");
     assert!(file.metadata().is_ok(), "Failed to get file metadata");
 
     //test write file in directory
-    let test_file = "gvfs/test_dir/test_read";
-    fs::write(test_file, "read test").expect("Failed to write file");
+    let test_file = base_path.join("test_dir/test_read");
+    fs::write(&test_file, "read test").expect("Failed to write file");
 
     //test read file in directory
-    let content = fs::read_to_string(test_file).expect("Failed to read file");
+    let content = fs::read_to_string(&test_file).expect("Failed to read file");
     assert_eq!(content, "read test", "File content mismatch");
 
     //test delete file in directory
-    fs::remove_file(test_file).expect("Failed to delete file");
-    assert!(!fs::exists(test_file).expect("File is not deleted"));
+    fs::remove_file(&test_file).expect("Failed to delete file");
+    assert!(!fs::exists(&test_file).expect("File is not deleted"));
 
     //test delete directory
-    fs::remove_dir_all(test_dir).expect("Failed to delete directory");
-    assert!(!fs::exists(test_dir).expect("Directory is not deleted"));
+    fs::remove_dir_all(&test_dir).expect("Failed to delete directory");
+    assert!(!fs::exists(&test_dir).expect("Directory is not deleted"));
 
     info!("Success test")
 }
@@ -121,11 +125,15 @@ fn test_fuse_filesystem() {
 fn test_fuse_system_with_auto() {
     tracing_subscriber::fmt().with_env_filter("debug").init();
 
+    let mount_point = "build/gvfs";
+    let _ = fs::create_dir_all(mount_point);
+
     let test = FuseTest {
-        server: Arc::new(FuseServer::new()),
+        server: Arc::new(FuseServer::new(mount_point)),
         runtime: Arc::new(Runtime::new().expect("")),
+        mount_point: mount_point.to_string(),
     };
     test.setup();
 
-    test_fuse_filesystem();
+    test_fuse_filesystem(mount_point);
 }

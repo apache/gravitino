@@ -32,7 +32,7 @@ use std::sync::Arc;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter("debug").init();
 
-    let server = Arc::new(FuseServer::new());
+    let server = Arc::new(FuseServer::new("gvfs"));
     let clone_server = server.clone();
     let v = tokio::spawn(async move { clone_server.start().await });
 

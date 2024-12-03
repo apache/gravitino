@@ -35,14 +35,18 @@ pub struct FuseServer {
 
     // Shared handle to manage FUSE unmounting
     mount_handle: Arc<Mutex<Option<MountHandle>>>, // Shared handle to manage FUSE unmounting
+
+    // Mount point of the FUSE filesystem
+    mount_point: String,
 }
 
 impl FuseServer {
     /// Creates a new instance of `FuseServer`.
-    pub fn new() -> Self {
+    pub fn new(mount_point: &str) -> Self {
         Self {
             close_notify: Arc::new(Notify::new()),
             mount_handle: Arc::new(Mutex::new(None)),
+            mount_point: mount_point.to_string(),
         }
     }
 
@@ -53,13 +57,21 @@ impl FuseServer {
         let gid = unsafe { libc::getgid() };
         let fs_context = crate::filesystem::FileSystemContext { uid: uid, gid: gid };
         let fuse_fs = FuseApiHandle::new(fs, fs_context);
-        let mount_path = "gvfs";
 
-        info!("Starting FUSE filesystem and mounting at {}", mount_path);
+        //check if the mount point exists
+        if !std::path::Path::new(&self.mount_point).exists() {
+            error!("Mount point {} does not exist", self.mount_point);
+            exit(libc::ENOENT);
+        }
+
+        info!(
+            "Starting FUSE filesystem and mounting at {}",
+            self.mount_point
+        );
 
         let mount_options = MountOptions::default();
         let mount_handle = Session::new(mount_options)
-            .mount_with_unprivileged(fuse_fs, mount_path)
+            .mount_with_unprivileged(fuse_fs, &self.mount_point)
             .await?;
 
         {
