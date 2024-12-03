@@ -67,3 +67,14 @@ tasks.jar {
   from(dependencies)
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    // Exclude integration tests
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(tasks.jar)
+    dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
+  }
+}
