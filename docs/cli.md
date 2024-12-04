@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, and tables. Future updates will expand on these capabilities to include roles, users, and tags.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
@@ -27,10 +27,16 @@ Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash
- usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
- Options
+  usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+  Options
+ usage: gcli
  -a,--audit              display audit information
+    --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
+    --columnfile <arg>   CSV file describing columns
+ -d,--distribution       display distribution information
+    --datatype <arg>     column data type
+    --default <arg>      default column value
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
@@ -38,8 +44,13 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+    --null <arg>         column value can be null (true/false)
+ -o,--owner              display entity owner
+    --output <arg>       output format (plain/table)
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
+    --partition          display partition information
+    --position <arg>     position of column
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -47,6 +58,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
+ -x,--index              display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
  ```
@@ -203,13 +215,13 @@ gcli metalake delete
 #### Rename a metalake
 
 ```bash
-gcli metalake update  --rename demo
+gcli metalake update --rename demo
 ```
 
 #### Update a metalake's comment
 
 ```bash
-gcli metalake update  --comment "new comment"
+gcli metalake update --comment "new comment"
 ```
 
 #### Display a metalake's properties
@@ -221,13 +233,13 @@ gcli metalake properties
 #### Set a metalake's property
 
 ```bash
-gcli metalake set  --property test --value value
+gcli metalake set --property test --value value
 ```
 
 #### Remove a metalake's property
 
 ```bash
-gcli metalake remove  --property test
+gcli metalake remove --property test
 ```
 
 ### Catalog commands
@@ -356,6 +368,16 @@ Setting and removing schema properties is not currently supported by the Java AP
 
 ### Table commands
 
+When creating a table the columns are specified in CSV file specifying the name of the column, the datatype, a comment, true or false if the column is nullable, true or false if the column is auto incremented, a default value and a default type. Not all of the columns need to be specifed just the name and datatype columns. If not specified comment default to null, nullability to true and auto increment to false. If only the default value is specified it defaults to the same data type as the column.
+
+Example CSV file
+```text
+Name,Datatype,Comment,Nullable,AutoIncrement,DefaultValue,DefaultType
+name,String,person's name
+ID,Integer,unique id,false,true
+location,String,city they work in,false,false,Sydney,String
+```
+
 #### Show all tables
 
 ```bash
@@ -384,6 +406,11 @@ gcli table details --name catalog_postgres.hr.departments --distribution
 gcli table details --name catalog_postgres.hr.departments --partition
 ```
 
+#### Show tables sort order information
+```bash
+gcli table details --name catalog_postgres.hr.departments --sortorder
+```
+
 ### Show table indexes
 
 ```bash
@@ -394,6 +421,31 @@ gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 
 ```bash
 gcli table delete --name catalog_postgres.hr.salaries
+```
+
+
+#### Display a tables's properties
+
+```bash
+gcli table properties --name catalog_postgres.hr.salaries
+```
+
+#### Set a tables's property
+
+```bash
+gcli table set --name catalog_postgres.hr.salaries --property test --value value
+```
+
+#### Remove a tables's property
+
+```bash
+gcli table remove --name catalog_postgres.hr.salaries --property test
+```
+
+#### Create a table
+
+```bash
+gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
 ```
 
 ### User commands
@@ -446,7 +498,7 @@ gcli group list
 
 ```bash
 gcli group delete --group new_group
- ```
+```
 
 ### Tag commands
 
@@ -522,6 +574,26 @@ gcli tag update --tag tagA --rename newTag
 gcli tag update --tag tagA --comment "new comment"
 ```
 
+### Owner commands
+
+#### List an owner
+
+```bash
+gcli catalog details --owner --name postgres
+```
+
+#### Set an owner to a user
+
+```bash
+gcli catalog set --owner --user admin --name postgres
+```
+
+#### Set an owner to a group
+
+```bash
+gcli catalog set --owner --group groupA --name postgres
+```
+
 ### Role commands
 
 #### Display role details
@@ -568,5 +640,144 @@ gcli group grant --group groupA --role admin
 
 #### Remove a role from a group
 ```bash
-gcli group revoke  --group groupA --role admin
+gcli group revoke --group groupA --role admin
+```
+
+### Topic commands
+
+#### Display a topic's details
+
+```bash
+gcli topic details --name kafka.default.topic3
+```
+
+#### Create a tag
+
+```bash
+gcli topic create --name kafka.default.topic3
+```
+
+#### List all topics
+
+```bash
+gcli topic list --name kafka.default
+```
+
+#### Delete a topic
+
+```bash
+gcli topic delete --name kafka.default.topic3
+```
+
+#### Change a topic's comment
+
+```bash
+gcli topic update --name kafka.default.topic3 --comment new_comment
+```
+
+#### Display a topics's properties
+
+```bash
+gcli topic properties --name kafka.default.topic3
+```
+
+#### Set a topics's property
+
+```bash
+gcli topic set --name kafka.default.topic3 --property test --value value
+```
+
+#### Remove a topics's property
+
+```bash
+gcli topic remove --name kafka.default.topic3 --property test
+```
+
+### Fileset commands
+
+#### Create a fileset
+
+```bash
+gcli fileset create --name hadoop.schema.fileset --properties managed=true,location=file:/tmp/root/schema/example
+```
+
+#### List filesets
+
+```bash
+gcli fileset list --name hadoop.schema
+```
+
+#### Display a fileset's details
+
+```bash
+gcli fileset details --name hadoop.schema.fileset
+```
+
+#### Delete a fileset
+
+```bash
+gcli fileset delete --name hadoop.schema.fileset
+```
+
+#### Update a fileset's comment
+
+```bash
+gcli fileset update --name hadoop.schema.fileset --comment new_comment
+```
+
+#### Rename a fileset
+
+```bash
+gcli fileset update --name hadoop.schema.fileset --rename new_name
+```
+
+#### Display a fileset's properties
+
+```bash
+gcli fileset properties --name hadoop.schema.fileset 
+```
+
+#### Set a fileset's property
+
+```bash
+gcli fileset set  --name hadoop.schema.fileset --property test --value value
+```
+
+#### Remove a fileset's property
+
+```bash
+gcli fileset remove --name hadoop.schema.fileset --property test
+```
+
+### column commands
+
+Note that some commands are not supported depending on what the database supports.
+
+When setting the datatype of a column the following basic types are currently supported:
+null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
+
+In addition decimal(precision,scale) and varchar(length).
+
+#### Add a column
+
+```bash
+gcli column create --name catalog_postgres.hr.departments.value --datatype long
+gcli column create --name catalog_postgres.hr.departments.money --datatype "decimal(10,2)"
+gcli column create --name catalog_postgres.hr.departments.name --datatype "varchar(100)"
+gcli column create --name catalog_postgres.hr.departments.fullname --datatype "varchar(250)" --default "Fred Smith" --null=false
+```
+
+#### Delete a column
+
+```bash
+gcli  column delete --name catalog_postgres.hr.departments.money
+```
+
+#### Update a column
+
+```bash
+gcli column update --name catalog_postgres.hr.departments.value --rename values
+gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
+gcli column update --name catalog_postgres.hr.departments.values --position name
+gcli column update --name catalog_postgres.hr.departments.name --null=true
 ```

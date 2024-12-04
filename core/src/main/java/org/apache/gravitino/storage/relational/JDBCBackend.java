@@ -42,6 +42,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -54,6 +55,7 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -111,6 +113,8 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) RoleMetaService.getInstance().listRolesByNamespace(namespace);
       case GROUP:
         return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace, allFields);
+      case MODEL:
+        return (List<E>) ModelMetaService.getInstance().listModelsByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -150,6 +154,8 @@ public class JDBCBackend implements RelationalBackend {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
     } else if (e instanceof TagEntity) {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
+    } else if (e instanceof ModelEntity) {
+      ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -212,6 +218,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       case TAG:
         return (E) TagMetaService.getInstance().getTagByIdentifier(ident);
+      case MODEL:
+        return (E) ModelMetaService.getInstance().getModelByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -242,6 +250,8 @@ public class JDBCBackend implements RelationalBackend {
         return RoleMetaService.getInstance().deleteRole(ident);
       case TAG:
         return TagMetaService.getInstance().deleteTag(ident);
+      case MODEL:
+        return ModelMetaService.getInstance().deleteModel(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
@@ -295,10 +305,13 @@ public class JDBCBackend implements RelationalBackend {
       case COLUMN:
         return TableColumnMetaService.getInstance()
             .deleteColumnsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-      case AUDIT:
       case MODEL:
+        return ModelMetaService.getInstance()
+            .deleteModelMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case MODEL_VERSION:
         // TODO (jerryshao): Implement hard delete logic for these entity types.
+      case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
 

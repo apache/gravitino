@@ -16,15 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
 
-import org.apache.gravitino.authorization.Privilege;
+package org.apache.gravitino.cli;
 
-/** RangerPrivilege interface is used to define the Ranger privileges. */
-public interface RangerPrivilege {
-  String getName();
+import org.apache.gravitino.rel.TableChange;
 
-  Privilege.Condition condition();
+public class PositionConverter {
 
-  boolean equalsTo(String value);
+  /**
+   * Converts a position string to the appropriate position.
+   *
+   * @param position The string representing the position i.e. "first" or a column name.
+   * @return An instance of the appropriate position.
+   * @throws IllegalArgumentException if the type name is not recognized.
+   */
+  public static TableChange.ColumnPosition convert(String position) {
+
+    if (position == null || position.isEmpty()) {
+      return TableChange.ColumnPosition.defaultPos();
+    } else if (position.equalsIgnoreCase("first")) {
+      return TableChange.ColumnPosition.first();
+    } else {
+      return TableChange.ColumnPosition.after(position);
+    }
+  }
 }

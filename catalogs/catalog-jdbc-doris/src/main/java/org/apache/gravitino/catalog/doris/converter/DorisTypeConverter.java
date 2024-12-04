@@ -59,7 +59,7 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case DATETIME:
-        return Types.TimestampType.withTimeZone();
+        return Types.TimestampType.withoutTimeZone();
       case CHAR:
         return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
       case VARCHAR:

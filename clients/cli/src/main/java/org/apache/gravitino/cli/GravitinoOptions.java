@@ -40,12 +40,22 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String DATATYPE = "datatype";
+  public static final String POSITION = "position";
+  public static final String NULL = "null";
+  public static final String AUTO = "auto";
+  public static final String DEFAULT = "default";
+  public static final String FILESET = "fileset";
+  public static final String OWNER = "owner";
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
-  public static final String INDEX = "index";
   public static final String FORCE = "force";
+  public static final String COLUMNFILE = "columnfile";
+  public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
+  public static final String OUTPUT = "output";
+  public static final String SORTORDER = "sortorder";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -64,12 +74,14 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
-    options.addOption(createSimpleOption("x", INDEX, "Display index infromation"));
-    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
-    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
+    options.addOption(createSimpleOption("x", INDEX, "display index information"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
+    options.addOption(createSimpleOption(PARTITION, "display partition information"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+    options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
 
     // Create/update options
-    options.addOption(createArgOption(null, RENAME, "new entity name"));
+    options.addOption(createArgOption(RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));
     options.addOption(createArgOption("V", VALUE, "property value"));
@@ -78,16 +90,23 @@ public class GravitinoOptions {
             "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgsOption("t", TAG, "tag name"));
+    options.addOption(createArgOption(DATATYPE, "column data type"));
+    options.addOption(createArgOption(POSITION, "position of column"));
+    options.addOption(createArgOption(NULL, "column value can be null (true/false)"));
+    options.addOption(createArgOption(AUTO, "column value auto-increments (true/false)"));
+    options.addOption(createArgOption(DEFAULT, "default column value"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
+    options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
-    // Properties option can have multiple values
-    Option properties =
-        Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
-    options.addOption(properties);
+    // Properties and tags can have multiple values
+    options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
+    options.addOption(createArgsOption("t", TAG, "tag name"));
 
-    // Force delete entity and rename metalake operations
+    // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
+
+    options.addOption(createArgOption(OUTPUT, "output format (plain/table)"));
 
     return options;
   }
@@ -105,6 +124,17 @@ public class GravitinoOptions {
   }
 
   /**
+   * Helper method to create an Option that does not require arguments.
+   *
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
+  public Option createSimpleOption(String longName, String description) {
+    return new Option(null, longName, false, description);
+  }
+
+  /**
    * Helper method to create an Option that requires an argument.
    *
    * @param shortName The option name as a single letter
@@ -116,8 +146,26 @@ public class GravitinoOptions {
     return new Option(shortName, longName, true, description);
   }
 
+  /**
+   * Helper method to create an Option that requires an argument.
+   *
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
+  public Option createArgOption(String longName, String description) {
+    return new Option(null, longName, true, description);
+  }
+
+  /**
+   * Helper method to create an Option that requires multiple argument.
+   *
+   * @param shortName The option name as a single letter
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
   public Option createArgsOption(String shortName, String longName, String description) {
-    // Support multiple arguments
     return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
   }
 }

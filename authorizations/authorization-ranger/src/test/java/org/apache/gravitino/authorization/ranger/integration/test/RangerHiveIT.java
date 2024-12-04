@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
@@ -339,8 +340,8 @@ public class RangerHiveIT {
         Lists.newArrayList(String.format("%s3", dbName), "tab*"),
         GravitinoITUtils.genRandomName(currentFunName()));
     // findManagedPolicy function use precise search, so return null
-    RangerSecurableObject rangerSecurableObject =
-        rangerAuthHivePlugin.generateRangerSecurableObject(
+    AuthorizationSecurableObject rangerSecurableObject =
+        rangerAuthHivePlugin.generateAuthorizationSecurableObject(
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
             RangerMetadataObject.Type.TABLE,
             ImmutableSet.of(
@@ -1825,7 +1826,7 @@ public class RangerHiveIT {
    * @param rangerSecurableObject: the Ranger securable object to be verified
    */
   private void verifyRangerSecurableObjectInRanger(
-      RangerSecurableObject rangerSecurableObject,
+      AuthorizationSecurableObject rangerSecurableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
@@ -1937,24 +1938,26 @@ public class RangerHiveIT {
             });
   }
 
-  private void verifyRangerSecurableObjectInRanger(RangerSecurableObject securableObject) {
+  private void verifyRangerSecurableObjectInRanger(AuthorizationSecurableObject securableObject) {
     verifyRangerSecurableObjectInRanger(securableObject, null, null, null, null, null, null);
   }
 
   private void verifyRangerSecurableObjectInRanger(
-      RangerSecurableObject securableObject, List<String> includeUsers) {
+      AuthorizationSecurableObject securableObject, List<String> includeUsers) {
     verifyRangerSecurableObjectInRanger(
         securableObject, includeUsers, null, null, null, null, null);
   }
 
   private void verifyRangerSecurableObjectInRanger(
-      RangerSecurableObject securableObject, List<String> includeUsers, List<String> excludeUsers) {
+      AuthorizationSecurableObject securableObject,
+      List<String> includeUsers,
+      List<String> excludeUsers) {
     verifyRangerSecurableObjectInRanger(
         securableObject, includeUsers, excludeUsers, null, null, null, null);
   }
 
   private void verifyRangerSecurableObjectInRanger(
-      RangerSecurableObject securableObject,
+      AuthorizationSecurableObject securableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups) {
@@ -1963,7 +1966,7 @@ public class RangerHiveIT {
   }
 
   private void verifyRangerSecurableObjectInRanger(
-      RangerSecurableObject securableObject,
+      AuthorizationSecurableObject securableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
@@ -1973,7 +1976,7 @@ public class RangerHiveIT {
   }
 
   private void verifyRangerSecurableObjectInRanger(
-      RangerSecurableObject securableObject,
+      AuthorizationSecurableObject securableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,

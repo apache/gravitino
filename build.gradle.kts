@@ -31,6 +31,8 @@ import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
 import java.util.Locale
 
+Locale.setDefault(Locale.US)
+
 plugins {
   `maven-publish`
   id("java")
@@ -172,7 +174,7 @@ allprojects {
       param.environment("PROJECT_VERSION", project.version)
 
       // Gravitino CI Docker image
-      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.14")
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.16")
       param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
@@ -413,6 +415,8 @@ subprojects {
           artifact(javadocJar)
         }
 
+        artifactId = "${rootProject.name.lowercase()}-${project.name}"
+
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
@@ -488,7 +492,7 @@ subprojects {
   version = "$version"
 
   tasks.withType<Jar> {
-    archiveBaseName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}")
+    archiveBaseName.set("${rootProject.name.lowercase()}-${project.name}")
     if (project.name == "server") {
       from(sourceSets.main.get().resources)
       setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
@@ -547,6 +551,7 @@ tasks.rat {
     "clients/client-python/tests/integration/htmlcov/*",
     "clients/client-python/docs/build",
     "clients/client-python/docs/source/generated",
+    "clients/cli/src/main/resources/*.txt",
     "clients/filesystem-fuse/Cargo.lock"
   )
 
@@ -964,7 +969,7 @@ fun checkOrbStackStatus() {
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
       println("Current docker context is: $currentContext")
-      project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
+      project.extra["isOrbStack"] = currentContext.lowercase().contains("orbstack")
     } else {
       println("checkOrbStackStatus Command execution failed with exit code $exitCode")
     }

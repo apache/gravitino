@@ -16,26 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.authorization.ranger;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.annotation.Unstable;
+import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
-/**
- * The Ranger MetadataObject is the basic unit of the Gravitino system. It represents the Apache
- * Ranger metadata object in the Apache Gravitino system. The object can be a catalog, schema,
- * table, column, etc.
- */
-@Unstable
-public interface RangerMetadataObject {
+/** The helper class for {@link AuthorizationMetadataObject}. */
+public class RangerMetadataObject implements AuthorizationMetadataObject {
   /**
    * The type of object in the Ranger system. Every type will map one kind of the entity of the
    * Gravitino type system.
    */
-  enum Type {
+  public enum Type implements AuthorizationMetadataObject.Type {
     /** A schema is a sub collection of the catalog. The schema can contain tables, columns, etc. */
     SCHEMA(MetadataObject.Type.SCHEMA),
     /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
@@ -51,13 +45,13 @@ public interface RangerMetadataObject {
       this.metadataType = type;
     }
 
-    public MetadataObject.Type getMetadataType() {
+    public MetadataObject.Type metadataObjectType() {
       return metadataType;
     }
 
     public static Type fromMetadataType(MetadataObject.Type metadataType) {
       for (Type type : Type.values()) {
-        if (type.getMetadataType() == metadataType) {
+        if (type.metadataObjectType() == metadataType) {
           return type;
         }
       }
@@ -66,47 +60,97 @@ public interface RangerMetadataObject {
     }
   }
 
-  /**
-   * The parent full name of the object. If the object doesn't have parent, this method will return
-   * null.
-   *
-   * @return The parent full name of the object.
-   */
-  @Nullable
-  String parent();
+  /** The implementation of the {@link MetadataObject}. */
+  private final String name;
+
+  private final String parent;
+
+  private final AuthorizationMetadataObject.Type type;
 
   /**
-   * The name of the object.
+   * Create the metadata object with the given name, parent and type.
    *
-   * @return The name of the object.
+   * @param parent The parent of the metadata object
+   * @param name The name of the metadata object
+   * @param type The type of the metadata object
    */
-  String name();
+  public RangerMetadataObject(String parent, String name, AuthorizationMetadataObject.Type type) {
+    this.parent = parent;
+    this.name = name;
+    this.type = type;
+  }
 
-  /**
-   * The all name list of the object.
-   *
-   * @return The name list of the object.
-   */
-  List<String> names();
+  @Override
+  public String name() {
+    return name;
+  }
 
-  /**
-   * The full name of the object. Full name will be separated by "." to represent a string
-   * identifier of the object, like catalog, catalog.table, etc.
-   *
-   * @return The name of the object.
-   */
-  default String fullName() {
-    if (parent() == null) {
-      return name();
-    } else {
-      return parent() + "." + name();
+  @Override
+  public List<String> names() {
+    return DOT_SPLITTER.splitToList(fullName());
+  }
+
+  @Override
+  public String parent() {
+    return parent;
+  }
+
+  @Override
+  public AuthorizationMetadataObject.Type type() {
+    return type;
+  }
+
+  @Override
+  public void validateAuthorizationMetadataObject() throws IllegalArgumentException {
+    List<String> names = names();
+    Preconditions.checkArgument(
+        names != null && !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
+    Preconditions.checkArgument(
+        names.size() <= 3,
+        "Cannot create a Ranger metadata object with the name length which is greater than 3");
+    Preconditions.checkArgument(
+        type != null, "Cannot create a Ranger metadata object with no type");
+
+    Preconditions.checkArgument(
+        names.size() != 1 || type == RangerMetadataObject.Type.SCHEMA,
+        "If the length of names is 1, it must be the SCHEMA type");
+
+    Preconditions.checkArgument(
+        names.size() != 2 || type == RangerMetadataObject.Type.TABLE,
+        "If the length of names is 2, it must be the TABLE type");
+
+    Preconditions.checkArgument(
+        names.size() != 3 || type == RangerMetadataObject.Type.COLUMN,
+        "If the length of names is 3, it must be COLUMN");
+
+    for (String name : names) {
+      Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     }
   }
 
-  /**
-   * The type of the object.
-   *
-   * @return The type of the object.
-   */
-  Type type();
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof RangerMetadataObject)) {
+      return false;
+    }
+
+    RangerMetadataObject that = (RangerMetadataObject) o;
+    return java.util.Objects.equals(name, that.name)
+        && java.util.Objects.equals(parent, that.parent)
+        && type == that.type;
+  }
+
+  @Override
+  public int hashCode() {
+    return java.util.Objects.hash(name, parent, type);
+  }
+
+  @Override
+  public String toString() {
+    return "MetadataObject: [fullName=" + fullName() + "], [type=" + type + "]";
+  }
 }

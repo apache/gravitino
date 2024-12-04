@@ -63,4 +63,24 @@
     <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider,com.amazonaws.auth.EnvironmentVariableCredentialsProvider,org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider</value>
   </property>
 
+  <property>
+    <name>fs.abfss.impl</name>
+    <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
+  </property>
+
+  <property>
+    <name>fs.azure.account.key.ABS_ACCOUNT_NAME.dfs.core.windows.net</name>
+    <value>ABS_ACCOUNT_KEY</value>
+  </property>
+
+  <property>
+    <name>fs.gs.auth.service.account.enable</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>fs.gs.auth.service.account.json.keyfile</name>
+    <value>SERVICE_ACCOUNT_FILE</value>
+  </property>
+
 </configuration>

@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization;
 
-import java.util.List;
+/** AuthorizationPrivilege interface is used to define the underlying data source privileges. */
+public interface AuthorizationPrivilege {
+  String getName();
 
-/** Different underlying datasource have different Ranger metadata object rules */
-interface RangerMetadataObjectRule {
-  /** Validate different underlying datasource Ranger metadata object */
-  void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
-      throws IllegalArgumentException;
+  Privilege.Condition condition();
+
+  boolean equalsTo(String value);
 }
