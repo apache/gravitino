@@ -28,7 +28,6 @@ import com.google.common.collect.Streams;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,8 +44,8 @@ public class FileSystemUtils {
     Set<String> providersInUses =
         fileSystemProviders != null
             ? Arrays.stream(fileSystemProviders.split(","))
-            .map(f -> f.trim().toLowerCase(Locale.ROOT))
-            .collect(java.util.stream.Collectors.toSet())
+                .map(f -> f.trim().toLowerCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.toSet())
             : Sets.newHashSet();
 
     // Add built-in file system providers to the use list automatically.
