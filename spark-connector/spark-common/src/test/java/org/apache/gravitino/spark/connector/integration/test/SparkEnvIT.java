@@ -30,6 +30,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
@@ -49,8 +51,10 @@ import org.slf4j.LoggerFactory;
 public abstract class SparkEnvIT extends SparkUtilIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected static final TestDatabaseName TEST_DB_NAME =
+      TestDatabaseName.PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD;
+  protected static MySQLContainer mySQLContainer;
   protected static final String icebergRestServiceName = "iceberg-rest";
   protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
   protected String warehouse;

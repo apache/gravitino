@@ -31,18 +31,22 @@ public class PaimonPropertiesConstants {
 
   public static final String GRAVITINO_PAIMON_CATALOG_URI = PaimonConstants.URI;
   static final String PAIMON_CATALOG_URI = PaimonConstants.URI;
-  static final String GRAVITINO_PAIMON_CATALOG_JDBC_USER = PaimonConstants.GRAVITINO_JDBC_USER;
+  public static final String GRAVITINO_PAIMON_CATALOG_JDBC_USER =
+      PaimonConstants.GRAVITINO_JDBC_USER;
   static final String PAIMON_CATALOG_JDBC_USER = PaimonConstants.PAIMON_JDBC_USER;
 
-  static final String GRAVITINO_PAIMON_CATALOG_JDBC_PASSWORD =
+  public static final String GRAVITINO_PAIMON_CATALOG_JDBC_PASSWORD =
       PaimonConstants.GRAVITINO_JDBC_PASSWORD;
   static final String PAIMON_CATALOG_JDBC_PASSWORD = PaimonConstants.PAIMON_JDBC_PASSWORD;
+
+  public static final String GRAVITINO_PAIMON_CATALOG_JDBC_DRIVER =
+      PaimonConstants.GRAVITINO_JDBC_DRIVER;
 
   public static final String PAIMON_CATALOG_BACKEND_HIVE = "hive";
   static final String GRAVITINO_PAIMON_CATALOG_BACKEND_HIVE = "hive";
 
+  public static final String PAIMON_CATALOG_BACKEND_JDBC = "jdbc";
   static final String GRAVITINO_PAIMON_CATALOG_BACKEND_JDBC = "jdbc";
-  static final String PAIMON_CATALOG_BACKEND_JDBC = "jdbc";
 
   public static final String PAIMON_CATALOG_BACKEND_FILESYSTEM = "filesystem";
   static final String GRAVITINO_PAIMON_CATALOG_BACKEND_FILESYSTEM = "filesystem";
