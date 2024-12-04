@@ -33,6 +33,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -a,--audit              display audit information
     --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
+    --columnfile <arg>   CSV file describing columns
  -d,--distribution       display distribution information
     --datatype <arg>     column data type
     --default <arg>      default column value
@@ -367,6 +368,16 @@ Setting and removing schema properties is not currently supported by the Java AP
 
 ### Table commands
 
+When creating a table the columns are specified in CSV file specifying the name of the column, the datatype, a comment, true or false if the column is nullable, true or false if the column is auto incremented, a default value and a default type. Not all of the columns need to be specifed just the name and datatype columns. If not specified comment default to null, nullability to true and auto increment to false. If only the default value is specified it defaults to the same data type as the column.
+
+Example CSV file
+```text
+Name,Datatype,Comment,Nullable,AutoIncrement,DefaultValue,DefaultType
+name,String,person's name
+ID,Integer,unique id,false,true
+location,String,city they work in,false,false,Sydney,String
+```
+
 #### Show all tables
 
 ```bash
@@ -431,6 +442,11 @@ gcli table set --name catalog_postgres.hr.salaries --property test --value value
 gcli table remove --name catalog_postgres.hr.salaries --property test
 ```
 
+#### Create a table
+
+```bash
+gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
+```
 
 ### User commands
 
