@@ -27,6 +27,7 @@ import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.paimon.spark.SparkCatalog;
+import org.apache.paimon.spark.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
