@@ -411,6 +411,32 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     }
   }
 
+  protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+          Identifier ident, String version) {
+    try {
+      return sparkCatalog.loadTable(ident, version);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+              String.format(
+                      "Failed to load the real sparkTable: %s",
+                      String.join(".", getDatabase(ident), ident.name())),
+              e);
+    }
+  }
+
+  protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+          Identifier ident, long timestamp) {
+    try {
+      return sparkCatalog.loadTable(ident, timestamp);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+              String.format(
+                      "Failed to load the real sparkTable: %s",
+                      String.join(".", getDatabase(ident), ident.name())),
+              e);
+    }
+  }
+
   protected String getDatabase(Identifier sparkIdentifier) {
     if (sparkIdentifier.namespace().length > 0) {
       return sparkIdentifier.namespace()[0];

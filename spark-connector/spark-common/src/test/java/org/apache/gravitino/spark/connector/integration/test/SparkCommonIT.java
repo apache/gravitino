@@ -1011,4 +1011,12 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String location = tableInfo.getTableLocation();
     Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
   }
+
+  protected long waitUntilAfter(Long timestampMillis) {
+    long current = System.currentTimeMillis();
+    while (current <= timestampMillis) {
+      current = System.currentTimeMillis();
+    }
+    return current;
+  }
 }

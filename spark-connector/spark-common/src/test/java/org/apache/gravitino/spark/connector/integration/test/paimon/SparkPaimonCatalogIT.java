@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
@@ -29,12 +30,12 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataC
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
+import org.apache.gravitino.spark.connector.paimon.SparkPaimonTable;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
-import org.apache.spark.sql.connector.catalog.CatalogPlugin;
-import org.apache.spark.sql.connector.catalog.FunctionCatalog;
-import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.connector.catalog.*;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -183,6 +184,63 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
                     });
   }
 
+  @Test
+  void testPaimonTimeTravelQuery() throws NoSuchTableException {
+    String tableName = "test_paimon_as_of_query";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+
+    sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    SparkPaimonTable sparkPaimonTable = getSparkPaimonTableInstance(tableName);
+    long snapshotId = getCurrentSnapshotId(tableName);
+    sparkPaimonTable.table().createTag("test_tag", snapshotId);
+    long snapshotTimestamp = getCurrentSnapshotTimestamp(tableName);
+    long timestamp = waitUntilAfter(snapshotTimestamp + 1000);
+    long timestampInSeconds = TimeUnit.MILLISECONDS.toSeconds(timestamp);
+
+    // create a second snapshot
+    sql(String.format("INSERT INTO %s VALUES (2, '2', 2)", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+
+    tableData =
+            getQueryData(
+                    String.format("SELECT * FROM %s TIMESTAMP AS OF %s", tableName, timestampInSeconds));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+    tableData =
+            getQueryData(
+                    String.format(
+                            "SELECT * FROM %s FOR SYSTEM_TIME AS OF %s", tableName, timestampInSeconds));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    tableData =
+            getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+    tableData =
+            getQueryData(
+                    String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF 'test_tag'", tableName));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+    tableData =
+            getQueryData(
+                    String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_tag'", tableName));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
   private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
@@ -300,5 +358,26 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
       new SparkMetadataColumnInfo("__paimon_file_path", DataTypes.StringType, true),
       new SparkMetadataColumnInfo("__paimon_row_index", DataTypes.LongType, true)
     };
+  }
+
+  private SparkPaimonTable getSparkPaimonTableInstance(String tableName)
+          throws NoSuchTableException {
+    CatalogPlugin catalogPlugin =
+            getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
+    TableCatalog catalog = (TableCatalog) catalogPlugin;
+    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+    return (SparkPaimonTable) table;
+  }
+
+  private long getCurrentSnapshotTimestamp(String tableName) throws NoSuchTableException {
+    SparkPaimonTable sparkPaimonTable = getSparkPaimonTableInstance(tableName);
+    long latestSnapshotId = getCurrentSnapshotId(tableName);
+    return sparkPaimonTable.table().snapshot(latestSnapshotId).timeMillis();
+  }
+
+  private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
+    SparkPaimonTable sparkPaimonTable = getSparkPaimonTableInstance(tableName);
+    return sparkPaimonTable.table().latestSnapshotId().getAsLong();
   }
 }

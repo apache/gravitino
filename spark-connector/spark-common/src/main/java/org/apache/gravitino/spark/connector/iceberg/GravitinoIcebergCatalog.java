@@ -186,30 +186,4 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     isSystemNamespace.setAccessible(true);
     return (Boolean) isSystemNamespace.invoke(baseCatalog, (Object) namespace);
   }
-
-  private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
-      Identifier ident, String version) {
-    try {
-      return sparkCatalog.loadTable(ident, version);
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              String.join(".", getDatabase(ident), ident.name())),
-          e);
-    }
-  }
-
-  private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
-      Identifier ident, long timestamp) {
-    try {
-      return sparkCatalog.loadTable(ident, timestamp);
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              String.join(".", getDatabase(ident), ident.name())),
-          e);
-    }
-  }
 }

@@ -1224,14 +1224,6 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     return sparkIcebergTable.table().currentSnapshot().snapshotId();
   }
 
-  private long waitUntilAfter(Long timestampMillis) {
-    long current = System.currentTimeMillis();
-    while (current <= timestampMillis) {
-      current = System.currentTimeMillis();
-    }
-    return current;
-  }
-
   @Data
   private static class IcebergTableWriteProperties {
 
