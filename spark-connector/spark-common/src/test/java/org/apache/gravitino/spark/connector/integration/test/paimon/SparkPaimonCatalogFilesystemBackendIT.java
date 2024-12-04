@@ -20,8 +20,6 @@ package org.apache.gravitino.spark.connector.integration.test.paimon;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -50,8 +48,7 @@ public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonC
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     // The database of the Paimon filesystem backend do not store any properties.
     Assertions.assertFalse(databaseMeta.containsKey("ID"));
-    Assertions.assertFalse(
-            databaseMeta.containsKey("comment"));
+    Assertions.assertFalse(databaseMeta.containsKey("comment"));
   }
 
   @Test
@@ -59,20 +56,21 @@ public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonC
   protected void testAlterSchema() {
     String testDatabaseName = "t_alter";
     dropDatabaseIfExists(testDatabaseName);
-    sql("CREATE DATABASE " + testDatabaseName + " COMMENT 'db comment' WITH DBPROPERTIES (ID=001);");
+    sql(
+        "CREATE DATABASE "
+            + testDatabaseName
+            + " COMMENT 'db comment' WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     // The database of the Paimon filesystem backend do not store any properties.
-    Assertions.assertFalse(
-            databaseMeta.get("Properties").contains("(ID,001)"));
-    Assertions.assertFalse(
-            databaseMeta.containsKey("Comment"));
+    Assertions.assertFalse(databaseMeta.get("Properties").contains("(ID,001)"));
+    Assertions.assertFalse(databaseMeta.containsKey("Comment"));
 
     // The Paimon filesystem backend do not support alter database operation.
     Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                    sql(
-                            String.format(
-                                    "ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName)));
+        UnsupportedOperationException.class,
+        () ->
+            sql(
+                String.format(
+                    "ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName)));
   }
 }

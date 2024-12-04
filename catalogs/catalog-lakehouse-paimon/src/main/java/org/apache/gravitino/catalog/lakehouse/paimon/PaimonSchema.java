@@ -19,10 +19,11 @@
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
+
+import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import com.google.common.collect.Maps;
 import lombok.ToString;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseSchema;
@@ -80,7 +81,8 @@ public class PaimonSchema extends BaseSchema {
       PaimonSchema paimonSchema = new PaimonSchema();
       paimonSchema.name = name;
 
-      Map<String, String> propertiesWithComment = Maps.newHashMap(Optional.ofNullable(properties).orElse(new HashMap<>()));
+      Map<String, String> propertiesWithComment =
+          Maps.newHashMap(Optional.ofNullable(properties).orElse(new HashMap<>()));
       if (comment != null) {
         paimonSchema.comment = comment;
         propertiesWithComment.put(PaimonSchemaPropertiesMetadata.COMMENT, comment);
