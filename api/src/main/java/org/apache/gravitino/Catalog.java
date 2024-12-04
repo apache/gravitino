@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
@@ -206,5 +207,13 @@ public interface Catalog extends Auditable {
    */
   default SupportsRoles supportsRoles() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support role operations");
+  }
+
+  /**
+   * @return the {@link SupportsCredentials} if the catalog supports credential operations.
+   * @throws UnsupportedOperationException if the catalog does not support credential operations.
+   */
+  default SupportsCredentials supportsCredentials() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support credential operations");
   }
 }

@@ -36,10 +36,10 @@ public class S3TokenCredential implements Credential {
   /** S3 session token. */
   public static final String GRAVITINO_S3_TOKEN = "s3-session-token";
 
-  private final String accessKeyId;
-  private final String secretAccessKey;
-  private final String sessionToken;
-  private final long expireTimeInMS;
+  private String accessKeyId;
+  private String secretAccessKey;
+  private String sessionToken;
+  private long expireTimeInMS;
 
   /**
    * Constructs an instance of {@link S3SecretKeyCredential} with session secret key and token.
@@ -64,6 +64,12 @@ public class S3TokenCredential implements Credential {
     this.expireTimeInMS = expireTimeInMS;
   }
 
+  /**
+   * This is the constructor that is used by CredentialProvider to create an instance of Credential
+   * according to the credential information.
+   */
+  public S3TokenCredential() {}
+
   @Override
   public String credentialType() {
     return S3_TOKEN_CREDENTIAL_TYPE;
@@ -81,6 +87,16 @@ public class S3TokenCredential implements Credential {
         .put(GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY, secretAccessKey)
         .put(GRAVITINO_S3_TOKEN, sessionToken)
         .build();
+  }
+
+  @Override
+  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        expireTimeInMs > 0, "The expire time of S3TokenCredential should great than 0");
+    this.expireTimeInMS = expireTimeInMs;
+    this.accessKeyId = credentialInfo.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
+    this.secretAccessKey = credentialInfo.get(GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY);
+    this.sessionToken = credentialInfo.get(GRAVITINO_S3_TOKEN);
   }
 
   /**

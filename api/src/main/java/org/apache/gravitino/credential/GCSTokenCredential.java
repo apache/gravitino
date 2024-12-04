@@ -33,8 +33,8 @@ public class GCSTokenCredential implements Credential {
   /** GCS credential property, token name. */
   public static final String GCS_TOKEN_NAME = "token";
 
-  private final String token;
-  private final long expireMs;
+  private String token;
+  private long expireMs;
 
   /**
    * @param token The GCS token.
@@ -46,6 +46,12 @@ public class GCSTokenCredential implements Credential {
     this.token = token;
     this.expireMs = expireMs;
   }
+
+  /**
+   * This is the constructor that is used by CredentialProvider to create an instance of Credential
+   * according to the credential information.
+   */
+  public GCSTokenCredential() {}
 
   @Override
   public String credentialType() {
@@ -60,6 +66,15 @@ public class GCSTokenCredential implements Credential {
   @Override
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>()).put(GCS_TOKEN_NAME, token).build();
+  }
+
+  @Override
+  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        credentialInfo != null && credentialInfo.containsKey(GCS_TOKEN_NAME),
+        "Credential info is not valid");
+    this.expireMs = expireTimeInMs;
+    this.token = credentialInfo.get(GCS_TOKEN_NAME);
   }
 
   /**
