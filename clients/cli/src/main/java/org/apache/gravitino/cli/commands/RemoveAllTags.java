@@ -1,0 +1,131 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.cli.commands;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.FullName;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.rel.Table;
+
+/* Removes all the tags of an entity. */
+public class RemoveAllTags extends Command {
+
+  protected String metalake;
+  protected FullName name;
+  protected final boolean force;
+
+  /**
+   * Removes all the tags of an entity
+   *
+   * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param name The name of the entity.
+   * @param force Force operation.
+   */
+  public RemoveAllTags(
+      String url, boolean ignoreVersions, String metalake, FullName name, boolean force) {
+    super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.name = name;
+    this.force = force;
+  }
+
+  @Override
+  public void handle() {
+    if (!AreYouSure.really(force)) {
+      return;
+    }
+    String[] tags = new String[0];
+    try {
+      GravitinoClient client = buildClient(metalake);
+
+      // TODO fileset and topic
+      if (name.hasTableName()) {
+        String catalog = name.getCatalogName();
+        String schema = name.getSchemaName();
+        String table = name.getTableName();
+        Table gTable =
+            client
+                .loadCatalog(catalog)
+                .asTableCatalog()
+                .loadTable(NameIdentifier.of(schema, table));
+        tags = gTable.supportsTags().listTags();
+      } else if (name.hasSchemaName()) {
+        String catalog = name.getCatalogName();
+        String schema = name.getSchemaName();
+        Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
+        tags = gSchema.supportsTags().listTags();
+      } else if (name.hasCatalogName()) {
+        String catalog = name.getCatalogName();
+        Catalog gCatalog = client.loadCatalog(catalog);
+        tags = gCatalog.supportsTags().listTags();
+      }
+      removeTags(client, tags);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+    } catch (NoSuchTableException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TABLE);
+    } catch (Exception exp) {
+      System.err.println(exp.getMessage());
+    }
+  }
+
+  private void removeTags(GravitinoClient client, String[] tags) {
+    List<String> deleted = new ArrayList<>();
+    try {
+      for (String tag : tags) {
+        if (client.deleteTag(tag)) {
+          deleted.add(tag);
+        }
+      }
+    } catch (NoSuchTagException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TAG);
+      return;
+    } catch (Exception exp) {
+      System.err.println(exp.getMessage());
+      return;
+    }
+    if (!deleted.isEmpty()) {
+      System.out.println("Tags " + String.join(",", deleted) + " deleted.");
+    }
+    if (deleted.size() < tags.length) {
+      List<String> remaining = Arrays.asList(tags);
+      remaining.removeAll(deleted);
+      System.out.println("Tags " + String.join(",", remaining) + " not deleted.");
+    }
+  }
+}

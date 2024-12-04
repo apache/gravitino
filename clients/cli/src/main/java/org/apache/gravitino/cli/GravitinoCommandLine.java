@@ -437,6 +437,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newTagEntity(url, ignore, metalake, name, tags).handle();
       }
     } else if (CommandActions.REMOVE.equals(command)) {
+      boolean isTag = line.hasOption(GravitinoOptions.TAG);
+      if (!isTag) {
+        boolean force = line.hasOption(GravitinoOptions.FORCE);
+        newRemoveAllTags(url, ignore, metalake, name, force).handle();
+      }
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       if (property != null) {
         newRemoveTagProperty(url, ignore, metalake, getOneTag(tags), property).handle();

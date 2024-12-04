@@ -562,6 +562,10 @@ gcli tag set --name catalog_postgres.hr --tag tagA tagB
 gcli tag remove --name catalog_postgres.hr --tag tagA tagB
 ```
 
+```bash
+gcli tag remove --name catalog_postgres.hr
+```
+
 #### List all tags on an entity
 
 ```bash
