@@ -440,7 +440,7 @@ gcli table remove --name catalog_postgres.hr.salaries --property test
 #### Create a table
 
 ```bash
-gcli table remove --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
+gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
 ```
 
 ### User commands
