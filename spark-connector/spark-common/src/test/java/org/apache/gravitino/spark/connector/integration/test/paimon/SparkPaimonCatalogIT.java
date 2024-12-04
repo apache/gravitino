@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
@@ -30,6 +31,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
@@ -111,6 +115,88 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     testPaimonListAndDropPartition();
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testPaimonMetadataColumns(boolean isPartitioned) {
+    testMetadataColumns();
+    testFilePathMetadataColumn(isPartitioned);
+    testRowIndexMetadataColumn(isPartitioned);
+  }
+
+  private void testMetadataColumns() {
+    String tableName = "test_metadata_columns";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+    sql(createTableSQL);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkMetadataColumnInfo[] metadataColumns = getPaimonMetadataColumns();
+    SparkTableInfoChecker checker =
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getPaimonSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
+    checker.check(tableInfo);
+  }
+
+  private void testFilePathMetadataColumn(boolean isPartitioned) {
+    String tableName = "test_file_path_metadata_column";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    if (isPartitioned) {
+      createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+    }
+    sql(createTableSQL);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkMetadataColumnInfo[] metadataColumns = getPaimonMetadataColumns();
+    SparkTableInfoChecker checker =
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getPaimonSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
+    checker.check(tableInfo);
+
+    String insertData = String.format("INSERT into %s values(2,'a', 'beijing');", tableName);
+    sql(insertData);
+
+    String getMetadataSQL = String.format("SELECT __paimon_file_path FROM %s", tableName);
+    List<String> queryResult = getTableMetadata(getMetadataSQL);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertTrue(queryResult.get(0).contains(tableName));
+  }
+
+  private void testRowIndexMetadataColumn(boolean isPartitioned) {
+    String tableName = "test_row_index_metadata_column";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    if (isPartitioned) {
+      createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+    }
+    sql(createTableSQL);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkMetadataColumnInfo[] metadataColumns = getPaimonMetadataColumns();
+    SparkTableInfoChecker checker =
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getPaimonSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
+    checker.check(tableInfo);
+
+    String insertData = String.format("INSERT into %s values(2,'a', 'beijing');", tableName);
+    sql(insertData);
+
+    String getMetadataSQL = String.format("SELECT __paimon_row_index FROM %s", tableName);
+    List<String> queryResult = getTableMetadata(getMetadataSQL);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertEquals(0, Integer.parseInt(queryResult.get(0)));
+  }
+
   private void testPaimonListAndDropPartition() {
     String tableName = "test_paimon_drop_partition";
     dropTableIfExists(tableName);
@@ -147,5 +233,13 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
         SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
         SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
         SparkTableInfo.SparkColumnInfo.of("address", DataTypes.StringType, ""));
+  }
+
+  private SparkMetadataColumnInfo[] getPaimonMetadataColumns() {
+    return new SparkMetadataColumnInfo[] {
+            new SparkMetadataColumnInfo("__paimon_file_path", DataTypes.StringType, true),
+            new SparkMetadataColumnInfo(
+                    "__paimon_row_index", DataTypes.LongType, true)
+    };
   }
 }
