@@ -72,17 +72,33 @@ public class CreateTable extends Command {
   /** Create a new table. */
   @Override
   public void handle() {
-    try {
-      NameIdentifier tableName = NameIdentifier.of(schema, table);
-      GravitinoClient client = buildClient(metalake);
-      ReadTableCSV readTableCSV = new ReadTableCSV();
-      Map<String, List<String>> tableData = readTableCSV.parse(columnFile);
-      Column[] columns = readTableCSV.columns(tableData);
+    NameIdentifier tableName;
+    GravitinoClient client;
+    ReadTableCSV readTableCSV = new ReadTableCSV();
+    Map<String, List<String>> tableData;
+    Column[] columns;
 
-      client.loadCatalog(catalog).asTableCatalog().createTable(tableName, columns, comment, null);
+    try {
+      tableName = NameIdentifier.of(schema, table);
+      client = buildClient(metalake);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
+    } catch (Exception exp) {
+      System.err.println("Error initializing client or table name: " + exp.getMessage());
+      return;
+    }
+
+    try {
+      tableData = readTableCSV.parse(columnFile);
+      columns = readTableCSV.columns(tableData);
+    } catch (Exception exp) {
+      System.err.println("Error reading or parsing column file: " + exp.getMessage());
+      return;
+    }
+
+    try {
+      client.loadCatalog(catalog).asTableCatalog().createTable(tableName, columns, comment, null);
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;

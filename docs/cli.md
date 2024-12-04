@@ -33,7 +33,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -a,--audit              display audit information
     --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
-    --csv <arg>          CSV file describing columns
+    --columnfile <arg>   CSV file describing columns
  -d,--distribution       display distribution information
     --datatype <arg>     column data type
     --default <arg>      default column value
@@ -464,7 +464,7 @@ gcli table remove --name catalog_postgres.hr.salaries --property test
 #### Create a table
 
 ```bash
-gcli table remove --name catalog_postgres.hr.salaries --comment "comment" --csv ~/table.csv
+gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
 ```
 
 ### User commands
