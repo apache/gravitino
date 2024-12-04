@@ -127,3 +127,16 @@ tasks.jar {
 tasks.compileJava {
   dependsOn(":catalogs:catalog-hadoop:runtimeJars")
 }
+
+// This is to fix the problem:
+/**
+Reason: Task ':bundles:aws-bundle:javadoc' uses this output of task ':bundles:aws-bundle:copyHadoop2_10' without declaring an explicit or implicit dependency. This can lead to incorrect results being produced, depending on what order the tasks are executed.
+
+Possible solutions:
+1. Declare task ':bundles:aws-bundle:copyHadoop2_10' as an input of ':bundles:aws-bundle:javadoc'.
+2. Declare an explicit dependency on ':bundles:aws-bundle:copyHadoop2_10' from ':bundles:aws-bundle:javadoc' using Task#dependsOn.
+3. Declare an explicit dependency on ':bundles:aws-bundle:copyHadoop2_10' from ':bundles:aws-bundle:javadoc' using Task#mustRunAfter
+*/
+tasks.javadoc {
+  dependsOn("copyHadoop3_3", "copyHadoop2_7", "copyHadoop2_10")
+}
