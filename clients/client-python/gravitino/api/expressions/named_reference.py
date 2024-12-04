@@ -16,7 +16,6 @@
 # under the License.
 
 from __future__ import annotations
-from typing import List
 
 from gravitino.api.expressions.expression import Expression
 
@@ -27,7 +26,7 @@ class NamedReference(Expression):
     """
 
     @staticmethod
-    def field(field_name: List[str]) -> FieldReference:
+    def field(field_name: list[str]) -> FieldReference:
         """
         Returns a FieldReference for the given field name(s). The array of field name(s) is
         used to reference nested fields. For example, if we have a struct column named "student" with a
@@ -44,18 +43,18 @@ class NamedReference(Expression):
         """Returns a FieldReference for the given column name."""
         return FieldReference([column_name])
 
-    def field_name(self) -> List[str]:
+    def field_name(self) -> list[str]:
         """
         Returns the referenced field name as a list of string parts.
         Must be implemented by subclasses.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def children(self) -> List[Expression]:
+    def children(self) -> list[Expression]:
         """Named references do not have children."""
         return Expression.EMPTY_EXPRESSION
 
-    def references(self) -> List[NamedReference]:
+    def references(self) -> list[NamedReference]:
         """Named references reference themselves."""
         return [self]
 
@@ -65,13 +64,13 @@ class FieldReference(NamedReference):
     A NamedReference that references a field or column.
     """
 
-    _field_names: List[str]
+    _field_names: list[str]
 
-    def __init__(self, field_names: List[str]):
+    def __init__(self, field_names: list[str]):
         super().__init__()
         self._field_names = field_names
 
-    def field_name(self) -> List[str]:
+    def field_name(self) -> list[str]:
         return self._field_names
 
     def __eq__(self, other: object) -> bool:

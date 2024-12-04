@@ -16,7 +16,7 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import List, TypeVar, Generic
+from typing import TypeVar, Generic
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.types.type import Type
@@ -39,5 +39,5 @@ class Literal(Generic[T], Expression):
         """The data type of the literal."""
         raise NotImplementedError("Subclasses must implement the `data_type` method.")
 
-    def children(self) -> List[Expression]:
+    def children(self) -> list[Expression]:
         return Expression.EMPTY_EXPRESSION

@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List
 
 from gravitino.api.expressions.expression import Expression
 
@@ -47,11 +46,11 @@ class FunctionExpression(Expression):
         pass
 
     @abstractmethod
-    def arguments(self) -> List[Expression]:
+    def arguments(self) -> list[Expression]:
         """Returns the arguments passed to the function."""
         pass
 
-    def children(self) -> List[Expression]:
+    def children(self) -> list[Expression]:
         """Returns the arguments as children."""
         return self.arguments()
 
@@ -62,9 +61,9 @@ class FuncExpressionImpl(FunctionExpression):
     """
 
     _function_name: str
-    _arguments: List[Expression]
+    _arguments: list[Expression]
 
-    def __init__(self, function_name: str, arguments: List[Expression]):
+    def __init__(self, function_name: str, arguments: list[Expression]):
         super().__init__()
         self._function_name = function_name
         self._arguments = arguments
@@ -72,7 +71,7 @@ class FuncExpressionImpl(FunctionExpression):
     def function_name(self) -> str:
         return self._function_name
 
-    def arguments(self) -> List[Expression]:
+    def arguments(self) -> list[Expression]:
         return self._arguments
 
     def __str__(self) -> str:

@@ -31,11 +31,7 @@ class LiteralImpl(Literal[T]):
     _value: T
     _data_type: Type
 
-    def __init__(
-        self,
-        value: T,
-        data_type: Type,
-    ):
+    def __init__(self, value: T, data_type: Type):
         self._value = value
         self._data_type = data_type
 
@@ -114,9 +110,7 @@ class Literals:
     def decimal_literal(value: decimal.Decimal) -> LiteralImpl[decimal.Decimal]:
         precision: int = len(value.as_tuple().digits)
         scale: int = -value.as_tuple().exponent
-        return LiteralImpl(
-            value, Types.DecimalType.of(max(precision, scale), scale)
-        )
+        return LiteralImpl(value, Types.DecimalType.of(max(precision, scale), scale))
 
     @staticmethod
     def date_literal(value: date) -> Literal[date]:

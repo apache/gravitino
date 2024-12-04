@@ -16,7 +16,6 @@
 # under the License.
 
 from __future__ import annotations
-from typing import List
 
 from gravitino.api.expressions.expression import Expression
 
@@ -33,7 +32,7 @@ class UnparsedExpression(Expression):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def children(self) -> List[Expression]:
+    def children(self) -> list[Expression]:
         """
         Unparsed expressions do not have children.
         """

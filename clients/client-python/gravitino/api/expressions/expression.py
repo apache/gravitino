@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import List, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gravitino.api.expressions.named_reference import NamedReference
@@ -26,26 +26,26 @@ if TYPE_CHECKING:
 class Expression(ABC):
     """Base class of the public logical expression API."""
 
-    EMPTY_EXPRESSION: List[Expression] = []
+    EMPTY_EXPRESSION: list[Expression] = []
     """
     `EMPTY_EXPRESSION` is only used as an input when the default `children` method builds the result.
     """
 
-    EMPTY_NAMED_REFERENCE: List[NamedReference] = []
+    EMPTY_NAMED_REFERENCE: list[NamedReference] = []
     """
     `EMPTY_NAMED_REFERENCE` is only used as an input when the default `references` method builds
     the result array to avoid repeatedly allocating an empty array.
     """
 
     @abstractmethod
-    def children(self) -> List[Expression]:
+    def children(self) -> list[Expression]:
         """Returns a list of the children of this node. Children should not change."""
         pass
 
-    def references(self) -> List[NamedReference]:
+    def references(self) -> list[NamedReference]:
         """Returns a list of fields or columns that are referenced by this expression."""
 
-        ref_set: Set[NamedReference] = set()
+        ref_set: set[NamedReference] = set()
         for child in self.children():
             ref_set.update(child.references())
         return list(ref_set)
