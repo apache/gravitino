@@ -33,6 +33,10 @@ public class Providers {
   public static final String MYSQL = "mysql";
   public static final String POSTGRES = "postgres";
   public static final String KAFKA = "kafka";
+  public static final String DORIS = "doris";
+  public static final String PAIMON = "paimon";
+  public static final String HUDI = "hudi";
+  public static final String OCEANBASE = "oceanbase";
 
   private static final HashSet<String> VALID_PROVIDERS = new HashSet<>();
 
@@ -43,6 +47,10 @@ public class Providers {
     VALID_PROVIDERS.add(MYSQL);
     VALID_PROVIDERS.add(POSTGRES);
     VALID_PROVIDERS.add(KAFKA);
+    VALID_PROVIDERS.add(DORIS);
+    VALID_PROVIDERS.add(PAIMON);
+    VALID_PROVIDERS.add(HUDI);
+    VALID_PROVIDERS.add(OCEANBASE);
   }
 
   /**
@@ -69,6 +77,14 @@ public class Providers {
         return "lakehouse-iceberg";
       case KAFKA:
         return "kafka";
+      case DORIS:
+        return "jdbc-doris";
+      case PAIMON:
+        return "lakehouse-paimon";
+      case HUDI:
+        return "lakehouse-hudi";
+      case OCEANBASE:
+        return "jdbc-oceanbase";
       default:
         throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
@@ -82,6 +98,10 @@ public class Providers {
       case MYSQL:
       case POSTGRES:
       case ICEBERG:
+      case DORIS:
+      case PAIMON:
+      case HUDI:
+      case OCEANBASE:
         return Catalog.Type.RELATIONAL;
       case KAFKA:
         return Catalog.Type.MESSAGING;
