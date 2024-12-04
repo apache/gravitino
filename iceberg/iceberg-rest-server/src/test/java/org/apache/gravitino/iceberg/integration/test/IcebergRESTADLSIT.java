@@ -36,6 +36,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 public class IcebergRESTADLSIT extends IcebergRESTJdbcCatalogIT {
 
   private String storageAccountName;
+  private String storageAccountKey;
   private String tenantId;
   private String clientId;
   private String clientSecret;
@@ -45,6 +46,8 @@ public class IcebergRESTADLSIT extends IcebergRESTJdbcCatalogIT {
   void initEnv() {
     this.storageAccountName =
         getFromEnvOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
+    this.storageAccountKey =
+        getFromEnvOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
     this.tenantId = getFromEnvOrDefault("GRAVITINO_ADLS_TENANT_ID", "{TENANT_ID}");
     this.clientId = getFromEnvOrDefault("GRAVITINO_ADLS_CLIENT_ID", "{CLIENT_ID}");
     this.clientSecret = getFromEnvOrDefault("GRAVITINO_ADLS_CLIENT_SECRET", "{CLIENT_SECRET}");
@@ -87,6 +90,9 @@ public class IcebergRESTADLSIT extends IcebergRESTJdbcCatalogIT {
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME,
         storageAccountName);
+    configMap.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY,
+        storageAccountKey);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_TENANT_ID, tenantId);
     configMap.put(

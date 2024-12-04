@@ -37,6 +37,13 @@ public class ADLSCredentialConfig extends Config {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<String> ADLS_STORAGE_ACCOUNT_KEY =
+      new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY)
+          .doc("The key of the Azure Data Lake Storage account.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> ADLS_TENANT_ID =
       new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_TENANT_ID)
           .doc("The Azure Active Directory (AAD) tenant ID used for authentication.")
@@ -74,6 +81,11 @@ public class ADLSCredentialConfig extends Config {
   @NotNull
   public String storageAccountName() {
     return this.get(ADLS_STORAGE_ACCOUNT_NAME);
+  }
+
+  @NotNull
+  public String storageAccountKey() {
+    return this.get(ADLS_STORAGE_ACCOUNT_KEY);
   }
 
   @NotNull

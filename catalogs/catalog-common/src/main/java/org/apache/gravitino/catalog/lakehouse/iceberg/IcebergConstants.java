@@ -48,10 +48,9 @@ public class IcebergConstants {
   public static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
 
   // TODO: Investigate and clarify the intended usage.
-  public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME = "adls.storage-account-name";
-  public static final String ICEBERG_ADLS_TENANT_ID = "adls.tenant-id";
-  public static final String ICEBERG_ADLS_CLIENT_ID = "adls.client-id";
-  public static final String ICEBERG_ADLS_CLIENT_SECRET = "adls.client-secret";
+  public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME =
+      "adls.auth.shared-key.account.name";
+  public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
   // Iceberg Table properties constants
 

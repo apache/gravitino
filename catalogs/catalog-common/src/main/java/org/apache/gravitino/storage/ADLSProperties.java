@@ -23,14 +23,14 @@ public class ADLSProperties {
 
   // Configuration key for specifying the name of the ADLS storage account.
   public static final String GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME = "adls-storage-account-name";
+  // Configuration key for specifying the key of the ADLS storage account.
+  public static final String GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY = "adls-storage-account-key";
 
   // Configuration key for specifying the Azure Active Directory (AAD) tenant ID.
   public static final String GRAVITINO_ADLS_TENANT_ID = "adls-tenant-id";
-
   // Configuration key for specifying the Azure Active Directory (AAD) client ID used for
   // authentication.
   public static final String GRAVITINO_ADLS_CLIENT_ID = "adls-client-id";
-
   // Configuration key for specifying the Azure Active Directory (AAD) client secret used for
   // authentication.
   public static final String GRAVITINO_ADLS_CLIENT_SECRET = "adls-client-secret";
