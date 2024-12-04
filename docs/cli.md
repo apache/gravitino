@@ -296,6 +296,30 @@ gcli catalog create  -name postgres --provider postgres --properties jdbc-url=jd
 gcli catalog create --name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
 ```
 
+##### Create a Doris catalog
+
+```bash
+gcli catalog create --name doris --provider doris --properties jdbc-url=jdbc:mysql://localhost:9030,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
+```
+
+##### Create a Paimon catalog
+
+```bash
+gcli catalog create --name paimon --provider paimon --properties catalog-backend=jdbc,uri=jdbc:mysql://127.0.0.1:3306/metastore_db,authentication.type=simple
+```
+
+#### Create a Hudi catalog
+
+```bash
+gcli catalog create --name hudi --provider hudi --properties catalog-backend=hms,uri=thrift://127.0.0.1:9083
+```
+
+#### Create an Oceanbase catalog
+
+```bash
+gcli catalog create --name oceanbase --provider oceanbase --properties jdbc-url=jdbc:mysql://localhost:2881,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
+```
+
 #### Delete a catalog
 
 ```bash
