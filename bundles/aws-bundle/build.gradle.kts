@@ -34,13 +34,86 @@ dependencies {
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
-  implementation(libs.hadoop3.aws)
+  compileOnly(libs.hadoop3.aws)
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
 }
 
+tasks.register<Copy>("copyHadoop2_7") {
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+
+  val commonsLang3Dependency = libs.commons.lang3.get()
+  val hadoopAWSDependencies = libs.hadoop2.aws.old.get()
+
+  val hadoopDependenciesFor2_7 = configurations.detachedConfiguration(
+    dependencies.create("${hadoopAWSDependencies.group}:${hadoopAWSDependencies.name}:${hadoopAWSDependencies.version}"),
+    dependencies.create("${commonsLang3Dependency.group}:${commonsLang3Dependency.name}:${commonsLang3Dependency.version}")
+  ).files
+
+  from(hadoopDependenciesFor2_7)
+  into("$buildDir/resources/main/hadoop2_7")
+
+  rename { original ->
+    if (original.endsWith(".jar")) {
+      original.replace(".jar", ".jar.zip")
+    } else {
+      original
+    }
+  }
+}
+
+tasks.register<Copy>("copyHadoop2_10") {
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+
+  val commonsLangDependency = libs.commons.lang.get()
+  val commonsLang3Dependency = libs.commons.lang3.get()
+  val hadoopAWSDependencies = libs.hadoop3.aws.get()
+
+  val hadoopDependenciesFor2_10 = configurations.detachedConfiguration(
+    dependencies.create("${hadoopAWSDependencies.group}:${hadoopAWSDependencies.name}:${hadoopAWSDependencies.version}"),
+    dependencies.create("${commonsLang3Dependency.group}:${commonsLang3Dependency.name}:${commonsLang3Dependency.version}"),
+    dependencies.create("${commonsLangDependency.group}:${commonsLangDependency.name}:${commonsLangDependency.version}")
+  ).files
+
+  from(hadoopDependenciesFor2_10)
+  into("$buildDir/resources/main/hadoop2_10")
+
+  // We need to rename the jars to zip to avoid because gradle can't distinguish resources from dependencies if the
+  // extension is the same.
+  rename { original ->
+    if (original.endsWith(".jar")) {
+      original.replace(".jar", ".jar.zip")
+    } else {
+      original
+    }
+  }
+}
+
+tasks.register<Copy>("copyHadoop3_3") {
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  val commonsLang3Dependency = libs.commons.lang3.get()
+  val hadoopAWSDependencies = libs.hadoop3.aws.get()
+
+  val hadoopDependenciesFor3_3 = configurations.detachedConfiguration(
+    dependencies.create("${hadoopAWSDependencies.group}:${hadoopAWSDependencies.name}:${hadoopAWSDependencies.version}"),
+    dependencies.create("${commonsLang3Dependency.group}:${commonsLang3Dependency.name}:${commonsLang3Dependency.version}")
+  ).files
+
+  from(hadoopDependenciesFor3_3)
+  into("$buildDir/resources/main/hadoop3_3")
+
+  rename { original ->
+    if (original.endsWith(".jar")) {
+      original.replace(".jar", ".jar.zip")
+    } else {
+      original
+    }
+  }
+}
+
 tasks.withType(ShadowJar::class.java) {
+  dependsOn("copyHadoop3_3", "copyHadoop2_7", "copyHadoop2_10")
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
