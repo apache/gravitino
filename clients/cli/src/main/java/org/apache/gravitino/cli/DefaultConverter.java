@@ -35,6 +35,11 @@ public class DefaultConverter {
    * @return An instance of the appropriate default value.
    */
   public static Expression convert(String defaultValue, String dataType) {
+
+    if (dataType == null || dataType.isEmpty()) {
+      return Column.DEFAULT_VALUE_NOT_SET;
+    }
+
     Type convertedDatatype = ParseType.toType(dataType);
 
     if (defaultValue == null || defaultValue.isEmpty()) {

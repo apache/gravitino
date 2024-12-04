@@ -33,6 +33,7 @@ import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.CreateRole;
 import org.apache.gravitino.cli.commands.CreateSchema;
+import org.apache.gravitino.cli.commands.CreateTable;
 import org.apache.gravitino.cli.commands.CreateTag;
 import org.apache.gravitino.cli.commands.CreateTopic;
 import org.apache.gravitino.cli.commands.CreateUser;
@@ -814,5 +815,17 @@ public class TestableCommandLine {
       String dataType) {
     return new UpdateColumnDefault(
         url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType);
+  }
+
+  protected CreateTable newCreateTable(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String columnFile,
+      String comment) {
+    return new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment);
   }
 }

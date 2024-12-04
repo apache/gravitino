@@ -50,6 +50,7 @@ public class GravitinoOptions {
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
+  public static final String COLUMNFILE = "columnfile";
   public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
@@ -96,6 +97,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
+    options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
     // Properties and tags can have multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
@@ -104,7 +106,7 @@ public class GravitinoOptions {
     // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
-    options.addOption(createArgOption(null, OUTPUT, "output format (plain/table)"));
+    options.addOption(createArgOption(OUTPUT, "output format (plain/table)"));
 
     return options;
   }

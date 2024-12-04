@@ -315,7 +315,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newTableDetails(url, ignore, metalake, catalog, schema, table).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
-      // TODO
+      String columnFile = line.getOptionValue(GravitinoOptions.COLUMNFILE);
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      newCreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteTable(url, ignore, force, metalake, catalog, schema, table).handle();
