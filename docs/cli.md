@@ -311,7 +311,7 @@ gcli catalog create --name paimon --provider paimon --properties catalog-backend
 #### Create a Hudi catalog
 
 ```bash
-gcli catalog create --name oceanbase --provider oceanbase --properties catalog-backend=hms,uri=thrift://127.0.0.1:9083
+gcli catalog create --name hudi --provider hudi --properties catalog-backend=hms,uri=thrift://127.0.0.1:9083
 ```
 
 #### Create an Oceanbase catalog
