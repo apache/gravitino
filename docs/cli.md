@@ -430,6 +430,11 @@ gcli table details --name catalog_postgres.hr.departments --distribution
 gcli table details --name catalog_postgres.hr.departments --partition
 ```
 
+#### Show tables sort order information
+```bash
+gcli table details --name catalog_postgres.hr.departments --sortorder
+```
+
 ### Show table indexes
 
 ```bash

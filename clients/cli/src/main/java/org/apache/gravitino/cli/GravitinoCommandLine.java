@@ -309,6 +309,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newTableDistribution(url, ignore, metalake, catalog, schema, table).handle();
       } else if (line.hasOption(GravitinoOptions.PARTITION)) {
         newTablePartition(url, ignore, metalake, catalog, schema, table).handle();
+      } else if (line.hasOption(GravitinoOptions.SORTORDER)) {
+        newTableSortOrder(url, ignore, metalake, catalog, schema, table).handle();
       } else {
         newTableDetails(url, ignore, metalake, catalog, schema, table).handle();
       }
