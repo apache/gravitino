@@ -41,23 +41,6 @@ public class FileSystemUtils {
     ServiceLoader<FileSystemProvider> allFileSystemProviders =
         ServiceLoader.load(FileSystemProvider.class);
 
-    if (null == fileSystemProviders) {
-      // If the file system providers are not specified, return all file system providers.
-      Streams.stream(allFileSystemProviders.iterator())
-          .forEach(
-              fileSystemProvider -> {
-                if (resultMap.containsKey(fileSystemProvider.scheme())) {
-                  throw new UnsupportedOperationException(
-                      String.format(
-                          "File system provider: '%s' with scheme '%s' already exists in the provider list, "
-                              + "please make sure the file system provider scheme is unique.",
-                          fileSystemProvider.getClass().getName(), fileSystemProvider.scheme()));
-                }
-                resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);
-              });
-      return resultMap;
-    }
-
     Set<String> providersInUses =
         Arrays.stream(fileSystemProviders.split(","))
             .map(f -> f.trim().toLowerCase(Locale.ROOT))
