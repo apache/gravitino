@@ -61,7 +61,7 @@ public class ReadTableCSV {
     List<String> datatypes = tableData.get(ExpectedColumns.DATATYPE.getName());
     List<String> comments = tableData.get(ExpectedColumns.COMMENT.getName());
     List<String> nullables = tableData.get(ExpectedColumns.NULLABLE.getName());
-    List<String> autos = tableData.get(ExpectedColumns.AUTOINCREMENT.getName());
+    List<String> autoIncs = tableData.get(ExpectedColumns.AUTOINCREMENT.getName());
     List<String> defaultTypes = tableData.get(ExpectedColumns.DEFAULTTYPE.getName());
     List<String> defaulValues = tableData.get(ExpectedColumns.DEFAULTVALUE.getName());
     int size = names.size();
@@ -70,9 +70,9 @@ public class ReadTableCSV {
     for (int i = 0; i < size; i++) {
       String columnName = names.get(i);
       String datatype = datatypes.get(i);
-      String columnComment = comments.get(i);
+      String comment = comments.get(i);
       boolean nullable = nullables.get(i).equals("true");
-      boolean auto = autos.get(i).equals("true");
+      boolean auto = autoIncs.get(i).equals("true");
       String defaultValue = defaulValues.get(i);
       String defaultType = defaultTypes.get(i);
 
@@ -84,7 +84,7 @@ public class ReadTableCSV {
           Column.of(
               columnName,
               ParseType.toType(datatype),
-              columnComment,
+              comment,
               nullable,
               auto,
               DefaultConverter.convert(defaultValue, defaultType));
