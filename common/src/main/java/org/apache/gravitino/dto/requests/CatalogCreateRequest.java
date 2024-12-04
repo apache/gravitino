@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -27,6 +28,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to create a catalog. */
@@ -42,7 +44,7 @@ public class CatalogCreateRequest implements RESTRequest {
   private final Catalog.Type type;
 
   @JsonProperty("provider")
-  private final String provider;
+  private String provider;
 
   @Nullable
   @JsonProperty("comment")
@@ -80,6 +82,17 @@ public class CatalogCreateRequest implements RESTRequest {
   }
 
   /**
+   * Sets the provider of the catalog.
+   *
+   * @param provider The provider of the catalog.
+   */
+  @JsonSetter(value = "provider")
+  public void setProvider(String provider) {
+    this.provider =
+        StringUtils.isNotBlank(provider) ? provider : CatalogProvider.builtinCatalogShortName(type);
+  }
+
+  /**
    * Validates the fields of the request.
    *
    * @throws IllegalArgumentException if name or type are not set.
@@ -89,7 +102,5 @@ public class CatalogCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
   }
 }

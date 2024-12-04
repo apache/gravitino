@@ -78,12 +78,14 @@ public interface SupportsCatalogs {
    * Create a catalog with specified catalog name, type, provider, comment, and properties.
    *
    * <p>The parameter "provider" is a short name of the catalog, used to tell Gravitino which
-   * catalog should be created. The short name should be the same as the {@link CatalogProvider}
-   * interface provided.
+   * catalog should be created. The short name:
+   *
+   * <p>1) should be the same as the {@link CatalogProvider} interface provided. 2) can be "null" if
+   * the created catalog is a built-in catalog, like model catalog.
    *
    * @param catalogName the name of the catalog.
    * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
+   * @param provider the provider of the catalog, or null if the catalog is a built-in catalog.
    * @param comment the comment of the catalog.
    * @param properties the properties of the catalog.
    * @return The created catalog.
@@ -97,6 +99,23 @@ public interface SupportsCatalogs {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
+
+  /**
+   * Create a built-in catalog with specified catalog name, type, comment, and properties.
+   *
+   * @param catalogName the name of the catalog.
+   * @param type the type of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   * @return The created catalog.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   * @throws CatalogAlreadyExistsException If the catalog already exists.
+   */
+  default Catalog createCatalog(
+      String catalogName, Catalog.Type type, String comment, Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(catalogName, type, null, comment, properties);
+  }
 
   /**
    * Alter a catalog with specified catalog name and changes.

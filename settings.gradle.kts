@@ -41,6 +41,7 @@ include(
 )
 include("catalogs:catalog-hadoop")
 include("catalogs:catalog-kafka")
+include("catalogs:catalog-model")
 include(
   "clients:client-java",
   "clients:client-java-runtime",
@@ -49,7 +50,7 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() ?: false) {
+if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
   include("clients:filesystem-fuse")
 } else {
   println("Skipping filesystem-fuse module since enableFuse is set to false")

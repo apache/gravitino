@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino;
 
+import java.util.Locale;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -26,6 +27,17 @@ import org.apache.gravitino.annotation.Evolving;
  */
 @Evolving
 public interface CatalogProvider {
+
+  /**
+   * Form the provider short name for a builtin catalog. The provider short name for a builtin
+   * catalog is the catalog type in lowercase.
+   *
+   * @param type The catalog type.
+   * @return The provider short name for the builtin catalog.
+   */
+  static String builtinCatalogShortName(Catalog.Type type) {
+    return type.name().toLowerCase(Locale.ROOT);
+  }
 
   /**
    * The string that represents the catalog that this provider uses. This is overridden by children

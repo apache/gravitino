@@ -826,7 +826,8 @@ tasks {
       ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      ":catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig",
+      ":catalogs:catalog-modle:copyLibAndConfig"
     )
   }
 
@@ -924,7 +925,7 @@ fun printMacDockerTip() {
 
 fun checkMacDockerConnector() {
   if (!OperatingSystem.current().isMacOsX()) {
-    // Only MacOs requires the use of `docker-connector`
+    // Only macOS requires the use of `docker-connector`
     return
   }
 
