@@ -36,7 +36,7 @@ public class RangerMetadataObject implements AuthorizationMetadataObject {
     TABLE(MetadataObject.Type.TABLE),
     /** A column is a sub-collection of the table that represents a group of same type data. */
     COLUMN(MetadataObject.Type.COLUMN),
-
+    /** A path is mapped the path of storages like HDFS, S3 etc. */
     PATH(MetadataObject.Type.FILESET);
 
     private final MetadataObject.Type metadataType;
