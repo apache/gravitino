@@ -34,8 +34,10 @@ from gravitino.exceptions.base import (
     SchemaAlreadyExistsException,
     UnsupportedOperationException,
     ConnectionFailedException,
-    CatalogAlreadyExistsException,
+    CatalogAlreadyExistsException, NoSuchCredentialException,
 )
+from gravitino.exceptions.handlers.credential_error_handler import \
+    CREDENTIAL_ERROR_HANDLER
 
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
@@ -114,6 +116,25 @@ class TestErrorHandler(unittest.TestCase):
             FILESET_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
                     NoSuchSchemaException, "mock error"
+                )
+            )
+
+        with self.assertRaises(InternalError):
+            FILESET_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InternalError, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            FILESET_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_credential_error_handler(self):
+
+        with self.assertRaises(NoSuchCredentialException):
+            CREDENTIAL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchCredentialException, "mock error"
                 )
             )
 
