@@ -192,9 +192,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         String.format(
             "The metadata object type %s is not supported in the RangerAuthorizationHDFSPlugin",
             metadataObject.type()));
-    Preconditions.checkArgument(
-        !(metadataObject instanceof RangerPrivileges),
-        "The metadata object must be not a RangerPrivileges object.");
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     Preconditions.checkArgument(
