@@ -88,6 +88,7 @@ public class ADLSTokenProvider implements CredentialProvider {
     OffsetDateTime expiry = start.plusSeconds(tokenExpireSecs);
     UserDelegationKey userDelegationKey = dataLakeServiceClient.getUserDelegationKey(start, expiry);
 
+    // Define Path SAS permissions, read, write, delete, list
     PathSasPermission permission = PathSasPermission.parse("rwdl");
     DataLakeServiceSasSignatureValues signatureValues =
         new DataLakeServiceSasSignatureValues(expiry, permission);
