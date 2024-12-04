@@ -19,14 +19,17 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import static org.apache.gravitino.rel.indexes.Indexes.primary;
+import static org.apache.gravitino.spark.connector.ConnectorConstants.PRIMARY_KEY_IDENTIFIER;
+
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Collections;
-import java.util.stream.Collectors;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -59,9 +62,6 @@ import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
-
-import static org.apache.gravitino.rel.indexes.Indexes.primary;
-import static org.apache.gravitino.spark.connector.ConnectorConstants.PRIMARY_KEY_IDENTIFIER;
 
 /**
  * BaseCatalog acts as the foundational class for Apache Spark CatalogManager registration, enabling
@@ -422,28 +422,28 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   }
 
   protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(
-          Identifier ident, String version) {
+      Identifier ident, String version) {
     try {
       return sparkCatalog.loadTable(ident, version);
     } catch (NoSuchTableException e) {
       throw new RuntimeException(
-              String.format(
-                      "Failed to load the real sparkTable: %s",
-                      String.join(".", getDatabase(ident), ident.name())),
-              e);
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(ident), ident.name())),
+          e);
     }
   }
 
   protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(
-          Identifier ident, long timestamp) {
+      Identifier ident, long timestamp) {
     try {
       return sparkCatalog.loadTable(ident, timestamp);
     } catch (NoSuchTableException e) {
       throw new RuntimeException(
-              String.format(
-                      "Failed to load the real sparkTable: %s",
-                      String.join(".", getDatabase(ident), ident.name())),
-              e);
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(ident), ident.name())),
+          e);
     }
   }
 
@@ -501,11 +501,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   private static List<String> extractPrimaryKeyString(Map<String, String> properties) {
     String pkAsString = properties.get(PRIMARY_KEY_IDENTIFIER);
-      return pkAsString == null
-              ? Collections.emptyList()
-              : Arrays.stream(pkAsString.split(","))
-              .map(String::trim)
-              .collect(Collectors.toList());
+    return pkAsString == null
+        ? Collections.emptyList()
+        : Arrays.stream(pkAsString.split(",")).map(String::trim).collect(Collectors.toList());
   }
 
   private static Index[] constructIndexesFromPrimaryKeys(List<String> pks) {
@@ -513,16 +511,16 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     if (pks != null && !pks.isEmpty()) {
       String[][] filedNames = constructIndexFiledNames(pks);
       indexes =
-              Collections.singletonList(primary(PRIMARY_KEY_IDENTIFIER, filedNames))
-                      .toArray(new Index[0]);
+          Collections.singletonList(primary(PRIMARY_KEY_IDENTIFIER, filedNames))
+              .toArray(new Index[0]);
     }
     return indexes;
   }
 
   private static String[][] constructIndexFiledNames(List<String> primaryKeys) {
     return primaryKeys.stream()
-            .map(pk -> new String[] {pk})
-            .collect(Collectors.toList())
-            .toArray(new String[0][0]);
+        .map(pk -> new String[] {pk})
+        .collect(Collectors.toList())
+        .toArray(new String[0][0]);
   }
 }

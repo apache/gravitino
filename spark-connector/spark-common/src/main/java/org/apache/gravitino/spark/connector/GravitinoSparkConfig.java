@@ -29,7 +29,7 @@ public class GravitinoSparkConfig {
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =
       GRAVITINO_PREFIX + "enableIcebergSupport";
   public static final String GRAVITINO_ENABLE_PAIMON_SUPPORT =
-          GRAVITINO_PREFIX + "enablePaimonSupport";
+      GRAVITINO_PREFIX + "enablePaimonSupport";
 
   public static final String GRAVITINO_AUTH_TYPE =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;

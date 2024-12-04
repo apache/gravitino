@@ -18,14 +18,12 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
@@ -36,7 +34,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
-import org.apache.spark.sql.connector.catalog.*;
+import org.apache.spark.sql.connector.catalog.CatalogPlugin;
+import org.apache.spark.sql.connector.catalog.FunctionCatalog;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -142,20 +144,20 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     List<String> functions = Collections.singletonList("bucket");
 
     CatalogPlugin catalogPlugin =
-            getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
     Assertions.assertInstanceOf(FunctionCatalog.class, catalogPlugin);
     FunctionCatalog functionCatalog = (FunctionCatalog) catalogPlugin;
 
     for (String[] namespace : ImmutableList.of(empty_namespace, system_namespace)) {
       Arrays.stream(functionCatalog.listFunctions(namespace))
-              .map(Identifier::name)
-              .forEach(function -> Assertions.assertTrue(functions.contains(function)));
+          .map(Identifier::name)
+          .forEach(function -> Assertions.assertTrue(functions.contains(function)));
     }
     Arrays.stream(functionCatalog.listFunctions(default_namespace))
-            .map(Identifier::name)
-            .forEach(function -> Assertions.assertFalse(functions.contains(function)));
+        .map(Identifier::name)
+        .forEach(function -> Assertions.assertFalse(functions.contains(function)));
     Assertions.assertThrows(
-            NoSuchNamespaceException.class, () -> functionCatalog.listFunctions(non_exists_namespace));
+        NoSuchNamespaceException.class, () -> functionCatalog.listFunctions(non_exists_namespace));
 
     for (String[] namespace : ImmutableList.of(empty_namespace, system_namespace)) {
       for (String function : functions) {
@@ -165,24 +167,24 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
       }
     }
     functions.forEach(
-            function -> {
-              Identifier identifier = Identifier.of(new String[] {getDefaultDatabase()}, function);
-              Assertions.assertThrows(
-                      NoSuchFunctionException.class, () -> functionCatalog.loadFunction(identifier));
-            });
+        function -> {
+          Identifier identifier = Identifier.of(new String[] {getDefaultDatabase()}, function);
+          Assertions.assertThrows(
+              NoSuchFunctionException.class, () -> functionCatalog.loadFunction(identifier));
+        });
   }
 
   @Test
   void testPaimonFunction() {
     String[] catalogAndNamespaces = new String[] {getCatalogName() + ".sys", getCatalogName()};
     Arrays.stream(catalogAndNamespaces)
-            .forEach(
-                    catalogAndNamespace -> {
-                      List<String> bucket =
-                              getQueryData(String.format("SELECT %s.bucket(2, 100)", catalogAndNamespace));
-                      Assertions.assertEquals(1, bucket.size());
-                      Assertions.assertEquals("0", bucket.get(0));
-                    });
+        .forEach(
+            catalogAndNamespace -> {
+              List<String> bucket =
+                  getQueryData(String.format("SELECT %s.bucket(2, 100)", catalogAndNamespace));
+              Assertions.assertEquals(1, bucket.size());
+              Assertions.assertEquals("0", bucket.get(0));
+            });
   }
 
   @Test
@@ -211,24 +213,24 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
 
     tableData =
-            getQueryData(
-                    String.format("SELECT * FROM %s TIMESTAMP AS OF %s", tableName, timestampInSeconds));
+        getQueryData(
+            String.format("SELECT * FROM %s TIMESTAMP AS OF %s", tableName, timestampInSeconds));
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
     tableData =
-            getQueryData(
-                    String.format(
-                            "SELECT * FROM %s FOR SYSTEM_TIME AS OF %s", tableName, timestampInSeconds));
+        getQueryData(
+            String.format(
+                "SELECT * FROM %s FOR SYSTEM_TIME AS OF %s", tableName, timestampInSeconds));
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
 
     tableData =
-            getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
+        getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
     tableData =
-            getQueryData(
-                    String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
+        getQueryData(
+            String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
 
@@ -236,8 +238,8 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
     tableData =
-            getQueryData(
-                    String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_tag'", tableName));
+        getQueryData(
+            String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_tag'", tableName));
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
   }
@@ -402,9 +404,9 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   private SparkPaimonTable getSparkPaimonTableInstance(String tableName)
-          throws NoSuchTableException {
+      throws NoSuchTableException {
     CatalogPlugin catalogPlugin =
-            getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
     Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
     TableCatalog catalog = (TableCatalog) catalogPlugin;
     Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
