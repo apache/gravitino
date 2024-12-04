@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 public class ADLSTokenCredential implements Credential {
 
   /** ADLS SAS token credential type. */
-  public static final String ADLS_SAS_TOKEN_CREDENTIAL_TYPE = "adls-sas-token";
+  private static final String ADLS_SAS_TOKEN_CREDENTIAL_TYPE = "adls-sas-token";
   /** ADLS SAS token used to access ADLS data. */
   public static final String GRAVITINO_ADLS_SAS_TOKEN = "adls-sas-token";
 
