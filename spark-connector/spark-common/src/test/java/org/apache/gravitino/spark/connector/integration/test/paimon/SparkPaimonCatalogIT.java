@@ -78,25 +78,6 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  @Override
-  protected void testAlterSchema() {
-    String testDatabaseName = "t_alter";
-    dropDatabaseIfExists(testDatabaseName);
-    sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
-    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
-    // The database of the Paimon filesystem backend do not store any properties.
-    Assertions.assertTrue(databaseMeta.containsKey("ID"));
-
-    // The Paimon filesystem backend do not support alter database operation.
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () ->
-            sql(
-                String.format(
-                    "ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName)));
-  }
-
-  @Test
   void testPaimonPartitions() {
     String partitionPathString = "name=a/address=beijing";
 

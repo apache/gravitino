@@ -20,8 +20,12 @@ package org.apache.gravitino.spark.connector.integration.test.paimon;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 /** This class use Apache Paimon HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
@@ -36,5 +40,25 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
     catalogProperties.put(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_URI, hiveMetastoreUri);
     catalogProperties.put(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_WAREHOUSE, warehouse);
     return catalogProperties;
+  }
+
+  @Test
+  @Override
+  protected void testAlterSchema() {
+    String testDatabaseName = "t_alter";
+    dropDatabaseIfExists(testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName + " COMMENT 'db comment' WITH DBPROPERTIES (ID=001);");
+    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
+    Assertions.assertTrue(
+            databaseMeta.get("Properties").contains("(ID,001)"));
+    Assertions.assertEquals("db comment", databaseMeta.get("Comment"));
+
+    // The Paimon filesystem backend do not support alter database operation.
+    Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                    sql(
+                            String.format(
+                                    "ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName)));
   }
 }
