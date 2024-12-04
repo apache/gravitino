@@ -20,6 +20,7 @@ mod filesystem;
 mod filesystem_metadata;
 mod fuse_api_handle;
 pub mod fuse_server;
+mod log_fuse_api_handle;
 mod memory_filesystem;
 mod opened_file_manager;
 mod utils;
