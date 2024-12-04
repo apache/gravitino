@@ -78,6 +78,25 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  @Override
+  protected void testAlterSchema() {
+    String testDatabaseName = "t_alter";
+    dropDatabaseIfExists(testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
+    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
+    // The database of the Paimon filesystem backend do not store any properties.
+    Assertions.assertTrue(databaseMeta.containsKey("ID"));
+
+    // The Paimon filesystem backend do not support alter database operation.
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            sql(
+                String.format(
+                    "ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName)));
+  }
+
+  @Test
   void testPaimonPartitions() {
     String partitionPathString = "name=a/address=beijing";
 
@@ -104,38 +123,37 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     checkDirExists(partitionPath);
   }
 
+  @Test
+  void testPaimonPartitionManagement() {
+    // replace, add and load partition operations are unsupported in Paimon now.
+    // Therefore, Paimon spark runtime only supports list and drop partition operations.
+    testPaimonListAndDropPartition();
+  }
 
-    @Test
-    void testPaimonPartitionManagement() {
-        // replace, add and load partition operations are unsupported in Paimon now.
-        // Therefore, Paimon spark runtime only supports list and drop partition operations.
-        testPaimonListAndDropPartition();
-    }
+  private void testPaimonListAndDropPartition() {
+    String tableName = "test_paimon_drop_partition";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+    sql(createTableSQL);
 
-    private void testPaimonListAndDropPartition() {
-        String tableName = "test_paimon_drop_partition";
-        dropTableIfExists(tableName);
-        String createTableSQL = getCreatePaimonSimpleTableString(tableName);
-        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-        sql(createTableSQL);
+    String insertData =
+        String.format(
+            "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
+            tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult.size());
 
-        String insertData =
-                String.format(
-                        "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
-                        tableName);
-        sql(insertData);
-        List<String> queryResult = getTableData(tableName);
-        Assertions.assertEquals(3, queryResult.size());
+    List<String> partitions = getQueryData(String.format("show partitions %s", tableName));
+    Assertions.assertEquals(3, partitions.size());
+    Assertions.assertEquals("name=a;name=b;name=c", String.join(";", partitions));
 
-        List<String> partitions = getQueryData(String.format("show partitions %s", tableName));
-        Assertions.assertEquals(3, partitions.size());
-        Assertions.assertEquals("name=a;name=b;name=c", String.join(";", partitions));
-
-        sql(String.format("ALTER TABLE %s DROP PARTITION (`name`='a')", tableName));
-        partitions = getQueryData(String.format("show partitions %s", tableName));
-        Assertions.assertEquals(2, partitions.size());
-        Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
-    }
+    sql(String.format("ALTER TABLE %s DROP PARTITION (`name`='a')", tableName));
+    partitions = getQueryData(String.format("show partitions %s", tableName));
+    Assertions.assertEquals(2, partitions.size());
+    Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
+  }
 
   private String getCreatePaimonSimpleTableString(String tableName) {
     return String.format(
