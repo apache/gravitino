@@ -19,39 +19,41 @@
 use fuse3::{Errno, FileType, Timestamp};
 use std::time::SystemTime;
 
+pub type Result<T> = std::result::Result<T, Errno>;
+
 /// File system interface for the file system implementation. it use by FuseApiHandle
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system, it is used to identify the file or directory
 /// the `fh` it is the file handle, it is used to identify the opened file, it is used to read or write the file content
 pub trait IFileSystem: Send + Sync {
     fn get_file_path(&self, file_id: u64) -> String;
 
-    fn get_opened_file(&self, file_id: u64, fh: u64) -> Option<OpenedFile>;
+    fn get_opened_file(&self, file_id: u64, fh: u64) -> Result<OpenedFile>;
 
-    fn stat(&self, file_id: u64) -> Option<FileStat>;
+    fn stat(&self, file_id: u64) -> Result<FileStat>;
 
-    fn lookup(&self, parent_file_id: u64, name: &str) -> Option<FileStat>;
+    fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat>;
 
-    fn read_dir(&self, dir_file_id: u64) -> Vec<FileStat>;
+    fn read_dir(&self, dir_file_id: u64) -> Result<Vec<FileStat>>;
 
-    fn open_file(&self, file_id: u64) -> Result<OpenedFile, Errno>;
+    fn open_file(&self, file_id: u64) -> Result<OpenedFile>;
 
-    fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile, Errno>;
+    fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile>;
 
-    fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile, Errno>;
+    fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile>;
 
-    fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<(), Errno>;
+    fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
-    fn update_file_status(&self, file_id: u64, file_stat: &FileStat);
+    fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
     fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader>;
 
     fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter>;
 
-    fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<(), Errno>;
+    fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
-    fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<(), Errno>;
+    fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
-    fn close_file(&self, file_id: u64, fh: u64) -> Result<(), Errno>;
+    fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
 }
 
 pub struct FileSystemContext {

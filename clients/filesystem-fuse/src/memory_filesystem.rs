@@ -17,10 +17,9 @@
  * under the License.
  */
 use crate::file_handle_manager::FileHandleManager;
-use crate::filesystem::{FileReader, FileStat, FileWriter, IFileSystem, OpenedFile};
+use crate::filesystem::{FileReader, FileStat, FileWriter, IFileSystem, OpenedFile, Result};
 use crate::filesystem_metadata::{DefaultFileSystemMetadata, IFileSystemMetadata};
 use dashmap::DashMap;
-use fuse3::Errno;
 use std::sync::{Arc, Mutex, RwLock};
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
@@ -71,27 +70,28 @@ impl IFileSystem for MemoryFileSystem {
         meta.get_file_path(file_id)
     }
 
-    fn get_opened_file(&self, _file_id: u64, fh: u64) -> Option<OpenedFile> {
+    fn get_opened_file(&self, _file_id: u64, fh: u64) -> Result<OpenedFile> {
         let file_handle_map = self.file_handle_manager.read().unwrap();
-        file_handle_map.get_file(fh)
+        file_handle_map.get_file(fh).ok_or(libc::ENOENT.into())
     }
 
-    fn stat(&self, file_id: u64) -> Option<FileStat> {
+    fn stat(&self, file_id: u64) -> Result<FileStat> {
         let meta = self.meta.read().unwrap();
-        meta.get_file(file_id)
+        meta.get_file(file_id).ok_or(libc::ENOENT.into())
     }
 
-    fn lookup(&self, parent_file_id: u64, name: &str) -> Option<FileStat> {
+    fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
         let meta = self.meta.read().unwrap();
         meta.get_file_from_dir(parent_file_id, name)
+            .ok_or(libc::ENOENT.into())
     }
 
-    fn read_dir(&self, file_id: u64) -> Vec<FileStat> {
+    fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
         let meta = self.meta.read().unwrap();
-        meta.get_dir_childs(file_id)
+        Ok(meta.get_dir_childs(file_id))
     }
 
-    fn open_file(&self, file_id: u64) -> Result<OpenedFile, Errno> {
+    fn open_file(&self, file_id: u64) -> Result<OpenedFile> {
         let meta = self.meta.read().unwrap();
         let file_stat = meta.get_file(file_id);
         match file_stat {
@@ -104,7 +104,7 @@ impl IFileSystem for MemoryFileSystem {
         }
     }
 
-    fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile, Errno> {
+    fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
         let mut meta = self.meta.write().unwrap();
         let file_stat = meta.add_file(parent_file_id, name);
 
@@ -116,7 +116,7 @@ impl IFileSystem for MemoryFileSystem {
         Ok(file_handle)
     }
 
-    fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile, Errno> {
+    fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
         let mut meta = self.meta.write().unwrap();
         let file_stat = meta.add_dir(parent_file_id, name);
 
@@ -125,13 +125,13 @@ impl IFileSystem for MemoryFileSystem {
         Ok(file_handle)
     }
 
-    fn set_attr(&self, file_id: u64, file_info: &FileStat) -> Result<(), Errno> {
+    fn set_attr(&self, file_id: u64, file_info: &FileStat) -> Result<()> {
         Ok(())
     }
 
-    fn update_file_status(&self, file_id: u64, file_stat: &FileStat) {
+    fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
         let mut meta = self.meta.write().unwrap();
-        meta.update_file_stat(file_id, file_stat)
+        Ok(meta.update_file_stat(file_id, file_stat))
     }
 
     fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader> {
@@ -162,18 +162,18 @@ impl IFileSystem for MemoryFileSystem {
         })
     }
 
-    fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<(), Errno> {
+    fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
         let mut meta = self.meta.write().unwrap();
         meta.remove_file(parent_file_id, name);
         Ok(())
     }
 
-    fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<(), Errno> {
+    fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
         let mut meta = self.meta.write().unwrap();
         meta.remove_dir(parent_file_id, name)
     }
 
-    fn close_file(&self, _file_id: u64, fh: u64) -> Result<(), Errno> {
+    fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
         let mut file_handle_manager = self.file_handle_manager.write().unwrap();
         file_handle_manager.remove_file(fh);
         Ok(())

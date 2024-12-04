@@ -72,24 +72,19 @@ impl FuseApiHandle {
         size: Option<u64>,
         atime: Option<Timestamp>,
         mtime: Option<Timestamp>,
-    ) -> Option<FileStat> {
-        let file_stat = self.local_fs.stat(inode);
-        match file_stat {
-            Some(f) => {
-                let mut nf = FileStat::clone(&f);
-                size.map(|size| {
-                    nf.size = size;
-                });
-                atime.map(|atime| {
-                    nf.atime = atime;
-                });
-                mtime.map(|mtime| {
-                    nf.mtime = mtime;
-                });
-                Some(nf)
-            }
-            _ => None,
-        }
+    ) -> Result<FileStat, Errno> {
+        let file_stat = self.local_fs.stat(inode)?;
+        let mut nf = FileStat::clone(&file_stat);
+        size.map(|size| {
+            nf.size = size;
+        });
+        atime.map(|atime| {
+            nf.atime = atime;
+        });
+        mtime.map(|mtime| {
+            nf.mtime = mtime;
+        });
+        Ok(nf)
     }
 }
 
@@ -108,16 +103,12 @@ impl Filesystem for FuseApiHandle {
         parent: Inode,
         name: &OsStr,
     ) -> fuse3::Result<ReplyEntry> {
-        let file_stat = self.local_fs.lookup(parent, name.to_str().unwrap());
-
-        match file_stat {
-            Some(f) => Ok(ReplyEntry {
-                ttl: self.default_ttl,
-                attr: fstat_to_file_attr(&f, &self.fs_context),
-                generation: 0,
-            }),
-            None => Err(libc::ENOENT.into()),
-        }
+        let file_stat = self.local_fs.lookup(parent, name.to_str().unwrap())?;
+        Ok(ReplyEntry {
+            ttl: self.default_ttl,
+            attr: fstat_to_file_attr(&file_stat, &self.fs_context),
+            generation: 0,
+        })
     }
 
     async fn getattr(
@@ -128,20 +119,18 @@ impl Filesystem for FuseApiHandle {
         _flags: u32,
     ) -> fuse3::Result<ReplyAttr> {
         // check the opened file inode is the same as the inode
-        if let Some(f) = fh.and_then(|fh| self.local_fs.get_opened_file(inode, fh)) {
-            if f.file_id != inode {
+        if let Some(fh) = fh {
+            let opened_file = self.local_fs.get_opened_file(inode, fh)?;
+            if opened_file.file_id != inode {
                 return Err(libc::EBADF.into());
             }
         }
 
-        let file_stat = self.local_fs.stat(inode);
-        match file_stat {
-            Some(f) => Ok(ReplyAttr {
-                ttl: self.default_ttl,
-                attr: fstat_to_file_attr(&f, &self.fs_context),
-            }),
-            None => Err(libc::ENOENT.into()),
-        }
+        let file_stat = self.local_fs.stat(inode)?;
+        Ok(ReplyAttr {
+            ttl: self.default_ttl,
+            attr: fstat_to_file_attr(&file_stat, &self.fs_context),
+        })
     }
 
     async fn setattr(
@@ -152,18 +141,13 @@ impl Filesystem for FuseApiHandle {
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
         let new_file_stat =
-            self.get_modified_file_stat(inode, set_attr.size, set_attr.atime, set_attr.mtime);
-        match new_file_stat {
-            Some(stat) => {
-                let attr = fstat_to_file_attr(&stat, &self.fs_context);
-                self.local_fs.set_attr(inode, &stat);
-                Ok(ReplyAttr {
-                    ttl: self.default_ttl,
-                    attr: attr,
-                })
-            }
-            None => Err(libc::ENOENT.into()),
-        }
+            self.get_modified_file_stat(inode, set_attr.size, set_attr.atime, set_attr.mtime)?;
+        let attr = fstat_to_file_attr(&new_file_stat, &self.fs_context);
+        self.local_fs.set_attr(inode, &new_file_stat)?;
+        Ok(ReplyAttr {
+            ttl: self.default_ttl,
+            attr: attr,
+        })
     }
 
     async fn mkdir(
@@ -300,11 +284,11 @@ impl Filesystem for FuseApiHandle {
     ) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
         let current = self.local_fs.stat(parent);
         let current = match current {
-            Some(file) => file,
-            None => return Err(libc::ENOENT.into()),
+            Ok(file) => file,
+            Err(e) => return Err(e),
         };
 
-        let files = self.local_fs.read_dir(parent);
+        let files = self.local_fs.read_dir(parent)?;
         let entries_stream =
             stream::iter(files.into_iter().enumerate().map(|(index, file_stat)| {
                 Ok(DirectoryEntry {
@@ -383,13 +367,8 @@ impl Filesystem for FuseApiHandle {
         offset: u64,
         lock_owner: u64,
     ) -> fuse3::Result<ReplyDirectoryPlus<Self::DirEntryPlusStream<'a>>> {
-        let current = self.local_fs.stat(parent);
-        let current = match current {
-            Some(file) => file,
-            None => return Err(libc::ENOENT.into()),
-        };
-
-        let files = self.local_fs.read_dir(parent);
+        let current = self.local_fs.stat(parent)?;
+        let files = self.local_fs.read_dir(parent)?;
         let entries_stream =
             stream::iter(files.into_iter().enumerate().map(|(index, file_stat)| {
                 Ok(DirectoryEntryPlus {
