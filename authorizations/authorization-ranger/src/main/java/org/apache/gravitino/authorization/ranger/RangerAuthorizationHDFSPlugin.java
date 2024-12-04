@@ -51,12 +51,13 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   private static final Pattern pattern = Pattern.compile("^hdfs://[^/]*");
 
-  private RangerAuthorizationHDFSPlugin(Map<String, String> config) {
-    super(config);
+  private RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
+    super(metalake, config);
   }
 
-  public static synchronized RangerAuthorizationHDFSPlugin getInstance(Map<String, String> config) {
-    return new RangerAuthorizationHDFSPlugin(config);
+  public static synchronized RangerAuthorizationHDFSPlugin getInstance(
+      String metalake, Map<String, String> config) {
+    return new RangerAuthorizationHDFSPlugin(metalake, config);
   }
 
   @Override
@@ -207,8 +208,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
-    // TODO how to get metalake ?
-    NameIdentifier identifier = NameIdentifier.parse("metalake." + metadataObject.fullName());
+    NameIdentifier identifier =
+        NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
     Fileset fileset = GravitinoEnv.getInstance().filesetDispatcher().loadFileset(identifier);
     Preconditions.checkArgument(
         fileset != null, String.format("Fileset %s is not found", identifier));
