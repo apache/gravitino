@@ -22,12 +22,20 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import com.google.common.collect.ImmutableList;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.connector.catalog.CatalogPlugin;
+import org.apache.spark.sql.connector.catalog.FunctionCatalog;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -120,6 +128,59 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     testMetadataColumns();
     testFilePathMetadataColumn(isPartitioned);
     testRowIndexMetadataColumn(isPartitioned);
+  }
+
+  @Test
+  void testPaimonListAndLoadFunctions() throws NoSuchNamespaceException, NoSuchFunctionException {
+    String[] empty_namespace = new String[] {};
+    String[] system_namespace = new String[] {"sys"};
+    String[] default_namespace = new String[] {getDefaultDatabase()};
+    String[] non_exists_namespace = new String[] {"non_existent"};
+    // Paimon Spark connector only support bucket function now.
+    List<String> functions = Collections.singletonList("bucket");
+
+    CatalogPlugin catalogPlugin =
+            getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Assertions.assertInstanceOf(FunctionCatalog.class, catalogPlugin);
+    FunctionCatalog functionCatalog = (FunctionCatalog) catalogPlugin;
+
+    for (String[] namespace : ImmutableList.of(empty_namespace, system_namespace)) {
+      Arrays.stream(functionCatalog.listFunctions(namespace))
+              .map(Identifier::name)
+              .forEach(function -> Assertions.assertTrue(functions.contains(function)));
+    }
+    Arrays.stream(functionCatalog.listFunctions(default_namespace))
+            .map(Identifier::name)
+            .forEach(function -> Assertions.assertFalse(functions.contains(function)));
+    Assertions.assertThrows(
+            NoSuchNamespaceException.class, () -> functionCatalog.listFunctions(non_exists_namespace));
+
+    for (String[] namespace : ImmutableList.of(empty_namespace, system_namespace)) {
+      for (String function : functions) {
+        Identifier identifier = Identifier.of(namespace, function);
+        UnboundFunction func = functionCatalog.loadFunction(identifier);
+        Assertions.assertEquals(function, func.name());
+      }
+    }
+    functions.forEach(
+            function -> {
+              Identifier identifier = Identifier.of(new String[] {getDefaultDatabase()}, function);
+              Assertions.assertThrows(
+                      NoSuchFunctionException.class, () -> functionCatalog.loadFunction(identifier));
+            });
+  }
+
+  @Test
+  void testPaimonFunction() {
+    String[] catalogAndNamespaces = new String[] {getCatalogName() + ".sys", getCatalogName()};
+    Arrays.stream(catalogAndNamespaces)
+            .forEach(
+                    catalogAndNamespace -> {
+                      List<String> bucket =
+                              getQueryData(String.format("SELECT %s.bucket(2, 100)", catalogAndNamespace));
+                      Assertions.assertEquals(1, bucket.size());
+                      Assertions.assertEquals("0", bucket.get(0));
+                    });
   }
 
   private void testMetadataColumns() {

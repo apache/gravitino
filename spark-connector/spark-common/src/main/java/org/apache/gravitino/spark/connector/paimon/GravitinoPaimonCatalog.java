@@ -27,13 +27,16 @@ import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.paimon.spark.SparkCatalog;
-import org.apache.paimon.spark.SparkTable;
+import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-public class GravitinoPaimonCatalog extends BaseCatalog {
+public class GravitinoPaimonCatalog extends BaseCatalog implements FunctionCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -80,5 +83,15 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     return gravitinoCatalogClient
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
+  }
+
+  @Override
+  public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
+    return ((SparkCatalog)sparkCatalog).listFunctions(namespace);
+  }
+
+  @Override
+  public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
+    return ((SparkCatalog) sparkCatalog).loadFunction(ident);
   }
 }
