@@ -21,5 +21,4 @@ mod filesystem;
 mod filesystem_metadata;
 mod fuse_api_handle;
 pub mod fuse_server;
-mod log_filesystem;
 mod memory_filesystem;

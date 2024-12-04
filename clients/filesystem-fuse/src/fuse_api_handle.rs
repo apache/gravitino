@@ -31,7 +31,6 @@ use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
 use futures_util::{stream, FutureExt};
 use std::ffi::{OsStr, OsString};
-use std::future::Future;
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
 
@@ -48,6 +47,10 @@ impl FuseApiHandle {
             default_ttl: Duration::from_secs(1),
             fs_context: context,
         }
+    }
+
+    pub fn get_file_path(&self, inode: u64) -> String {
+        self.local_fs.get_file_path(inode)
     }
 
     fn update_file_status(
@@ -187,6 +190,22 @@ impl Filesystem for FuseApiHandle {
         }
     }
 
+    async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
+        let result = self.local_fs.remove_file(parent, name.to_str().unwrap());
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Errno::from(e)),
+        }
+    }
+
+    async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
+        let result = self.local_fs.remove_dir(parent, name.to_str().unwrap());
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Errno::from(e)),
+        }
+    }
+
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
         let file_handle = self.local_fs.open_file(inode);
         match file_handle {
@@ -244,6 +263,19 @@ impl Filesystem for FuseApiHandle {
             namelen: 255,
             frsize: 4096,
         })
+    }
+
+    async fn release(
+        &self,
+        req: Request,
+        inode: Inode,
+        fh: u64,
+        flags: u32,
+        lock_owner: u64,
+        flush: bool,
+    ) -> fuse3::Result<()> {
+        self.local_fs.close_file(inode, fh);
+        Ok(())
     }
 
     async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
@@ -304,6 +336,17 @@ impl Filesystem for FuseApiHandle {
         })
     }
 
+    async fn releasedir(
+        &self,
+        req: Request,
+        inode: Inode,
+        fh: u64,
+        flags: u32,
+    ) -> fuse3::Result<()> {
+        self.local_fs.close_file(inode, fh);
+        Ok(())
+    }
+
     async fn create(
         &self,
         req: Request,
@@ -326,46 +369,6 @@ impl Filesystem for FuseApiHandle {
                 fh: fh.handle_id,
                 flags: flags,
             }),
-            Err(e) => Err(Errno::from(e)),
-        }
-    }
-
-    async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let result = self.local_fs.remove_file(parent, name.to_str().unwrap());
-        match result {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Errno::from(e)),
-        }
-    }
-
-    async fn release(
-        &self,
-        req: Request,
-        inode: Inode,
-        fh: u64,
-        flags: u32,
-        lock_owner: u64,
-        flush: bool,
-    ) -> fuse3::Result<()> {
-        self.local_fs.close_file(inode, fh);
-        Ok(())
-    }
-
-    async fn releasedir(
-        &self,
-        req: Request,
-        inode: Inode,
-        fh: u64,
-        flags: u32,
-    ) -> fuse3::Result<()> {
-        self.local_fs.close_file(inode, fh);
-        Ok(())
-    }
-
-    async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let result = self.local_fs.remove_dir(parent, name.to_str().unwrap());
-        match result {
-            Ok(_) => Ok(()),
             Err(e) => Err(Errno::from(e)),
         }
     }
