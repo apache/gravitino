@@ -42,6 +42,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +81,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   public List<String> policyResourceDefinesRule() {
     return ImmutableList.of(RangerDefines.PolicyResource.PATH.getName());
+  }
+
+  @Override
+  protected RangerPolicy createPolicyAddResources(AuthorizationMetadataObject metadataObject) {
+    RangerPolicy policy = new RangerPolicy();
+    policy.setService(rangerServiceName);
+    policy.setName(metadataObject.fullName());
+    RangerPolicy.RangerPolicyResource policyResource =
+        new RangerPolicy.RangerPolicyResource(metadataObject.names().get(0), false, true);
+    policy.getResources().put(RangerDefines.PolicyResource.PATH.getName(), policyResource);
+    return policy;
   }
 
   @Override

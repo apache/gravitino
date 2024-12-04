@@ -116,6 +116,57 @@ public abstract class RangerAuthorizationPlugin
   public abstract List<String> policyResourceDefinesRule();
 
   /**
+   * Create a new policy for metadata object
+   *
+   * @return The RangerPolicy for metadata object.
+   */
+  protected abstract RangerPolicy createPolicyAddResources(
+      AuthorizationMetadataObject metadataObject);
+
+  protected RangerPolicy addOwnerToNewPolicy(
+      AuthorizationMetadataObject metadataObject, Owner newOwner) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+    ownerMappingRule()
+        .forEach(
+            ownerPrivilege -> {
+              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              if (newOwner != null) {
+                if (newOwner.type() == Owner.Type.USER) {
+                  policyItem.getUsers().add(newOwner.name());
+                } else {
+                  policyItem.getGroups().add(newOwner.name());
+                }
+                // mark the policy item is created by Gravitino
+                policyItem.getRoles().add(RangerHelper.GRAVITINO_OWNER_ROLE);
+              }
+              policy.getPolicyItems().add(policyItem);
+            });
+    return policy;
+  }
+
+  protected RangerPolicy addOwnerRoleToNewPolicy(
+      AuthorizationMetadataObject metadataObject, String ownerRoleName) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+
+    ownerMappingRule()
+        .forEach(
+            ownerPrivilege -> {
+              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.getRoles().add(rangerHelper.generateGravitinoRoleName(ownerRoleName));
+              policy.getPolicyItems().add(policyItem);
+            });
+    return policy;
+  }
+
+  /**
    * Create a new role in the Ranger. <br>
    * 1. Create a policy for metadata object. <br>
    * 2. Save role name in the Policy items. <br>
@@ -374,9 +425,7 @@ public abstract class RangerAuthorizationPlugin
                       rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
                   try {
                     if (policy == null) {
-                      policy =
-                          rangerHelper.addOwnerRoleToNewPolicy(
-                              AuthorizationSecurableObject, ownerRoleName);
+                      policy = addOwnerRoleToNewPolicy(AuthorizationSecurableObject, ownerRoleName);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
@@ -399,8 +448,7 @@ public abstract class RangerAuthorizationPlugin
                       rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
                   try {
                     if (policy == null) {
-                      policy =
-                          rangerHelper.addOwnerToNewPolicy(AuthorizationSecurableObject, newOwner);
+                      policy = addOwnerToNewPolicy(AuthorizationSecurableObject, newOwner);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwner(policy, preOwner, newOwner);
@@ -674,7 +722,7 @@ public abstract class RangerAuthorizationPlugin
         return true;
       }
     } else {
-      policy = rangerHelper.createPolicyAddResources(securableObject);
+      policy = createPolicyAddResources(securableObject);
     }
 
     rangerHelper.addPolicyItem(policy, roleName, securableObject);

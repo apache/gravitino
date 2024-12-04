@@ -41,6 +41,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +102,20 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         PolicyResource.DATABASE.getName(),
         PolicyResource.TABLE.getName(),
         PolicyResource.COLUMN.getName());
+  }
+
+  @Override
+  protected RangerPolicy createPolicyAddResources(AuthorizationMetadataObject metadataObject) {
+    RangerPolicy policy = new RangerPolicy();
+    policy.setService(rangerServiceName);
+    policy.setName(metadataObject.fullName());
+    List<String> nsMetadataObject = metadataObject.names();
+    for (int i = 0; i < nsMetadataObject.size(); i++) {
+      RangerPolicy.RangerPolicyResource policyResource =
+          new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
+      policy.getResources().put(policyResourceDefinesRule().get(i), policyResource);
+    }
+    return policy;
   }
 
   @Override
