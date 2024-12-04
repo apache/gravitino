@@ -15,6 +15,9 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationMetadataObject;
+import org.apache.gravitino.authorization.AuthorizationPrivilege;
+import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -38,25 +41,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   @Override
-  public void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
-      throws IllegalArgumentException {
-    LOG.info("validateRangerMetadataObject {}", names);
-    Preconditions.checkArgument(
-        names != null && !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
-    Preconditions.checkArgument(
-        names.size() == 1,
-        "Cannot create a Ranger metadata object with the name length which is not equal 1");
-    Preconditions.checkArgument(
-        type == RangerMetadataObject.Type.PATH,
-        String.format("Cannot create a Ranger metadata object with %s type", type));
-
-    for (String name : names) {
-      RangerMetadataObjects.checkName(name);
-    }
-  }
-
-  @Override
-  public Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule() {
+  public Map<Privilege.Name, Set<AuthorizationPrivilege>> privilegesMappingRule() {
     return ImmutableMap.of(
         Privilege.Name.READ_FILESET,
         ImmutableSet.of(RangerPrivileges.RangerHdfsPrivilege.READ),
@@ -65,7 +50,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   @Override
-  public Set<RangerPrivilege> ownerMappingRule() {
+  public Set<AuthorizationPrivilege> ownerMappingRule() {
     return ImmutableSet.of(
         RangerPrivileges.RangerHdfsPrivilege.READ,
         RangerPrivileges.RangerHdfsPrivilege.WRITE,
@@ -89,14 +74,14 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   @Override
-  public List<RangerSecurableObject> translatePrivilege(SecurableObject securableObject) {
-    List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
+  public List<AuthorizationSecurableObject> translatePrivilege(SecurableObject securableObject) {
+    List<AuthorizationSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
     securableObject.privileges().stream()
         .filter(Objects::nonNull)
         .forEach(
             gravitinoPrivilege -> {
-              Set<RangerPrivilege> rangerPrivileges = new HashSet<>();
+              Set<AuthorizationPrivilege> rangerPrivileges = new HashSet<>();
               // Ignore unsupported privileges
               if (!privilegesMappingRule().containsKey(gravitinoPrivilege.name())) {
                 return;
@@ -122,7 +107,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     case FILESET:
                       rangerSecurableObjects.add(
-                          generateRangerSecurableObject(
+                          generateAuthorizationSecurableObject(
                               ImmutableList.of(getFileSetPath(securableObject)),
                               RangerMetadataObject.Type.PATH,
                               rangerPrivileges));
@@ -145,8 +130,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   @Override
-  public List<RangerSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
-    List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
+  public List<AuthorizationSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
+    List<AuthorizationSecurableObject> rangerSecurableObjects = new ArrayList<>();
     switch (gravitinoMetadataObject.type()) {
       case METALAKE:
       case CATALOG:
@@ -154,7 +139,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         return rangerSecurableObjects;
       case FILESET:
         rangerSecurableObjects.add(
-            generateRangerSecurableObject(
+            generateAuthorizationSecurableObject(
                 ImmutableList.of(getFileSetPath(gravitinoMetadataObject)),
                 RangerMetadataObject.Type.PATH,
                 ownerMappingRule()));
@@ -169,7 +154,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   @Override
-  public RangerMetadataObject translateMetadataObject(MetadataObject metadataObject) {
+  public AuthorizationMetadataObject translateMetadataObject(MetadataObject metadataObject) {
     Preconditions.checkArgument(
         allowMetadataObjectTypesRule().contains(metadataObject.type()),
         String.format(
@@ -183,12 +168,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
 
-    return new RangerMetadataObjects.RangerMetadataObjectImpl(
-        null, "location", RangerMetadataObject.Type.PATH);
+    RangerMetadataObject rangerMetadataObject =
+        new RangerMetadataObject(
+            AuthorizationMetadataObject.getParentFullName(nsMetadataObject),
+            AuthorizationMetadataObject.getLastName(nsMetadataObject),
+            RangerMetadataObject.Type.PATH);
+    rangerMetadataObject.validateAuthorizationMetadataObject();
+    return rangerMetadataObject;
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
-    //TODO how to get metalake ?
+    // TODO how to get metalake ?
     NameIdentifier identifier = NameIdentifier.parse("metalake." + metadataObject.fullName());
     Fileset fileset = GravitinoEnv.getInstance().filesetDispatcher().loadFileset(identifier);
     Preconditions.checkArgument(

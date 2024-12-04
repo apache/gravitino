@@ -116,8 +116,8 @@ public class RangerMetadataObject implements AuthorizationMetadataObject {
         "If the length of names is 1, it must be the SCHEMA type");
 
     Preconditions.checkArgument(
-        names.size() != 2 || type == RangerMetadataObject.Type.TABLE,
-        "If the length of names is 2, it must be the TABLE type");
+        names.size() != 2 || type == RangerMetadataObject.Type.TABLE || type == Type.PATH,
+        "If the length of names is 2, it must be the TABLE type of PATH type");
 
     Preconditions.checkArgument(
         names.size() != 3 || type == RangerMetadataObject.Type.COLUMN,
