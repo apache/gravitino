@@ -30,12 +30,13 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
+  protected AuthorizationPlugin newPlugin(
+      String metalake, String catalogProvider, Map<String, String> config) {
     switch (catalogProvider) {
       case "hive":
       case "lakehouse-iceberg":
       case "lakehouse-paimon":
-        return RangerAuthorizationHadoopSQLPlugin.getInstance(config);
+        return RangerAuthorizationHadoopSQLPlugin.getInstance(metalake, config);
       case "hadoop":
         return RangerAuthorizationHDFSPlugin.getInstance(config);
       default:
