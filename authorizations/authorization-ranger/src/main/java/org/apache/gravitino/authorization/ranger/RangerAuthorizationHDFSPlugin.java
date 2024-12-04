@@ -51,14 +51,23 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   private static final Pattern pattern = Pattern.compile("^hdfs://[^/]*");
 
+  private static volatile RangerAuthorizationHDFSPlugin instance = null;
   private RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
   }
 
   public static synchronized RangerAuthorizationHDFSPlugin getInstance(
-      String metalake, Map<String, String> config) {
-    return new RangerAuthorizationHDFSPlugin(metalake, config);
+          String metalake, Map<String, String> config) {
+    if (instance == null) {
+      synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
+        if (instance == null) {
+          instance = new RangerAuthorizationHDFSPlugin(metalake, config);
+        }
+      }
+    }
+    return instance;
   }
+
 
   @Override
   public Map<Privilege.Name, Set<AuthorizationPrivilege>> privilegesMappingRule() {
