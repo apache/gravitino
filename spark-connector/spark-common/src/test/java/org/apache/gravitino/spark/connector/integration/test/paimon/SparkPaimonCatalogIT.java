@@ -32,7 +32,6 @@ import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
@@ -134,10 +133,10 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumnInfo[] metadataColumns = getPaimonMetadataColumns();
     SparkTableInfoChecker checker =
-            SparkTableInfoChecker.create()
-                    .withName(tableName)
-                    .withColumns(getPaimonSimpleTableColumn())
-                    .withMetadataColumns(metadataColumns);
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getPaimonSimpleTableColumn())
+            .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
   }
 
@@ -154,10 +153,10 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumnInfo[] metadataColumns = getPaimonMetadataColumns();
     SparkTableInfoChecker checker =
-            SparkTableInfoChecker.create()
-                    .withName(tableName)
-                    .withColumns(getPaimonSimpleTableColumn())
-                    .withMetadataColumns(metadataColumns);
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getPaimonSimpleTableColumn())
+            .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     String insertData = String.format("INSERT into %s values(2,'a', 'beijing');", tableName);
@@ -182,10 +181,10 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumnInfo[] metadataColumns = getPaimonMetadataColumns();
     SparkTableInfoChecker checker =
-            SparkTableInfoChecker.create()
-                    .withName(tableName)
-                    .withColumns(getPaimonSimpleTableColumn())
-                    .withMetadataColumns(metadataColumns);
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getPaimonSimpleTableColumn())
+            .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     String insertData = String.format("INSERT into %s values(2,'a', 'beijing');", tableName);
@@ -237,9 +236,8 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   private SparkMetadataColumnInfo[] getPaimonMetadataColumns() {
     return new SparkMetadataColumnInfo[] {
-            new SparkMetadataColumnInfo("__paimon_file_path", DataTypes.StringType, true),
-            new SparkMetadataColumnInfo(
-                    "__paimon_row_index", DataTypes.LongType, true)
+      new SparkMetadataColumnInfo("__paimon_file_path", DataTypes.StringType, true),
+      new SparkMetadataColumnInfo("__paimon_row_index", DataTypes.LongType, true)
     };
   }
 }
