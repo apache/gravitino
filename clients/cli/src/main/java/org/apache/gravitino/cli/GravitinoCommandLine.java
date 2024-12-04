@@ -143,6 +143,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleTagCommand();
     } else if (entity.equals(CommandEntities.ROLE)) {
       handleRoleCommand();
+    } else if (entity.equals(CommandEntities.OBJECT)) {
+      handleObjectCommand();
     }
   }
 
@@ -616,6 +618,21 @@ public class GravitinoCommandLine extends TestableCommandLine {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
   }
+
+    /** Handles the command execution for securable objects based on command type and the command line options. */
+    protected void handleObjectCommand() {
+      String url = getUrl();
+      FullName name = new FullName(line);
+      String metalake = name.getMetalakeName();
+      String entityName = line.getOptionValue(GravitinoOptions.NAME);
+      String privilege = line.getOptionValue(GravitinoOptions.PRIVILEGE);
+  
+      if (CommandActions.ADD.equals(command)) {
+        newRoleDetails(url, ignore, metalake, entityName, privilege).handle();
+      } else if (CommandActions.REMOVE.equals(command)) {
+        newListRoles(url, ignore, metalake, entityName, privilege).handle();
+      }
+    }
 
   /**
    * Handles the command execution for topics based on command type and the command line options.

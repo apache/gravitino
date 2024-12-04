@@ -54,6 +54,7 @@ public class GravitinoOptions {
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
   public static final String OUTPUT = "output";
+  public static final String PRIVILEGE = "privilege";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -94,6 +95,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
+    options.addOption(createArgOption(null, PRIVILEGE, "privilege"));
 
     // Properties and tags can have multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
