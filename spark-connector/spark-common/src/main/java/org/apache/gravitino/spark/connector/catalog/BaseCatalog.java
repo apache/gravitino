@@ -21,6 +21,9 @@ package org.apache.gravitino.spark.connector.catalog;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Collections;
+import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +36,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
@@ -55,6 +59,9 @@ import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+
+import static org.apache.gravitino.rel.indexes.Indexes.primary;
+import static org.apache.gravitino.spark.connector.ConnectorConstants.PRIMARY_KEY_IDENTIFIER;
 
 /**
  * BaseCatalog acts as the foundational class for Apache Spark CatalogManager registration, enabling
@@ -206,6 +213,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
         sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
     org.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
         sparkTransformConverter.toGravitinoPartitionings(transforms);
+    List<String> primaryKeysString = extractPrimaryKeyString(properties);
+    Index[] indexes = constructIndexesFromPrimaryKeys(primaryKeysString);
 
     try {
       org.apache.gravitino.rel.Table gravitinoTable =
@@ -218,7 +227,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
                   gravitinoProperties,
                   partitionings,
                   distributionAndSortOrdersInfo.getDistribution(),
-                  distributionAndSortOrdersInfo.getSortOrders());
+                  distributionAndSortOrdersInfo.getSortOrders(),
+                  indexes);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
       return createSparkTable(
           ident,
@@ -487,5 +497,32 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
               String.join(".", getDatabase(ident), ident.name())),
           e);
     }
+  }
+
+  private static List<String> extractPrimaryKeyString(Map<String, String> properties) {
+    String pkAsString = properties.get(PRIMARY_KEY_IDENTIFIER);
+      return pkAsString == null
+              ? Collections.emptyList()
+              : Arrays.stream(pkAsString.split(","))
+              .map(String::trim)
+              .collect(Collectors.toList());
+  }
+
+  private static Index[] constructIndexesFromPrimaryKeys(List<String> pks) {
+    Index[] indexes = new Index[0];
+    if (pks != null && !pks.isEmpty()) {
+      String[][] filedNames = constructIndexFiledNames(pks);
+      indexes =
+              Collections.singletonList(primary(PRIMARY_KEY_IDENTIFIER, filedNames))
+                      .toArray(new Index[0]);
+    }
+    return indexes;
+  }
+
+  private static String[][] constructIndexFiledNames(List<String> primaryKeys) {
+    return primaryKeys.stream()
+            .map(pk -> new String[] {pk})
+            .collect(Collectors.toList())
+            .toArray(new String[0][0]);
   }
 }

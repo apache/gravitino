@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
@@ -241,6 +242,46 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("1,1,1", tableData.get(0));
   }
 
+  @Test
+  void testPaimonTableRowLevelOperations() {
+    testPaimonDeleteOperation();
+    testPaimonUpdateOperation();
+    testPaimonMergeIntoDeleteOperation();
+    testPaimonMergeIntoUpdateOperation();
+  }
+
+  private void testPaimonDeleteOperation() {
+    String tableName = "test_paimon_delete_operation";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelDelete(tableName);
+  }
+
+  private void testPaimonUpdateOperation() {
+    String tableName = "test_paimon_update_operation";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelUpdate(tableName);
+  }
+
+  private void testPaimonMergeIntoDeleteOperation() {
+    String tableName = "test_paimon_mergeinto_delete_operation";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkDeleteByMergeInto(tableName);
+  }
+
+  private void testPaimonMergeIntoUpdateOperation() {
+    String tableName = "test_paimon_mergeinto_update_operation";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkTableUpdateByMergeInto(tableName);
+  }
+
   private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
@@ -342,7 +383,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   private String getCreatePaimonSimpleTableString(String tableName) {
     return String.format(
-        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon TBLPROPERTIES ('primary-key' = 'id')",
         tableName);
   }
 

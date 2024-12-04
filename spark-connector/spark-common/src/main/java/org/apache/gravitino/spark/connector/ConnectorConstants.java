@@ -26,6 +26,7 @@ public class ConnectorConstants {
 
   public static final SortDirection SPARK_DEFAULT_SORT_DIRECTION = SortDirection.ASCENDING;
   public static final String LOCATION = "location";
+  public static final String PRIMARY_KEY_IDENTIFIER = "primary-key";
 
   public static final String DOT = ".";
   public static final String COMMA = ",";
