@@ -50,7 +50,7 @@ public class GravitinoOptions {
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
-  public static final String COLUMNFILE = "csv";
+  public static final String COLUMNFILE = "columnfile";
   public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
   public static final String PARTITION = "partition";
