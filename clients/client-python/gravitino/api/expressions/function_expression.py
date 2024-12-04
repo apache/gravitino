@@ -43,12 +43,10 @@ class FunctionExpression(Expression):
     @abstractmethod
     def function_name(self) -> str:
         """Returns the function name."""
-        pass
 
     @abstractmethod
     def arguments(self) -> list[Expression]:
         """Returns the arguments passed to the function."""
-        pass
 
     def children(self) -> list[Expression]:
         """Returns the arguments as children."""
