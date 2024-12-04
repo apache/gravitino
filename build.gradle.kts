@@ -827,7 +827,7 @@ tasks {
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
-      ":catalogs:catalog-modle:copyLibAndConfig"
+      ":catalogs:catalog-model:copyLibAndConfig"
     )
   }
 
