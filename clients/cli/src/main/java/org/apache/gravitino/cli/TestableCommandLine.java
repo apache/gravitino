@@ -153,7 +153,6 @@ public class TestableCommandLine {
 
   protected SetMetalakeProperty newSetMetalakeProperty(
       String url, boolean ignore, String metalake, String property, String value) {
-
     return new SetMetalakeProperty(url, ignore, metalake, property, value);
   }
 
@@ -174,7 +173,6 @@ public class TestableCommandLine {
 
   protected UpdateMetalakeName newUpdateMetalakeName(
       String url, boolean ignore, boolean force, String metalake, String newName) {
-
     return new UpdateMetalakeName(url, ignore, force, metalake, newName);
   }
 
@@ -185,7 +183,6 @@ public class TestableCommandLine {
 
   protected CatalogDetails newCatalogDetails(
       String url, boolean ignore, String outputFormat, String metalake, String catalog) {
-
     return new CatalogDetails(url, ignore, outputFormat, metalake, catalog);
   }
 
@@ -206,19 +203,16 @@ public class TestableCommandLine {
 
   protected DeleteCatalog newDeleteCatalog(
       String url, boolean ignore, boolean force, String metalake, String catalog) {
-
     return new DeleteCatalog(url, ignore, force, metalake, catalog);
   }
 
   protected SetCatalogProperty newSetCatalogProperty(
       String url, boolean ignore, String metalake, String catalog, String property, String value) {
-
     return new SetCatalogProperty(url, ignore, metalake, catalog, property, value);
   }
 
   protected RemoveCatalogProperty newRemoveCatalogProperty(
       String url, boolean ignore, String metalake, String catalog, String property) {
-
     return new RemoveCatalogProperty(url, ignore, metalake, catalog, property);
   }
 
@@ -229,25 +223,21 @@ public class TestableCommandLine {
 
   protected UpdateCatalogComment newUpdateCatalogComment(
       String url, boolean ignore, String metalake, String catalog, String comment) {
-
     return new UpdateCatalogComment(url, ignore, metalake, catalog, comment);
   }
 
   protected UpdateCatalogName newUpdateCatalogName(
       String url, boolean ignore, String metalake, String catalog, String newName) {
-
     return new UpdateCatalogName(url, ignore, metalake, catalog, newName);
   }
 
   protected SchemaAudit newSchemaAudit(
       String url, boolean ignore, String metalake, String catalog, String schema) {
-
     return new SchemaAudit(url, ignore, metalake, catalog, schema);
   }
 
   protected SchemaDetails newSchemaDetails(
       String url, boolean ignore, String metalake, String catalog, String schema) {
-
     return new SchemaDetails(url, ignore, metalake, catalog, schema);
   }
 
@@ -257,13 +247,11 @@ public class TestableCommandLine {
 
   protected CreateSchema newCreateSchema(
       String url, boolean ignore, String metalake, String catalog, String schema, String comment) {
-
     return new CreateSchema(url, ignore, metalake, catalog, schema, comment);
   }
 
   protected DeleteSchema newDeleteSchema(
       String url, boolean ignore, boolean force, String metalake, String catalog, String schema) {
-
     return new DeleteSchema(url, ignore, force, metalake, catalog, schema);
   }
 
@@ -280,31 +268,26 @@ public class TestableCommandLine {
 
   protected RemoveSchemaProperty newRemoveSchemaProperty(
       String url, boolean ignore, String metalake, String catalog, String schema, String property) {
-
     return new RemoveSchemaProperty(url, ignore, metalake, catalog, schema, property);
   }
 
   protected ListSchemaProperties newListSchemaProperties(
       String url, boolean ignore, String metalake, String catalog, String schema) {
-
     return new ListSchemaProperties(url, ignore, metalake, catalog, schema);
   }
 
   protected TableAudit newTableAudit(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new TableAudit(url, ignore, metalake, catalog, schema, table);
   }
 
   protected TableDetails newTableDetails(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new TableDetails(url, ignore, metalake, catalog, schema, table);
   }
 
   protected ListTables newListTables(
       String url, boolean ignore, String metalake, String catalog, String table) {
-
     return new ListTables(url, ignore, metalake, catalog, table);
   }
 
@@ -321,19 +304,16 @@ public class TestableCommandLine {
 
   protected ListIndexes newListIndexes(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new ListIndexes(url, ignore, metalake, catalog, schema, table);
   }
 
   protected TablePartition newTablePartition(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new TablePartition(url, ignore, metalake, catalog, schema, table);
   }
 
   protected TableDistribution newTableDistribution(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new TableDistribution(url, ignore, metalake, catalog, schema, table);
   }
 
@@ -384,7 +364,6 @@ public class TestableCommandLine {
 
   protected ListTableProperties newListTableProperties(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new ListTableProperties(url, ignore, metalake, catalog, schema, table);
   }
 
@@ -402,19 +381,16 @@ public class TestableCommandLine {
 
   protected DeleteUser newDeleteUser(
       String url, boolean ignore, boolean force, String metalake, String user) {
-
     return new DeleteUser(url, ignore, force, metalake, user);
   }
 
   protected RemoveRoleFromUser newRemoveRoleFromUser(
       String url, boolean ignore, String metalake, String user, String role) {
-
     return new RemoveRoleFromUser(url, ignore, metalake, user, role);
   }
 
   protected AddRoleToUser newAddRoleToUser(
       String url, boolean ignore, String metalake, String user, String role) {
-
     return new AddRoleToUser(url, ignore, metalake, user, role);
   }
 
@@ -432,19 +408,16 @@ public class TestableCommandLine {
 
   protected DeleteGroup newDeleteGroup(
       String url, boolean ignore, boolean force, String metalake, String user) {
-
     return new DeleteGroup(url, ignore, force, metalake, user);
   }
 
   protected RemoveRoleFromGroup newRemoveRoleFromGroup(
       String url, boolean ignore, String metalake, String user, String role) {
-
     return new RemoveRoleFromGroup(url, ignore, metalake, user, role);
   }
 
   protected AddRoleToGroup newAddRoleToGroup(
       String url, boolean ignore, String metalake, String user, String role) {
-
     return new AddRoleToGroup(url, ignore, metalake, user, role);
   }
 
@@ -462,7 +435,6 @@ public class TestableCommandLine {
 
   protected DeleteRole newDeleteRole(
       String url, boolean ignore, boolean force, String metalake, String role) {
-
     return new DeleteRole(url, ignore, force, metalake, role);
   }
 
@@ -476,25 +448,21 @@ public class TestableCommandLine {
 
   protected CreateTag newCreateTags(
       String url, boolean ignore, String metalake, String[] tags, String comment) {
-
     return new CreateTag(url, ignore, metalake, tags, comment);
   }
 
   protected DeleteTag newDeleteTag(
       String url, boolean ignore, boolean force, String metalake, String[] tags) {
-
     return new DeleteTag(url, ignore, force, metalake, tags);
   }
 
   protected SetTagProperty newSetTagProperty(
       String url, boolean ignore, String metalake, String tag, String property, String value) {
-
     return new SetTagProperty(url, ignore, metalake, tag, property, value);
   }
 
   protected RemoveTagProperty newRemoveTagProperty(
       String url, boolean ignore, String metalake, String tag, String property) {
-
     return new RemoveTagProperty(url, ignore, metalake, tag, property);
   }
 
@@ -505,13 +473,11 @@ public class TestableCommandLine {
 
   protected UpdateTagComment newUpdateTagComment(
       String url, boolean ignore, String metalake, String tag, String comment) {
-
     return new UpdateTagComment(url, ignore, metalake, tag, comment);
   }
 
   protected UpdateTagName newUpdateTagName(
       String url, boolean ignore, String metalake, String tag, String newName) {
-
     return new UpdateTagName(url, ignore, metalake, tag, newName);
   }
 
@@ -522,19 +488,16 @@ public class TestableCommandLine {
 
   protected TagEntity newTagEntity(
       String url, boolean ignore, String metalake, FullName name, String[] tags) {
-
     return new TagEntity(url, ignore, metalake, name, tags);
   }
 
   protected UntagEntity newUntagEntity(
       String url, boolean ignore, String metalake, FullName name, String[] tags) {
-
     return new UntagEntity(url, ignore, metalake, name, tags);
   }
 
   protected ListColumns newListColumns(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-
     return new ListColumns(url, ignore, metalake, catalog, schema, table);
   }
 
@@ -551,19 +514,16 @@ public class TestableCommandLine {
 
   protected OwnerDetails newOwnerDetails(
       String url, boolean ignore, String metalake, String entity, String entityType) {
-
     return new OwnerDetails(url, ignore, metalake, entity, entityType);
   }
 
   protected ListTopics newListTopics(
       String url, boolean ignore, String metalake, String catalog, String schema) {
-
     return new ListTopics(url, ignore, metalake, catalog, schema);
   }
 
   protected TopicDetails newTopicDetails(
       String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
-
     return new TopicDetails(url, ignore, metalake, catalog, schema, topic);
   }
 
@@ -625,19 +585,16 @@ public class TestableCommandLine {
 
   protected ListTopicProperties newListTopicProperties(
       String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
-
     return new ListTopicProperties(url, ignore, metalake, catalog, schema, topic);
   }
 
   protected FilesetDetails newFilesetDetails(
       String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
-
     return new FilesetDetails(url, ignore, metalake, catalog, schema, fileset);
   }
 
   protected ListFilesets newListFilesets(
       String url, boolean ignore, String metalake, String catalog, String schema) {
-
     return new ListFilesets(url, ignore, metalake, catalog, schema);
   }
 
@@ -688,7 +645,6 @@ public class TestableCommandLine {
 
   protected ListFilesetProperties newListFilesetProperties(
       String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
-
     return new ListFilesetProperties(url, ignore, metalake, catalog, schema, fileset);
   }
 

@@ -47,7 +47,6 @@ public class TagEntity extends Command {
    */
   public TagEntity(
       String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;

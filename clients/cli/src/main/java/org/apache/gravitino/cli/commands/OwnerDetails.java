@@ -46,7 +46,6 @@ public class OwnerDetails extends Command {
    */
   public OwnerDetails(
       String url, boolean ignoreVersions, String metalake, String entity, String entityType) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.entity = entity;

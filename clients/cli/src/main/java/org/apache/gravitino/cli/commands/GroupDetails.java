@@ -39,7 +39,6 @@ public class GroupDetails extends Command {
    * @param group The name of the group.
    */
   public GroupDetails(String url, boolean ignoreVersions, String metalake, String group) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.group = group;

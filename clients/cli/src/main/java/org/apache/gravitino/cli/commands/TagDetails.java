@@ -39,7 +39,6 @@ public class TagDetails extends Command {
    * @param tag The name of the tag.
    */
   public TagDetails(String url, boolean ignoreVersions, String metalake, String tag) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;

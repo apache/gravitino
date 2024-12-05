@@ -39,7 +39,6 @@ public class CatalogAudit extends AuditCommand {
    * @param catalog The name of the catalog.
    */
   public CatalogAudit(String url, boolean ignoreVersions, String metalake, String catalog) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

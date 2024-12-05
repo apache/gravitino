@@ -40,7 +40,6 @@ public class ListSchema extends Command {
    * @param catalog The name of the catalog.
    */
   public ListSchema(String url, boolean ignoreVersions, String metalake, String catalog) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

@@ -44,7 +44,6 @@ public class AddRoleToGroup extends Command {
    */
   public AddRoleToGroup(
       String url, boolean ignoreVersions, String metalake, String group, String role) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.group = group;

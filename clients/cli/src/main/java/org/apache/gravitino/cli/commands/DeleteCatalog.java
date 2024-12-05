@@ -42,7 +42,6 @@ public class DeleteCatalog extends Command {
    */
   public DeleteCatalog(
       String url, boolean ignoreVersions, boolean force, String metalake, String catalog) {
-
     super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;

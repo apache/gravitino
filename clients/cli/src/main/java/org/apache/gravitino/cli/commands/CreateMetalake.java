@@ -36,7 +36,6 @@ public class CreateMetalake extends Command {
    * @param comment The metalake's comment.
    */
   public CreateMetalake(String url, boolean ignoreVersions, String metalake, String comment) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.comment = comment;

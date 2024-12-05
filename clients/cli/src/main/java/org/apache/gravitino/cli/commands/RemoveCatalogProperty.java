@@ -43,7 +43,6 @@ public class RemoveCatalogProperty extends Command {
    */
   public RemoveCatalogProperty(
       String url, boolean ignoreVersions, String metalake, String catalog, String property) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

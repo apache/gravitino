@@ -43,7 +43,6 @@ public class RemoveTagProperty extends Command {
    */
   public RemoveTagProperty(
       String url, boolean ignoreVersions, String metalake, String tag, String property) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;

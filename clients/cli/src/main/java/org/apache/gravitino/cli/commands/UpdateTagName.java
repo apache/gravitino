@@ -43,7 +43,6 @@ public class UpdateTagName extends Command {
    */
   public UpdateTagName(
       String url, boolean ignoreVersions, String metalake, String tag, String name) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;

@@ -44,7 +44,6 @@ public class AddRoleToUser extends Command {
    */
   public AddRoleToUser(
       String url, boolean ignoreVersions, String metalake, String user, String role) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;

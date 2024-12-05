@@ -46,7 +46,6 @@ public class ListEntityTags extends Command {
    * @param name The name of the entity.
    */
   public ListEntityTags(String url, boolean ignoreVersions, String metalake, FullName name) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;

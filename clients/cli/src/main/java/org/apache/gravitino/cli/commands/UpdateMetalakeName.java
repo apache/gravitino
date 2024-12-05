@@ -43,7 +43,6 @@ public class UpdateMetalakeName extends Command {
    */
   public UpdateMetalakeName(
       String url, boolean ignoreVersions, boolean force, String metalake, String name) {
-
     super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;

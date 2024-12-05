@@ -44,7 +44,6 @@ public class RemoveRoleFromGroup extends Command {
    */
   public RemoveRoleFromGroup(
       String url, boolean ignoreVersions, String metalake, String group, String role) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.group = group;

@@ -38,7 +38,6 @@ public class CreateRole extends Command {
    * @param role The name of the role.
    */
   public CreateRole(String url, boolean ignoreVersions, String metalake, String role) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.role = role;

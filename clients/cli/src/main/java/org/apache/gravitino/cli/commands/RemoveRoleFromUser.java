@@ -44,7 +44,6 @@ public class RemoveRoleFromUser extends Command {
    */
   public RemoveRoleFromUser(
       String url, boolean ignoreVersions, String metalake, String user, String role) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;

@@ -43,7 +43,6 @@ public class UpdateCatalogComment extends Command {
    */
   public UpdateCatalogComment(
       String url, boolean ignoreVersions, String metalake, String catalog, String comment) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

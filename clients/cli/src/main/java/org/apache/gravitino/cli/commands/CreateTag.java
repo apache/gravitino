@@ -43,7 +43,6 @@ public class CreateTag extends Command {
    */
   public CreateTag(
       String url, boolean ignoreVersions, String metalake, String[] tags, String comment) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.tags = tags;

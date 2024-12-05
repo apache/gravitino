@@ -42,7 +42,6 @@ public class SetMetalakeProperty extends Command {
    */
   public SetMetalakeProperty(
       String url, boolean ignoreVersions, String metalake, String property, String value) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.property = property;

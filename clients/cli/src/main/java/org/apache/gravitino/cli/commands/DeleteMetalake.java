@@ -37,7 +37,6 @@ public class DeleteMetalake extends Command {
    * @param metalake The name of the metalake.
    */
   public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
-
     super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;

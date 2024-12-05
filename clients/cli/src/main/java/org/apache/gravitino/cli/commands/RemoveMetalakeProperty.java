@@ -40,7 +40,6 @@ public class RemoveMetalakeProperty extends Command {
    */
   public RemoveMetalakeProperty(
       String url, boolean ignoreVersions, String metalake, String property) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.property = property;

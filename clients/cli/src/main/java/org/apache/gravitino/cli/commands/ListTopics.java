@@ -45,7 +45,6 @@ public class ListTopics extends Command {
    */
   public ListTopics(
       String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

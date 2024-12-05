@@ -40,7 +40,6 @@ public class UpdateMetalakeComment extends Command {
    */
   public UpdateMetalakeComment(
       String url, boolean ignoreVersions, String metalake, String comment) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.comment = comment;

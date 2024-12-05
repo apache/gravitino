@@ -45,7 +45,6 @@ public class DeleteTag extends Command {
    */
   public DeleteTag(
       String url, boolean ignoreVersions, boolean force, String metalake, String[] tags) {
-
     super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;

@@ -42,7 +42,6 @@ public class DeleteGroup extends Command {
    */
   public DeleteGroup(
       String url, boolean ignoreVersions, boolean force, String metalake, String group) {
-
     super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;

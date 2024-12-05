@@ -41,7 +41,6 @@ public class ListTagProperties extends ListProperties {
    * @param tag The name of the tag.
    */
   public ListTagProperties(String url, boolean ignoreVersions, String metalake, String tag) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;

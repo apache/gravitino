@@ -39,7 +39,6 @@ public class UserDetails extends Command {
    * @param user The name of the user.
    */
   public UserDetails(String url, boolean ignoreVersions, String metalake, String user) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;

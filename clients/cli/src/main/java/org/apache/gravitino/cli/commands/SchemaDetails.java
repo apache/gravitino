@@ -44,7 +44,6 @@ public class SchemaDetails extends Command {
    */
   public SchemaDetails(
       String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

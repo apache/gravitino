@@ -42,7 +42,6 @@ public class ListCatalogProperties extends ListProperties {
    */
   public ListCatalogProperties(
       String url, boolean ignoreVersions, String metalake, String catalog) {
-
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
