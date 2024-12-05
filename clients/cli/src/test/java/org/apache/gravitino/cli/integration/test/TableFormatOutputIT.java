@@ -64,20 +64,20 @@ public class TableFormatOutputIT extends BaseIT {
     Main.main(create_catalog_args);
 
     String[] create_catalog_with_comment_args = {
-        "catalog",
-        "create",
-        commandArg(GravitinoOptions.METALAKE),
-        "my_metalake",
-        commandArg(GravitinoOptions.NAME),
-        "postgres2",
-        commandArg(GravitinoOptions.PROVIDER),
-        "postgres",
-        commandArg(GravitinoOptions.PROPERTIES),
-        "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver",
-        commandArg(GravitinoOptions.URL),
-        gravitinoUrl,
-        commandArg(GravitinoOptions.COMMENT),
-        "catalog, 用于测试"
+      "catalog",
+      "create",
+      commandArg(GravitinoOptions.METALAKE),
+      "my_metalake",
+      commandArg(GravitinoOptions.NAME),
+      "postgres2",
+      commandArg(GravitinoOptions.PROVIDER),
+      "postgres",
+      commandArg(GravitinoOptions.PROPERTIES),
+      "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver",
+      commandArg(GravitinoOptions.URL),
+      gravitinoUrl,
+      commandArg(GravitinoOptions.COMMENT),
+      "catalog, 用于测试"
     };
     Main.main(create_catalog_with_comment_args);
   }
@@ -178,24 +178,23 @@ public class TableFormatOutputIT extends BaseIT {
         output);
   }
 
-
   @Test
-  public void testCatalogDetailsCommandFullCornerCharacter(){
+  public void testCatalogDetailsCommandFullCornerCharacter() {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintStream originalOut = System.out;
     System.setOut(new PrintStream(outputStream));
 
     String[] args = {
-        "catalog",
-        "details",
-        commandArg(GravitinoOptions.METALAKE),
-        "my_metalake",
-        commandArg(GravitinoOptions.NAME),
-        "postgres2",
-        commandArg(GravitinoOptions.OUTPUT),
-        "table",
-        commandArg(GravitinoOptions.URL),
-        gravitinoUrl
+      "catalog",
+      "details",
+      commandArg(GravitinoOptions.METALAKE),
+      "my_metalake",
+      commandArg(GravitinoOptions.NAME),
+      "postgres2",
+      commandArg(GravitinoOptions.OUTPUT),
+      "table",
+      commandArg(GravitinoOptions.URL),
+      gravitinoUrl
     };
     Main.main(args);
     // Restore the original System.out
