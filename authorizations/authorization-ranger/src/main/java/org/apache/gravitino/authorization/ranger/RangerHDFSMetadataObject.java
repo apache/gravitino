@@ -92,7 +92,7 @@ public class RangerHDFSMetadataObject implements AuthorizationMetadataObject {
     Preconditions.checkArgument(
         names != null && !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
     Preconditions.checkArgument(
-        names.size() == 3,
+        names.size() == 1,
         "Cannot create a Ranger metadata object with the name length which is 1");
     Preconditions.checkArgument(
         type != null, "Cannot create a Ranger metadata object with no type");
