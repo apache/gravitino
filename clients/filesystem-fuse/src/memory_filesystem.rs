@@ -24,6 +24,7 @@ use fuse3::Errno;
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
+use async_trait::async_trait;
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
 // It is used for testing purposes
@@ -46,10 +47,13 @@ impl MemoryFileSystem {
     pub fn init(&self) {}
 }
 
-impl PathFileSystem for MemoryFileSystem {
-    fn init(&self) {}
 
-    fn stat(&self, name: &str) -> Result<FileStat> {
+#[async_trait]
+impl PathFileSystem for MemoryFileSystem {
+
+    async fn init(&self) {}
+
+    async fn stat(&self, name: &str) -> Result<FileStat> {
         self.file_map
             .read()
             .unwrap()
@@ -58,11 +62,11 @@ impl PathFileSystem for MemoryFileSystem {
             .ok_or(Errno::from(libc::ENOENT))
     }
 
-    fn lookup(&self, parent: &str, name: &str) -> Result<FileStat> {
-        self.stat(&join_file_path(parent, name))
+    async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat> {
+        self.stat(&join_file_path(parent, name)).await
     }
 
-    fn read_dir(&self, name: &str) -> Result<Vec<FileStat>> {
+    async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>> {
         let file_map = self.file_map.read().unwrap();
 
         let results: Vec<FileStat> = file_map
@@ -74,7 +78,7 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(results)
     }
 
-    fn create_file(&self, parent: &str, name: &str) -> Result<FileStat> {
+    async fn create_file(&self, parent: &str, name: &str) -> Result<FileStat> {
         let mut file_map = self.file_map.read().unwrap();
         if file_map.contains_key(&join_file_path(parent, name)) {
             return Err(Errno::from(libc::EEXIST));
@@ -86,7 +90,7 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(file_stat)
     }
 
-    fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat> {
+    async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat> {
         let mut file_map = self.file_map.read().unwrap();
         if file_map.contains_key(&join_file_path(parent, name)) {
             return Err(Errno::from(libc::EEXIST));
@@ -96,13 +100,13 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(file_stat)
     }
 
-    fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()> {
+    async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()> {
         let mut file_map = self.file_map.write().unwrap();
         file_map.insert(name.to_string(), file_stat.clone());
         Ok(())
     }
 
-    fn read(&self, file: &OpenedFile) -> Box<dyn FileReader> {
+    async fn read(&self, file: &OpenedFile) -> Box<dyn FileReader> {
         let data = self.file_data_map.get(&file.path).unwrap().clone();
         Box::new(MemoryFileReader {
             file: file.clone(),
@@ -110,7 +114,7 @@ impl PathFileSystem for MemoryFileSystem {
         })
     }
 
-    fn write(&self, file: &OpenedFile) -> Box<dyn FileWriter> {
+    async fn write(&self, file: &OpenedFile) -> Box<dyn FileWriter> {
         let data = self.file_data_map.get(&file.path).unwrap().clone();
         Box::new(MemoryFileWriter {
             file: file.clone(),
@@ -118,7 +122,7 @@ impl PathFileSystem for MemoryFileSystem {
         })
     }
 
-    fn remove_file(&self, parent: &str, name: &str) -> Result<()> {
+    async fn remove_file(&self, parent: &str, name: &str) -> Result<()> {
         let mut file_map = self.file_map.write().unwrap();
         if file_map.remove(&join_file_path(parent, name)).is_none() {
             return Err(Errno::from(libc::ENOENT));
@@ -126,7 +130,7 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(())
     }
 
-    fn remove_dir(&self, parent: &str, name: &str) -> Result<()> {
+    async fn remove_dir(&self, parent: &str, name: &str) -> Result<()> {
         let mut file_map = self.file_map.write().unwrap();
         let count = file_map
             .iter()

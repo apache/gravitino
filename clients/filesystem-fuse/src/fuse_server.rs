@@ -55,7 +55,7 @@ impl FuseServer {
         let fs = Box::new(SimpleFileSystem::new(Box::new(MemoryFileSystem::new())));
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
-        let fs_context = crate::filesystem::FileSystemContext { uid: uid, gid: gid };
+        let fs_context = FileSystemContext { uid: uid, gid: gid };
         let fuse_fs = FuseApiHandle::new(fs, fs_context);
 
         //check if the mount point exists
