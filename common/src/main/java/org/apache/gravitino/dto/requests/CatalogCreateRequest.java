@@ -89,7 +89,7 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonSetter(value = "provider")
   public void setProvider(String provider) {
     this.provider =
-        StringUtils.isNotBlank(provider) ? provider : CatalogProvider.builtinCatalogShortName(type);
+        StringUtils.isNotBlank(provider) ? provider : CatalogProvider.builtinShortName(type);
   }
 
   /**

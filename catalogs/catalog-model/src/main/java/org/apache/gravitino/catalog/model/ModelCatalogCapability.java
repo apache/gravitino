@@ -29,6 +29,6 @@ public class ModelCatalogCapability implements Capability {
       return CapabilityResult.SUPPORTED;
     }
     return CapabilityResult.unsupported(
-        String.format("HModel catalog does not support managed storage for %s.", scope));
+        String.format("Model catalog does not support managed storage for %s.", scope));
   }
 }

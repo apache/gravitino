@@ -35,7 +35,7 @@ public interface CatalogProvider {
    * @param type The catalog type.
    * @return The provider short name for the builtin catalog.
    */
-  static String builtinCatalogShortName(Catalog.Type type) {
+  static String builtinShortName(Catalog.Type type) {
     return type.name().toLowerCase(Locale.ROOT);
   }
 
