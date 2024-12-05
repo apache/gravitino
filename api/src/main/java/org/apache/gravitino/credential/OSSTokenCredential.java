@@ -64,6 +64,12 @@ public class OSSTokenCredential implements Credential {
     this.expireTimeInMS = expireTimeInMS;
   }
 
+  /**
+   * This is the constructor that is used by credential factory to create an instance of credential
+   * according to the credential information.
+   */
+  public OSSTokenCredential() {}
+
   @Override
   public String credentialType() {
     return OSS_TOKEN_CREDENTIAL_TYPE;
