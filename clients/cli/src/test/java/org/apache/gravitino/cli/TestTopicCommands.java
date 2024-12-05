@@ -62,13 +62,7 @@ class TestTopicCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListTopics(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -87,14 +81,7 @@ class TestTopicCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newTopicDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -118,8 +105,6 @@ class TestTopicCommands {
         .newCreateTopic(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -146,8 +131,6 @@ class TestTopicCommands {
             GravitinoCommandLine.DEFAULT_URL,
             false,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -174,8 +157,6 @@ class TestTopicCommands {
             GravitinoCommandLine.DEFAULT_URL,
             false,
             true,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -203,8 +184,6 @@ class TestTopicCommands {
         .newUpdateTopicComment(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -229,14 +208,7 @@ class TestTopicCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListTopicProperties(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
@@ -262,8 +234,6 @@ class TestTopicCommands {
         .newSetTopicProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -293,8 +263,6 @@ class TestTopicCommands {
         .newRemoveTopicProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",

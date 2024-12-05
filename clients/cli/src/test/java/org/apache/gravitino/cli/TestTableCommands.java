@@ -67,13 +67,7 @@ class TestTableCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListTables(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -93,14 +87,7 @@ class TestTableCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newTableDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -120,14 +107,7 @@ class TestTableCommands {
     doReturn(mockIndex)
         .when(commandLine)
         .newListIndexes(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockIndex).handle();
   }
@@ -147,14 +127,7 @@ class TestTableCommands {
     doReturn(mockPartition)
         .when(commandLine)
         .newTablePartition(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockPartition).handle();
   }
@@ -174,14 +147,7 @@ class TestTableCommands {
     doReturn(mockDistribution)
         .when(commandLine)
         .newTableDistribution(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockDistribution).handle();
   }
@@ -201,14 +167,7 @@ class TestTableCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newTableAudit(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -230,8 +189,6 @@ class TestTableCommands {
             GravitinoCommandLine.DEFAULT_URL,
             false,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -258,8 +215,6 @@ class TestTableCommands {
             GravitinoCommandLine.DEFAULT_URL,
             false,
             true,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -283,14 +238,7 @@ class TestTableCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListTableProperties(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
@@ -316,8 +264,6 @@ class TestTableCommands {
         .newSetTableProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -347,8 +293,6 @@ class TestTableCommands {
         .newRemoveTableProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -376,8 +320,6 @@ class TestTableCommands {
         .newUpdateTableComment(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -405,8 +347,6 @@ class TestTableCommands {
         .newUpdateTableName(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",

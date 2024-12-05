@@ -34,19 +34,12 @@ public class CreateRole extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    */
-  public CreateRole(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String metalake,
-      String role) {
-    super(url, ignoreVersions, authentication, userName);
+  public CreateRole(String url, boolean ignoreVersions, String metalake, String role) {
+
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.role = role;
   }

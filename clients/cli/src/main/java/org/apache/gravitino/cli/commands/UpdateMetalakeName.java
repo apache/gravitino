@@ -37,21 +37,14 @@ public class UpdateMetalakeName extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param name The new metalake name.
    */
   public UpdateMetalakeName(
-      String url,
-      boolean ignoreVersions,
-      boolean force,
-      String authentication,
-      String userName,
-      String metalake,
-      String name) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, boolean force, String metalake, String name) {
+
+    super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;
     this.name = name;

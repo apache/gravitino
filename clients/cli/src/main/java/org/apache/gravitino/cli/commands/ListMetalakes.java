@@ -30,17 +30,11 @@ public class ListMetalakes extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param outputFormat The output format.
    */
-  public ListMetalakes(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String outputFormat) {
-    super(url, ignoreVersions, authentication, userName, outputFormat);
+  public ListMetalakes(String url, boolean ignoreVersions, String outputFormat) {
+
+    super(url, ignoreVersions, outputFormat);
   }
 
   /** Lists all metalakes. */

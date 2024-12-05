@@ -55,7 +55,7 @@ class TestRoleCommands {
                 mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListRoles(GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo");
+        .newListRoles(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -73,8 +73,7 @@ class TestRoleCommands {
                 mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DETAILS));
     doReturn(mockDetails)
         .when(commandLine)
-        .newRoleDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo", "admin");
+        .newRoleDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -92,8 +91,7 @@ class TestRoleCommands {
                 mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.CREATE));
     doReturn(mockCreate)
         .when(commandLine)
-        .newCreateRole(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo", "admin");
+        .newCreateRole(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -111,8 +109,7 @@ class TestRoleCommands {
                 mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DELETE));
     doReturn(mockDelete)
         .when(commandLine)
-        .newDeleteRole(
-            GravitinoCommandLine.DEFAULT_URL, false, false, null, null, "metalake_demo", "admin");
+        .newDeleteRole(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -131,8 +128,7 @@ class TestRoleCommands {
                 mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DELETE));
     doReturn(mockDelete)
         .when(commandLine)
-        .newDeleteRole(
-            GravitinoCommandLine.DEFAULT_URL, false, true, null, null, "metalake_demo", "admin");
+        .newDeleteRole(GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }

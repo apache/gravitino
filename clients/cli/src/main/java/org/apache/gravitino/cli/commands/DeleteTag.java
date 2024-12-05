@@ -39,21 +39,14 @@ public class DeleteTag extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param tags The names of the tags.
    */
   public DeleteTag(
-      String url,
-      boolean ignoreVersions,
-      boolean force,
-      String authentication,
-      String userName,
-      String metalake,
-      String[] tags) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, boolean force, String metalake, String[] tags) {
+
+    super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;
     this.tags = tags;

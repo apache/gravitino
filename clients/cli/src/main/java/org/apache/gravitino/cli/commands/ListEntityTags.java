@@ -42,19 +42,12 @@ public class ListEntityTags extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    */
-  public ListEntityTags(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String metalake,
-      FullName name) {
-    super(url, ignoreVersions, authentication, userName);
+  public ListEntityTags(String url, boolean ignoreVersions, String metalake, FullName name) {
+
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
   }

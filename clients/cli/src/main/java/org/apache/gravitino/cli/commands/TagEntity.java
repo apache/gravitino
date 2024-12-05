@@ -41,21 +41,14 @@ public class TagEntity extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param tags The names of the tags.
    */
   public TagEntity(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String metalake,
-      FullName name,
-      String[] tags) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
+
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
     this.tags = tags;

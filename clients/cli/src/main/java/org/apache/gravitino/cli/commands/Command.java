@@ -31,22 +31,23 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 public abstract class Command {
   private final String url;
   private final boolean ignoreVersions;
-  private final String authentication;
-  private final String userName;
   private final String outputFormat;
   public static String OUTPUT_FORMAT_TABLE = "table";
   public static String OUTPUT_FORMAT_PLAIN = "plain";
+
+  protected static String authentication = null;
+  protected static String userName = null;
 
   /**
    * Command constructor.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    */
-  public Command(String url, boolean ignoreVersions, String authentication, String userName) {
-    this(url, ignoreVersions, authentication, userName, null);
+  public Command(String url, boolean ignoreVersions) {
+    this.url = url;
+    this.ignoreVersions = ignoreVersions;
+    this.outputFormat = OUTPUT_FORMAT_PLAIN;
   }
 
   /**
@@ -54,21 +55,23 @@ public abstract class Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param outputFormat output format used in some commands
    */
-  public Command(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String outputFormat) {
+  public Command(String url, boolean ignoreVersions, String outputFormat) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
-    this.authentication = authentication;
-    this.userName = userName;
     this.outputFormat = outputFormat;
+  }
+
+  /**
+   * Sets the authentication mode and user credentials for the command.
+   *
+   * @param authentication the authentication mode to be used (e.g. "simple")
+   * @param userName the username associated with the authentication mode
+   */
+  public static void setAuthenicationMode(String authentication, String userName) {
+    Command.authentication = authentication;
+    Command.userName = userName;
   }
 
   /** All commands have a handle method to handle and run the required command. */

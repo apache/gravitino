@@ -61,8 +61,7 @@ class TestSchemaCommands {
                 mockCommandLine, mockOptions, CommandEntities.SCHEMA, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListSchema(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo", "catalog");
+        .newListSchema(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -82,13 +81,7 @@ class TestSchemaCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newSchemaDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -108,13 +101,7 @@ class TestSchemaCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newSchemaAudit(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -138,8 +125,6 @@ class TestSchemaCommands {
         .newCreateSchema(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -162,14 +147,7 @@ class TestSchemaCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteSchema(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -189,14 +167,7 @@ class TestSchemaCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteSchema(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            true,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -221,8 +192,6 @@ class TestSchemaCommands {
         .newSetSchemaProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -250,8 +219,6 @@ class TestSchemaCommands {
         .newRemoveSchemaProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -274,13 +241,7 @@ class TestSchemaCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListSchemaProperties(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }

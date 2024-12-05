@@ -56,14 +56,7 @@ class TestColumnCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListColumns(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }

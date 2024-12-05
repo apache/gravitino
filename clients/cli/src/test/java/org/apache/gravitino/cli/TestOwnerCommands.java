@@ -62,8 +62,6 @@ class TestOwnerCommands {
         .newSetOwner(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "postgres",
             "catalog",
@@ -93,8 +91,6 @@ class TestOwnerCommands {
         .newSetOwner(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "postgres",
             "catalog",
@@ -119,13 +115,7 @@ class TestOwnerCommands {
     doReturn(mockOwnerDetails)
         .when(commandLine)
         .newOwnerDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "postgres",
-            "catalog");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "postgres", "catalog");
     commandLine.handleCommandLine();
     verify(mockOwnerDetails).handle();
   }

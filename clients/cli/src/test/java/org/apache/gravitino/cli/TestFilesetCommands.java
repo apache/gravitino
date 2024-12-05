@@ -65,13 +65,7 @@ class TestFilesetCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListFilesets(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -93,8 +87,6 @@ class TestFilesetCommands {
         .newFilesetDetails(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -123,8 +115,6 @@ class TestFilesetCommands {
         .newCreateFileset(
             eq(GravitinoCommandLine.DEFAULT_URL),
             eq(false),
-            eq(null),
-            eq(null),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -153,8 +143,6 @@ class TestFilesetCommands {
             GravitinoCommandLine.DEFAULT_URL,
             false,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -182,8 +170,6 @@ class TestFilesetCommands {
             GravitinoCommandLine.DEFAULT_URL,
             false,
             true,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -212,8 +198,6 @@ class TestFilesetCommands {
         .newUpdateFilesetComment(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -243,8 +227,6 @@ class TestFilesetCommands {
         .newUpdateFilesetName(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -272,8 +254,6 @@ class TestFilesetCommands {
         .newListFilesetProperties(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -304,8 +284,6 @@ class TestFilesetCommands {
         .newSetFilesetProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",
@@ -336,8 +314,6 @@ class TestFilesetCommands {
         .newRemoveFilesetProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "schema",

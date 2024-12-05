@@ -33,19 +33,12 @@ public class MetalakeDetails extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
    * @param outputFormat The output format.
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    */
-  public MetalakeDetails(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String outputFormat,
-      String metalake) {
-    super(url, ignoreVersions, authentication, userName, outputFormat);
+  public MetalakeDetails(String url, boolean ignoreVersions, String outputFormat, String metalake) {
+
+    super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
   }
 

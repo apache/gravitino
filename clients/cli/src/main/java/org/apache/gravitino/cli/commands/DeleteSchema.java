@@ -38,8 +38,6 @@ public class DeleteSchema extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
@@ -49,12 +47,10 @@ public class DeleteSchema extends Command {
       String url,
       boolean ignoreVersions,
       boolean force,
-      String authentication,
-      String userName,
       String metalake,
       String catalog,
       String schema) {
-    super(url, ignoreVersions, authentication, userName);
+    super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;
     this.catalog = catalog;

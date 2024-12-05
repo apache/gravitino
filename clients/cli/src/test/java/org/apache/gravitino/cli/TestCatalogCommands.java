@@ -62,7 +62,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo");
+        .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -83,7 +83,7 @@ class TestCatalogCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newCatalogDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, null, "metalake_demo", "catalog");
+            GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -102,8 +102,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DETAILS));
     doReturn(mockAudit)
         .when(commandLine)
-        .newCatalogAudit(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo", "catalog");
+        .newCatalogAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -135,8 +134,6 @@ class TestCatalogCommands {
         .newCreateCatalog(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "postgres",
@@ -160,7 +157,7 @@ class TestCatalogCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteCatalog(
-            GravitinoCommandLine.DEFAULT_URL, false, false, null, null, "metalake_demo", "catalog");
+            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -180,7 +177,7 @@ class TestCatalogCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteCatalog(
-            GravitinoCommandLine.DEFAULT_URL, false, true, null, null, "metalake_demo", "catalog");
+            GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -205,8 +202,6 @@ class TestCatalogCommands {
         .newSetCatalogProperty(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            null,
-            null,
             "metalake_demo",
             "catalog",
             "property",
@@ -231,13 +226,7 @@ class TestCatalogCommands {
     doReturn(mockRemoveProperty)
         .when(commandLine)
         .newRemoveCatalogProperty(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "property");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "property");
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
   }
@@ -256,7 +245,7 @@ class TestCatalogCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListCatalogProperties(
-            GravitinoCommandLine.DEFAULT_URL, false, null, null, "metalake_demo", "catalog");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
@@ -277,13 +266,7 @@ class TestCatalogCommands {
     doReturn(mockUpdateComment)
         .when(commandLine)
         .newUpdateCatalogComment(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "new comment");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new comment");
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
   }
@@ -305,13 +288,7 @@ class TestCatalogCommands {
     doReturn(mockUpdateName)
         .when(commandLine)
         .newUpdateCatalogName(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            null,
-            null,
-            "metalake_demo",
-            "catalog",
-            "new_name");
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new_name");
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
   }

@@ -36,21 +36,14 @@ public class SetMetalakeProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    * @param value The value of the property.
    */
   public SetMetalakeProperty(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String metalake,
-      String property,
-      String value) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, String metalake, String property, String value) {
+
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.property = property;
     this.value = value;

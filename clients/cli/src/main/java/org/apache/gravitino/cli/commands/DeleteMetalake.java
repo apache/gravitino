@@ -33,19 +33,12 @@ public class DeleteMetalake extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    */
-  public DeleteMetalake(
-      String url,
-      boolean ignoreVersions,
-      boolean force,
-      String authentication,
-      String userName,
-      String metalake) {
-    super(url, ignoreVersions, authentication, userName);
+  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
+
+    super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;
   }
