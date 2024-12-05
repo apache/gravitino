@@ -104,6 +104,10 @@ public class S3TokenProvider implements CredentialProvider {
     if (StringUtils.isNotBlank(region)) {
       builder.region(Region.of(region));
     }
+    String stsEndpoint = s3CredentialConfig.stsEndpoint();
+    if (StringUtils.isNotBlank(stsEndpoint)) {
+      builder.endpointOverride(URI.create(stsEndpoint));
+    }
     return builder.build();
   }
 

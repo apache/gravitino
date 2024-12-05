@@ -117,6 +117,7 @@ Gravitino Iceberg REST service supports using static S3 secret key or generating
 | `gravitino.iceberg-rest.s3-role-arn`              | The ARN of the role to access the S3 data.                                                                                                                                                                          | (none)        | Yes, when `credential-provider-type` is `s3-token` | 0.7.0-incubating |
 | `gravitino.iceberg-rest.s3-external-id`           | The S3 external id to generate token, only used when `credential-provider-type` is `s3-token`.                                                                                                                      | (none)        | No                                                 | 0.7.0-incubating |
 | `gravitino.iceberg-rest.s3-token-expire-in-secs`  | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role, only used when `credential-provider-type` is `s3-token`.                                                     | 3600          | No                                                 | 0.7.0-incubating |
+| `gravitino.iceberg-rest.s3-sts-endpoint`          | The S3 Token Service         | (none)        | No                                                 | 0.8.0-incubating |
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
@@ -428,6 +429,7 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_S3_REGION`                | `gravitino.iceberg-rest.s3-region`                | 0.7.0-incubating  |
 | `GRAVITINO_S3_ROLE_ARN`              | `gravitino.iceberg-rest.s3-role-arn`              | 0.7.0-incubating  |
 | `GRAVITINO_S3_EXTERNAL_ID`           | `gravitino.iceberg-rest.s3-external-id`           | 0.7.0-incubating  |
+| `GRAVITINO_S3_STS_ENDPOINT`          | `gravitino.iceberg-rest.s3-sts-endpoint`          | 0.8.0-incubating  |
 
 Or build it manually to add custom configuration or logics:
 
