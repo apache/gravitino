@@ -781,7 +781,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       return urlEnv;
     }
 
-    // Check if the metalake name is specified in the configuration file
+    // Check if the Gravitino URL is specified in the configuration file
     if (config.fileExists()) {
       config.read();
       String configURL = config.getGravitinoURL();
@@ -806,24 +806,24 @@ public class GravitinoCommandLine extends TestableCommandLine {
       return GravitinoOptions.SIMPLE;
     }
 
-    // Cache the Gravitino URL environment variable
+    // Cache the Gravitino authentication type environment variable
     if (authEnv == null && !authSet) {
       authEnv = System.getenv("GRAVITINO_AUTH");
       authSet = true;
     }
 
-    // If set return the Gravitino URL environment variable
+    // If set return the Gravitino authentication type environment variable
     if (authEnv != null) {
       return authEnv;
     }
 
-    // Check if the metalake name is specified in the configuration file
+    // Check if the authentication type is specified in the configuration file
     GravitinoConfig config = new GravitinoConfig(null);
     if (config.fileExists()) {
       config.read();
-      String configAuth = config.getGravitinoAuth();
-      if (configAuth != null) {
-        return configAuth;
+      String configAuthType = config.getGravitinoAuthType();
+      if (configAuthType != null) {
+        return configAuthType;
       }
     }
 

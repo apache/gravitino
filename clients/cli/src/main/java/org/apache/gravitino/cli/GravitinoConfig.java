@@ -36,7 +36,7 @@ public class GravitinoConfig {
   private String metalake;
   private String url;
   private boolean ignore;
-  private String authentication;
+  private String authType;
   private OAuthData oauth;
   private KerberosData kerberos;
 
@@ -94,7 +94,7 @@ public class GravitinoConfig {
       ignore = prop.getProperty(ignoreKey).equals("true");
     }
     if (prop.containsKey(authKey)) {
-      authentication = prop.getProperty(authKey);
+      authType = prop.getProperty(authKey);
     }
 
     if (authKey.equals("oauth")) {
@@ -146,27 +146,27 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the Gravitino authentication stored in the configuration.
+   * Retrieves the Gravitino authType stored in the configuration.
    *
-   * @return The Gravitino authentication or null if not set.
+   * @return The Gravitino authType or null if not set.
    */
-  public String getGravitinoAuth() {
-    return authentication;
+  public String getGravitinoAuthType() {
+    return authType;
   }
 
   /**
-   * Retrieves the Gravitino oAuth authentication configuration.
+   * Retrieves the Gravitino oAuth authType configuration.
    *
-   * @return The Gravitino authentication or null if not set.
+   * @return The Gravitino authType or null if not set.
    */
   public OAuthData getOAuth() {
     return oauth;
   }
 
   /**
-   * Retrieves the Gravitino kerberos authentication configuration.
+   * Retrieves the Gravitino kerberos authType configuration.
    *
-   * @return The Gravitino authentication or null if not set.
+   * @return The Gravitino authType or null if not set.
    */
   public KerberosData getKerberos() {
     return kerberos;
