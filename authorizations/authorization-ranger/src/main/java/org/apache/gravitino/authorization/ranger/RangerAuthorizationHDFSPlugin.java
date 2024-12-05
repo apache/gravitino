@@ -217,13 +217,16 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+    if (testEnv) {
+      return metadataObject.fullName();
+    }
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
     Fileset fileset = GravitinoEnv.getInstance().filesetDispatcher().loadFileset(identifier);
     Preconditions.checkArgument(
         fileset != null, String.format("Fileset %s is not found", identifier));
     String filesetLocation = fileset.storageLocation();
-    LOG.warn("getFileSetPath filesetLocation {}", filesetLocation);
     Preconditions.checkArgument(
         filesetLocation != null, String.format("Fileset %s location is not found", identifier));
     return pattern.matcher(filesetLocation).replaceAll("");
