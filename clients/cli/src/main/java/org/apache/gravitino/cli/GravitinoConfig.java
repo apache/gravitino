@@ -36,6 +36,8 @@ public class GravitinoConfig {
   private String metalake;
   private String url;
   private boolean ignore;
+  private String authentication;
+  private OAuthData oauth;
 
   /**
    * Creates a GravitinoConfig object with a specified config file. If no file is provided, it
@@ -62,13 +64,14 @@ public class GravitinoConfig {
   }
 
   /**
-   * Reads the configuration file and loads the 'metalake' and 'URL' properties. If the file is not
-   * found, it is ignored as the config file is optional.
+   * Reads the configuration file and loads the 'metalake', 'URL' and other properties. If the file
+   * is not found, it is ignored as the config file is optional.
    */
   public void read() {
     String metalakeKey = "metalake";
     String urlKey = "URL";
     String ignoreKey = "ignore";
+    String authKey = "auth";
     Properties prop = new Properties();
 
     try (FileInputStream stream = new FileInputStream(configFile)) {
@@ -88,6 +91,18 @@ public class GravitinoConfig {
     }
     if (prop.containsKey(ignoreKey)) {
       ignore = prop.getProperty(ignoreKey).equals("true");
+    }
+    if (prop.containsKey(authKey)) {
+      authentication = prop.getProperty(authKey);
+    }
+
+    if (authKey.equals("oauth")) {
+      oauth =
+          new OAuthData(
+              prop.getProperty("serverURI"),
+              prop.getProperty("credential"),
+              prop.getProperty("token"),
+              prop.getProperty("scope"));
     }
   }
 
@@ -125,5 +140,23 @@ public class GravitinoConfig {
    */
   public String getConfigFile() {
     return configFile;
+  }
+
+  /**
+   * Retrieves the Gravitino authentication stored in the configuration.
+   *
+   * @return The Gravitino authentication or null if not set.
+   */
+  public String getGravitinoAuth() {
+    return authentication;
+  }
+
+  /**
+   * Retrieves the Gravitino oAuth authentication configuration.
+   *
+   * @return The Gravitino authentication or null if not set.
+   */
+  public OAuthData getOAuth() {
+    return oauth;
   }
 }

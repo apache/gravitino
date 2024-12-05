@@ -29,6 +29,30 @@ import org.junit.jupiter.api.Test;
 class TestDefaultConverter {
 
   @Test
+  void testConvertNulls() {
+    String defaultValue = null;
+    String dataType = null;
+    Expression result = DefaultConverter.convert(defaultValue, dataType);
+
+    assertEquals(
+        Column.DEFAULT_VALUE_NOT_SET,
+        result,
+        "Expected DEFAULT_VALUE_NOT_SET for null defaultValue.");
+  }
+
+  @Test
+  void testConvertEmpty() {
+    String defaultValue = "";
+    String dataType = "";
+    Expression result = DefaultConverter.convert(defaultValue, dataType);
+
+    assertEquals(
+        Column.DEFAULT_VALUE_NOT_SET,
+        result,
+        "Expected DEFAULT_VALUE_NOT_SET for null defaultValue.");
+  }
+
+  @Test
   void testConvertNullDefaultValue() {
     String defaultValue = null;
     String dataType = "INTEGER";

@@ -24,37 +24,41 @@ import org.apache.commons.cli.Options;
 
 /* Gravitino Command line options */
 public class GravitinoOptions {
-  public static final String HELP = "help";
-  public static final String VERSION = "version";
-  public static final String SERVER = "server";
-  public static final String URL = "url";
-  public static final String NAME = "name";
-  public static final String METALAKE = "metalake";
-  public static final String IGNORE = "ignore";
-  public static final String COMMENT = "comment";
-  public static final String RENAME = "rename";
-  public static final String PROPERTY = "property";
-  public static final String VALUE = "value";
-  public static final String PROVIDER = "provider";
-  public static final String PROPERTIES = "properties";
-  public static final String USER = "user";
-  public static final String GROUP = "group";
-  public static final String TAG = "tag";
-  public static final String DATATYPE = "datatype";
-  public static final String POSITION = "position";
-  public static final String NULL = "null";
-  public static final String AUTO = "auto";
-  public static final String DEFAULT = "default";
-  public static final String FILESET = "fileset";
-  public static final String OWNER = "owner";
-  public static final String ROLE = "role";
   public static final String AUDIT = "audit";
-  public static final String FORCE = "force";
-  public static final String INDEX = "index";
+  public static final String AUTO = "auto";
+  public static final String COLUMNFILE = "columnfile";
+  public static final String COMMENT = "comment";
+  public static final String DATATYPE = "datatype";
+  public static final String DEFAULT = "default";
   public static final String DISTRIBUTION = "distribution";
-  public static final String PARTITION = "partition";
+  public static final String FILESET = "fileset";
+  public static final String FORCE = "force";
+  public static final String GROUP = "group";
+  public static final String HELP = "help";
+  public static final String IGNORE = "ignore";
+  public static final String INDEX = "index";
+  public static final String LOGIN = "login";
+  public static final String METALAKE = "metalake";
+  public static final String NAME = "name";
+  public static final String NULL = "null";
   public static final String OUTPUT = "output";
+  public static final String OWNER = "owner";
+  public static final String PARTITION = "partition";
+  public static final String POSITION = "position";
   public static final String PRIVILEGE = "privilege";
+  public static final String PROPERTIES = "properties";
+  public static final String PROPERTY = "property";
+  public static final String PROVIDER = "provider";
+  public static final String RENAME = "rename";
+  public static final String ROLE = "role";
+  public static final String SERVER = "server";
+  public static final String SIMPLE = "simple";
+  public static final String SORTORDER = "sortorder";
+  public static final String TAG = "tag";
+  public static final String URL = "url";
+  public static final String USER = "user";
+  public static final String VALUE = "value";
+  public static final String VERSION = "version";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -73,10 +77,13 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption(null, SIMPLE, "simple authentication"));
+    options.addOption(createArgOption(null, LOGIN, "user name"));
     options.addOption(createSimpleOption("x", INDEX, "display index information"));
     options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
     options.addOption(createSimpleOption(PARTITION, "display partition information"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+    options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));
@@ -96,6 +103,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
     options.addOption(createArgOption(null, PRIVILEGE, "privilege"));
+    options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
     // Properties and tags can have multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
@@ -104,7 +112,7 @@ public class GravitinoOptions {
     // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
-    options.addOption(createArgOption(null, OUTPUT, "output format (plain/table)"));
+    options.addOption(createArgOption(OUTPUT, "output format (plain/table)"));
 
     return options;
   }

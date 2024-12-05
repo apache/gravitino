@@ -19,19 +19,32 @@
 
 package org.apache.gravitino.cli.commands;
 
+import static org.apache.gravitino.client.GravitinoClientBase.Builder;
+
+import org.apache.gravitino.cli.GravitinoConfig;
+import org.apache.gravitino.cli.OAuthData;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoClientBase;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /* The base for all commands. */
 public abstract class Command {
+  public static final String OUTPUT_FORMAT_TABLE = "table";
+  public static final String OUTPUT_FORMAT_PLAIN = "plain";
+
+  protected static String authentication = null;
+  protected static String userName = null;
+
+  private static final String SIMPLE_AUTH = "simple";
+  private static final String OAUTH_AUTH = "oauth";
+
   private final String url;
   private final boolean ignoreVersions;
   private final String outputFormat;
-  public static String OUTPUT_FORMAT_TABLE = "table";
-  public static String OUTPUT_FORMAT_PLAIN = "plain";
 
   /**
    * Command constructor.
@@ -40,18 +53,37 @@ public abstract class Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    */
   public Command(String url, boolean ignoreVersions) {
-    this(url, ignoreVersions, null);
+    this.url = url;
+    this.ignoreVersions = ignoreVersions;
+    this.outputFormat = OUTPUT_FORMAT_PLAIN;
   }
 
+  /**
+   * Command constructor.
+   *
+   * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param outputFormat output format used in some commands
+   */
   public Command(String url, boolean ignoreVersions, String outputFormat) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
     this.outputFormat = outputFormat;
   }
 
+  /**
+   * Sets the authentication mode and user credentials for the command.
+   *
+   * @param authentication the authentication mode to be used (e.g. "simple")
+   * @param userName the username associated with the authentication mode
+   */
+  public static void setAuthenticationMode(String authentication, String userName) {
+    Command.authentication = authentication;
+    Command.userName = userName;
+  }
+
   /** All commands have a handle method to handle and run the required command. */
   public abstract void handle();
-
   /**
    * Builds a {@link GravitinoClient} instance with the provided server URL and metalake.
    *
@@ -60,11 +92,9 @@ public abstract class Command {
    * @throws NoSuchMetalakeException if the specified metalake does not exist.
    */
   protected GravitinoClient buildClient(String metalake) throws NoSuchMetalakeException {
-    if (ignoreVersions) {
-      return GravitinoClient.builder(url).withMetalake(metalake).withVersionCheckDisabled().build();
-    } else {
-      return GravitinoClient.builder(url).withMetalake(metalake).build();
-    }
+    Builder<GravitinoClient> client = GravitinoClient.builder(url).withMetalake(metalake);
+
+    return constructClient(client).build();
   }
 
   /**
@@ -73,11 +103,48 @@ public abstract class Command {
    * @return A configured {@link GravitinoAdminClient} instance.
    */
   protected GravitinoAdminClient buildAdminClient() {
+    Builder<GravitinoAdminClient> client = GravitinoAdminClient.builder(url);
+
+    return constructClient(client).build();
+  }
+
+  /**
+   * Configures and constructs a {@link Builder} instance for creating a {@link GravitinoClient} or
+   * {@link GravitinoAdminClient}.
+   *
+   * @param builder The {@link Builder} instance to be configured.
+   * @param <T> The type of the {@link GravitinoClientBase}.
+   * @return A configured {@link Builder} instance.
+   */
+  protected <T extends GravitinoClientBase> Builder<T> constructClient(Builder<T> builder) {
     if (ignoreVersions) {
-      return GravitinoAdminClient.builder(url).withVersionCheckDisabled().build();
-    } else {
-      return GravitinoAdminClient.builder(url).build();
+      builder = builder.withVersionCheckDisabled();
     }
+    if (authentication != null) {
+      if (authentication.equals(SIMPLE_AUTH)) {
+        if (userName != null && !userName.isEmpty()) {
+          builder = builder.withSimpleAuth(userName);
+        } else {
+          builder = builder.withSimpleAuth();
+        }
+      } else if (authentication.equals(OAUTH_AUTH)) {
+        GravitinoConfig config = new GravitinoConfig(null);
+        OAuthData oauth = config.getOAuth();
+        DefaultOAuth2TokenProvider tokenProvider =
+            DefaultOAuth2TokenProvider.builder()
+                .withUri(oauth.getServerURI())
+                .withCredential(oauth.getCredential())
+                .withPath(oauth.getToken())
+                .withScope(oauth.getScope())
+                .build();
+
+        builder = builder.withOAuth(tokenProvider);
+      } else {
+        System.err.println("Unsupported authentication type " + authentication);
+      }
+    }
+
+    return builder;
   }
 
   /**

@@ -80,12 +80,14 @@ public abstract class RangerAuthorizationPlugin
     implements AuthorizationPlugin, AuthorizationPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
+  protected String metalake;
   protected final String rangerServiceName;
   protected final RangerClientExtension rangerClient;
   private final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
 
-  protected RangerAuthorizationPlugin(Map<String, String> config) {
+  protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
+    this.metalake = metalake;
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
     String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
@@ -106,6 +108,11 @@ public abstract class RangerAuthorizationPlugin
             rangerServiceName,
             ownerMappingRule(),
             policyResourceDefinesRule());
+  }
+
+  @VisibleForTesting
+  public String getMetalake() {
+    return metalake;
   }
 
   /**
@@ -251,18 +258,22 @@ public abstract class RangerAuthorizationPlugin
             ((MetadataObjectChange.RenameMetadataObject) change).metadataObject();
         MetadataObject newMetadataObject =
             ((MetadataObjectChange.RenameMetadataObject) change).newMetadataObject();
-        AuthorizationMetadataObject AuthorizationMetadataObject =
-            translateMetadataObject(metadataObject);
-        AuthorizationMetadataObject newAuthorizationMetadataObject =
+        if (metadataObject.type() == MetadataObject.Type.METALAKE
+            && newMetadataObject.type() == MetadataObject.Type.METALAKE) {
+          // Modify the metalake name
+          this.metalake = newMetadataObject.name();
+        }
+        AuthorizationMetadataObject oldAuthMetadataObject = translateMetadataObject(metadataObject);
+        AuthorizationMetadataObject newAuthMetadataObject =
             translateMetadataObject(newMetadataObject);
-        if (AuthorizationMetadataObject.equals(newAuthorizationMetadataObject)) {
+        if (oldAuthMetadataObject.equals(newAuthMetadataObject)) {
           LOG.info(
               "The metadata object({}) and new metadata object({}) are equal, so ignore rename!",
-              AuthorizationMetadataObject.fullName(),
-              newAuthorizationMetadataObject.fullName());
+              oldAuthMetadataObject.fullName(),
+              newAuthMetadataObject.fullName());
           continue;
         }
-        doRenameMetadataObject(AuthorizationMetadataObject, newAuthorizationMetadataObject);
+        doRenameMetadataObject(oldAuthMetadataObject, newAuthMetadataObject);
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
