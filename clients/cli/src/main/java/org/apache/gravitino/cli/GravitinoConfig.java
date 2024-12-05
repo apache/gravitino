@@ -107,6 +107,15 @@ public class GravitinoConfig {
     } else if (authKey.equals("kerberos")) {
       kerberos = new KerberosData(prop.getProperty("principal"), prop.getProperty("keytabFile"));
     }
+
+    if (authKey.equals("oauth")) {
+      oauth =
+          new OAuthData(
+              prop.getProperty("serverURI"),
+              prop.getProperty("credential"),
+              prop.getProperty("token"),
+              prop.getProperty("scope"));
+    }
   }
 
   /**
