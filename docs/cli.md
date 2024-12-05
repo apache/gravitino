@@ -42,6 +42,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
+    --login <arg>        user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
     --null <arg>         column value can be null (true/false)
@@ -54,6 +55,8 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
+    --simple             simple authentication
+    --sortorder          display sortorder information
  -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
