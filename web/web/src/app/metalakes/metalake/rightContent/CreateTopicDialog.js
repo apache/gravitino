@@ -42,7 +42,7 @@ import {
 import Icon from '@/components/Icon'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { createSchema, updateSchema } from '@/lib/store/metalakes'
+import { createTopic, updateTopic } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
@@ -78,21 +78,18 @@ const Transition = forwardRef(function Transition(props, ref) {
   return <Fade ref={ref} {...props} />
 })
 
-const CreateSchemaDialog = props => {
+const CreateTopicDialog = props => {
   const { open, setOpen, type = 'create', data = {} } = props
   const searchParams = useSearchParams()
   const metalake = searchParams.get('metalake')
   const catalog = searchParams.get('catalog')
+  const schemaName = searchParams.get('schema')
   const catalogType = searchParams.get('type')
   const [innerProps, setInnerProps] = useState([])
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
   const activatedCatalogDetail = store.activatedDetails
   const [cacheData, setCacheData] = useState()
-
-  const paimonCatalogBackend =
-    activatedCatalogDetail?.provider === 'lakehouse-paimon' &&
-    ['hive', 'jdbc'].includes(activatedCatalogDetail?.properties['catalog-backend'])
 
   const {
     control,
@@ -202,17 +199,26 @@ const CreateSchemaDialog = props => {
         }
 
         if (type === 'create') {
-          dispatch(createSchema({ data: schemaData, metalake, catalog, type: catalogType })).then(res => {
-            if (!res.payload?.err) {
-              handleClose()
+          dispatch(createTopic({ data: schemaData, metalake, catalog, schema: schemaName, type: catalogType })).then(
+            res => {
+              if (!res.payload?.err) {
+                handleClose()
+              }
             }
-          })
+          )
         } else {
           const reqData = { updates: genUpdates(cacheData, schemaData) }
 
           if (reqData.updates.length !== 0) {
             dispatch(
-              updateSchema({ metalake, catalog, type: catalogType, schema: cacheData.name, data: reqData })
+              updateTopic({
+                metalake,
+                catalog,
+                type: catalogType,
+                schema: schemaName,
+                topic: cacheData.name,
+                data: reqData
+              })
             ).then(res => {
               if (!res.payload?.err) {
                 handleClose()
@@ -270,7 +276,7 @@ const CreateSchemaDialog = props => {
           </IconButton>
           <Box sx={{ mb: 8, textAlign: 'center' }}>
             <Typography variant='h5' sx={{ mb: 3 }}>
-              {type === 'create' ? 'Create' : 'Edit'} Schema
+              {type === 'create' ? 'Create' : 'Edit'} Topic
             </Typography>
           </Box>
 
@@ -289,7 +295,7 @@ const CreateSchemaDialog = props => {
                       placeholder=''
                       disabled={type === 'update'}
                       error={Boolean(errors.name)}
-                      data-refer='schema-name-field'
+                      data-refer='topic-name-field'
                     />
                   )}
                 />
@@ -297,132 +303,117 @@ const CreateSchemaDialog = props => {
               </FormControl>
             </Grid>
 
-            {(!['jdbc-mysql', 'lakehouse-paimon', 'jdbc-oceanbase'].includes(activatedCatalogDetail?.provider) ||
-              paimonCatalogBackend) && (
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <Controller
-                    name='comment'
-                    control={control}
-                    rules={{ required: false }}
-                    render={({ field: { value, onChange } }) => (
-                      <TextField
-                        value={value}
-                        label='Comment'
-                        multiline
-                        rows={2}
-                        onChange={onChange}
-                        placeholder=''
-                        disabled={type === 'update'}
-                        error={Boolean(errors.comment)}
-                        data-refer='schema-comment-field'
-                      />
-                    )}
-                  />
-                </FormControl>
-                {activatedCatalogDetail?.['catalog-backend']}
-              </Grid>
-            )}
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <Controller
+                  name='comment'
+                  control={control}
+                  rules={{ required: false }}
+                  render={({ field: { value, onChange } }) => (
+                    <TextField
+                      value={value}
+                      label='Comment'
+                      multiline
+                      rows={2}
+                      onChange={onChange}
+                      placeholder=''
+                      error={Boolean(errors.comment)}
+                      data-refer='topic-comment-field'
+                    />
+                  )}
+                />
+              </FormControl>
+            </Grid>
 
-            {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql', 'jdbc-oceanbase'].includes(
-              activatedCatalogDetail?.provider
-            ) ||
-              paimonCatalogBackend) && (
-              <Grid item xs={12} data-refer='schema-props-layout'>
-                <Typography sx={{ mb: 2 }} variant='body2'>
-                  Properties
-                </Typography>
-                {innerProps.map((item, index) => {
-                  return (
-                    <Fragment key={index}>
-                      <Grid item xs={12} sx={{ '& + &': { mt: 2 } }}>
-                        <FormControl fullWidth>
-                          <Box>
-                            <Box
-                              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                              data-refer={`schema-props-${index}`}
-                            >
-                              <Box>
-                                <TextField
-                                  size='small'
-                                  name='key'
-                                  label='Key'
-                                  value={item.key}
-                                  disabled={item.disabled || (item.key === 'location' && type === 'update')}
-                                  onChange={event => handleFormChange({ index, event })}
-                                  error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
-                                  data-refer={`props-key-${index}`}
-                                />
-                              </Box>
-                              <Box>
-                                <TextField
-                                  size='small'
-                                  name='value'
-                                  label='Value'
-                                  error={item.required && item.value === ''}
-                                  value={item.value}
-                                  disabled={item.disabled || (item.key === 'location' && type === 'update')}
-                                  onChange={event => handleFormChange({ index, event })}
-                                  data-refer={`props-value-${index}`}
-                                  data-prev-refer={`props-${item.key}`}
-                                />
-                              </Box>
-
-                              {!(item.disabled || (item.key === 'location' && type === 'update')) ? (
-                                <Box sx={{ minWidth: 40 }}>
-                                  <IconButton onClick={() => removeFields(index)}>
-                                    <Icon icon='mdi:minus-circle-outline' />
-                                  </IconButton>
-                                </Box>
-                              ) : (
-                                <Box sx={{ minWidth: 40 }}></Box>
-                              )}
-                            </Box>
-                          </Box>
-                          <FormHelperText
-                            sx={{
-                              color: item.required && item.value === '' ? 'error.main' : 'text.main',
-                              maxWidth: 'calc(100% - 40px)'
-                            }}
+            <Grid item xs={12} data-refer='topic-props-layout'>
+              <Typography sx={{ mb: 2 }} variant='body2'>
+                Properties
+              </Typography>
+              {innerProps.map((item, index) => {
+                return (
+                  <Fragment key={index}>
+                    <Grid item xs={12} sx={{ '& + &': { mt: 2 } }}>
+                      <FormControl fullWidth>
+                        <Box>
+                          <Box
+                            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                            data-refer={`topic-props-${index}`}
                           >
-                            {item.description}
-                          </FormHelperText>
-                          {item.hasDuplicateKey && (
-                            <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
-                          )}
-                          {item.key && item.invalid && (
-                            <FormHelperText className={'twc-text-error-main'}>
-                              Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                              characters, underscores, hyphens, or dots.
-                            </FormHelperText>
-                          )}
-                          {!item.key.trim() && (
-                            <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
-                          )}
-                        </FormControl>
-                      </Grid>
-                    </Fragment>
-                  )
-                })}
-              </Grid>
-            )}
+                            <Box>
+                              <TextField
+                                size='small'
+                                name='key'
+                                label='Key'
+                                value={item.key}
+                                disabled={item.disabled || (item.key === 'location' && type === 'update')}
+                                onChange={event => handleFormChange({ index, event })}
+                                error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
+                                data-refer={`props-key-${index}`}
+                              />
+                            </Box>
+                            <Box>
+                              <TextField
+                                size='small'
+                                name='value'
+                                label='Value'
+                                error={item.required && item.value === ''}
+                                value={item.value}
+                                disabled={item.disabled || (item.key === 'location' && type === 'update')}
+                                onChange={event => handleFormChange({ index, event })}
+                                data-refer={`props-value-${index}`}
+                                data-prev-refer={`props-${item.key}`}
+                              />
+                            </Box>
 
-            {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql', 'jdbc-oceanbase'].includes(
-              activatedCatalogDetail?.provider
-            ) ||
-              paimonCatalogBackend) && (
-              <Grid item xs={12}>
-                <Button
-                  size='small'
-                  onClick={addFields}
-                  variant='outlined'
-                  startIcon={<Icon icon='mdi:plus-circle-outline' />}
-                  data-refer='add-schema-props'
-                >
-                  Add Property
-                </Button>
-              </Grid>
-            )}
+                            {!(item.disabled || (item.key === 'location' && type === 'update')) ? (
+                              <Box sx={{ minWidth: 40 }}>
+                                <IconButton onClick={() => removeFields(index)}>
+                                  <Icon icon='mdi:minus-circle-outline' />
+                                </IconButton>
+                              </Box>
+                            ) : (
+                              <Box sx={{ minWidth: 40 }}></Box>
+                            )}
+                          </Box>
+                        </Box>
+                        <FormHelperText
+                          sx={{
+                            color: item.required && item.value === '' ? 'error.main' : 'text.main',
+                            maxWidth: 'calc(100% - 40px)'
+                          }}
+                        >
+                          {item.description}
+                        </FormHelperText>
+                        {item.hasDuplicateKey && (
+                          <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
+                        )}
+                        {item.key && item.invalid && (
+                          <FormHelperText className={'twc-text-error-main'}>
+                            Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
+                            characters, underscores, hyphens, or dots.
+                          </FormHelperText>
+                        )}
+                        {!item.key.trim() && (
+                          <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                        )}
+                      </FormControl>
+                    </Grid>
+                  </Fragment>
+                )
+              })}
+            </Grid>
+
+            <Grid item xs={12}>
+              <Button
+                size='small'
+                onClick={addFields}
+                variant='outlined'
+                startIcon={<Icon icon='mdi:plus-circle-outline' />}
+                data-refer='add-topic-props'
+              >
+                Add Property
+              </Button>
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions
@@ -432,7 +423,7 @@ const CreateSchemaDialog = props => {
             pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
-          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-schema'>
+          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-topic'>
             {type === 'create' ? 'Create' : 'Update'}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
@@ -444,4 +435,4 @@ const CreateSchemaDialog = props => {
   )
 }
 
-export default CreateSchemaDialog
+export default CreateTopicDialog
