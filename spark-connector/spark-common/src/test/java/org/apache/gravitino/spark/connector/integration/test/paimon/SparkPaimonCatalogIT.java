@@ -31,6 +31,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.gravitino.spark.connector.paimon.SparkPaimonTable;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -175,16 +176,11 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testPaimonFunction() {
-    String[] catalogAndNamespaces = new String[] {getCatalogName() + ".sys", getCatalogName()};
-    Arrays.stream(catalogAndNamespaces)
-        .forEach(
-            catalogAndNamespace -> {
-              List<String> bucket =
-                  getQueryData(String.format("SELECT %s.bucket(2, 100)", catalogAndNamespace));
-              Assertions.assertEquals(1, bucket.size());
-              Assertions.assertEquals("0", bucket.get(0));
-            });
+  void testShowPaimonFunctions() {
+    AnalysisException analysisException =
+        Assertions.assertThrows(AnalysisException.class, () -> sql("SHOW FUNCTIONS;"));
+    Assertions.assertTrue(
+        analysisException.getMessage().contains("Catalog paimon does not support functions"));
   }
 
   @Test
