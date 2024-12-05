@@ -35,12 +35,13 @@ public class CatalogDetails extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param outputFormat The output format.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param outputFormat The output format.
    */
   public CatalogDetails(
-      String url, boolean ignoreVersions, String metalake, String catalog, String outputFormat) {
+      String url, boolean ignoreVersions, String outputFormat, String metalake, String catalog) {
+
     super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
     this.catalog = catalog;
