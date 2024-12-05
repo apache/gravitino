@@ -801,7 +801,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
    * @return The Gravitinno authentication, or null if not found.
    */
   public String getAuth() {
-    GravitinoConfig config = new GravitinoConfig(null);
 
     // If specified on the command line use that
     if (line.hasOption(GravitinoOptions.SIMPLE)) {
@@ -820,6 +819,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
 
     // Check if the metalake name is specified in the configuration file
+    GravitinoConfig config = new GravitinoConfig(null);
     if (config.fileExists()) {
       config.read();
       String configAuth = config.getGravitinoAuth();
