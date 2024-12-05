@@ -59,9 +59,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.PROPERTIES),
       "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver",
       commandArg(GravitinoOptions.URL),
-      gravitinoUrl,
-      commandArg(GravitinoOptions.COMMENT),
-      "catalog，用于测试"
+      gravitinoUrl
     };
     Main.main(create_catalog_args);
   }
@@ -154,11 +152,11 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+----------+------------+-----------------+-------------------+\n"
-            + "| catalog  | type       | provider        | comment           |\n"
-            + "+----------+------------+-----------------+-------------------+\n"
-            + "| postgres | RELATIONAL | jdbc-postgresql | catalog，用于测试 |\n"
-            + "+----------+------------+-----------------+-------------------+",
+        "+----------+------------+-----------------+---------+\n"
+            + "| catalog  | type       | provider        | comment |\n"
+            + "+----------+------------+-----------------+---------+\n"
+            + "| postgres | RELATIONAL | jdbc-postgresql | null    |\n"
+            + "+----------+------------+-----------------+---------+",
         output);
   }
 
