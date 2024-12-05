@@ -24,7 +24,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
 /** The helper class for {@link AuthorizationMetadataObject}. */
-public class RangerMetadataObject implements AuthorizationMetadataObject {
+public class RangerHadoopSQLMetadataObject implements AuthorizationMetadataObject {
   /**
    * The type of object in the Ranger system. Every type will map one kind of the entity of the
    * Gravitino type system.
@@ -74,7 +74,8 @@ public class RangerMetadataObject implements AuthorizationMetadataObject {
    * @param name The name of the metadata object
    * @param type The type of the metadata object
    */
-  public RangerMetadataObject(String parent, String name, AuthorizationMetadataObject.Type type) {
+  public RangerHadoopSQLMetadataObject(
+      String parent, String name, AuthorizationMetadataObject.Type type) {
     this.parent = parent;
     this.name = name;
     this.type = type;
@@ -112,15 +113,15 @@ public class RangerMetadataObject implements AuthorizationMetadataObject {
         type != null, "Cannot create a Ranger metadata object with no type");
 
     Preconditions.checkArgument(
-        names.size() != 1 || type == RangerMetadataObject.Type.SCHEMA || type == Type.PATH,
+        names.size() != 1 || type == RangerHadoopSQLMetadataObject.Type.SCHEMA || type == Type.PATH,
         "If the length of names is 1, it must be the SCHEMA type of PATH type");
 
     Preconditions.checkArgument(
-        names.size() != 2 || type == RangerMetadataObject.Type.TABLE,
+        names.size() != 2 || type == RangerHadoopSQLMetadataObject.Type.TABLE,
         "If the length of names is 2, it must be the TABLE type");
 
     Preconditions.checkArgument(
-        names.size() != 3 || type == RangerMetadataObject.Type.COLUMN,
+        names.size() != 3 || type == RangerHadoopSQLMetadataObject.Type.COLUMN,
         "If the length of names is 3, it must be COLUMN");
 
     for (String name : names) {
@@ -134,11 +135,11 @@ public class RangerMetadataObject implements AuthorizationMetadataObject {
       return true;
     }
 
-    if (!(o instanceof RangerMetadataObject)) {
+    if (!(o instanceof RangerHadoopSQLMetadataObject)) {
       return false;
     }
 
-    RangerMetadataObject that = (RangerMetadataObject) o;
+    RangerHadoopSQLMetadataObject that = (RangerHadoopSQLMetadataObject) o;
     return java.util.Objects.equals(name, that.name)
         && java.util.Objects.equals(parent, that.parent)
         && type == that.type;

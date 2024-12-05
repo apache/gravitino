@@ -868,7 +868,7 @@ public abstract class RangerAuthorizationPlugin
    */
   private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authMetadataObject) {
     Preconditions.checkArgument(
-        authMetadataObject.type() == RangerMetadataObject.Type.SCHEMA,
+        authMetadataObject.type() == RangerHadoopSQLMetadataObject.Type.SCHEMA,
         "The metadata object type must be SCHEMA");
     Preconditions.checkArgument(
         authMetadataObject.names().size() == 1, "The metadata object names must be 1");
@@ -1132,22 +1132,10 @@ public abstract class RangerAuthorizationPlugin
   public void close() throws IOException {}
 
   /** Generate authorization securable object */
-  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
+  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
       List<String> names,
       AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges) {
-    AuthorizationMetadataObject authMetadataObject =
-        new RangerMetadataObject(
-            AuthorizationMetadataObject.getParentFullName(names),
-            AuthorizationMetadataObject.getLastName(names),
-            type);
-    authMetadataObject.validateAuthorizationMetadataObject();
-    return new RangerSecurableObject(
-        authMetadataObject.parent(),
-        authMetadataObject.name(),
-        authMetadataObject.type(),
-        privileges);
-  }
+      Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()

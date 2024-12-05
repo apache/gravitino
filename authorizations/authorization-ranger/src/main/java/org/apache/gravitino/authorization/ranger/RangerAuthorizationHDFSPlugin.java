@@ -40,6 +40,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -105,6 +106,18 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   @Override
+  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
+      List<String> names,
+      AuthorizationMetadataObject.Type type,
+      Set<AuthorizationPrivilege> privileges) {
+    AuthorizationMetadataObject authMetadataObject =
+        new RangerHDFSMetadataObject(AuthorizationMetadataObject.getLastName(names), type);
+    authMetadataObject.validateAuthorizationMetadataObject();
+    return new RangerHDFSSecurableObject(
+        authMetadataObject.name(), authMetadataObject.type(), privileges);
+  }
+
+  @Override
   public Set<Privilege.Name> allowPrivilegesRule() {
     return ImmutableSet.of(
         Privilege.Name.CREATE_FILESET, Privilege.Name.READ_FILESET, Privilege.Name.WRITE_FILESET);
@@ -151,7 +164,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               translateMetadataObject(securableObject).names(),
-                              RangerMetadataObject.Type.PATH,
+                              RangerHadoopSQLMetadataObject.Type.PATH,
                               rangerPrivileges));
                       break;
                     default:
@@ -183,7 +196,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 translateMetadataObject(gravitinoMetadataObject).names(),
-                RangerMetadataObject.Type.PATH,
+                RangerHadoopSQLMetadataObject.Type.PATH,
                 ownerMappingRule()));
         break;
       default:
@@ -208,21 +221,23 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
 
     nsMetadataObject.remove(0); // Remove the catalog name
-    RangerMetadataObject rangerMetadataObject =
-        new RangerMetadataObject(
-            null, getFileSetPath(metadataObject), RangerMetadataObject.Type.PATH);
-    rangerMetadataObject.validateAuthorizationMetadataObject();
-    return rangerMetadataObject;
+    RangerHDFSMetadataObject rangerHDFSMetadataObject =
+        new RangerHDFSMetadataObject(
+            getFileSetPath(metadataObject), RangerHadoopSQLMetadataObject.Type.PATH);
+    rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
+    return rangerHDFSMetadataObject;
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-    if (testEnv) {
+    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
+    boolean testEnv =
+        System.getenv("GRAVITINO_TEST") != null || System.getenv("GRAVITINO_TEST_CLOUD_IT") == null;
+    if (filesetDispatcher == null && testEnv) {
       return "/test";
     }
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
-    Fileset fileset = GravitinoEnv.getInstance().filesetDispatcher().loadFileset(identifier);
+    Fileset fileset = filesetDispatcher.loadFileset(identifier);
     Preconditions.checkArgument(
         fileset != null, String.format("Fileset %s is not found", identifier));
     String filesetLocation = fileset.storageLocation();

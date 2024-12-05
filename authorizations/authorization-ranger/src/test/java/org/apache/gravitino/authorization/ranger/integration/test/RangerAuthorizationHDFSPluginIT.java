@@ -29,7 +29,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
+import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -75,7 +75,7 @@ public class RangerAuthorizationHDFSPluginIT {
     AuthorizationMetadataObject rangerFileset = rangerAuthPlugin.translateMetadataObject(fileset);
     Assertions.assertEquals(1, rangerFileset.names().size());
     Assertions.assertEquals("/test", rangerFileset.fullName());
-    Assertions.assertEquals(RangerMetadataObject.Type.PATH, rangerFileset.type());
+    Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.PATH, rangerFileset.type());
   }
 
   @Test
@@ -130,7 +130,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
     filesetInFileset1.forEach(
         securableObject -> {
-          Assertions.assertEquals(RangerMetadataObject.Type.PATH, securableObject.type());
+          Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.PATH, securableObject.type());
           Assertions.assertEquals("/test", securableObject.fullName());
           Assertions.assertTrue(
               securableObject.privileges().size() == 1 || securableObject.privileges().size() == 2);
@@ -176,7 +176,7 @@ public class RangerAuthorizationHDFSPluginIT {
     List<AuthorizationSecurableObject> filesetOwner = rangerAuthPlugin.translateOwner(fileset);
     Assertions.assertEquals(1, filesetOwner.size());
     Assertions.assertEquals("/test", filesetOwner.get(0).fullName());
-    Assertions.assertEquals(RangerMetadataObject.Type.PATH, filesetOwner.get(0).type());
+    Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.PATH, filesetOwner.get(0).type());
     Assertions.assertEquals(3, filesetOwner.get(0).privileges().size());
   }
 }
