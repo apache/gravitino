@@ -814,7 +814,7 @@ gcli  column delete --name catalog_postgres.hr.departments.money
 gcli column update --name catalog_postgres.hr.departments.value --rename values
 gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
 gcli column update --name catalog_postgres.hr.departments.values --position name
-gcli column update --name catalog_postgres.hr.departments.name --null=true
+gcli column update --name catalog_postgres.hr.departments.name --null true
 ```
 
 #### Simple authentication
