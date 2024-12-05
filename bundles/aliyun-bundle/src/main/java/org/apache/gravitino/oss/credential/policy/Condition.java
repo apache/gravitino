@@ -16,24 +16,41 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage;
 
-// Properties for OSS.
-public class OSSProperties {
+package org.apache.gravitino.oss.credential.policy;
 
-  // The region of Aliyun OSS.
-  public static final String GRAVITINO_OSS_REGION = "oss-region";
-  // The endpoint of Aliyun OSS.
-  public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
-  // The static access key ID used to access OSS data.
-  public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
-  // The static access key secret used to access OSS data.
-  public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-secret-access-key";
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-  // OSS role arn
-  public static final String GRAVITINO_OSS_ROLE_ARN = "oss-role-arn";
-  // OSS external id
-  public static final String GRAVITINO_OSS_EXTERNAL_ID = "oss-external-id";
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class Condition {
 
-  private OSSProperties() {}
+  @JsonProperty("StringLike")
+  private StringLike stringLike;
+
+  private Condition(Builder builder) {
+    this.stringLike = builder.stringLike;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static class Builder {
+    private StringLike stringLike;
+
+    public Builder stringLike(StringLike stringLike) {
+      this.stringLike = stringLike;
+      return this;
+    }
+
+    public Condition build() {
+      return new Condition(this);
+    }
+  }
+
+  @SuppressWarnings("unused")
+  public StringLike getStringLike() {
+    return stringLike;
+  }
 }

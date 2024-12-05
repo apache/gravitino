@@ -51,4 +51,21 @@ public class TestCredentialPropertiesUtils {
             "secret");
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
+
+  @Test
+  void testToIcebergPropertiesForOSS() {
+    OSSTokenCredential ossTokenCredential =
+        new OSSTokenCredential("key", "secret", "security-token", 0);
+    Map<String, String> icebergProperties =
+        CredentialPropertyUtils.toIcebergProperties(ossTokenCredential);
+    Map<String, String> expectedProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_ID,
+            "key",
+            CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_SECRET,
+            "secret",
+            CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN,
+            "security-token");
+    Assertions.assertEquals(expectedProperties, icebergProperties);
+  }
 }
