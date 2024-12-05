@@ -130,6 +130,17 @@ auth=simple
 
 ```
 
+OAuth authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=oauth
+serverURI=http://127.0.0.1:1082
+credential=xx:xx
+token=test
+scope=token/test
+```
+
 ### Potentially unsafe operations
 
 For operations that delete data or rename a metalake the user with be prompted to make sure they wish to run this command. The `--force` option can be specified to override this behaviour.
