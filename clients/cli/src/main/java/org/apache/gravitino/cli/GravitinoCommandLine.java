@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.Command;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine extends TestableCommandLine {
@@ -43,6 +44,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
   private boolean ignore = false;
   private String ignoreEnv;
   private boolean ignoreSet = false;
+  private String authEnv;
+  private boolean authSet = false;
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
@@ -151,15 +154,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleMetalakeCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newMetalakeAudit(url, ignore, metalake).handle();
       } else {
-        newMetalakeDetails(url, ignore, metalake, outputFormat).handle();
+        newMetalakeDetails(url, ignore, outputFormat, metalake).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
       newListMetalakes(url, ignore, outputFormat).handle();
@@ -196,9 +203,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleCatalogCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListCatalogs(url, ignore, metalake).handle();
@@ -211,7 +222,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newCatalogAudit(url, ignore, metalake, catalog).handle();
       } else {
-        newCatalogDetails(url, ignore, metalake, catalog, outputFormat).handle();
+        newCatalogDetails(url, ignore, outputFormat, metalake, catalog).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
@@ -248,9 +259,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleSchemaCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListSchema(url, ignore, metalake, catalog).handle();
@@ -288,10 +303,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleTableCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListTables(url, ignore, metalake, catalog, schema).handle();
@@ -345,9 +364,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
   /** Handles the command execution for Users based on command type and the command line options. */
   protected void handleUserCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String user = line.getOptionValue(GravitinoOptions.USER);
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newUserDetails(url, ignore, metalake, user).handle();
@@ -376,9 +399,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
   /** Handles the command execution for Group based on command type and the command line options. */
   protected void handleGroupCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String group = line.getOptionValue(GravitinoOptions.GROUP);
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newGroupDetails(url, ignore, metalake, group).handle();
@@ -407,8 +434,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
   /** Handles the command execution for Tags based on command type and the command line options. */
   protected void handleTagCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+
+    Command.setAuthenicationMode(auth, userName);
 
     String[] tags = line.getOptionValues(GravitinoOptions.TAG);
     if (tags != null) {
@@ -465,9 +496,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
   /** Handles the command execution for Roles based on command type and the command line options. */
   protected void handleRoleCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String role = line.getOptionValue(GravitinoOptions.ROLE);
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newRoleDetails(url, ignore, metalake, role).handle();
@@ -486,12 +521,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleColumnCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String table = name.getTableName();
     String column = name.getColumnName();
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
@@ -599,9 +638,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleOwnerCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String entityName = line.getOptionValue(GravitinoOptions.NAME);
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newOwnerDetails(url, ignore, metalake, entityName, entity).handle();
@@ -626,11 +669,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleTopicCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String topic = name.getTopicName();
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListTopics(url, ignore, metalake, catalog, schema).handle();
@@ -664,11 +711,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   private void handleFilesetCommand() {
     String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String fileset = name.getFilesetName();
+
+    Command.setAuthenicationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();
@@ -741,5 +792,42 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     // Return the default localhost URL
     return DEFAULT_URL;
+  }
+
+  /**
+   * Retrieves the Gravitinno authentication from the command line options or the GRAVITINO_AUTH
+   * environment variable or the Gravitio config file.
+   *
+   * @return The Gravitinno authentication, or null if not found.
+   */
+  public String getAuth() {
+
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.SIMPLE)) {
+      return GravitinoOptions.SIMPLE;
+    }
+
+    // Cache the Gravitino URL environment variable
+    if (authEnv == null && !authSet) {
+      authEnv = System.getenv("GRAVITINO_AUTH");
+      authSet = true;
+    }
+
+    // If set return the Gravitino URL environment variable
+    if (authEnv != null) {
+      return authEnv;
+    }
+
+    // Check if the metalake name is specified in the configuration file
+    GravitinoConfig config = new GravitinoConfig(null);
+    if (config.fileExists()) {
+      config.read();
+      String configAuth = config.getGravitinoAuth();
+      if (configAuth != null) {
+        return configAuth;
+      }
+    }
+
+    return null;
   }
 }

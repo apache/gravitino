@@ -50,6 +50,8 @@ public class GravitinoOptions {
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
+  public static final String SIMPLE = "simple";
+  public static final String LOGIN = "login";
   public static final String COLUMNFILE = "columnfile";
   public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
@@ -74,6 +76,8 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption(null, SIMPLE, "simple authentication"));
+    options.addOption(createArgOption(null, LOGIN, "user name"));
     options.addOption(createSimpleOption("x", INDEX, "display index information"));
     options.addOption(createSimpleOption("d", DISTRIBUTION, "display distribution information"));
     options.addOption(createSimpleOption(PARTITION, "display partition information"));
