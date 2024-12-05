@@ -37,7 +37,6 @@ public class MetalakeDetails extends Command {
    * @param metalake The name of the metalake.
    */
   public MetalakeDetails(String url, boolean ignoreVersions, String outputFormat, String metalake) {
-
     super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
   }

@@ -33,7 +33,6 @@ public class ListMetalakes extends Command {
    * @param outputFormat The output format.
    */
   public ListMetalakes(String url, boolean ignoreVersions, String outputFormat) {
-
     super(url, ignoreVersions, outputFormat);
   }
 

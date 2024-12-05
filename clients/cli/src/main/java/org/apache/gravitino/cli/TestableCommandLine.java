@@ -133,7 +133,6 @@ public class TestableCommandLine {
 
   protected MetalakeDetails newMetalakeDetails(
       String url, boolean ignore, String outputFormat, String metalake) {
-
     return new MetalakeDetails(url, ignore, outputFormat, metalake);
   }
 

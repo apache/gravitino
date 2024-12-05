@@ -41,7 +41,6 @@ public class ListTables extends TableCommand {
    */
   public ListTables(
       String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-
     super(url, ignoreVersions, metalake, catalog);
     this.schema = schema;
   }

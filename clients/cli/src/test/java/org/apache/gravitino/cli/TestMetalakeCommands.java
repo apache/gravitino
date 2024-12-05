@@ -72,7 +72,6 @@ class TestMetalakeCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(false);
-
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(

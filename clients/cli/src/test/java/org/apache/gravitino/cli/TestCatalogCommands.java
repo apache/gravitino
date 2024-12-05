@@ -75,7 +75,6 @@ class TestCatalogCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
     when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(false);
-
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
