@@ -82,6 +82,8 @@ public class TableFormat {
 
   static final class TableFormatImpl {
     private int[] maxElementLengths;
+    // This expression is primarily used to match characters that have a display width of
+    // 2, such as characters from Korean, Chinese
     private static final Pattern FULL_WIDTH_PATTERN =
         Pattern.compile(
             "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
