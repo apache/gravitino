@@ -36,10 +36,10 @@ public class OSSTokenCredential implements Credential {
   /** OSS security token. */
   public static final String GRAVITINO_OSS_TOKEN = "oss-security-token";
 
-  private final String accessKeyId;
-  private final String secretAccessKey;
-  private final String securityToken;
-  private final long expireTimeInMS;
+  private String accessKeyId;
+  private String secretAccessKey;
+  private String securityToken;
+  private long expireTimeInMS;
 
   /**
    * Constructs an instance of {@link OSSTokenCredential} with secret key and token.
@@ -83,6 +83,20 @@ public class OSSTokenCredential implements Credential {
         .build();
   }
 
+  @Override
+  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+    String accessKeyId = credentialInfo.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
+    String secretAccessKey = credentialInfo.get(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY);
+    String securityToken = credentialInfo.get(GRAVITINO_OSS_TOKEN);
+
+    validate(accessKeyId, secretAccessKey, securityToken, expireTimeInMs);
+
+    this.accessKeyId = accessKeyId;
+    this.secretAccessKey = secretAccessKey;
+    this.securityToken = securityToken;
+    this.expireTimeInMS = expireTimeInMs;
+  }
+
   /**
    * Get oss access key ID.
    *
@@ -108,5 +122,17 @@ public class OSSTokenCredential implements Credential {
    */
   public String securityToken() {
     return securityToken;
+  }
+
+  private void validate(
+      String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessKeyId), "S3 access key Id should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(secretAccessKey), "S3 secret access key should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(sessionToken), "S3 session token should not be empty");
+    Preconditions.checkArgument(
+        expireTimeInMs > 0, "The expire time of S3TokenCredential should great than 0");
   }
 }

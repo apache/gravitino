@@ -89,4 +89,28 @@ public class TestCredentialFactory {
     Assertions.assertEquals("accessToken", gcsTokenCredential1.token());
     Assertions.assertEquals(expireTime, gcsTokenCredential1.expireTimeInMs());
   }
+
+  @Test
+  void testOSSTokenCredential() {
+    Map<String, String> ossTokenCredentialInfo =
+        ImmutableMap.of(
+            OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID,
+            "access-id",
+            OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
+            "secret-key",
+            OSSTokenCredential.GRAVITINO_OSS_TOKEN,
+            "token");
+    long expireTime = 100;
+    Credential ossTokenCredential =
+        CredentialFactory.create(
+            OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenCredentialInfo, expireTime);
+    Assertions.assertEquals(
+        OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenCredential.credentialType());
+    Assertions.assertTrue(ossTokenCredential instanceof OSSTokenCredential);
+    OSSTokenCredential ossTokenCredential1 = (OSSTokenCredential) ossTokenCredential;
+    Assertions.assertEquals("access-id", ossTokenCredential1.accessKeyId());
+    Assertions.assertEquals("secret-key", ossTokenCredential1.secretAccessKey());
+    Assertions.assertEquals("token", ossTokenCredential1.securityToken());
+    Assertions.assertEquals(expireTime, ossTokenCredential1.expireTimeInMs());
+  }
 }
