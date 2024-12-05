@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -33,7 +30,6 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.rel.Table;
 
 /* Removes all the tags of an entity. */
@@ -65,9 +61,10 @@ public class RemoveAllTags extends Command {
     if (!AreYouSure.really(force)) {
       return;
     }
+    String entity = "unknown";
     String[] tags = new String[0];
+    GravitinoClient client = buildClient(metalake);
     try {
-      GravitinoClient client = buildClient(metalake);
 
       // TODO fileset and topic
       if (name.hasTableName()) {
@@ -80,52 +77,45 @@ public class RemoveAllTags extends Command {
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
         tags = gTable.supportsTags().listTags();
+        gTable.supportsTags().associateTags(null, tags);
+        entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
         tags = gSchema.supportsTags().listTags();
+        gSchema.supportsTags().associateTags(null, tags);
+        entity = schema;
       } else if (name.hasCatalogName()) {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
         tags = gCatalog.supportsTags().listTags();
+        gCatalog.supportsTags().associateTags(null, tags);
+        entity = catalog;
       }
-      removeTags(client, tags);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (NoSuchSchemaException err) {
       System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (NoSuchTableException err) {
       System.err.println(ErrorMessages.UNKNOWN_TABLE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
+      return;
     }
-  }
 
-  private void removeTags(GravitinoClient client, String[] tags) {
-    List<String> deleted = new ArrayList<>();
-    try {
-      for (String tag : tags) {
-        if (client.deleteTag(tag)) {
-          deleted.add(tag);
-        }
-      }
-    } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
-    } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
-    }
-    if (!deleted.isEmpty()) {
-      System.out.println("Tags " + String.join(",", deleted) + " deleted.");
-    }
-    if (deleted.size() < tags.length) {
-      List<String> remaining = Arrays.asList(tags);
-      remaining.removeAll(deleted);
-      System.out.println("Tags " + String.join(",", remaining) + " not deleted.");
+    if (tags.length > 1) {
+      System.out.println(
+          entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
+    } else {
+      System.out.println(
+          entity + " removed tag " + tags[0].toString() + " now tagged with nothing");
     }
   }
 }
