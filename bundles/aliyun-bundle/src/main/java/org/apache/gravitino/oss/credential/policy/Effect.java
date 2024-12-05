@@ -16,24 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage;
 
-// Properties for OSS.
-public class OSSProperties {
+package org.apache.gravitino.oss.credential.policy;
 
-  // The region of Aliyun OSS.
-  public static final String GRAVITINO_OSS_REGION = "oss-region";
-  // The endpoint of Aliyun OSS.
-  public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
-  // The static access key ID used to access OSS data.
-  public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
-  // The static access key secret used to access OSS data.
-  public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-secret-access-key";
-
-  // OSS role arn
-  public static final String GRAVITINO_OSS_ROLE_ARN = "oss-role-arn";
-  // OSS external id
-  public static final String GRAVITINO_OSS_EXTERNAL_ID = "oss-external-id";
-
-  private OSSProperties() {}
+public class Effect {
+  public static final String ALLOW = "Allow";
 }
