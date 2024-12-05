@@ -63,9 +63,9 @@ public class RemoveAllTags extends Command {
     }
     String entity = "unknown";
     String[] tags = new String[0];
-    GravitinoClient client = buildClient(metalake);
     try {
 
+      GravitinoClient client = buildClient(metalake);
       // TODO fileset and topic
       if (name.hasTableName()) {
         String catalog = name.getCatalogName();
