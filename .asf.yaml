@@ -53,13 +53,10 @@ github:
   protected_tags:
     - "v*.*.*"
   collaborators:
-    - jerqi
-    - diqiu50
-    - xloya
-    - coolderli
     - LauraXia123
     - noidname01
     - caican00
+    - orenccl
 
 notifications:
   commits: commits@gravitino.apache.org

@@ -38,21 +38,13 @@ public class RemoveRoleFromUser extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    * @param role The name of the role.
    */
   public RemoveRoleFromUser(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String metalake,
-      String user,
-      String role) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, String metalake, String user, String role) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;
     this.role = role;

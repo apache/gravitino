@@ -26,6 +26,7 @@ import java.util.HashSet;
  * Gravitino CLI. It also can validate if a given command is a valid commands.
  */
 public class CommandActions {
+  public static final String HELP = "help";
   public static final String DETAILS = "details";
   public static final String LIST = "list";
   public static final String UPDATE = "update";
@@ -40,6 +41,7 @@ public class CommandActions {
   private static final HashSet<String> VALID_COMMANDS = new HashSet<>();
 
   static {
+    VALID_COMMANDS.add(HELP);
     VALID_COMMANDS.add(DETAILS);
     VALID_COMMANDS.add(LIST);
     VALID_COMMANDS.add(UPDATE);

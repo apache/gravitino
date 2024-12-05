@@ -48,7 +48,7 @@ def parse_config_file(file_path):
         for line in file:  
             stripped_line = line.strip()  
             if stripped_line and not stripped_line.startswith('#'):  
-                key, value = stripped_line.split('=')  
+                key, value = stripped_line.split('=', 1)
                 key = key.strip()  
                 value = value.strip()  
                 config_map[key] = value  

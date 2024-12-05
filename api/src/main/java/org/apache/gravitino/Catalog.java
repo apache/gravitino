@@ -22,8 +22,10 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
+import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -46,6 +48,9 @@ public interface Catalog extends Auditable {
     /** Catalog Type for Message Queue, like Kafka://topic */
     MESSAGING,
 
+    /** Catalog Type for ML model */
+    MODEL,
+
     /** Catalog Type for test only. */
     UNSUPPORTED;
 
@@ -63,6 +68,8 @@ public interface Catalog extends Auditable {
           return FILESET;
         case "messaging":
           return MESSAGING;
+        case "model":
+          return MODEL;
         default:
           throw new IllegalArgumentException("Unknown catalog type: " + type);
       }
@@ -179,6 +186,14 @@ public interface Catalog extends Auditable {
   }
 
   /**
+   * @return the {@link ModelCatalog} if the catalog supports model operations.
+   * @throws UnsupportedOperationException if the catalog does not support model operations.
+   */
+  default ModelCatalog asModelCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support model operations");
+  }
+
+  /**
    * @return the {@link SupportsTags} if the catalog supports tag operations.
    * @throws UnsupportedOperationException if the catalog does not support tag operations.
    */
@@ -192,5 +207,13 @@ public interface Catalog extends Auditable {
    */
   default SupportsRoles supportsRoles() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support role operations");
+  }
+
+  /**
+   * @return the {@link SupportsCredentials} if the catalog supports credential operations.
+   * @throws UnsupportedOperationException if the catalog does not support credential operations.
+   */
+  default SupportsCredentials supportsCredentials() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support credential operations");
   }
 }

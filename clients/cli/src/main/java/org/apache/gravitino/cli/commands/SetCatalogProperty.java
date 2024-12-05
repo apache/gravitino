@@ -38,8 +38,6 @@ public class SetCatalogProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param property The name of the property.
@@ -48,13 +46,11 @@ public class SetCatalogProperty extends Command {
   public SetCatalogProperty(
       String url,
       boolean ignoreVersions,
-      String authentication,
-      String userName,
       String metalake,
       String catalog,
       String property,
       String value) {
-    super(url, ignoreVersions, authentication, userName);
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.property = property;

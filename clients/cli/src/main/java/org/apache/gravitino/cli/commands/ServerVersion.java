@@ -31,7 +31,7 @@ public class ServerVersion extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    */
   public ServerVersion(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions, null, null);
+    super(url, ignoreVersions);
   }
 
   /** Displays the server version. */

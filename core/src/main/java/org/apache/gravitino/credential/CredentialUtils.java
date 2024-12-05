@@ -23,10 +23,10 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {
-  public static Credential vendCredential(CredentialProvider credentialProvider, String path) {
+  public static Credential vendCredential(CredentialProvider credentialProvider, String[] path) {
     PathBasedCredentialContext pathBasedCredentialContext =
         new PathBasedCredentialContext(
-            PrincipalUtils.getCurrentUserName(), ImmutableSet.of(path), ImmutableSet.of());
+            PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), ImmutableSet.of());
     return credentialProvider.getCredential(pathBasedCredentialContext);
   }
 }

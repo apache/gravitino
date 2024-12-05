@@ -129,12 +129,15 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 
 ##### Pre-event
 
-| Operation type                      | Pre-event                                                                                                                                                                                                  | Since Version     |
-|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| Iceberg REST server table operation | `IcebergCreateTablePreEvent`, `IcebergUpdateTablePreEvent`, `IcebergDropTablePreEvent`, `IcebergLoadTablePreEvent`, `IcebergListTablePreEvent`, `IcebergTableExistsPreEvent`, `IcebergRenameTablePreEvent` | 0.7.0-incubating  |
-| Gravitino server table operation    | `CreateTablePreEvent`, `AlterTablePreEvent`, `DropTablePreEvent`, `PurgeTablePreEvent`, `LoadTablePreEvent`, `ListTablePreEvent`                                                                           | 0.8.0-incubating  |
-| Gravitino server schema operation   | `CreateSchemaPreEvent`, `AlterSchemaPreEvent`, `DropSchemaPreEvent`, `LoadSchemaPreEvent`, `ListSchemaPreEvent`                                                                                            | 0.8.0-incubating  |
-| Gravitino server catalog operation  | `CreateCatalogPreEvent`, `AlterCatalogPreEvent`, `DropCatalogPreEvent`, `LoadCatalogPreEvent`, `ListCatalogPreEvent`                                                                                       | 0.8.0-incubating  |
+| Operation type                       | Pre-event                                                                                                                                                                                                 | Since Version     |
+|--------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
+| Iceberg REST server table operation  | `IcebergCreateTablePreEvent`, `IcebergUpdateTablePreEvent`, `IcebergDropTablePreEvent`, `IcebergLoadTablePreEvent`, `IcebergListTablePreEvent`, `IcebergTableExistsPreEvent`, `IcebergRenameTablePreEvent` | 0.7.0-incubating  |
+| Gravitino server table operation     | `CreateTablePreEvent`, `AlterTablePreEvent`, `DropTablePreEvent`, `PurgeTablePreEvent`, `LoadTablePreEvent`, `ListTablePreEvent`                                                                          | 0.8.0-incubating  |
+| Gravitino server schema operation    | `CreateSchemaPreEvent`, `AlterSchemaPreEvent`, `DropSchemaPreEvent`, `LoadSchemaPreEvent`, `ListSchemaPreEvent`                                                                                           | 0.8.0-incubating  |
+| Gravitino server catalog operation   | `CreateCatalogPreEvent`, `AlterCatalogPreEvent`, `DropCatalogPreEvent`, `LoadCatalogPreEvent`, `ListCatalogPreEvent`                                                                                      | 0.8.0-incubating  |
+| Gravitino server metalake operation  | `CreateMetalakePreEvent`, `AlterMetalakePreEvent`,`DropMetalakePreEvent`,`LoadMetalakePreEvent`,`ListMetalakePreEvent`                                                                                    | 0.8.0-incubating |
+| Gravitino server partition operation | `AddPartitionPreEvent`, `DropPartitionPreEvent`, `GetPartitionPreEvent`, `PurgePartitionPreEvent`,`ListPartitionPreEvent`,`ListPartitionNamesPreEvent`                                                    | 0.8.0-incubating |
+| Gravitino server fileset operation   | `CreateFilesetPreEvent`, `AlterFilesetPreEvent`, `DropFilesetPreEvent`, `LoadFilesetPreEvent`,`ListFilesetPreEvent`,`GetFileLocationPreEvent`                                                             | 0.8.0-incubating |
 
 #### Event listener plugin
 
@@ -231,6 +234,7 @@ The following table lists the catalog specific properties and their default path
 | `jdbc-doris`        | [Doris catalog properties](jdbc-doris-catalog.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
 | `jdbc-oceanbase`    | [OceanBase catalog properties](jdbc-oceanbase-catalog.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
 | `kafka`             | [Kafka catalog properties](kafka-catalog.md#catalog-properties)                         | `catalogs/kafka/conf/kafka.conf`                         |
+| `hadoop`            | [Hadoop catalog properties](hadoop-catalog.md#catalog-properties)                       | `catalogs/hadoop/conf/hadoop.conf`                       |
 
 :::info
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.

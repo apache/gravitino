@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.client.GravitinoAdminClient;
 
@@ -32,33 +29,23 @@ public class ListMetalakes extends Command {
    * List all metalakes.
    *
    * @param url The URL of the Gravitino server.
-   * @param authentication Authentication type i.e. "simple"
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param userName User name for simple authentication.
+   * @param outputFormat The output format.
    */
-  public ListMetalakes(String url, boolean ignoreVersions, String authentication, String userName) {
-    super(url, ignoreVersions, authentication, userName);
+  public ListMetalakes(String url, boolean ignoreVersions, String outputFormat) {
+    super(url, ignoreVersions, outputFormat);
   }
 
   /** Lists all metalakes. */
   @Override
   public void handle() {
-    Metalake[] metalakes = new Metalake[0];
+    Metalake[] metalakes;
     try {
       GravitinoAdminClient client = buildAdminClient();
       metalakes = client.listMetalakes();
+      output(metalakes);
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
-      return;
     }
-
-    List<String> metalakeNames = new ArrayList<>();
-    for (int i = 0; i < metalakes.length; i++) {
-      metalakeNames.add(metalakes[i].name());
-    }
-
-    String all = Joiner.on(System.lineSeparator()).join(metalakeNames);
-
-    System.out.println(all.toString());
   }
 }

@@ -34,8 +34,6 @@ public class ListIndexes extends TableCommand {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -44,18 +42,17 @@ public class ListIndexes extends TableCommand {
   public ListIndexes(
       String url,
       boolean ignoreVersions,
-      String authentication,
-      String userName,
       String metalake,
       String catalog,
       String schema,
       String table) {
-    super(url, ignoreVersions, authentication, userName, metalake, catalog);
+    super(url, ignoreVersions, metalake, catalog);
     this.schema = schema;
     this.table = table;
   }
 
   /** Displays the details of a table's index. */
+  @Override
   public void handle() {
     Index[] indexes;
 

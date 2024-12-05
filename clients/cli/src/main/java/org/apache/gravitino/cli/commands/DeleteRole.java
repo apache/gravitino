@@ -36,21 +36,13 @@ public class DeleteRole extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    */
   public DeleteRole(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      boolean force,
-      String metalake,
-      String role) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, boolean force, String metalake, String role) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.force = force;
     this.role = role;

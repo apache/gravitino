@@ -58,4 +58,14 @@ public final class CreateFilesetFailureEvent extends FilesetFailureEvent {
   public FilesetInfo createFilesetRequest() {
     return createFilesetRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_FILESET;
+  }
 }

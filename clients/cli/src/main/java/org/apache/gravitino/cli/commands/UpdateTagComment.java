@@ -37,21 +37,13 @@ public class UpdateTagComment extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param authentication Authentication type i.e. "simple"
-   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param comment New metalake comment.
    */
   public UpdateTagComment(
-      String url,
-      boolean ignoreVersions,
-      String authentication,
-      String userName,
-      String metalake,
-      String tag,
-      String comment) {
-    super(url, ignoreVersions, authentication, userName);
+      String url, boolean ignoreVersions, String metalake, String tag, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
     this.comment = comment;

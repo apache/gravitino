@@ -41,6 +41,7 @@ import clsx from 'clsx'
 
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
+import GitHubInfo from './GitHubInfo'
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -94,6 +95,7 @@ const AppBar = () => {
               >
                 Gravitino
               </Typography>
+              <VersionView />
             </Link>
             <Box className={'app-bar-content-right twc-flex twc-items-center'}>
               <Stack direction='row' spacing={2} alignItems='center'>
@@ -135,7 +137,7 @@ const AppBar = () => {
                     </Select>
                   </FormControl>
                 ) : null}
-                <VersionView />
+                <GitHubInfo />
                 <LogoutButton />
               </Stack>
             </Box>

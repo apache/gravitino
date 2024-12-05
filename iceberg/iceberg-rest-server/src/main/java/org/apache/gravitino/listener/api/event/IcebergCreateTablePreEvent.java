@@ -36,6 +36,11 @@ public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
     this.createTableRequest = createTableRequest;
   }
 
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
+  }
+
   public CreateTableRequest createTableRequest() {
     return createTableRequest;
   }
