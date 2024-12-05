@@ -89,7 +89,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements FunctionCatal
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    return ((SparkCatalog)sparkCatalog).listFunctions(namespace);
+    return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
   }
 
   @Override
@@ -97,22 +97,21 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements FunctionCatal
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
   }
 
-
   @Override
   public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, String version)
-          throws NoSuchTableException {
+      throws NoSuchTableException {
     try {
       org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, version);
       // Will create a catalog specific table
       return createSparkTable(
-              ident,
-              gravitinoTable,
-              sparkTable,
-              sparkCatalog,
-              propertiesConverter,
-              sparkTransformConverter,
-              getSparkTypeConverter());
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter,
+          getSparkTypeConverter());
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -120,19 +119,19 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements FunctionCatal
 
   @Override
   public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, long timestamp)
-          throws NoSuchTableException {
+      throws NoSuchTableException {
     try {
       org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, timestamp);
       // Will create a catalog specific table
       return createSparkTable(
-              ident,
-              gravitinoTable,
-              sparkTable,
-              sparkCatalog,
-              propertiesConverter,
-              sparkTransformConverter,
-              getSparkTypeConverter());
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter,
+          getSparkTypeConverter());
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
