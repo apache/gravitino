@@ -151,6 +151,7 @@ public abstract class Command {
    * Outputs the entity to the console.
    *
    * @param entity The entity to output.
+   * @param <T> The type of entity.
    */
   protected <T> void output(T entity) {
     if (outputFormat == null) {
