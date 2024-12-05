@@ -101,7 +101,14 @@ const schema = yup.object().shape({
   columns: yup.array().of(
     yup.object().shape({
       name: yup.string().required(),
-      type: yup.string().required(),
+      type: yup
+        .mixed()
+        .test(
+          'is-string-or-object',
+          'type must be a string or an object',
+          value => typeof value === 'string' || typeof value === 'object'
+        )
+        .required(),
       nullable: yup.boolean(),
       comment: yup.string()
     })
@@ -415,7 +422,7 @@ const CreateTableDialog = props => {
         column.uniqueId = column.name
 
         // Extract type suffix for types with parameters
-        const match = column.type.match(/(\w+)(\([\d,]+\))/)
+        const match = typeof column.type === 'string' && column.type.match(/(\w+)(\([\d,]+\))/)
         if (match && match.length === 3) {
           column.typeSuffix = match[2]
           column.type = match[1]
@@ -579,28 +586,50 @@ const CreateTableDialog = props => {
                           <FormControl fullWidth>
                             <Box sx={{ display: 'flex', gap: 1 }}>
                               <Box sx={{ minWidth: 120 }}>
-                                <Select
-                                  size='small'
-                                  fullWidth
-                                  value={column.type}
-                                  onChange={e => handleColumnChange({ index, field: 'type', value: e.target.value })}
-                                  error={!column.type.trim() || column.paramErrors}
-                                  data-refer={`column-type-${index}`}
-                                  renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
-                                >
-                                  {columnTypes.map(type => (
-                                    <MenuItem key={type} value={type}>
-                                      {type}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                                {!column.type.trim() && (
-                                  <FormHelperText className={'twc-text-error-main'}>Type is required</FormHelperText>
-                                )}
-                                {column.paramErrors && (
-                                  <FormHelperText className={'twc-text-error-main'}>
-                                    {column.paramErrors}
-                                  </FormHelperText>
+                                {typeof column.type === 'string' ? (
+                                  <>
+                                    <Select
+                                      size='small'
+                                      fullWidth
+                                      value={column.type}
+                                      onChange={e =>
+                                        handleColumnChange({ index, field: 'type', value: e.target.value })
+                                      }
+                                      error={!column.type.trim() || column.paramErrors}
+                                      data-refer={`column-type-${index}`}
+                                      renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
+                                    >
+                                      {columnTypes.map(type => (
+                                        <MenuItem key={type} value={type}>
+                                          {type}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                    {!column.type.trim() && (
+                                      <FormHelperText className={'twc-text-error-main'}>
+                                        Type is required
+                                      </FormHelperText>
+                                    )}
+                                    {column.paramErrors && (
+                                      <FormHelperText className={'twc-text-error-main'}>
+                                        {column.paramErrors}
+                                      </FormHelperText>
+                                    )}
+                                  </>
+                                ) : (
+                                  <Select
+                                    size='small'
+                                    fullWidth
+                                    value={column.type.type}
+                                    disabled
+                                    sx={{
+                                      '.MuiSelect-icon': {
+                                        display: 'none'
+                                      }
+                                    }}
+                                  >
+                                    <MenuItem value={column.type.type}>{column.type.type}</MenuItem>
+                                  </Select>
                                 )}
                               </Box>
                               {selectedColumnIndex === index &&
