@@ -42,9 +42,10 @@ impl FileHandleManager {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    pub(crate) fn open_file(&mut self, file: &FileStat) -> OpenedFile {
+    pub(crate) fn create_file(&mut self, file: &FileStat) -> OpenedFile {
         let file_handle = OpenedFile {
             file_id: file.inode,
+            path: file.path.clone(),
             handle_id: self.next_handle_id(),
             size: file.size,
         };

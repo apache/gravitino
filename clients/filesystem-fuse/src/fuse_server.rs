@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::FileSystemContext;
+use crate::filesystem::{FileSystemContext, SimpleFileSystem};
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::memory_filesystem::MemoryFileSystem;
 use fuse3::raw::{MountHandle, Session};
@@ -52,7 +52,7 @@ impl FuseServer {
 
     /// Starts the FUSE filesystem and blocks until it is stopped.
     pub async fn start(&self) -> Result<()> {
-        let fs = Box::new(MemoryFileSystem::new());
+        let fs = Box::new(SimpleFileSystem::new(Box::new(MemoryFileSystem::new())));
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
         let fs_context = crate::filesystem::FileSystemContext { uid: uid, gid: gid };

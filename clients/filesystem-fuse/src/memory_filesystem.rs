@@ -16,166 +16,128 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::file_handle_manager::FileHandleManager;
-use crate::filesystem::{FileReader, FileStat, FileWriter, IFileSystem, OpenedFile, Result};
-use crate::filesystem_metadata::{DefaultFileSystemMetadata, IFileSystemMetadata};
+use crate::filesystem::{
+    join_file_path, FileReader, FileStat, FileWriter, OpenedFile, PathFileSystem, Result,
+};
 use dashmap::DashMap;
+use fuse3::Errno;
+use regex::Regex;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
 // It is used for testing purposes
 pub(crate) struct MemoryFileSystem {
-    // meta is the metadata of the filesystem
-    meta: RwLock<DefaultFileSystemMetadata>,
-
-    file_handle_manager: RwLock<FileHandleManager>,
+    // file_map is a map of file stats
+    file_map: RwLock<BTreeMap<String, FileStat>>,
 
     // file_data_map is a map of file data
-    file_data_map: DashMap<u64, Arc<Mutex<Vec<u8>>>>,
+    file_data_map: DashMap<String, Arc<Mutex<Vec<u8>>>>,
 }
 
 impl MemoryFileSystem {
-    const ROOT_DIR_PARENT_FILE_ID: u64 = 0;
-    const ROOT_DIR_FILE_ID: u64 = 1;
-    const FS_META_FILE_NAME: &'static str = ".gvfs_meta";
-
     pub fn new() -> Self {
-        let fs = Self {
-            meta: RwLock::new(DefaultFileSystemMetadata::new()),
-            file_handle_manager: RwLock::new(FileHandleManager::new()),
+        Self {
+            file_map: RwLock::new(Default::default()),
             file_data_map: Default::default(),
-        };
-
-        FileStat::new_dir(
-            "/".into(),
-            MemoryFileSystem::ROOT_DIR_FILE_ID,
-            MemoryFileSystem::ROOT_DIR_PARENT_FILE_ID,
-        );
-
-        {
-            let mut meta = fs.meta.write().unwrap();
-            meta.add_root_dir();
-            meta.add_file(
-                MemoryFileSystem::ROOT_DIR_FILE_ID,
-                MemoryFileSystem::FS_META_FILE_NAME,
-            );
         }
-        fs
     }
+
+    pub fn init(&self) {}
 }
 
-impl IFileSystem for MemoryFileSystem {
-    fn get_file_path(&self, file_id: u64) -> String {
-        let meta = self.meta.read().unwrap();
-        meta.get_file_path(file_id)
+impl PathFileSystem for MemoryFileSystem {
+    fn init(&self) {}
+
+    fn stat(&self, name: &str) -> Result<FileStat> {
+        self.file_map
+            .read()
+            .unwrap()
+            .get(name)
+            .map(|x| x.clone())
+            .ok_or(Errno::from(libc::ENOENT))
     }
 
-    fn get_opened_file(&self, _file_id: u64, fh: u64) -> Result<OpenedFile> {
-        let file_handle_map = self.file_handle_manager.read().unwrap();
-        file_handle_map.get_file(fh).ok_or(libc::ENOENT.into())
+    fn lookup(&self, parent: &str, name: &str) -> Result<FileStat> {
+        self.stat(&join_file_path(parent, name))
     }
 
-    fn stat(&self, file_id: u64) -> Result<FileStat> {
-        let meta = self.meta.read().unwrap();
-        meta.get_file(file_id).ok_or(libc::ENOENT.into())
+    fn read_dir(&self, name: &str) -> Result<Vec<FileStat>> {
+        let file_map = self.file_map.read().unwrap();
+
+        let results: Vec<FileStat> = file_map
+            .iter()
+            .filter(|x| dir_child_reg_expr(name).is_match(x.0))
+            .map(|(_, v)| v.clone())
+            .collect();
+
+        Ok(results)
     }
 
-    fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
-        let meta = self.meta.read().unwrap();
-        meta.get_file_from_dir(parent_file_id, name)
-            .ok_or(libc::ENOENT.into())
-    }
-
-    fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
-        let meta = self.meta.read().unwrap();
-        Ok(meta.get_dir_childs(file_id))
-    }
-
-    fn open_file(&self, file_id: u64) -> Result<OpenedFile> {
-        let meta = self.meta.read().unwrap();
-        let file_stat = meta.get_file(file_id);
-        match file_stat {
-            Some(file_stat) => {
-                let mut file_handle_map = self.file_handle_manager.write().unwrap();
-                let file_handle = file_handle_map.open_file(&file_stat);
-                Ok(file_handle)
-            }
-            None => Err(libc::ENOENT.into()),
+    fn create_file(&self, parent: &str, name: &str) -> Result<FileStat> {
+        let mut file_map = self.file_map.read().unwrap();
+        if file_map.contains_key(&join_file_path(parent, name)) {
+            return Err(Errno::from(libc::EEXIST));
         }
-    }
 
-    fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
-        let mut meta = self.meta.write().unwrap();
-        let file_stat = meta.add_file(parent_file_id, name);
-
-        let mut file_handle_map = self.file_handle_manager.write().unwrap();
-        let file_handle = file_handle_map.open_file(&file_stat);
-
+        let file_stat = FileStat::new_file(parent, name, 0);
         self.file_data_map
-            .insert(file_stat.inode, Arc::new(Mutex::new(Vec::new())));
-        Ok(file_handle)
+            .insert(file_stat.path.clone(), Arc::new(Mutex::new(Vec::new())));
+        Ok(file_stat)
     }
 
-    fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
-        let mut meta = self.meta.write().unwrap();
-        let file_stat = meta.add_dir(parent_file_id, name);
+    fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat> {
+        let mut file_map = self.file_map.read().unwrap();
+        if file_map.contains_key(&join_file_path(parent, name)) {
+            return Err(Errno::from(libc::EEXIST));
+        }
 
-        let mut file_handle_map = self.file_handle_manager.write().unwrap();
-        let file_handle = file_handle_map.open_file(&file_stat);
-        Ok(file_handle)
+        let file_stat = FileStat::new_dir(parent, name);
+        Ok(file_stat)
     }
 
-    fn set_attr(&self, file_id: u64, file_info: &FileStat) -> Result<()> {
+    fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()> {
+        let mut file_map = self.file_map.write().unwrap();
+        file_map.insert(name.to_string(), file_stat.clone());
         Ok(())
     }
 
-    fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
-        let mut meta = self.meta.write().unwrap();
-        Ok(meta.update_file_stat(file_id, file_stat))
-    }
-
-    fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader> {
-        let file = {
-            let file_handle_map = self.file_handle_manager.read().unwrap();
-            file_handle_map.get_file(fh).unwrap()
-        };
-
-        let data = { self.file_data_map.get(&file_id).unwrap().clone() };
-
+    fn read(&self, file: &OpenedFile) -> Box<dyn FileReader> {
+        let data = self.file_data_map.get(&file.path).unwrap().clone();
         Box::new(MemoryFileReader {
             file: file.clone(),
-            data: data,
+            data,
         })
     }
 
-    fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter> {
-        let file = {
-            let file_handle_map = self.file_handle_manager.read().unwrap();
-            file_handle_map.get_file(fh).unwrap()
-        };
-
-        let data = { self.file_data_map.get(&file_id).unwrap().clone() };
-
+    fn write(&self, file: &OpenedFile) -> Box<dyn FileWriter> {
+        let data = self.file_data_map.get(&file.path).unwrap().clone();
         Box::new(MemoryFileWriter {
             file: file.clone(),
-            data: data,
+            data,
         })
     }
 
-    fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
-        let mut meta = self.meta.write().unwrap();
-        meta.remove_file(parent_file_id, name);
+    fn remove_file(&self, parent: &str, name: &str) -> Result<()> {
+        let mut file_map = self.file_map.write().unwrap();
+        if file_map.remove(&join_file_path(parent, name)).is_none() {
+            return Err(Errno::from(libc::ENOENT));
+        }
         Ok(())
     }
 
-    fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
-        let mut meta = self.meta.write().unwrap();
-        meta.remove_dir(parent_file_id, name)
-    }
+    fn remove_dir(&self, parent: &str, name: &str) -> Result<()> {
+        let mut file_map = self.file_map.write().unwrap();
+        let count = file_map
+            .iter()
+            .filter(|x| dir_child_reg_expr(name).is_match(x.0))
+            .count();
 
-    fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
-        let mut file_handle_manager = self.file_handle_manager.write().unwrap();
-        file_handle_manager.remove_file(fh);
+        if count != 0 {
+            return Err(Errno::from(libc::ENOTEMPTY));
+        }
+
+        file_map.remove(&join_file_path(parent, name));
         Ok(())
     }
 }
@@ -224,4 +186,13 @@ impl FileWriter for MemoryFileWriter {
         v[start..end].copy_from_slice(data);
         data.len() as u32
     }
+}
+
+fn dir_child_reg_expr(name: &str) -> Regex {
+    let regex_pattern = if name.is_empty() {
+        r"^[^/]+$".to_string()
+    } else {
+        format!(r"^{}/[^/]+$", name)
+    };
+    Regex::new(&regex_pattern).unwrap()
 }

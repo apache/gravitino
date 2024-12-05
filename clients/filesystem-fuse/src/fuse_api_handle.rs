@@ -17,7 +17,7 @@
  * under the License.
  */
 
-use crate::filesystem::{FileStat, FileSystemContext, IFileSystem};
+use crate::filesystem::{FileStat, FileSystemContext, RawFileSystem};
 use fuse3::path::prelude::{ReplyData, ReplyOpen, ReplyStatFs, ReplyWrite};
 use fuse3::path::Request;
 use fuse3::raw::prelude::{
@@ -35,13 +35,13 @@ use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
 
 pub(crate) struct FuseApiHandle {
-    local_fs: Box<dyn IFileSystem>,
+    local_fs: Box<dyn RawFileSystem>,
     default_ttl: Duration,
     fs_context: FileSystemContext,
 }
 
 impl FuseApiHandle {
-    pub fn new(fs: Box<dyn IFileSystem>, context: FileSystemContext) -> Self {
+    pub fn new(fs: Box<dyn RawFileSystem>, context: FileSystemContext) -> Self {
         FuseApiHandle {
             local_fs: fs,
             default_ttl: Duration::from_secs(1),
@@ -90,6 +90,7 @@ impl FuseApiHandle {
 
 impl Filesystem for FuseApiHandle {
     async fn init(&self, _req: Request) -> fuse3::Result<ReplyInit> {
+        self.local_fs.init();
         Ok(ReplyInit {
             max_write: NonZeroU32::new(16 * 1024).unwrap(),
         })
@@ -327,8 +328,7 @@ impl Filesystem for FuseApiHandle {
         fh: u64,
         flags: u32,
     ) -> fuse3::Result<()> {
-        self.local_fs.close_file(inode, fh);
-        Ok(())
+        self.local_fs.close_file(inode, fh)
     }
 
     async fn create(

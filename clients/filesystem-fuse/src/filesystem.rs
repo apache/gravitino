@@ -16,15 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::file_handle_manager::FileHandleManager;
+use crate::filesystem_metadata::DefaultFileSystemMetadata;
 use fuse3::{Errno, FileType, Timestamp};
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
+use std::sync::RwLock;
 use std::time::SystemTime;
 
 pub type Result<T> = std::result::Result<T, Errno>;
 
-/// File system interface for the file system implementation. it use by FuseApiHandle
+/// RawFileSystem interface for the file system implementation. it use by FuseApiHandle
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system, it is used to identify the file or directory
 /// the `fh` it is the file handle, it is used to identify the opened file, it is used to read or write the file content
-pub trait IFileSystem: Send + Sync {
+pub trait RawFileSystem: Send + Sync {
+    fn init(&self);
+
     fn get_file_path(&self, file_id: u64) -> String;
 
     fn get_opened_file(&self, file_id: u64, fh: u64) -> Result<OpenedFile>;
@@ -45,15 +52,41 @@ pub trait IFileSystem: Send + Sync {
 
     fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
-    fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader>;
-
-    fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter>;
-
     fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
     fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
     fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
+
+    fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader>;
+
+    fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter>;
+}
+
+/// PathFileSystem is the interface for the file system implementation, it use to interact with other file system
+/// it is used file name or path to operate the file system
+pub trait PathFileSystem: Send + Sync {
+    fn init(&self);
+
+    fn stat(&self, name: &str) -> Result<FileStat>;
+
+    fn lookup(&self, parent: &str, name: &str) -> Result<FileStat>;
+
+    fn read_dir(&self, name: &str) -> Result<Vec<FileStat>>;
+
+    fn create_file(&self, parent: &str, name: &str) -> Result<FileStat>;
+
+    fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat>;
+
+    fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
+
+    fn read(&self, file: &OpenedFile) -> Box<dyn FileReader>;
+
+    fn write(&self, file: &OpenedFile) -> Box<dyn FileWriter>;
+
+    fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
+
+    fn remove_dir(&self, parent: &str, name: &str) -> Result<()>;
 }
 
 pub struct FileSystemContext {
@@ -108,14 +141,14 @@ pub(crate) struct FileStat {
 
 impl FileStat {
     // TODO need to handle the file permission by config
-    pub fn new_file(name: &str, inode: u64, parent_inode: u64) -> Self {
+    pub fn new_file(parent: &str, name: &str, size: u64) -> Self {
         let atime = Timestamp::from(SystemTime::now());
         Self {
-            inode: inode,
-            parent_inode: parent_inode,
+            inode: 0,
+            parent_inode: 0,
             name: name.into(),
-            path: "".to_string(),
-            size: 0,
+            path: join_file_path(parent, name),
+            size: size,
             kind: FileType::RegularFile,
             perm: 0o664,
             atime: atime,
@@ -125,13 +158,13 @@ impl FileStat {
         }
     }
 
-    pub fn new_dir(name: &str, inode: u64, parent_inode: u64) -> Self {
+    pub fn new_dir(parent: &str, name: &str) -> Self {
         let atime = Timestamp::from(SystemTime::now());
         Self {
-            inode: inode,
-            parent_inode: parent_inode,
+            inode: 0,
+            parent_inode: 0,
             name: name.into(),
-            path: "".to_string(),
+            path: join_file_path(parent, name),
             size: 0,
             kind: FileType::Directory,
             perm: 0o755,
@@ -148,6 +181,9 @@ impl FileStat {
 pub(crate) struct OpenedFile {
     // file id
     pub(crate) file_id: u64,
+
+    // file path (full name)
+    pub(crate) path: String,
 
     // file handle id, open a same file multiple times will have different handle id
     pub(crate) handle_id: u64,
@@ -166,4 +202,238 @@ pub(crate) trait FileReader {
 pub(crate) trait FileWriter {
     fn file(&self) -> &OpenedFile;
     fn write(&mut self, offset: u64, data: &[u8]) -> u32;
+}
+
+/// FileIdManager is a manager for file id and file name mapping.
+struct FileIdManager {
+    // file_id_map is a map of file_id to file name.
+    file_id_map: HashMap<u64, String>,
+
+    // file_name_map is a map of file name to file id.
+    file_name_map: HashMap<String, u64>,
+}
+
+impl FileIdManager {
+    fn new() -> Self {
+        Self {
+            file_id_map: HashMap::new(),
+            file_name_map: HashMap::new(),
+        }
+    }
+
+    fn get_file_name(&self, file_id: u64) -> Option<String> {
+        self.file_id_map.get(&file_id).map(|x| x.clone())
+    }
+
+    fn get_file_id(&self, file_name: &str) -> Option<u64> {
+        self.file_name_map.get(file_name).map(|x| *x)
+    }
+
+    fn insert(&mut self, file_id: u64, file_name: &str) {
+        self.file_id_map.insert(file_id, file_name.to_string());
+        self.file_name_map.insert(file_name.to_string(), file_id);
+    }
+
+    fn remove(&mut self, file_name: &str) {
+        if let Some(file_id) = self.file_name_map.remove(file_name) {
+            self.file_id_map.remove(&file_id);
+        }
+    }
+}
+
+// SimpleFileSystem is a simple file system implementation for the file system.
+// it is used to manage the file system metadata and file handle.
+// The operations of the file system are implemented by the PathFileSystem.
+pub struct SimpleFileSystem {
+    file_id_manager: RwLock<FileIdManager>,
+    file_handle_manager: RwLock<FileHandleManager>,
+
+    inode_id_generator: AtomicU64,
+
+    fs: Box<dyn PathFileSystem>,
+}
+
+impl SimpleFileSystem {
+    pub fn new(fs: Box<dyn PathFileSystem>) -> Self {
+        Self {
+            file_id_manager: RwLock::new(FileIdManager::new()),
+            file_handle_manager: RwLock::new(FileHandleManager::new()),
+            inode_id_generator: AtomicU64::new(10000),
+            fs,
+        }
+    }
+
+    fn next_inode_id(&self) -> u64 {
+        self.inode_id_generator
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn get_file_path(&self, file_id: u64) -> Result<String> {
+        self.file_id_manager
+            .read()
+            .unwrap()
+            .get_file_name(file_id)
+            .ok_or(Errno::from(libc::ENOENT))
+    }
+}
+
+impl RawFileSystem for SimpleFileSystem {
+    fn init(&self) {
+        self.fs.init();
+
+        let mut root_dir = FileStat::new_dir("", "");
+        root_dir.inode = 1;
+        root_dir.parent_inode = 0;
+        self.file_id_manager
+            .write()
+            .unwrap()
+            .insert(root_dir.inode, &root_dir.path);
+        self.fs.set_attr(&root_dir.path, &root_dir, true).unwrap();
+
+        self.create_file(root_dir.inode, DefaultFileSystemMetadata::FS_META_FILE_NAME);
+    }
+
+    fn get_file_path(&self, file_id: u64) -> String {
+        self.get_file_path(file_id).unwrap_or("".to_string())
+    }
+
+    fn get_opened_file(&self, _file_id: u64, fh: u64) -> Result<OpenedFile> {
+        let file_handle_map = self.file_handle_manager.read().unwrap();
+        file_handle_map
+            .get_file(fh)
+            .ok_or(Errno::from(libc::ENOENT))
+    }
+
+    fn stat(&self, file_id: u64) -> Result<FileStat> {
+        let file_path = self.get_file_path(file_id)?;
+        self.fs.stat(&file_path)
+    }
+
+    fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
+        let parent_file_path = self.get_file_path(parent_file_id)?;
+        self.fs.lookup(&parent_file_path, name)
+    }
+
+    fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
+        let file_path = self.get_file_path(file_id)?;
+        self.fs.read_dir(&file_path)
+    }
+
+    fn open_file(&self, file_id: u64) -> Result<OpenedFile> {
+        let file_path = self.get_file_path(file_id)?;
+        let file_stat = self.fs.stat(&file_path)?;
+        let file_handle = {
+            let mut file_handle_map = self.file_handle_manager.write().unwrap();
+            file_handle_map.create_file(&file_stat)
+        };
+        Ok(file_handle)
+    }
+
+    fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
+        let parent_file_path = self.get_file_path(parent_file_id)?;
+        let mut file = self.fs.create_file(&parent_file_path, name)?;
+
+        file.inode = self.next_inode_id();
+        file.parent_inode = parent_file_id;
+
+        {
+            let mut file_id_manager = self.file_id_manager.write().unwrap();
+            file_id_manager.insert(file.inode, &file.path);
+        }
+
+        self.fs.set_attr(&file.path, &file, false)?;
+
+        let file_handle = {
+            let mut file_handle_map = self.file_handle_manager.write().unwrap();
+            file_handle_map.create_file(&file)
+        };
+
+        Ok(file_handle)
+    }
+
+    fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
+        let parent_file_path = self.get_file_path(parent_file_id)?;
+        let mut dir = self.fs.create_dir(&parent_file_path, name)?;
+
+        dir.inode = self.next_inode_id();
+        dir.parent_inode = parent_file_id;
+
+        {
+            let mut file_id_manager = self.file_id_manager.write().unwrap();
+            file_id_manager.insert(dir.inode, &dir.path);
+        }
+
+        self.fs.set_attr(&dir.path, &dir, false)?;
+
+        let file_handle = {
+            let mut file_handle_map = self.file_handle_manager.write().unwrap();
+            file_handle_map.create_file(&dir)
+        };
+
+        Ok(file_handle)
+    }
+
+    fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
+        let file_path = self.get_file_path(file_id)?;
+        self.fs.set_attr(&file_path, file_stat, true)
+    }
+
+    fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
+        let file_path = self.get_file_path(file_id)?;
+        self.fs.set_attr(&file_path, file_stat, false)
+    }
+
+    fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
+        let parent_file_path = self.get_file_path(parent_file_id)?;
+        self.fs.remove_file(&parent_file_path, name)?;
+
+        {
+            let mut file_id_manager = self.file_id_manager.write().unwrap();
+            file_id_manager.remove(&join_file_path(&parent_file_path, name));
+        }
+        Ok(())
+    }
+
+    fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
+        let parent_file_path = self.get_file_path(parent_file_id)?;
+        self.fs.remove_dir(&parent_file_path, name)?;
+
+        {
+            let mut file_id_manager = self.file_id_manager.write().unwrap();
+            file_id_manager.remove(&join_file_path(&parent_file_path, name));
+        }
+        Ok(())
+    }
+
+    fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
+        let mut file_handle_manager = self.file_handle_manager.write().unwrap();
+        file_handle_manager.remove_file(fh);
+        Ok(())
+    }
+
+    fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader> {
+        let file = {
+            let file_handle_map = self.file_handle_manager.read().unwrap();
+            file_handle_map.get_file(fh).unwrap()
+        };
+
+        self.fs.read(&file)
+    }
+
+    fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter> {
+        let file = {
+            let file_handle_map = self.file_handle_manager.read().unwrap();
+            file_handle_map.get_file(fh).unwrap()
+        };
+
+        self.fs.write(&file)
+    }
+}
+
+pub fn join_file_path(parent: &str, name: &str) -> String {
+    if parent.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", parent, name)
+    }
 }
