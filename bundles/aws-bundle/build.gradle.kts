@@ -44,7 +44,7 @@ tasks.register<Copy>("copyHadoop2_7") {
   dependsOn(":catalogs:catalog-hadoop:runtimeJars")
 
   val commonsLang3Dependency = libs.commons.lang3.get()
-  val hadoopAWSDependencies = libs.hadoop2.aws.old.get()
+  val hadoopAWSDependencies = libs.hadoop207.aws.get()
 
   val hadoopDependenciesFor2_7 = configurations.detachedConfiguration(
     dependencies.create("${hadoopAWSDependencies.group}:${hadoopAWSDependencies.name}:${hadoopAWSDependencies.version}"),
@@ -68,7 +68,7 @@ tasks.register<Copy>("copyHadoop2_10") {
 
   val commonsLangDependency = libs.commons.lang.get()
   val commonsLang3Dependency = libs.commons.lang3.get()
-  val hadoopAWSDependencies = libs.hadoop3.aws.get()
+  val hadoopAWSDependencies = libs.hadoop210.aws.get()
 
   val hadoopDependenciesFor2_10 = configurations.detachedConfiguration(
     dependencies.create("${hadoopAWSDependencies.group}:${hadoopAWSDependencies.name}:${hadoopAWSDependencies.version}"),
