@@ -107,9 +107,10 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `VarChar`          | `VarChar`           |
 | `FixedChar`        | `FixedChar`         |
 | `Binary`           | `Binary`            |
+| `BOOLEAN`          | `BIT`               |
 
 :::info
-MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

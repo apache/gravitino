@@ -643,7 +643,9 @@ public class CatalogMysqlIT extends BaseIT {
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
             + "  binary_col binary,\n"
-            + "  blob_col blob\n"
+            + "  blob_col blob,\n"
+            + "  bit_col_8 bit(8),\n"
+            + "  bit_col bit\n"
             + ");\n";
 
     mysqlService.executeQuery(sql);
@@ -693,6 +695,12 @@ public class CatalogMysqlIT extends BaseIT {
           break;
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        case "bit_col_8":
+          Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        case "bit_col":
+          Assertions.assertEquals(Types.BooleanType.get(), column.dataType());
           break;
         case "blob_col":
           Assertions.assertEquals(Types.ExternalType.of("BLOB"), column.dataType());
@@ -1691,13 +1699,13 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testUnparsedTypeConverter() {
+  void testParsedBitTypeConverter() {
     String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
     mysqlService.executeQuery(
         String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
-    Assertions.assertEquals(Types.ExternalType.of("BIT"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.BooleanType.get(), loadedTable.columns()[0].dataType());
   }
 
   @Test
