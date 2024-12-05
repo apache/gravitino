@@ -112,12 +112,12 @@ public class RangerMetadataObject implements AuthorizationMetadataObject {
         type != null, "Cannot create a Ranger metadata object with no type");
 
     Preconditions.checkArgument(
-        names.size() != 1 || type == RangerMetadataObject.Type.SCHEMA,
-        "If the length of names is 1, it must be the SCHEMA type");
+        names.size() != 1 || type == RangerMetadataObject.Type.SCHEMA || type == Type.PATH,
+        "If the length of names is 1, it must be the SCHEMA type of PATH type");
 
     Preconditions.checkArgument(
-        names.size() != 2 || type == RangerMetadataObject.Type.TABLE || type == Type.PATH,
-        "If the length of names is 2, it must be the TABLE type of PATH type");
+        names.size() != 2 || type == RangerMetadataObject.Type.TABLE,
+        "If the length of names is 2, it must be the TABLE type");
 
     Preconditions.checkArgument(
         names.size() != 3 || type == RangerMetadataObject.Type.COLUMN,

@@ -1,5 +1,6 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
@@ -54,10 +55,9 @@ public class RangerAuthorizationHDFSPluginIT {
         MetadataObjects.parse(
             String.format("catalog1.schema1.fileset1"), MetadataObject.Type.FILESET);
     AuthorizationMetadataObject rangerFileset = rangerAuthPlugin.translateMetadataObject(fileset);
-    Assertions.assertEquals(2, rangerFileset.names().size());
-    Assertions.assertEquals("schema1", rangerFileset.names().get(0));
-    Assertions.assertEquals("fileset1", rangerFileset.names().get(1));
-    Assertions.assertEquals(RangerMetadataObject.Type.TABLE, rangerFileset.type());
+    Assertions.assertEquals(1, rangerFileset.names().size());
+    Assertions.assertEquals("/test", rangerFileset.fullName());
+    Assertions.assertEquals(RangerMetadataObject.Type.PATH, rangerFileset.type());
   }
 
   @Test
@@ -108,19 +108,31 @@ public class RangerAuthorizationHDFSPluginIT {
                 Privileges.WriteFileset.allow()));
     List<AuthorizationSecurableObject> filesetInFileset1 =
         rangerAuthPlugin.translatePrivilege(filesetInFileset);
-    Assertions.assertEquals(2, filesetInSchema1.size());
-    Assertions.assertEquals("catalog1.schema1.fileset1", filesetInFileset1.get(0).fullName());
-    Assertions.assertEquals(RangerMetadataObject.Type.PATH, filesetInFileset1.get(0).type());
-    filesetInFileset1
-        .get(0)
-        .privileges()
-        .forEach(
-            privilege ->
-                Assertions.assertEquals(
-                    RangerPrivileges.RangerHdfsPrivilege.READ.getName(), privilege.getName()));
-    Assertions.assertEquals("catalog1.schema1.fileset1", filesetInFileset1.get(1).fullName());
-    Assertions.assertEquals(RangerMetadataObject.Type.PATH, filesetInFileset1.get(1).type());
-    Assertions.assertEquals(2, filesetInFileset1.get(1).privileges().size());
+    Assertions.assertEquals(2, filesetInFileset1.size());
+
+    filesetInFileset1.forEach(
+        securableObject -> {
+          Assertions.assertEquals(RangerMetadataObject.Type.PATH, securableObject.type());
+          Assertions.assertEquals("/test", securableObject.fullName());
+          Assertions.assertTrue(
+              securableObject.privileges().size() == 1 || securableObject.privileges().size() == 2);
+          if (securableObject.privileges().size() == 1) {
+            Assertions.assertEquals(
+                RangerPrivileges.RangerHdfsPrivilege.READ.getName(),
+                securableObject.privileges().get(0).getName());
+          } else {
+            securableObject
+                .privileges()
+                .forEach(
+                    privilege -> {
+                      Assertions.assertTrue(
+                          ImmutableList.of(
+                                  RangerPrivileges.RangerHdfsPrivilege.WRITE.getName(),
+                                  RangerPrivileges.RangerHdfsPrivilege.EXECUTE.getName())
+                              .contains(privilege.getName()));
+                    });
+          }
+        });
   }
 
   @Test
@@ -145,7 +157,7 @@ public class RangerAuthorizationHDFSPluginIT {
             String.format("catalog1.schema1.fileset1"), MetadataObject.Type.FILESET);
     List<AuthorizationSecurableObject> filesetOwner = rangerAuthPlugin.translateOwner(fileset);
     Assertions.assertEquals(1, filesetOwner.size());
-    Assertions.assertEquals("catalog1.schema1.fileset1", filesetOwner.get(0).fullName());
+    Assertions.assertEquals("/test", filesetOwner.get(0).fullName());
     Assertions.assertEquals(RangerMetadataObject.Type.PATH, filesetOwner.get(0).type());
     Assertions.assertEquals(3, filesetOwner.get(0).privileges().size());
   }

@@ -150,7 +150,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     case FILESET:
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
-                              ImmutableList.of(getFileSetPath(securableObject)),
+                              translateMetadataObject(securableObject).names(),
                               RangerMetadataObject.Type.PATH,
                               rangerPrivileges));
                       break;
@@ -182,7 +182,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       case FILESET:
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
-                ImmutableList.of(getFileSetPath(gravitinoMetadataObject)),
+                translateMetadataObject(gravitinoMetadataObject).names(),
                 RangerMetadataObject.Type.PATH,
                 ownerMappingRule()));
         break;
@@ -207,11 +207,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
 
+    nsMetadataObject.remove(0); // Remove the catalog name
     RangerMetadataObject rangerMetadataObject =
         new RangerMetadataObject(
-            AuthorizationMetadataObject.getParentFullName(nsMetadataObject),
-            AuthorizationMetadataObject.getLastName(nsMetadataObject),
-            RangerMetadataObject.Type.PATH);
+            null, getFileSetPath(metadataObject), RangerMetadataObject.Type.PATH);
     rangerMetadataObject.validateAuthorizationMetadataObject();
     return rangerMetadataObject;
   }
@@ -219,7 +218,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   private String getFileSetPath(MetadataObject metadataObject) {
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
     if (testEnv) {
-      return metadataObject.fullName();
+      return "/test";
     }
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
