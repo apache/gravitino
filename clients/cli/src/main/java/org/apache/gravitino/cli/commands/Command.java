@@ -21,22 +21,30 @@ package org.apache.gravitino.cli.commands;
 
 import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
+import org.apache.gravitino.cli.GravitinoConfig;
+import org.apache.gravitino.cli.OAuthData;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoClientBase;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /* The base for all commands. */
 public abstract class Command {
-  private final String url;
-  private final boolean ignoreVersions;
-  private final String outputFormat;
-  public static String OUTPUT_FORMAT_TABLE = "table";
-  public static String OUTPUT_FORMAT_PLAIN = "plain";
+  public static final String OUTPUT_FORMAT_TABLE = "table";
+  public static final String OUTPUT_FORMAT_PLAIN = "plain";
 
   protected static String authentication = null;
   protected static String userName = null;
+
+  private static final String SIMPLE_AUTH = "simple";
+  private static final String OAUTH_AUTH = "oauth";
+
+  private final String url;
+  private final boolean ignoreVersions;
+  private final String outputFormat;
 
   /**
    * Command constructor.
@@ -69,14 +77,13 @@ public abstract class Command {
    * @param authentication the authentication mode to be used (e.g. "simple")
    * @param userName the username associated with the authentication mode
    */
-  public static void setAuthenicationMode(String authentication, String userName) {
+  public static void setAuthenticationMode(String authentication, String userName) {
     Command.authentication = authentication;
     Command.userName = userName;
   }
 
   /** All commands have a handle method to handle and run the required command. */
   public abstract void handle();
-
   /**
    * Builds a {@link GravitinoClient} instance with the provided server URL and metalake.
    *
@@ -87,20 +94,7 @@ public abstract class Command {
   protected GravitinoClient buildClient(String metalake) throws NoSuchMetalakeException {
     Builder<GravitinoClient> client = GravitinoClient.builder(url).withMetalake(metalake);
 
-    if (ignoreVersions) {
-      client = client.withVersionCheckDisabled();
-    }
-    if (authentication != null) {
-      if (authentication.equals("simple")) {
-        if (userName != null && !userName.isEmpty()) {
-          client = client.withSimpleAuth(userName);
-        } else {
-          client = client.withSimpleAuth();
-        }
-      }
-    }
-
-    return client.build();
+    return constructClient(client).build();
   }
 
   /**
@@ -111,20 +105,46 @@ public abstract class Command {
   protected GravitinoAdminClient buildAdminClient() {
     Builder<GravitinoAdminClient> client = GravitinoAdminClient.builder(url);
 
+    return constructClient(client).build();
+  }
+
+  /**
+   * Configures and constructs a {@link Builder} instance for creating a {@link GravitinoClient} or
+   * {@link GravitinoAdminClient}.
+   *
+   * @param builder The {@link Builder} instance to be configured.
+   * @param <T> The type of the {@link GravitinoClientBase}.
+   * @return A configured {@link Builder} instance.
+   */
+  protected <T extends GravitinoClientBase> Builder<T> constructClient(Builder<T> builder) {
     if (ignoreVersions) {
-      client = client.withVersionCheckDisabled();
+      builder = builder.withVersionCheckDisabled();
     }
     if (authentication != null) {
-      if (authentication.equals("simple")) {
+      if (authentication.equals(SIMPLE_AUTH)) {
         if (userName != null && !userName.isEmpty()) {
-          client = client.withSimpleAuth(userName);
+          builder = builder.withSimpleAuth(userName);
         } else {
-          client = client.withSimpleAuth();
+          builder = builder.withSimpleAuth();
         }
+      } else if (authentication.equals(OAUTH_AUTH)) {
+        GravitinoConfig config = new GravitinoConfig(null);
+        OAuthData oauth = config.getOAuth();
+        DefaultOAuth2TokenProvider tokenProvider =
+            DefaultOAuth2TokenProvider.builder()
+                .withUri(oauth.getServerURI())
+                .withCredential(oauth.getCredential())
+                .withPath(oauth.getToken())
+                .withScope(oauth.getScope())
+                .build();
+
+        builder = builder.withOAuth(tokenProvider);
+      } else {
+        System.err.println("Unsupported authentication type " + authentication);
       }
     }
 
-    return client.build();
+    return builder;
   }
 
   /**

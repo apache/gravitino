@@ -37,6 +37,7 @@ public class GravitinoConfig {
   private String url;
   private boolean ignore;
   private String authentication;
+  private OAuthData oauth;
 
   /**
    * Creates a GravitinoConfig object with a specified config file. If no file is provided, it
@@ -94,6 +95,15 @@ public class GravitinoConfig {
     if (prop.containsKey(authKey)) {
       authentication = prop.getProperty(authKey);
     }
+
+    if (authKey.equals("oauth")) {
+      oauth =
+          new OAuthData(
+              prop.getProperty("serverURI"),
+              prop.getProperty("credential"),
+              prop.getProperty("token"),
+              prop.getProperty("scope"));
+    }
   }
 
   /**
@@ -139,5 +149,14 @@ public class GravitinoConfig {
    */
   public String getGravitinoAuth() {
     return authentication;
+  }
+
+  /**
+   * Retrieves the Gravitino oAuth authentication configuration.
+   *
+   * @return The Gravitino authentication or null if not set.
+   */
+  public OAuthData getOAuth() {
+    return oauth;
   }
 }
