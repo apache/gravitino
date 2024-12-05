@@ -146,27 +146,27 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the Gravitino authType stored in the configuration.
+   * Retrieves the Gravitino authentication type stored in the configuration.
    *
-   * @return The Gravitino authType or null if not set.
+   * @return The Gravitino authentication type or null if not set.
    */
   public String getGravitinoAuthType() {
     return authType;
   }
 
   /**
-   * Retrieves the Gravitino oAuth authType configuration.
+   * Retrieves the Gravitino OAuth configuration.
    *
-   * @return The Gravitino authType or null if not set.
+   * @return The Gravitino OAuth data or null if not set.
    */
   public OAuthData getOAuth() {
     return oauth;
   }
 
   /**
-   * Retrieves the Gravitino kerberos authType configuration.
+   * Retrieves the Gravitino kerberos configuration.
    *
-   * @return The Gravitino authType or null if not set.
+   * @return The Gravitino Kerberos data or null if not set.
    */
   public KerberosData getKerberos() {
     return kerberos;
