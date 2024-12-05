@@ -18,12 +18,11 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.collect.ImmutableList;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
@@ -141,20 +140,20 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     List<String> functions = Collections.singletonList("bucket");
 
     CatalogPlugin catalogPlugin =
-            getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
     Assertions.assertInstanceOf(FunctionCatalog.class, catalogPlugin);
     FunctionCatalog functionCatalog = (FunctionCatalog) catalogPlugin;
 
     for (String[] namespace : ImmutableList.of(empty_namespace, system_namespace)) {
       Arrays.stream(functionCatalog.listFunctions(namespace))
-              .map(Identifier::name)
-              .forEach(function -> Assertions.assertTrue(functions.contains(function)));
+          .map(Identifier::name)
+          .forEach(function -> Assertions.assertTrue(functions.contains(function)));
     }
     Arrays.stream(functionCatalog.listFunctions(default_namespace))
-            .map(Identifier::name)
-            .forEach(function -> Assertions.assertFalse(functions.contains(function)));
+        .map(Identifier::name)
+        .forEach(function -> Assertions.assertFalse(functions.contains(function)));
     Assertions.assertThrows(
-            NoSuchNamespaceException.class, () -> functionCatalog.listFunctions(non_exists_namespace));
+        NoSuchNamespaceException.class, () -> functionCatalog.listFunctions(non_exists_namespace));
 
     for (String[] namespace : ImmutableList.of(empty_namespace, system_namespace)) {
       for (String function : functions) {
@@ -164,17 +163,19 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
       }
     }
     functions.forEach(
-            function -> {
-              Identifier identifier = Identifier.of(new String[] {getDefaultDatabase()}, function);
-              Assertions.assertThrows(
-                      NoSuchFunctionException.class, () -> functionCatalog.loadFunction(identifier));
-            });
+        function -> {
+          Identifier identifier = Identifier.of(new String[] {getDefaultDatabase()}, function);
+          Assertions.assertThrows(
+              NoSuchFunctionException.class, () -> functionCatalog.loadFunction(identifier));
+        });
   }
 
   @Test
   void testShowPaimonFunctions() {
-    AnalysisException analysisException = Assertions.assertThrows(AnalysisException.class, () -> sql("SHOW FUNCTIONS;"));
-    Assertions.assertTrue(analysisException.getMessage().contains("Catalog paimon does not support functions"));
+    AnalysisException analysisException =
+        Assertions.assertThrows(AnalysisException.class, () -> sql("SHOW FUNCTIONS;"));
+    Assertions.assertTrue(
+        analysisException.getMessage().contains("Catalog paimon does not support functions"));
   }
 
   private void testMetadataColumns() {

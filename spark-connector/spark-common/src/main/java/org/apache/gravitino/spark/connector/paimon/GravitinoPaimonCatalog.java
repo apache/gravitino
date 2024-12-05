@@ -88,7 +88,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements FunctionCatal
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    return ((SparkCatalog)sparkCatalog).listFunctions(namespace);
+    return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
   }
 
   @Override
