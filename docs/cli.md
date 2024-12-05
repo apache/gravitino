@@ -141,6 +141,15 @@ token=test
 scope=token/test
 ```
 
+Kerberos authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=kerberos
+principal=user/admin@foo.com
+keytabFile=file.keytab
+```
+
 ### Potentially unsafe operations
 
 For operations that delete data or rename a metalake the user with be prompted to make sure they wish to run this command. The `--force` option can be specified to override this behaviour.

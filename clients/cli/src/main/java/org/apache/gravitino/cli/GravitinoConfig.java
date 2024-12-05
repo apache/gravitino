@@ -38,6 +38,7 @@ public class GravitinoConfig {
   private boolean ignore;
   private String authentication;
   private OAuthData oauth;
+  private KerberosData kerberos;
 
   /**
    * Creates a GravitinoConfig object with a specified config file. If no file is provided, it
@@ -103,6 +104,8 @@ public class GravitinoConfig {
               prop.getProperty("credential"),
               prop.getProperty("token"),
               prop.getProperty("scope"));
+    } else if (authKey.equals("kerberos")) {
+      kerberos = new KerberosData(prop.getProperty("principal"), prop.getProperty("keytabFile"));
     }
   }
 
@@ -158,5 +161,14 @@ public class GravitinoConfig {
    */
   public OAuthData getOAuth() {
     return oauth;
+  }
+
+  /**
+   * Retrieves the Gravitino kerberos authentication configuration.
+   *
+   * @return The Gravitino authentication or null if not set.
+   */
+  public KerberosData getKerberos() {
+    return kerberos;
   }
 }
