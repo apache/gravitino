@@ -42,6 +42,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
+    --login <arg>        user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
     --null <arg>         column value can be null (true/false)
@@ -54,6 +55,8 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
+    --simple             simple authentication
+    --sortorder          display sortorder information
  -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
@@ -125,6 +128,17 @@ ignore=true
 # Authentication
 auth=simple
 
+```
+
+OAuth authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=oauth
+serverURI=http://127.0.0.1:1082
+credential=xx:xx
+token=test
+scope=token/test
 ```
 
 ### Potentially unsafe operations
@@ -814,7 +828,7 @@ gcli  column delete --name catalog_postgres.hr.departments.money
 gcli column update --name catalog_postgres.hr.departments.value --rename values
 gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
 gcli column update --name catalog_postgres.hr.departments.values --position name
-gcli column update --name catalog_postgres.hr.departments.name --null=true
+gcli column update --name catalog_postgres.hr.departments.name --null true
 ```
 
 #### Simple authentication

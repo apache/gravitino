@@ -48,7 +48,7 @@ Builds with Apache Paimon `0.8.0`.
 | `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)        | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating  |
 
 :::note
-If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/). 
+If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/).
 :::
 
 :::note
@@ -75,7 +75,7 @@ You must download the corresponding JDBC driver and place it to the `catalogs/la
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
-## Schema 
+## Schema
 
 ### Schema capabilities
 
@@ -94,7 +94,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
-## Table 
+## Table
 
 ### Table capabilities
 
@@ -185,23 +185,22 @@ Gravitino doesn't support Paimon `MultisetType` type.
 
 You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
 
-The Gravitino server doesn't allow passing the following reserved fields.
+:::note
+**Reserved**: Fields that cannot be passed to the Gravitino server.
 
-| Configuration item                 | Description                                                  |
-|------------------------------------|--------------------------------------------------------------|
-| `comment`                          | The table comment.                                           |
-| `owner`                            | The table owner.                                             |
-| `bucket-key`                       | The table bucket-key.                                        |
-| `primary-key`                      | The table primary-key.                                       |
-| `partition`                        | The table partition.                                         |
+**Immutable**: Fields that cannot be modified once set.
+:::
 
-The Gravitino server doesn't allow the following immutable fields to be modified, but allows them to be specified when creating a new table.
-
-| Configuration item                 | Description                                                  |
-|------------------------------------|--------------------------------------------------------------|
-| `merge-engine`                     | The table merge-engine.                                      |
-| `sequence.field`                   | The table sequence.field.                                    |
-| `rowkind.field`                    | The table rowkind.field.                                     |
+| Configuration item                 | Description                                                  | Default Value | Required  | Reserved | Immutable | Since version     |
+|------------------------------------|--------------------------------------------------------------|---------------|-----------|----------|-----------|-------------------|
+| `merge-engine`                     | The table merge-engine.                                      | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `sequence.field`                   | The table sequence.field.                                    | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `rowkind.field`                    | The table rowkind.field.                                     | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `comment`                          | The table comment.                                           | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `owner`                            | The table owner.                                             | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `bucket-key`                       | The table bucket-key.                                        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `primary-key`                      | The table primary-key.                                       | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `partition`                        | The table partition.                                         | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 
 ### Table operations
 

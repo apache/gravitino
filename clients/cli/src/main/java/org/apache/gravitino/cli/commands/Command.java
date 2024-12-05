@@ -32,14 +32,18 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /* The base for all commands. */
 public abstract class Command {
-  private final String url;
-  private final boolean ignoreVersions;
-  private final String outputFormat;
-  public static String OUTPUT_FORMAT_TABLE = "table";
-  public static String OUTPUT_FORMAT_PLAIN = "plain";
+  public static final String OUTPUT_FORMAT_TABLE = "table";
+  public static final String OUTPUT_FORMAT_PLAIN = "plain";
 
   protected static String authentication = null;
   protected static String userName = null;
+
+  private static final String SIMPLE_AUTH = "simple";
+  private static final String OAUTH_AUTH = "oauth";
+
+  private final String url;
+  private final boolean ignoreVersions;
+  private final String outputFormat;
 
   /**
    * Command constructor.
@@ -94,13 +98,13 @@ public abstract class Command {
       client = client.withVersionCheckDisabled();
     }
     if (authentication != null) {
-      if (authentication.equals("simple")) {
+      if (authentication.equals(SIMPLE_AUTH)) {
         if (userName != null && !userName.isEmpty()) {
           client = client.withSimpleAuth(userName);
         } else {
           client = client.withSimpleAuth();
         }
-      } else if (authentication.equals("oauth")) {
+      } else if (authentication.equals(OAUTH_AUTH)) {
         GravitinoConfig config = new GravitinoConfig(null);
         OAuthData oauth = config.getOAuth();
         DefaultOAuth2TokenProvider tokenProvider =
@@ -112,6 +116,8 @@ public abstract class Command {
                 .build();
 
         client = client.withOAuth(tokenProvider);
+      } else {
+        System.err.println("Unsupported authentication type " + authentication);
       }
     }
 
@@ -130,13 +136,13 @@ public abstract class Command {
       client = client.withVersionCheckDisabled();
     }
     if (authentication != null) {
-      if (authentication.equals("simple")) {
+      if (authentication.equals(SIMPLE_AUTH)) {
         if (userName != null && !userName.isEmpty()) {
           client = client.withSimpleAuth(userName);
         } else {
           client = client.withSimpleAuth();
         }
-      } else if (authentication.equals("oauth")) {
+      } else if (authentication.equals(OAUTH_AUTH)) {
         GravitinoConfig config = new GravitinoConfig(null);
         OAuthData oauth = config.getOAuth();
         DefaultOAuth2TokenProvider tokenProvider =
@@ -148,6 +154,8 @@ public abstract class Command {
                 .build();
 
         client = client.withOAuth(tokenProvider);
+      } else {
+        System.err.println("Unsupported authentication type " + authentication);
       }
     }
 
