@@ -31,8 +31,8 @@ else
   ln -s ${HADOOP2_HOME} ${HADOOP_HOME}
 fi
 
- cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
- cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 
 # Copy Hadoop and Hive configuration file and update hostname
 cp -f ${HADOOP_TMP_CONF_DIR}/* ${HADOOP_CONF_DIR}
@@ -52,6 +52,11 @@ fi
 if [[ -n "${ABS_ACCOUNT_NAME}" && -n "${ABS_ACCOUNT_KEY}" ]]; then
   sed -i "s|ABS_ACCOUNT_NAME|${ABS_ACCOUNT_NAME}|g" ${HIVE_CONF_DIR}/hive-site.xml
   sed -i "s|ABS_ACCOUNT_KEY|${ABS_ACCOUNT_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+fi
+
+# whether GCS is set
+if [[ -n "$SERVICE_ACCOUNT_FILE" ]]; then
+  sed -i "s|SERVICE_ACCOUNT_FILE|${SERVICE_ACCOUNT_FILE}|g" ${HIVE_CONF_DIR}/hive-site.xml
 fi
 
 # Link mysql-connector-java after deciding where HIVE_HOME symbolic link points to.

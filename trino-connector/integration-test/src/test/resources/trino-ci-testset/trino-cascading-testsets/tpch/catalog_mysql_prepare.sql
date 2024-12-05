@@ -114,3 +114,5 @@ insert into part select * from tpch.tiny.part;
 insert into partsupp select * from tpch.tiny.partsupp;
 insert into region select * from tpch.tiny.region;
 insert into supplier select * from tpch.tiny.supplier;
+
+use gt_mysql2.gt_tpch;

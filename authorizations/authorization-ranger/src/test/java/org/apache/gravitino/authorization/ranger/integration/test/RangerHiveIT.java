@@ -697,9 +697,8 @@ public class RangerHiveIT {
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
     assertFindManagedPolicyItems(role, true);
 
-    MetadataObject newMetadataObject =
-        MetadataObjects.parse(
-            String.format("metalake-new-%s", currentFunName), oldMetadataObject.type());
+    String newMetalake = String.format("metalake-new-%s", currentFunName);
+    MetadataObject newMetadataObject = MetadataObjects.parse(newMetalake, oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
             MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
@@ -716,6 +715,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
             .build();
     assertFindManagedPolicyItems(newRole, true);
+    Assertions.assertEquals(newMetalake, rangerAuthHivePlugin.getMetalake());
   }
 
   @Test
