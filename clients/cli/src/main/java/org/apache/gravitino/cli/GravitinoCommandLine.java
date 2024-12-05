@@ -160,7 +160,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
@@ -209,7 +209,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListCatalogs(url, ignore, metalake).handle();
@@ -265,7 +265,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListSchema(url, ignore, metalake, catalog).handle();
@@ -310,7 +310,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListTables(url, ignore, metalake, catalog, schema).handle();
@@ -370,7 +370,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String user = line.getOptionValue(GravitinoOptions.USER);
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newUserDetails(url, ignore, metalake, user).handle();
@@ -405,7 +405,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String group = line.getOptionValue(GravitinoOptions.GROUP);
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newGroupDetails(url, ignore, metalake, group).handle();
@@ -439,7 +439,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     String[] tags = line.getOptionValues(GravitinoOptions.TAG);
     if (tags != null) {
@@ -502,7 +502,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String role = line.getOptionValue(GravitinoOptions.ROLE);
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newRoleDetails(url, ignore, metalake, role).handle();
@@ -530,7 +530,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String table = name.getTableName();
     String column = name.getColumnName();
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
@@ -644,7 +644,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String entityName = line.getOptionValue(GravitinoOptions.NAME);
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newOwnerDetails(url, ignore, metalake, entityName, entity).handle();
@@ -677,7 +677,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String schema = name.getSchemaName();
     String topic = name.getTopicName();
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListTopics(url, ignore, metalake, catalog, schema).handle();
@@ -719,7 +719,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String schema = name.getSchemaName();
     String fileset = name.getFilesetName();
 
-    Command.setAuthenicationMode(auth, userName);
+    Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
       newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();

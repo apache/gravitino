@@ -76,7 +76,7 @@ public abstract class Command {
    * @param authentication the authentication mode to be used (e.g. "simple")
    * @param userName the username associated with the authentication mode
    */
-  public static void setAuthenicationMode(String authentication, String userName) {
+  public static void setAuthenticationMode(String authentication, String userName) {
     Command.authentication = authentication;
     Command.userName = userName;
   }
