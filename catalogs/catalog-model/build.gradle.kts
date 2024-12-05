@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "catalog-hadoop"
+description = "catalog-model"
 
 plugins {
   `maven-publish`
@@ -71,6 +71,12 @@ tasks {
   val copyCatalogConfig by registering(Copy::class) {
     from("src/main/resources")
     into("$rootDir/distribution/package/catalogs/model/conf")
+
+    include("model.conf")
+
+    exclude { details ->
+      details.file.isDirectory()
+    }
 
     fileMode = 0b111101101
   }
