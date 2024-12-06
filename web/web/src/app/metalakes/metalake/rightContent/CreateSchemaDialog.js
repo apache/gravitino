@@ -320,7 +320,7 @@ const CreateSchemaDialog = props => {
                     )}
                   />
                 </FormControl>
-                {activatedCatalogDetail?.['catalog-backend']}
+                {activatedCatalogDetail?.properties['catalog-backend']}
               </Grid>
             )}
 
