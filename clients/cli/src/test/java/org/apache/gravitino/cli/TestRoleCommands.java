@@ -138,7 +138,7 @@ class TestRoleCommands {
   @Test
   void testGrantPrivilegesToRole() {
     GrantPrivilegesToRole mockGrant = mock(GrantPrivilegesToRole.class);
-    String[] privileges = {"create_table","modify_table" };
+    String[] privileges = {"create_table", "modify_table"};
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -168,7 +168,7 @@ class TestRoleCommands {
   @Test
   void testRevokePrivilegesFromRole() {
     RevokePrivilegesFromRole mockRevoke = mock(RevokePrivilegesFromRole.class);
-    String[] privileges = {"create_table","modify_table" };
+    String[] privileges = {"create_table", "modify_table"};
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
