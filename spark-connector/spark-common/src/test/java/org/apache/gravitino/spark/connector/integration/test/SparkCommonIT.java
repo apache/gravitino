@@ -168,7 +168,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testListTables() {
+  protected void testListTables() {
     String tableName = "t_list";
     dropTableIfExists(tableName);
     Set<String> tableNames = listTableNames();
@@ -187,7 +187,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateAndLoadSchema() {
+  protected void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
@@ -216,7 +216,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterSchema() {
+  protected void testAlterSchema() {
     String testDatabaseName = "t_alter";
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
@@ -256,7 +256,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateSimpleTable() {
+  protected void testCreateSimpleTable() {
     String tableName = "simple_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
@@ -273,7 +273,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateTableWithDatabase() {
+  protected void testCreateTableWithDatabase() {
     // test db.table as table identifier
     String databaseName = "db1";
     String tableName = "table1";
@@ -304,7 +304,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateTableWithComment() {
+  protected void testCreateTableWithComment() {
     String tableName = "comment_table";
     dropTableIfExists(tableName);
     String createTableSql = getCreateSimpleTableString(tableName);
@@ -324,7 +324,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testDropTable() {
+  protected void testDropTable() {
     String tableName = "drop_table";
     createSimpleTable(tableName);
     Assertions.assertEquals(true, tableExists(tableName));
@@ -337,7 +337,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testRenameTable() {
+  protected void testRenameTable() {
     String tableName = "rename1";
     String newTableName = "rename2";
     dropTableIfExists(tableName);
@@ -364,7 +364,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testListTable() {
+  protected void testListTable() {
     String table1 = "list1";
     String table2 = "list2";
     dropTableIfExists(table1);
@@ -393,7 +393,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableSetAndRemoveProperty() {
+  protected void testAlterTableSetAndRemoveProperty() {
     String tableName = "test_property";
     dropTableIfExists(tableName);
 
@@ -411,7 +411,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableUpdateComment() {
+  protected void testAlterTableUpdateComment() {
     String tableName = "test_comment";
     String comment = "comment1";
     dropTableIfExists(tableName);
@@ -428,7 +428,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableAddAndDeleteColumn() {
+  protected void testAlterTableAddAndDeleteColumn() {
     String tableName = "test_column";
     dropTableIfExists(tableName);
 
@@ -447,7 +447,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableUpdateColumnType() {
+  protected void testAlterTableUpdateColumnType() {
     String tableName = "test_column_type";
     dropTableIfExists(tableName);
 
@@ -464,7 +464,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableRenameColumn() {
+  protected void testAlterTableRenameColumn() {
     String tableName = "test_rename_column";
     dropTableIfExists(tableName);
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
@@ -484,7 +484,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testUpdateColumnPosition() {
+  protected void testUpdateColumnPosition() {
     String tableName = "test_column_position";
     dropTableIfExists(tableName);
 
@@ -527,7 +527,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableUpdateColumnComment() {
+  protected void testAlterTableUpdateColumnComment() {
     String tableName = "test_update_column_comment";
     dropTableIfExists(tableName);
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
@@ -550,7 +550,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableReplaceColumns() {
+  protected void testAlterTableReplaceColumns() {
     String tableName = "test_replace_columns_table";
     dropTableIfExists(tableName);
 
@@ -589,7 +589,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testComplexType() {
+  protected void testComplexType() {
     String tableName = "complex_type_table";
     dropTableIfExists(tableName);
 
@@ -678,7 +678,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   // Spark CTAS doesn't copy table properties and partition schema from source table.
   @Test
-  void testCreateTableAsSelect() {
+  protected void testCreateTableAsSelect() {
     String tableName = "ctas_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
@@ -700,7 +700,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testInsertTableAsSelect() {
+  protected void testInsertTableAsSelect() {
     String tableName = "insert_select_table";
     String newTableName = "new_" + tableName;
 
@@ -793,7 +793,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testTableOptions() {
+  protected void testTableOptions() {
     String tableName = "options_table";
     dropTableIfExists(tableName);
     String createTableSql = getCreateSimpleTableString(tableName);
@@ -810,7 +810,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testDropAndWriteTable() {
+  protected void testDropAndWriteTable() {
     String tableName = "drop_then_create_write_table";
 
     createSimpleTable(tableName);
