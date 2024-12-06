@@ -104,6 +104,6 @@ public class PartitionOperationDispatcher extends OperationDispatcher
         LockType.WRITE,
         () ->
             doWithTable(
-                tableIdent, p -> p.dropPartition(partitionName), NoSuchPartitionException.class));
+                tableIdent, p -> p.purgePartition(partitionName), NoSuchPartitionException.class));
   }
 }
