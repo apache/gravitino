@@ -37,7 +37,6 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
@@ -52,8 +51,6 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
@@ -82,14 +79,10 @@ public class RoleOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(metalake),
-                  LockType.READ,
-                  () -> {
-                    String[] names = accessControlManager.listRoleNames(metalake);
-                    return Utils.ok(new NameListResponse(names));
-                  }));
+          () -> {
+            String[] names = accessControlManager.listRoleNames(metalake);
+            return Utils.ok(new NameListResponse(names));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);
     }
@@ -105,13 +98,9 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () ->
-              TreeLockUtils.doWithTreeLock(
-                  AuthorizationUtils.ofRole(metalake, role),
-                  LockType.READ,
-                  () ->
-                      Utils.ok(
-                          new RoleResponse(
-                              DTOConverters.toDTO(accessControlManager.getRole(metalake, role))))));
+              Utils.ok(
+                  new RoleResponse(
+                      DTOConverters.toDTO(accessControlManager.getRole(metalake, role)))));
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.GET, role, metalake, e);
     }
@@ -166,19 +155,14 @@ public class RoleOperations {
                                                 (PrivilegeDTO) privilege))
                                     .collect(Collectors.toList())))
                     .collect(Collectors.toList());
-
-            return TreeLockUtils.doWithTreeLock(
-                NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                LockType.WRITE,
-                () ->
-                    Utils.ok(
-                        new RoleResponse(
-                            DTOConverters.toDTO(
-                                accessControlManager.createRole(
-                                    metalake,
-                                    request.getName(),
-                                    request.getProperties(),
-                                    securableObjects)))));
+            return Utils.ok(
+                new RoleResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.createRole(
+                            metalake,
+                            request.getName(),
+                            request.getProperties(),
+                            securableObjects))));
           });
 
     } catch (Exception e) {
@@ -198,11 +182,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean deleted =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                    LockType.WRITE,
-                    () -> accessControlManager.deleteRole(metalake, role));
+            boolean deleted = accessControlManager.deleteRole(metalake, role);
             if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }

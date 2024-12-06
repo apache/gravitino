@@ -91,10 +91,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    return doWithCatalog(
-        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-        c -> c.doWithTableOps(t -> t.listTables(namespace)),
-        NoSuchSchemaException.class);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(namespace.levels()),
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+                c -> c.doWithTableOps(t -> t.listTables(namespace)),
+                NoSuchSchemaException.class));
   }
 
   /**
@@ -191,71 +195,76 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () -> {
+          validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          Table alteredTable =
+              doWithCatalog(
+                  catalogIdent,
+                  c ->
+                      c.doWithTableOps(
+                          t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
+                  NoSuchTableException.class,
+                  IllegalArgumentException.class);
 
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    Table alteredTable =
-        doWithCatalog(
-            catalogIdent,
-            c ->
-                c.doWithTableOps(
-                    t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
-            NoSuchTableException.class,
-            IllegalArgumentException.class);
+          StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
+          // Case 1: The table is not created by Gravitino.
+          if (stringId == null) {
+            return EntityCombinedTable.of(alteredTable)
+                .withHiddenPropertiesSet(
+                    getHiddenPropertyNames(
+                        getCatalogIdentifier(ident),
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredTable.properties()));
+          }
 
-    StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
-    // Case 1: The table is not created by Gravitino.
-    if (stringId == null) {
-      return EntityCombinedTable.of(alteredTable)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  getCatalogIdentifier(ident),
-                  HasPropertyMetadata::tablePropertiesMetadata,
-                  alteredTable.properties()));
-    }
+          TableEntity updatedTableEntity =
+              operateOnEntity(
+                  ident,
+                  id ->
+                      store.update(
+                          id,
+                          TableEntity.class,
+                          TABLE,
+                          tableEntity -> {
+                            String newName =
+                                Arrays.stream(changes)
+                                    .filter(c -> c instanceof TableChange.RenameTable)
+                                    .map(c -> ((TableChange.RenameTable) c).getNewName())
+                                    .reduce((c1, c2) -> c2)
+                                    .orElse(tableEntity.name());
+                            // Update the columns
+                            Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
+                                updateColumnsIfNecessary(alteredTable, tableEntity);
 
-    TableEntity updatedTableEntity =
-        operateOnEntity(
-            ident,
-            id ->
-                store.update(
-                    id,
-                    TableEntity.class,
-                    TABLE,
-                    tableEntity -> {
-                      String newName =
-                          Arrays.stream(changes)
-                              .filter(c -> c instanceof TableChange.RenameTable)
-                              .map(c -> ((TableChange.RenameTable) c).getNewName())
-                              .reduce((c1, c2) -> c2)
-                              .orElse(tableEntity.name());
-                      // Update the columns
-                      Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
-                          updateColumnsIfNecessary(alteredTable, tableEntity);
+                            return TableEntity.builder()
+                                .withId(tableEntity.id())
+                                .withName(newName)
+                                .withNamespace(ident.namespace())
+                                .withColumns(columnsUpdateResult.getRight())
+                                .withAuditInfo(
+                                    AuditInfo.builder()
+                                        .withCreator(tableEntity.auditInfo().creator())
+                                        .withCreateTime(tableEntity.auditInfo().createTime())
+                                        .withLastModifier(
+                                            PrincipalUtils.getCurrentPrincipal().getName())
+                                        .withLastModifiedTime(Instant.now())
+                                        .build())
+                                .build();
+                          }),
+                  "UPDATE",
+                  stringId.id());
 
-                      return TableEntity.builder()
-                          .withId(tableEntity.id())
-                          .withName(newName)
-                          .withNamespace(ident.namespace())
-                          .withColumns(columnsUpdateResult.getRight())
-                          .withAuditInfo(
-                              AuditInfo.builder()
-                                  .withCreator(tableEntity.auditInfo().creator())
-                                  .withCreateTime(tableEntity.auditInfo().createTime())
-                                  .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                                  .withLastModifiedTime(Instant.now())
-                                  .build())
-                          .build();
-                    }),
-            "UPDATE",
-            stringId.id());
-
-    return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                getCatalogIdentifier(ident),
-                HasPropertyMetadata::tablePropertiesMetadata,
-                alteredTable.properties()));
+          return EntityCombinedTable.of(alteredTable, updatedTableEntity)
+              .withHiddenPropertiesSet(
+                  getHiddenPropertyNames(
+                      getCatalogIdentifier(ident),
+                      HasPropertyMetadata::tablePropertiesMetadata,
+                      alteredTable.properties()));
+        });
   }
 
   /**
@@ -268,33 +277,40 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    boolean droppedFromCatalog =
-        doWithCatalog(
-            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () -> {
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean droppedFromCatalog =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                  RuntimeException.class);
 
-    // For unmanaged table, it could happen that the table:
-    // 1. Is not found in the catalog (dropped directly from underlying sources)
-    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-    // 3. Is found in the catalog and the store (managed by Gravitino)
-    // 4. Neither found in the catalog nor in the store.
-    // In all situations, we try to delete the schema from the store, but we don't take the
-    // return value of the store operation into account. We only take the return value of the
-    // catalog into account.
-    //
-    // For managed table, we should take the return value of the store operation into account.
-    boolean droppedFromStore = false;
-    try {
-      droppedFromStore = store.delete(ident, TABLE);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+          // For unmanaged table, it could happen that the table:
+          // 1. Is not found in the catalog (dropped directly from underlying sources)
+          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // 4. Neither found in the catalog nor in the store.
+          // In all situations, we try to delete the schema from the store, but we don't take the
+          // return value of the store operation into account. We only take the return value of the
+          // catalog into account.
+          //
+          // For managed table, we should take the return value of the store operation into account.
+          boolean droppedFromStore = false;
+          try {
+            droppedFromStore = store.delete(ident, TABLE);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
 
-    return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
-        ? droppedFromStore
-        : droppedFromCatalog;
+          return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
+              ? droppedFromStore
+              : droppedFromCatalog;
+        });
   }
 
   /**
@@ -313,37 +329,42 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    boolean droppedFromCatalog =
-        doWithCatalog(
-            catalogIdent,
-            c -> c.doWithTableOps(t -> t.purgeTable(ident)),
-            RuntimeException.class,
-            UnsupportedOperationException.class);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () -> {
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean droppedFromCatalog =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithTableOps(t -> t.purgeTable(ident)),
+                  RuntimeException.class,
+                  UnsupportedOperationException.class);
 
-    // For unmanaged table, it could happen that the table:
-    // 1. Is not found in the catalog (dropped directly from underlying sources)
-    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-    // 3. Is found in the catalog and the store (managed by Gravitino)
-    // 4. Neither found in the catalog nor in the store.
-    // In all situations, we try to delete the schema from the store, but we don't take the
-    // return value of the store operation into account. We only take the return value of the
-    // catalog into account.
-    //
-    // For managed table, we should take the return value of the store operation into account.
-    boolean droppedFromStore = false;
-    try {
-      droppedFromStore = store.delete(ident, TABLE);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-      return false;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+          // For unmanaged table, it could happen that the table:
+          // 1. Is not found in the catalog (dropped directly from underlying sources)
+          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // 4. Neither found in the catalog nor in the store.
+          // In all situations, we try to delete the schema from the store, but we don't take the
+          // return value of the store operation into account. We only take the return value of the
+          // catalog into account.
+          //
+          // For managed table, we should take the return value of the store operation into account.
+          boolean droppedFromStore = false;
+          try {
+            droppedFromStore = store.delete(ident, TABLE);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
 
-    return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
-        ? droppedFromStore
-        : droppedFromCatalog;
+          return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
+              ? droppedFromStore
+              : droppedFromCatalog;
+        });
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
