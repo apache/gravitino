@@ -17,47 +17,47 @@
 
 import logging
 from random import randint
+from unittest import TestCase
 
 from gravitino import (
-    NameIdentifier,
-    GravitinoAdminClient,
-    GravitinoClient,
+  NameIdentifier,
+  GravitinoAdminClient,
+  GravitinoClient,
 )
+from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
 
 
-class TestFilesetCatalog(IntegrationTestEnv):
-    metalake_name: str = "TestFilesetCatalog_metalake" + str(randint(1, 10000))
-    catalog_name: str = "catalog"
-    catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
-    catalog_provider: str = "hadoop"
+class TestGetCredentials(TestCase):
+  metalake_name: str = "test"
+  catalog_name: str = "catalog"
+  schema_name: str = "schema"
+  fileset_name: str = "fileset"
 
-    schema_name: str = "schema"
+  catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
+  schema_ident: NameIdentifier = NameIdentifier.of(
+    metalake_name, catalog_name, schema_name
+  )
+  fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
 
-    fileset_name: str = "fileset"
-    fileset_alter_name: str = fileset_name + "Alter"
-    fileset_comment: str = "fileset_comment"
+  gravitino_client: GravitinoClient = GravitinoClient(
+    uri="http://localhost:8090", metalake_name=metalake_name, check_version=False)
 
-    catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
-    schema_ident: NameIdentifier = NameIdentifier.of(
-        metalake_name, catalog_name, schema_name
-    )
-    fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
+  def test_get_catalog_credentials(self):
+    catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+    credentials = catalog.as_fileset_catalog().support_credentials().get_credentials()
+    self.assertEqual(1, credentials.length)
+    credential = credentials[0]
+    self.assertEqual(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, credential.credential_type())
+    self.assertEqual("access_key", credential.access_key_id())
+    self.assertEqual("secret_key", credential.secret_access_key())
+    self.assertEqual("token", credential.session_token())
 
-    gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
-        uri="http://localhost:8090"
-    )
-    gravitino_client: GravitinoClient = None
-
-    def test_get_catalog_credentials(self):
-        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
-        credentials = catalog.as_fileset_catalog().support_credentials().get_credentials()
-        self.assertEqual(1, credentials.length)
-
-    def test_get_fileset_credentials(self):
-        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
-        fileset = catalog.as_fileset_catalog().load_fileset(ident=self.fileset_ident)
-        fileset_credentials = fileset.support_credentials().get_credentials()
-        self.assertEqual(1, fileset_credentials.length)
+  def test_get_fileset_credentials(self):
+    catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+    fileset = catalog.as_fileset_catalog().load_fileset(
+      ident=self.fileset_ident)
+    fileset_credentials = fileset.support_credentials().get_credentials()
+    self.assertEqual(1, fileset_credentials.length)
