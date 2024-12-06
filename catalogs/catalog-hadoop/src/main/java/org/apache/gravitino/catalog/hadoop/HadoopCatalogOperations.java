@@ -31,6 +31,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -71,6 +73,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -836,6 +840,28 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
               scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
 
-    return provider.getFileSystem(path, config);
+    int timeoutSeconds =
+        (int)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(
+                    config, HadoopCatalogPropertiesMetadata.GET_FILESYSTEM_TIMEOUT_SECONDS);
+    try {
+      AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
+      Awaitility.await()
+          .atMost(timeoutSeconds, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                fileSystem.set(provider.getFileSystem(path, config));
+                return true;
+              });
+      return fileSystem.get();
+    } catch (ConditionTimeoutException e) {
+      throw new IOException(
+          String.format(
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s seconds",
+              path, scheme, provider, config, timeoutSeconds),
+          e);
+    }
   }
 }

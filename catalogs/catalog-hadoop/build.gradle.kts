@@ -72,6 +72,7 @@ dependencies {
   }
 
   implementation(libs.slf4j.api)
+  implementation(libs.awaitility)
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
