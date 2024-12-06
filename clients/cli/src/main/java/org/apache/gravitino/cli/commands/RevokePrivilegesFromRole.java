@@ -33,7 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
-/** Revokes oen or more privileges. */
+/** Revokes one or more privileges. */
 public class RevokePrivilegesFromRole extends Command {
 
   protected final String metalake;
@@ -43,7 +43,7 @@ public class RevokePrivilegesFromRole extends Command {
   protected final String[] privileges;
 
   /**
-   * Revokes oen or more privileges.
+   * Revokes one or more privileges.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -69,7 +69,7 @@ public class RevokePrivilegesFromRole extends Command {
     this.privileges = privileges;
   }
 
-  /** Revokes oen or more privileges. */
+  /** Revokes One or more privileges. */
   @Override
   public void handle() {
     try {
@@ -90,20 +90,30 @@ public class RevokePrivilegesFromRole extends Command {
         privilegesList.add(privilegeDTO);
       }
 
-      if (entityType.equals(CommandEntities.METALAKE)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.METALAKE);
-      } else if (entityType.equals(CommandEntities.CATALOG)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.CATALOG);
-      } else if (entityType.equals(CommandEntities.SCHEMA)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.SCHEMA);
-      } else if (entityType.equals(CommandEntities.TABLE)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TABLE);
-      } else if (entityType.equals(CommandEntities.TOPIC)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TOPIC);
-      } else if (entityType.equals(CommandEntities.FILESET)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.FILESET);
-      } else if (entityType.equals(CommandEntities.COLUMN)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.COLUMN);
+      switch (entityType) {
+        case CommandEntities.METALAKE:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.METALAKE);
+          break;
+        case CommandEntities.CATALOG:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.CATALOG);
+          break;
+        case CommandEntities.SCHEMA:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.SCHEMA);
+          break;
+        case CommandEntities.TABLE:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TABLE);
+          break;
+        case CommandEntities.TOPIC:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TOPIC);
+          break;
+        case CommandEntities.FILESET:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.FILESET);
+          break;
+        case CommandEntities.COLUMN:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.COLUMN);
+          break;
+        default:
+          throw new IllegalArgumentException("Unknown entity type: " + entityType);
       }
 
       client.revokePrivilegesFromRole(role, metadataObject, privilegesList);

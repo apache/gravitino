@@ -90,20 +90,30 @@ public class GrantPrivilegesToRole extends Command {
         privilegesList.add(privilegeDTO);
       }
 
-      if (entityType.equals(CommandEntities.METALAKE)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.METALAKE);
-      } else if (entityType.equals(CommandEntities.CATALOG)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.CATALOG);
-      } else if (entityType.equals(CommandEntities.SCHEMA)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.SCHEMA);
-      } else if (entityType.equals(CommandEntities.TABLE)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TABLE);
-      } else if (entityType.equals(CommandEntities.TOPIC)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TOPIC);
-      } else if (entityType.equals(CommandEntities.FILESET)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.FILESET);
-      } else if (entityType.equals(CommandEntities.COLUMN)) {
-        metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.COLUMN);
+      switch (entityType) {
+        case CommandEntities.METALAKE:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.METALAKE);
+          break;
+        case CommandEntities.CATALOG:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.CATALOG);
+          break;
+        case CommandEntities.SCHEMA:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.SCHEMA);
+          break;
+        case CommandEntities.TABLE:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TABLE);
+          break;
+        case CommandEntities.TOPIC:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TOPIC);
+          break;
+        case CommandEntities.FILESET:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.FILESET);
+          break;
+        case CommandEntities.COLUMN:
+          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.COLUMN);
+          break;
+        default:
+          throw new IllegalArgumentException("Unknown entity type: " + entityType);
       }
 
       client.grantPrivilegesToRole(role, metadataObject, privilegesList);
