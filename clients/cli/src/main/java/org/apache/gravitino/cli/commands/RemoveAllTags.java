@@ -113,9 +113,6 @@ public class RemoveAllTags extends Command {
     if (tags.length > 1) {
       System.out.println(
           entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
-    } else {
-      System.out.println(
-          entity + " removed tag " + tags[0].toString() + " now tagged with nothing");
     }
   }
 }
