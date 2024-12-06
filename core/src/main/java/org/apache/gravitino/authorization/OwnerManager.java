@@ -67,119 +67,140 @@ public class OwnerManager {
 
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
-    try {
-      Optional<Owner> originOwner = getOwner(metalake, metadataObject);
 
-      NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      OwnerImpl newOwner = new OwnerImpl();
+    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    TreeLockUtils.doWithTreeLock(
+        objectIdent,
+        LockType.READ,
+        () -> {
+          try {
+            Optional<Owner> originOwner = getOwner(metalake, metadataObject);
 
-      if (ownerType == Owner.Type.USER) {
-        NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
-        TreeLockUtils.doWithTreeLock(
-            ownerIdent,
-            LockType.READ,
-            () -> {
-              store
-                  .relationOperations()
-                  .insertRelation(
-                      SupportsRelationOperations.Type.OWNER_REL,
-                      objectIdent,
-                      MetadataObjectUtil.toEntityType(metadataObject),
-                      ownerIdent,
-                      Entity.EntityType.USER,
-                      true);
-              return null;
-            });
+            OwnerImpl newOwner = new OwnerImpl();
+            if (ownerType == Owner.Type.USER) {
+              NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
+              TreeLockUtils.doWithTreeLock(
+                  ownerIdent,
+                  LockType.READ,
+                  () -> {
+                    store
+                        .relationOperations()
+                        .insertRelation(
+                            SupportsRelationOperations.Type.OWNER_REL,
+                            objectIdent,
+                            MetadataObjectUtil.toEntityType(metadataObject),
+                            ownerIdent,
+                            Entity.EntityType.USER,
+                            true);
+                    return null;
+                  });
 
-        newOwner.name = ownerName;
-        newOwner.type = Owner.Type.USER;
-      } else if (ownerType == Owner.Type.GROUP) {
-        NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
-        TreeLockUtils.doWithTreeLock(
-            ownerIdent,
-            LockType.READ,
-            () -> {
-              store
-                  .relationOperations()
-                  .insertRelation(
-                      SupportsRelationOperations.Type.OWNER_REL,
-                      objectIdent,
-                      MetadataObjectUtil.toEntityType(metadataObject),
-                      ownerIdent,
-                      Entity.EntityType.GROUP,
-                      true);
-              return null;
-            });
+              newOwner.name = ownerName;
+              newOwner.type = Owner.Type.USER;
+            } else if (ownerType == Owner.Type.GROUP) {
+              NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
+              TreeLockUtils.doWithTreeLock(
+                  ownerIdent,
+                  LockType.READ,
+                  () -> {
+                    store
+                        .relationOperations()
+                        .insertRelation(
+                            SupportsRelationOperations.Type.OWNER_REL,
+                            objectIdent,
+                            MetadataObjectUtil.toEntityType(metadataObject),
+                            ownerIdent,
+                            Entity.EntityType.GROUP,
+                            true);
+                    return null;
+                  });
 
-        newOwner.name = ownerName;
-        newOwner.type = Owner.Type.GROUP;
-      }
+              newOwner.name = ownerName;
+              newOwner.type = Owner.Type.GROUP;
+            }
 
-      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-          metalake,
-          metadataObject,
-          authorizationPlugin ->
-              authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
-    } catch (NoSuchEntityException nse) {
-      LOG.warn(
-          "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
-      throw new NotFoundException(
-          nse, "Metadata object %s or owner %s is not found", metadataObject.fullName(), ownerName);
-    } catch (IOException ioe) {
-      LOG.info(
-          "Fail to set the owner {} of metadata object {}",
-          ownerName,
-          metadataObject.fullName(),
-          ioe);
-      throw new RuntimeException(ioe);
-    }
+            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                metalake,
+                metadataObject,
+                authorizationPlugin ->
+                    authorizationPlugin.onOwnerSet(
+                        metadataObject, originOwner.orElse(null), newOwner));
+          } catch (NoSuchEntityException nse) {
+            LOG.warn(
+                "Metadata object {} or owner {} is not found",
+                metadataObject.fullName(),
+                ownerName,
+                nse);
+            throw new NotFoundException(
+                nse,
+                "Metadata object %s or owner %s is not found",
+                metadataObject.fullName(),
+                ownerName);
+          } catch (IOException ioe) {
+            LOG.info(
+                "Fail to set the owner {} of metadata object {}",
+                ownerName,
+                metadataObject.fullName(),
+                ioe);
+            throw new RuntimeException(ioe);
+          }
+
+          return null;
+        });
   }
 
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
-    try {
-      OwnerImpl owner = new OwnerImpl();
-      NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      List<? extends Entity> entities =
-          store
-              .relationOperations()
-              .listEntitiesByRelation(
-                  SupportsRelationOperations.Type.OWNER_REL,
-                  ident,
-                  MetadataObjectUtil.toEntityType(metadataObject));
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
 
-      if (entities.isEmpty()) {
-        return Optional.empty();
-      }
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          try {
+            OwnerImpl owner = new OwnerImpl();
+            List<? extends Entity> entities =
+                store
+                    .relationOperations()
+                    .listEntitiesByRelation(
+                        SupportsRelationOperations.Type.OWNER_REL,
+                        ident,
+                        MetadataObjectUtil.toEntityType(metadataObject));
 
-      if (entities.size() != 1) {
-        throw new IllegalStateException(
-            String.format("The number of the owner %s must be 1", metadataObject.fullName()));
-      }
+            if (entities.isEmpty()) {
+              return Optional.empty();
+            }
 
-      Entity entity = entities.get(0);
-      if (!(entity instanceof UserEntity) && !(entity instanceof GroupEntity)) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Doesn't support owner entity class %s", entities.get(0).getClass().getName()));
-      }
+            if (entities.size() != 1) {
+              throw new IllegalStateException(
+                  String.format("The number of the owner %s must be 1", metadataObject.fullName()));
+            }
 
-      if (entities.get(0) instanceof UserEntity) {
-        UserEntity user = (UserEntity) entities.get(0);
-        owner.name = user.name();
-        owner.type = Owner.Type.USER;
-      } else if (entities.get(0) instanceof GroupEntity) {
-        GroupEntity group = (GroupEntity) entities.get(0);
-        owner.name = group.name();
-        owner.type = Owner.Type.GROUP;
-      }
-      return Optional.of(owner);
-    } catch (NoSuchEntityException nse) {
-      throw new NoSuchMetadataObjectException(
-          "The metadata object of %s isn't found", metadataObject.fullName());
-    } catch (IOException ioe) {
-      LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);
-      throw new RuntimeException(ioe);
-    }
+            Entity entity = entities.get(0);
+            if (!(entity instanceof UserEntity) && !(entity instanceof GroupEntity)) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "Doesn't support owner entity class %s",
+                      entities.get(0).getClass().getName()));
+            }
+
+            if (entities.get(0) instanceof UserEntity) {
+              UserEntity user = (UserEntity) entities.get(0);
+              owner.name = user.name();
+              owner.type = Owner.Type.USER;
+            } else if (entities.get(0) instanceof GroupEntity) {
+              GroupEntity group = (GroupEntity) entities.get(0);
+              owner.name = group.name();
+              owner.type = Owner.Type.GROUP;
+            }
+            return Optional.of(owner);
+          } catch (NoSuchEntityException nse) {
+            throw new NoSuchMetadataObjectException(
+                "The metadata object of %s isn't found", metadataObject.fullName());
+          } catch (IOException ioe) {
+            LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   private static class OwnerImpl implements Owner {

@@ -41,8 +41,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.TopicResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.metrics.MetricNames;
@@ -79,11 +77,7 @@ public class TopicOperations {
           () -> {
             LOG.info("Listing topics under schema: {}.{}.{}", metalake, catalog, schema);
             Namespace topicNS = NamespaceUtil.ofTopic(metalake, catalog, schema);
-            NameIdentifier[] topics =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog, schema),
-                    LockType.READ,
-                    () -> dispatcher.listTopics(topicNS));
+            NameIdentifier[] topics = dispatcher.listTopics(topicNS);
             Response response = Utils.ok(new EntityListResponse(topics));
             LOG.info(
                 "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
@@ -186,11 +180,7 @@ public class TopicOperations {
                     .map(TopicUpdateRequest::topicChange)
                     .toArray(TopicChange[]::new);
 
-            Topic t =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () -> dispatcher.alterTopic(ident, changes));
+            Topic t = dispatcher.alterTopic(ident, changes);
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
             LOG.info("Topic altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
             return response;
@@ -217,11 +207,7 @@ public class TopicOperations {
           () -> {
             LOG.info("Dropping topic under schema: {}.{}.{}", metalake, catalog, schema);
             NameIdentifier ident = NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic);
-            boolean dropped =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () -> dispatcher.dropTopic(ident));
+            boolean dropped = dispatcher.dropTopic(ident);
 
             if (!dropped) {
               LOG.warn("Failed to drop topic {} under schema {}", topic, schema);
