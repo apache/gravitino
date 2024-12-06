@@ -123,8 +123,10 @@ const TableView = () => {
   useEffect(() => {
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === catalog)[0]
-      
-      const isHideAction = (['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3) || (currentCatalog?.provider === 'lakehouse-hudi' && paramsSize == 4)
+
+      const isHideAction =
+        (['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3) ||
+        (currentCatalog?.provider === 'lakehouse-hudi' && paramsSize == 4)
       setIsHideEdit(isHideAction)
     }
   }, [store.catalogs, store.catalogs.length, paramsSize, catalog])
