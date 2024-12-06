@@ -20,15 +20,18 @@
 package org.apache.gravitino.abs.credential;
 
 import com.azure.core.credential.TokenCredential;
+import com.azure.core.util.Context;
 import com.azure.identity.ClientSecretCredentialBuilder;
-import com.azure.storage.file.datalake.DataLakeFileSystemClientBuilder;
 import com.azure.storage.file.datalake.DataLakeServiceClient;
 import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
+import com.azure.storage.file.datalake.implementation.util.DataLakeSasImplUtil;
 import com.azure.storage.file.datalake.models.UserDelegationKey;
 import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
 import com.azure.storage.file.datalake.sas.PathSasPermission;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -70,6 +73,7 @@ public class ADLSTokenProvider implements CredentialProvider {
     if (!(context instanceof PathBasedCredentialContext)) {
       return null;
     }
+    PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
 
     TokenCredential tokenCredential =
         new ClientSecretCredentialBuilder()
@@ -93,12 +97,27 @@ public class ADLSTokenProvider implements CredentialProvider {
     DataLakeServiceSasSignatureValues signatureValues =
         new DataLakeServiceSasSignatureValues(expiry, permission);
 
+    Set<String> writePaths = pathBasedCredentialContext.getWritePaths();
+    Set<String> readPaths = pathBasedCredentialContext.getReadPaths();
+
+    Set<String> combinedPaths = new HashSet<>(writePaths);
+    combinedPaths.addAll(readPaths);
+
+    if (combinedPaths.size() != 1) {
+      throw new IllegalArgumentException(
+          "ADLS should contain exactly one unique path, but found: "
+              + combinedPaths.size()
+              + " paths: "
+              + combinedPaths);
+    }
+    String uniquePath = combinedPaths.iterator().next();
+
+    ADLSLocationUtils.ADLSLocationParts locationParts = ADLSLocationUtils.parseLocation(uniquePath);
     String sasToken =
-        new DataLakeFileSystemClientBuilder()
-            .endpoint(endpoint)
-            .fileSystemName("containerName")
-            .buildClient()
-            .generateUserDelegationSas(signatureValues, userDelegationKey);
+        new DataLakeSasImplUtil(
+                signatureValues, locationParts.getContainer(), locationParts.getPath(), true)
+            .generateUserDelegationSas(
+                userDelegationKey, locationParts.getAccountName(), Context.NONE);
 
     return new ADLSTokenCredential(sasToken, tokenExpireSecs * 1000);
   }
