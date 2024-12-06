@@ -14,3 +14,19 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from abc import ABC, abstractmethod
+from typing import List
+from gravitino.api.credential.credential import Credential
+
+
+class SupportsCredentials(ABC):
+    """Represents the audit information of an entity."""
+
+    @abstractmethod
+    def get_credentials(self) -> List[Credential]:
+        """The creator of the entity.
+
+        Returns:
+             the creator of the entity.
+        """

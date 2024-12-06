@@ -59,7 +59,6 @@ class Catalog(Auditable):
         Returns:
             The name of the catalog.
         """
-        pass
 
     @abstractmethod
     def type(self) -> Type:
@@ -67,7 +66,6 @@ class Catalog(Auditable):
         Returns:
             The type of the catalog.
         """
-        pass
 
     @abstractmethod
     def provider(self) -> str:
@@ -75,7 +73,6 @@ class Catalog(Auditable):
         Returns:
             The provider of the catalog.
         """
-        pass
 
     @abstractmethod
     def comment(self) -> Optional[str]:
@@ -85,7 +82,6 @@ class Catalog(Auditable):
         Returns:
             The provider of the catalog.
         """
-        pass
 
     @abstractmethod
     def properties(self) -> Optional[Dict[str, str]]:
@@ -95,7 +91,6 @@ class Catalog(Auditable):
         Returns:
             The properties of the catalog.
         """
-        pass
 
     def as_schemas(self) -> SupportsSchemas:
         """Return the {@link SupportsSchemas} if the catalog supports schema operations.

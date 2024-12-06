@@ -40,7 +40,6 @@ class Expression(ABC):
     @abstractmethod
     def children(self) -> list[Expression]:
         """Returns a list of the children of this node. Children should not change."""
-        pass
 
     def references(self) -> list[NamedReference]:
         """Returns a list of fields or columns that are referenced by this expression."""

@@ -34,7 +34,6 @@ class Schema(Auditable):
     @abstractmethod
     def name(self) -> str:
         """Returns the name of the Schema."""
-        pass
 
     def comment(self) -> Optional[str]:
         """Returns the comment of the Schema. None is returned if the comment is not set."""

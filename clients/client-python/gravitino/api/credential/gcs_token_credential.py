@@ -15,39 +15,46 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import ABC, abstractmethod
-from datetime import datetime
+from abc import ABC
+from typing import Dict
+
+from gravitino.api.credential.credential import Credential
 
 
-class Audit(ABC):
+class GCSTokenCredential(Credential, ABC):
     """Represents the audit information of an entity."""
 
-    @abstractmethod
-    def creator(self) -> str:
+    GCS_TOKEN_CREDENTIAL_TYPE = "gcs-token"
+    _GCS_TOKEN_NAME = "token"
+
+    _expire_time_in_ms = 0
+
+    def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
+        self._token = credential_info[self._GCS_TOKEN_NAME]
+        self._expire_time_in_ms = expire_time_in_ms
+
+    def credential_type(self) -> str:
         """The creator of the entity.
 
         Returns:
              the creator of the entity.
         """
+        return self.GCS_TOKEN_CREDENTIAL_TYPE
 
-    @abstractmethod
-    def create_time(self) -> datetime:
+    def expire_time_in_ms(self) -> int:
         """The creation time of the entity.
 
         Returns:
              The creation time of the entity.
         """
+        return self._expire_time_in_ms
 
-    @abstractmethod
-    def last_modifier(self) -> str:
+    def credential_info(self) -> Dict[str, str]:
         """
         Returns:
              The last modifier of the entity.
         """
+        return {self._GCS_TOKEN_NAME: self._token}
 
-    @abstractmethod
-    def last_modified_time(self) -> datetime:
-        """
-        Returns:
-             The last modified time of the entity.
-        """
+    def token(self) -> str:
+        return self._token

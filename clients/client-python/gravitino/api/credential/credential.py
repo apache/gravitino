@@ -15,40 +15,32 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import abstractmethod
-from typing import Optional, Dict
-
-from gravitino.api.auditable import Auditable
+from abc import ABC, abstractmethod
+from typing import Dict
 
 
-class Metalake(Auditable):
-    """
-    The interface of a metalake. The metalake is the top level entity in the gravitino system,
-    containing a set of catalogs.
-    """
+class Credential(ABC):
+    """Represents the audit information of an entity."""
 
     @abstractmethod
-    def name(self) -> str:
-        """The name of the metalake.
+    def credential_type(self) -> str:
+        """The creator of the entity.
 
         Returns:
-            str: The name of the metalake.
+             the creator of the entity.
         """
 
     @abstractmethod
-    def comment(self) -> Optional[str]:
-        """The comment of the metalake. Note. this method will return None if the comment is not set for
-        this metalake.
+    def expire_time_in_ms(self) -> int:
+        """The creation time of the entity.
 
         Returns:
-            Optional[str]: The comment of the metalake.
+             The creation time of the entity.
         """
 
     @abstractmethod
-    def properties(self) -> Optional[Dict[str, str]]:
-        """The properties of the metalake. Note, this method will return None if the properties are not
-        set.
-
+    def credential_info(self) -> Dict[str, str]:
+        """
         Returns:
-            Optional[Dict[str, str]]: The properties of the metalake.
+             The last modifier of the entity.
         """

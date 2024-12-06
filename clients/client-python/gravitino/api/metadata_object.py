@@ -14,3 +14,25 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from abc import ABC, abstractmethod
+from enum import Enum
+
+
+class MetadataObject(ABC):
+    class Type(Enum):
+        """The type of the metadata object."""
+
+        CATALOG = "catalog"
+        """"Metadata Type for catalog."""
+
+        FILESET = "fileset"
+        """Metadata Type for Fileset System (including HDFS, S3, etc.), like path/to/file"""
+
+    @abstractmethod
+    def type(self) -> Type:
+        pass
+
+    @abstractmethod
+    def name(self) -> str:
+        pass
