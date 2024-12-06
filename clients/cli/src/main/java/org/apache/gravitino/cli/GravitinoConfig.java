@@ -36,8 +36,9 @@ public class GravitinoConfig {
   private String metalake;
   private String url;
   private boolean ignore;
-  private String authentication;
+  private String authType;
   private OAuthData oauth;
+  private KerberosData kerberos;
 
   /**
    * Creates a GravitinoConfig object with a specified config file. If no file is provided, it
@@ -93,7 +94,18 @@ public class GravitinoConfig {
       ignore = prop.getProperty(ignoreKey).equals("true");
     }
     if (prop.containsKey(authKey)) {
-      authentication = prop.getProperty(authKey);
+      authType = prop.getProperty(authKey);
+    }
+
+    if (authKey.equals("oauth")) {
+      oauth =
+          new OAuthData(
+              prop.getProperty("serverURI"),
+              prop.getProperty("credential"),
+              prop.getProperty("token"),
+              prop.getProperty("scope"));
+    } else if (authKey.equals("kerberos")) {
+      kerberos = new KerberosData(prop.getProperty("principal"), prop.getProperty("keytabFile"));
     }
 
     if (authKey.equals("oauth")) {
@@ -143,20 +155,29 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the Gravitino authentication stored in the configuration.
+   * Retrieves the Gravitino authentication type stored in the configuration.
    *
-   * @return The Gravitino authentication or null if not set.
+   * @return The Gravitino authentication type or null if not set.
    */
-  public String getGravitinoAuth() {
-    return authentication;
+  public String getGravitinoAuthType() {
+    return authType;
   }
 
   /**
-   * Retrieves the Gravitino oAuth authentication configuration.
+   * Retrieves the Gravitino OAuth configuration.
    *
-   * @return The Gravitino authentication or null if not set.
+   * @return The Gravitino OAuth data or null if not set.
    */
   public OAuthData getOAuth() {
     return oauth;
+  }
+
+  /**
+   * Retrieves the Gravitino kerberos configuration.
+   *
+   * @return The Gravitino Kerberos data or null if not set.
+   */
+  public KerberosData getKerberos() {
+    return kerberos;
   }
 }

@@ -21,7 +21,9 @@ package org.apache.gravitino.cli.commands;
 
 import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
+import java.io.File;
 import org.apache.gravitino.cli.GravitinoConfig;
+import org.apache.gravitino.cli.KerberosData;
 import org.apache.gravitino.cli.OAuthData;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
@@ -29,6 +31,7 @@ import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClientBase;
+import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /* The base for all commands. */
@@ -41,6 +44,7 @@ public abstract class Command {
 
   private static final String SIMPLE_AUTH = "simple";
   private static final String OAUTH_AUTH = "oauth";
+  private static final String KERBEROS_AUTH = "kerberos";
 
   private final String url;
   private final boolean ignoreVersions;
@@ -139,6 +143,16 @@ public abstract class Command {
                 .build();
 
         builder = builder.withOAuth(tokenProvider);
+      } else if (authentication.equals(KERBEROS_AUTH)) {
+        GravitinoConfig config = new GravitinoConfig(null);
+        KerberosData kerberos = config.getKerberos();
+        KerberosTokenProvider tokenProvider =
+            KerberosTokenProvider.builder()
+                .withClientPrincipal(kerberos.getPrincipal())
+                .withKeyTabFile(new File(kerberos.getKeytabFile()))
+                .build();
+
+        builder = builder.withKerberosAuth(tokenProvider);
       } else {
         System.err.println("Unsupported authentication type " + authentication);
       }
@@ -151,6 +165,7 @@ public abstract class Command {
    * Outputs the entity to the console.
    *
    * @param entity The entity to output.
+   * @param <T> The type of entity.
    */
   protected <T> void output(T entity) {
     if (outputFormat == null) {
