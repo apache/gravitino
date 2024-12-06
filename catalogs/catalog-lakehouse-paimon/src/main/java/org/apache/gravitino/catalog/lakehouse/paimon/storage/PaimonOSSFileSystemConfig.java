@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -29,9 +30,9 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class PaimonOSSFileSystemConfig extends Config {
   // OSS related properties
-  public static final String OSS_ENDPOINT = "fs.oss.endpoint";
-  public static final String OSS_ACCESS_KEY = "fs.oss.accessKeyId";
-  public static final String OSS_SECRET_KEY = "fs.oss.accessKeySecret";
+  public static final String OSS_ENDPOINT = PaimonConstants.OSS_ENDPOINT;
+  public static final String OSS_ACCESS_KEY = PaimonConstants.OSS_ACCESS_KEY;
+  public static final String OSS_SECRET_KEY = PaimonConstants.OSS_SECRET_KEY;
 
   public PaimonOSSFileSystemConfig(Map<String, String> properties) {
     super(false);
