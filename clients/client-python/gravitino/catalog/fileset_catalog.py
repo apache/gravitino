@@ -72,7 +72,6 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
             rest_client,
         )
 
-
     def as_fileset_catalog(self):
         return self
 
@@ -326,7 +325,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
             return FilesetUpdateRequest.UpdateFilesetCommentRequest(None)
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
-    def support_credentials(self)-> SupportsCredentials:
+    def support_credentials(self) -> SupportsCredentials:
         return self
 
     def get_credentials(self) -> List[Credential]:

@@ -112,10 +112,8 @@ def mock_name_identifier_json(name, namespace):
 
 def mock_get_credential(name: str, location: str):
     credential = CredentialDTO(
-        _credential_type = "mock",
+        _credential_type="mock",
         _expire_time_in_ms=0,
-        _credential_info= {"access_id":"id", "secret_key":"secret"},
+        _credential_info={"access_id": "id", "secret_key": "secret"},
     )
     return credential
-
-

@@ -31,7 +31,7 @@ class MetadataObject(ABC):
 
     @abstractmethod
     def type(self) -> Type:
-       pass
+        pass
 
     @abstractmethod
     def name(self) -> str:

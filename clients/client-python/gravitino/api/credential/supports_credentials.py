@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from gravitino.api.credential.credential import Credential
 
+
 class SupportsCredentials(ABC):
     """Represents the audit information of an entity."""
 

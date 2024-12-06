@@ -34,10 +34,12 @@ from gravitino.exceptions.base import (
     SchemaAlreadyExistsException,
     UnsupportedOperationException,
     ConnectionFailedException,
-    CatalogAlreadyExistsException, NoSuchCredentialException,
+    CatalogAlreadyExistsException,
+    NoSuchCredentialException,
 )
-from gravitino.exceptions.handlers.credential_error_handler import \
-    CREDENTIAL_ERROR_HANDLER
+from gravitino.exceptions.handlers.credential_error_handler import (
+    CREDENTIAL_ERROR_HANDLER,
+)
 
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER

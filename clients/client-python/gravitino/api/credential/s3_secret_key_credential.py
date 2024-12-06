@@ -22,44 +22,46 @@ from gravitino.api.credential.credential import Credential
 
 
 class S3SecretKeyCredential(Credential, ABC):
-  """Represents the audit information of an entity."""
+    """Represents the audit information of an entity."""
 
-  S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key"
-  _GRAVITINO_S3_STATIC_ACCESS_KEY_ID = "s3-access-key-id"
-  _GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-secret-access-key"
+    S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key"
+    _GRAVITINO_S3_STATIC_ACCESS_KEY_ID = "s3-access-key-id"
+    _GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-secret-access-key"
 
-  def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-    self._access_key_id = credential_info[
-      self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID]
-    self._secret_access_key = credential_info[
-      self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY]
+    def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
+        self._access_key_id = credential_info[self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID]
+        self._secret_access_key = credential_info[
+            self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY
+        ]
 
-  def credential_type(self) -> str:
-    """The creator of the entity.
+    def credential_type(self) -> str:
+        """The creator of the entity.
 
-    Returns:
-         the creator of the entity.
-    """
-    return self.S3_SECRET_KEY_CREDENTIAL_TYPE
+        Returns:
+             the creator of the entity.
+        """
+        return self.S3_SECRET_KEY_CREDENTIAL_TYPE
 
-  def expire_time_in_ms(self) -> int:
-    """The creation time of the entity.
+    def expire_time_in_ms(self) -> int:
+        """The creation time of the entity.
 
-    Returns:
-         The creation time of the entity.
-    """
-    return 0
+        Returns:
+             The creation time of the entity.
+        """
+        return 0
 
-  def credential_info(self) -> Dict[str, str]:
-    """
-    Returns:
-         The last modifier of the entity.
-    """
-    return {self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
-            self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID: self._access_key_id}
+    def credential_info(self) -> Dict[str, str]:
+        """
+        Returns:
+             The last modifier of the entity.
+        """
+        return {
+            self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
+            self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID: self._access_key_id,
+        }
 
-  def access_key_id(self) -> str:
-    return self._access_key_id
+    def access_key_id(self) -> str:
+        return self._access_key_id
 
-  def secret_access_key(self) -> str:
-    return self._secret_access_key
+    def secret_access_key(self) -> str:
+        return self._secret_access_key

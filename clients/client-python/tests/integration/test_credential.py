@@ -20,9 +20,9 @@ from random import randint
 from unittest import TestCase
 
 from gravitino import (
-  NameIdentifier,
-  GravitinoAdminClient,
-  GravitinoClient,
+    NameIdentifier,
+    GravitinoAdminClient,
+    GravitinoClient,
 )
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -31,42 +31,45 @@ logger = logging.getLogger(__name__)
 
 
 class TestGetCredentials(TestCase):
-  metalake_name: str = "test"
-  catalog_name: str = "catalog"
-  schema_name: str = "schema"
-  fileset_name: str = "fileset"
+    metalake_name: str = "test"
+    catalog_name: str = "catalog"
+    schema_name: str = "schema"
+    fileset_name: str = "fileset"
 
-  catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
-  schema_ident: NameIdentifier = NameIdentifier.of(
-    metalake_name, catalog_name, schema_name
-  )
-  fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
+    catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
+    schema_ident: NameIdentifier = NameIdentifier.of(
+        metalake_name, catalog_name, schema_name
+    )
+    fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
 
-  gravitino_client: GravitinoClient = GravitinoClient(
-    uri="http://localhost:8090", metalake_name=metalake_name,
-    check_version=False)
+    gravitino_client: GravitinoClient = GravitinoClient(
+        uri="http://localhost:8090", metalake_name=metalake_name, check_version=False
+    )
 
-  def test_get_catalog_credentials(self):
-    catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
-    credentials = catalog.as_fileset_catalog().support_credentials().get_credentials()
-    self.assertEqual(1, len(credentials))
-    credential = credentials[0]
-    self.assertEqual(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
-                     credential.credential_type())
-    self.assertEqual("access-id", credential.access_key_id())
-    self.assertEqual("secret-key", credential.secret_access_key())
-    self.assertEqual("token", credential.session_token())
+    def test_get_catalog_credentials(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        credentials = (
+            catalog.as_fileset_catalog().support_credentials().get_credentials()
+        )
+        self.assertEqual(1, len(credentials))
+        credential = credentials[0]
+        self.assertEqual(
+            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, credential.credential_type()
+        )
+        self.assertEqual("access-id", credential.access_key_id())
+        self.assertEqual("secret-key", credential.secret_access_key())
+        self.assertEqual("token", credential.session_token())
 
-  def test_get_fileset_credentials(self):
-    catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
-    fileset = catalog.as_fileset_catalog().load_fileset(
-      ident=self.fileset_ident)
-    credentials = fileset.support_credentials().get_credentials()
-    self.assertEqual(1, len(credentials))
+    def test_get_fileset_credentials(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        fileset = catalog.as_fileset_catalog().load_fileset(ident=self.fileset_ident)
+        credentials = fileset.support_credentials().get_credentials()
+        self.assertEqual(1, len(credentials))
 
-    credential = credentials[0]
-    self.assertEqual(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
-                     credential.credential_type())
-    self.assertEqual("access-id", credential.access_key_id())
-    self.assertEqual("secret-key", credential.secret_access_key())
-    self.assertEqual("token", credential.session_token())
+        credential = credentials[0]
+        self.assertEqual(
+            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, credential.credential_type()
+        )
+        self.assertEqual("access-id", credential.access_key_id())
+        self.assertEqual("secret-key", credential.secret_access_key())
+        self.assertEqual("token", credential.session_token())

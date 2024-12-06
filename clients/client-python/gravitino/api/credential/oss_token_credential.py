@@ -31,7 +31,9 @@ class OSSTokenCredential(Credential, ABC):
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
         self._access_key_id = credential_info[self._GRAVITINO_OSS_SESSION_ACCESS_KEY_ID]
-        self._secret_access_key = credential_info[self._GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY]
+        self._secret_access_key = credential_info[
+            self._GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY
+        ]
         self._security_token = credential_info[self._GRAVITINO_OSS_TOKEN]
         self._expire_time_in_ms = expire_time_in_ms
 
@@ -56,7 +58,11 @@ class OSSTokenCredential(Credential, ABC):
         Returns:
              The last modifier of the entity.
         """
-        return {self._GRAVITINO_OSS_TOKEN: self._security_token, self._GRAVITINO_OSS_SESSION_ACCESS_KEY_ID: self._access_key_id, self._GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY: self._secret_access_key}
+        return {
+            self._GRAVITINO_OSS_TOKEN: self._security_token,
+            self._GRAVITINO_OSS_SESSION_ACCESS_KEY_ID: self._access_key_id,
+            self._GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY: self._secret_access_key,
+        }
 
     def access_key_id(self) -> str:
         return self._access_key_id

@@ -21,9 +21,12 @@ from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
 
+
 class CredentialUtils:
     @staticmethod
-    def to_credential(credential_type: str, credential_info: dict, expire_time_in_ms: int) -> Credential:
+    def to_credential(
+        credential_type: str, credential_info: dict, expire_time_in_ms: int
+    ) -> Credential:
         if credential_type == S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE:
             return S3TokenCredential(credential_info, expire_time_in_ms)
         if credential_type == S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE:

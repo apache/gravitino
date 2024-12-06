@@ -28,7 +28,9 @@ class CredentialDTO(Credential, DataClassJsonMixin):
 
     _credential_type: str = field(metadata=config(field_name="credentialType"))
     _expire_time_in_ms: int = field(metadata=config(field_name="expireTimeInMs"))
-    _credential_info: Dict[str, str] = field(metadata=config(field_name="credentialInfo"))
+    _credential_info: Dict[str, str] = field(
+        metadata=config(field_name="credentialInfo")
+    )
 
     def credential_type(self) -> str:
         return self._credential_type

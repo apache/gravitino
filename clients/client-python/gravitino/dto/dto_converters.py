@@ -25,6 +25,7 @@ from gravitino.api.metalake_change import MetalakeChange
 from gravitino.utils import HTTPClient
 from gravitino.namespace import Namespace
 
+
 class DTOConverters:
     """Utility class for converting between DTOs and domain objects."""
 
@@ -85,5 +86,3 @@ class DTOConverters:
             )
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")
-
-

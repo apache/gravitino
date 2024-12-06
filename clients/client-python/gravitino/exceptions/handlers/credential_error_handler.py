@@ -21,7 +21,8 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
     NoSuchFilesetException,
     NoSuchSchemaException,
-    CatalogNotInUseException, NoSuchCredentialException,
+    CatalogNotInUseException,
+    NoSuchCredentialException,
 )
 
 
