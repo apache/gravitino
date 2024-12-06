@@ -127,9 +127,4 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
   }
-
-  private String getFromEnvOrDefault(String envVar, String defaultValue) {
-    String envValue = System.getenv(envVar);
-    return Optional.ofNullable(envValue).orElse(defaultValue);
-  }
 }
