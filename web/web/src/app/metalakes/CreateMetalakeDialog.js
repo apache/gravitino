@@ -316,8 +316,8 @@ const CreateMetalakeDialog = props => {
                       )}
                       {item.invalid && (
                         <FormHelperText className={'twc-text-error-main'}>
-                          Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                          characters, underscores, hyphens, or dots.
+                          Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                          underscores, hyphens, or dots.
                         </FormHelperText>
                       )}
                     </FormControl>
