@@ -42,6 +42,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
+    --login <arg>        user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
     --null <arg>         column value can be null (true/false)
@@ -54,6 +55,8 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
+    --simple             simple authentication
+    --sortorder          display sortorder information
  -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
@@ -96,6 +99,14 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
+### Setting the Gravitino Authentication Type
+
+The authentication type can also be set in several ways.
+
+1. Passed in on the command line via the `--simple` flag.
+2. Set via the 'GRAVITINO_AUTH' environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
 ### Gravitino CLI configuration file
 
 The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
@@ -114,6 +125,29 @@ URL=http://localhost:8090
 # Ignore client/server version mismatch
 ignore=true
 
+# Authentication
+auth=simple
+
+```
+
+OAuth authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=oauth
+serverURI=http://127.0.0.1:1082
+credential=xx:xx
+token=test
+scope=token/test
+```
+
+Kerberos authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=kerberos
+principal=user/admin@foo.com
+keytabFile=file.keytab
 ```
 
 ### Potentially unsafe operations
@@ -779,7 +813,7 @@ gcli fileset set  --name hadoop.schema.fileset --property test --value value
 gcli fileset remove --name hadoop.schema.fileset --property test
 ```
 
-### column commands
+### Column commands
 
 Note that some commands are not supported depending on what the database supports.
 
@@ -809,5 +843,19 @@ gcli  column delete --name catalog_postgres.hr.departments.money
 gcli column update --name catalog_postgres.hr.departments.value --rename values
 gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
 gcli column update --name catalog_postgres.hr.departments.values --position name
-gcli column update --name catalog_postgres.hr.departments.name --null=true
+gcli column update --name catalog_postgres.hr.departments.name --null true
+```
+
+#### Simple authentication
+
+```bash
+gcli <normal command> --simple
+```
+
+### Authentication
+
+#### Simple authentication with user name
+
+```bash
+gcli <normal command> --simple --login userName
 ```
