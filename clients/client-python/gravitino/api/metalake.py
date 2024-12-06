@@ -34,7 +34,6 @@ class Metalake(Auditable):
         Returns:
             str: The name of the metalake.
         """
-        pass
 
     @abstractmethod
     def comment(self) -> Optional[str]:
@@ -44,7 +43,6 @@ class Metalake(Auditable):
         Returns:
             Optional[str]: The comment of the metalake.
         """
-        pass
 
     @abstractmethod
     def properties(self) -> Optional[Dict[str, str]]:
@@ -54,4 +52,3 @@ class Metalake(Auditable):
         Returns:
             Optional[Dict[str, str]]: The properties of the metalake.
         """
-        pass

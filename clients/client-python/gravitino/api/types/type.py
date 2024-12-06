@@ -122,43 +122,31 @@ class Type(ABC):
     @abstractmethod
     def name(self) -> Name:
         """Returns the generic name of the type."""
-        pass
 
     @abstractmethod
     def simple_string(self) -> str:
         """Returns a readable string representation of the type."""
-        pass
 
 
 # Define base classes
 class PrimitiveType(Type, ABC):
     """Base class for all primitive types."""
 
-    pass
-
 
 class NumericType(PrimitiveType, ABC):
     """Base class for all numeric types."""
-
-    pass
 
 
 class DateTimeType(PrimitiveType, ABC):
     """Base class for all date/time types."""
 
-    pass
-
 
 class IntervalType(PrimitiveType, ABC):
     """Base class for all interval types."""
 
-    pass
-
 
 class ComplexType(Type, ABC):
     """Base class for all complex types, including struct, list, map, and union."""
-
-    pass
 
 
 class IntegralType(NumericType, ABC):
@@ -176,5 +164,3 @@ class IntegralType(NumericType, ABC):
 
 class FractionType(NumericType, ABC):
     """Base class for all fractional types."""
-
-    pass

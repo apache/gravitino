@@ -51,7 +51,6 @@ class Fileset(Auditable):
         Returns:
             Name of the fileset object.
         """
-        pass
 
     @abstractmethod
     def comment(self) -> Optional[str]:
@@ -59,7 +58,6 @@ class Fileset(Auditable):
         Returns:
             The comment of the fileset object. Null is returned if no comment is set.
         """
-        pass
 
     @abstractmethod
     def type(self) -> Type:
@@ -67,7 +65,6 @@ class Fileset(Auditable):
         @Returns:
             The type of the fileset object.
         """
-        pass
 
     @abstractmethod
     def storage_location(self) -> str:
@@ -101,7 +98,6 @@ class Fileset(Auditable):
         Returns:
              The storage location of the fileset object.
         """
-        pass
 
     @abstractmethod
     def properties(self) -> Dict[str, str]:
@@ -109,4 +105,3 @@ class Fileset(Auditable):
         Returns:
             The properties of the fileset object. Empty map is returned if no properties are set.
         """
-        pass

@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import ABC, abstractmethod
-from enum import Enum
 from typing import List, ClassVar
 
 from gravitino.api.metadata_object import MetadataObject

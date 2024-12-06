@@ -25,8 +25,6 @@ from gravitino.api.schema_change import SchemaChange
 class NoSuchSchemaException(Exception):
     """Exception raised if the schema does not exist."""
 
-    pass
-
 
 class SupportsSchemas(ABC):
     """
@@ -48,7 +46,6 @@ class SupportsSchemas(ABC):
         Returns:
             A list of schema names under the namespace.
         """
-        pass
 
     def schema_exists(self, schema_name: str) -> bool:
         """Check if a schema exists.
@@ -86,7 +83,6 @@ class SupportsSchemas(ABC):
         Returns:
             The created schema.
         """
-        pass
 
     @abstractmethod
     def load_schema(self, schema_name: str) -> Schema:
@@ -101,7 +97,6 @@ class SupportsSchemas(ABC):
         Returns:
             A schema.
         """
-        pass
 
     @abstractmethod
     def alter_schema(self, schema_name: str, *changes: SchemaChange) -> Schema:
@@ -117,7 +112,6 @@ class SupportsSchemas(ABC):
         Returns:
             The altered schema.
         """
-        pass
 
     @abstractmethod
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
@@ -134,4 +128,3 @@ class SupportsSchemas(ABC):
         Raises:
             NonEmptySchemaException: If the schema is not empty and cascade is false.
         """
-        pass

@@ -16,16 +16,13 @@
 # under the License.
 
 import logging
-from random import randint
 from unittest import TestCase
 
 from gravitino import (
     NameIdentifier,
-    GravitinoAdminClient,
     GravitinoClient,
 )
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
-from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
 

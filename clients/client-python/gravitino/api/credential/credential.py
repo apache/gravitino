@@ -29,7 +29,6 @@ class Credential(ABC):
         Returns:
              the creator of the entity.
         """
-        pass
 
     @abstractmethod
     def expire_time_in_ms(self) -> int:
@@ -38,7 +37,6 @@ class Credential(ABC):
         Returns:
              The creation time of the entity.
         """
-        pass
 
     @abstractmethod
     def credential_info(self) -> Dict[str, str]:
@@ -46,4 +44,3 @@ class Credential(ABC):
         Returns:
              The last modifier of the entity.
         """
-        pass

@@ -30,4 +30,3 @@ class SupportsCredentials(ABC):
         Returns:
              the creator of the entity.
         """
-        pass

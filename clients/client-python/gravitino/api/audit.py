@@ -29,7 +29,6 @@ class Audit(ABC):
         Returns:
              the creator of the entity.
         """
-        pass
 
     @abstractmethod
     def create_time(self) -> datetime:
@@ -38,7 +37,6 @@ class Audit(ABC):
         Returns:
              The creation time of the entity.
         """
-        pass
 
     @abstractmethod
     def last_modifier(self) -> str:
@@ -46,7 +44,6 @@ class Audit(ABC):
         Returns:
              The last modifier of the entity.
         """
-        pass
 
     @abstractmethod
     def last_modified_time(self) -> datetime:
@@ -54,4 +51,3 @@ class Audit(ABC):
         Returns:
              The last modified time of the entity.
         """
-        pass

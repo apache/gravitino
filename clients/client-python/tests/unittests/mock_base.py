@@ -19,7 +19,6 @@ import json
 from unittest.mock import patch
 
 from gravitino import GravitinoMetalake, Catalog, Fileset
-from gravitino.api.credential.credential import Credential
 from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.dto.credential_dto import CredentialDTO
 from gravitino.dto.fileset_dto import FilesetDTO
