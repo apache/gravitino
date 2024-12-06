@@ -18,13 +18,28 @@
 from abc import ABC, abstractmethod
 from typing import Dict
 
-class S3TokenCredential(ABC):
+from gravitino.api.credential.credential import Credential
+
+
+class S3TokenCredential(Credential, ABC):
     """Represents the audit information of an entity."""
+
+    S3_TOKEN_CREDENTIAL_TYPE = "s3-token"
+    _GRAVITINO_S3_SESSION_ACCESS_KEY_ID = "s3-access-key-id"
+    _GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY = "s3-secret-access-key"
+    _GRAVITINO_S3_TOKEN = "s3-session-token"
+
     _credential_type = "s3"
     _expire_time_in_ms = 0
     _access_key_id = None
     _secret_access_key = None
     _session_token = None
+
+    def __init__(self, expire_time_in_ms: int, access_key_id: str, secret_access_key: str, session_token: str):
+        self._expire_time_in_ms = expire_time_in_ms
+        self._access_key_id = access_key_id
+        self._secret_access_key = secret_access_key
+        self._session_token = session_token
 
     def credential_type(self) -> str:
         """The creator of the entity.
@@ -32,7 +47,7 @@ class S3TokenCredential(ABC):
         Returns:
              the creator of the entity.
         """
-        pass
+        return self._credential_type
 
     def expire_time_in_ms(self) -> int:
         """The creation time of the entity.
@@ -40,18 +55,30 @@ class S3TokenCredential(ABC):
         Returns:
              The creation time of the entity.
         """
-        pass
+        return self._expire_time_in_ms
 
     def credential_info(self) -> Dict[str, str]:
         """
         Returns:
              The last modifier of the entity.
         """
-        pass
+        return {self._GRAVITINO_S3_TOKEN: self._session_token, self._GRAVITINO_S3_SESSION_ACCESS_KEY_ID: self._access_key_id, self._GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY: self._secret_access_key }
 
-    def init_with_credential_info(self) -> None:
+    def init_with_credential_info(self, credential_info: Dict[str, str], expire_time) -> None:
         """
         Returns:
              The last modifier of the entity.
         """
-        pass
+        self._access_key_id = credential_info["access_key_id"]
+        self._secret_access_key = credential_info["secret_access_key"]
+        self._session_token = credential_info["session_token"]
+        self._expire_time_in_ms = expire_time
+
+    def access_key_id(self) -> str:
+        return self._access_key_id
+
+    def secret_access_key(self) -> str:
+        return self._secret_access_key
+
+    def session_token(self) -> str:
+        return self._session_token
