@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.ImmutableMap;
 import java.util.Locale;
 import org.apache.gravitino.Catalog;
@@ -33,7 +34,7 @@ public class TestCatalogCreateRequest {
     CatalogCreateRequest request =
         new CatalogCreateRequest(
             "catalog_test",
-            Catalog.Type.RELATIONAL,
+            Catalog.Type.MODEL,
             "provider_test",
             "catalog comment",
             ImmutableMap.of("key", "value"));
@@ -44,14 +45,14 @@ public class TestCatalogCreateRequest {
 
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("catalog_test", deserRequest.getName());
-    Assertions.assertEquals(Catalog.Type.RELATIONAL, deserRequest.getType());
+    Assertions.assertEquals(Catalog.Type.MODEL, deserRequest.getType());
     Assertions.assertEquals("provider_test", deserRequest.getProvider());
     Assertions.assertEquals("catalog comment", deserRequest.getComment());
     Assertions.assertEquals(ImmutableMap.of("key", "value"), deserRequest.getProperties());
 
     // Test with null provider, comment and properties
     CatalogCreateRequest request1 =
-        new CatalogCreateRequest("catalog_test", Catalog.Type.RELATIONAL, null, null, null);
+        new CatalogCreateRequest("catalog_test", Catalog.Type.MODEL, null, null, null);
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
     CatalogCreateRequest deserRequest1 =
@@ -61,5 +62,14 @@ public class TestCatalogCreateRequest {
         deserRequest1.getType().name().toLowerCase(Locale.ROOT), deserRequest1.getProvider());
     Assertions.assertNull(deserRequest1.getComment());
     Assertions.assertNull(deserRequest1.getProperties());
+
+    // Test using null provider with catalog type doesn't support managed catalog
+    CatalogCreateRequest request2 =
+        new CatalogCreateRequest("catalog_test", Catalog.Type.RELATIONAL, null, null, null);
+
+    String serJson2 = JsonUtils.objectMapper().writeValueAsString(request2);
+    Assertions.assertThrows(
+        JsonMappingException.class,
+        () -> JsonUtils.objectMapper().readValue(serJson2, CatalogCreateRequest.class));
   }
 }

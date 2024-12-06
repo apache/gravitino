@@ -38,7 +38,7 @@ public class ModelCatalog extends BaseCatalog<ModelCatalog> {
 
   @Override
   public String shortName() {
-    return CatalogProvider.builtinShortName(super.type());
+    return CatalogProvider.shortNameForManagedCatalog(super.type());
   }
 
   @Override

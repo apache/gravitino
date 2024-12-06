@@ -81,11 +81,12 @@ public interface SupportsCatalogs {
    * catalog should be created. The short name:
    *
    * <p>1) should be the same as the {@link CatalogProvider} interface provided. 2) can be "null" if
-   * the created catalog is a built-in catalog, like model catalog.
+   * the created catalog is the managed catalog, like model catalog. For the details of the provider
+   * definition, see {@link CatalogProvider}.
    *
    * @param catalogName the name of the catalog.
    * @param type the type of the catalog.
-   * @param provider the provider of the catalog, or null if the catalog is a built-in catalog.
+   * @param provider the provider of the catalog, or null if the catalog is a managed catalog.
    * @param comment the comment of the catalog.
    * @param properties the properties of the catalog.
    * @return The created catalog.
@@ -101,7 +102,7 @@ public interface SupportsCatalogs {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
 
   /**
-   * Create a built-in catalog with specified catalog name, type, comment, and properties.
+   * Create a managed catalog with specified catalog name, type, comment, and properties.
    *
    * @param catalogName the name of the catalog.
    * @param type the type of the catalog.

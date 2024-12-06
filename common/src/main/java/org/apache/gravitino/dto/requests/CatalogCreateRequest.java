@@ -82,14 +82,25 @@ public class CatalogCreateRequest implements RESTRequest {
   }
 
   /**
-   * Sets the provider of the catalog.
+   * Sets the provider of the catalog if it is null. The value of provider in the request can be
+   * null if the catalog is a managed catalog. For such request, the value will be set when it is
+   * deserialized.
    *
    * @param provider The provider of the catalog.
    */
   @JsonSetter(value = "provider")
   public void setProvider(String provider) {
-    this.provider =
-        StringUtils.isNotBlank(provider) ? provider : CatalogProvider.builtinShortName(type);
+    if (StringUtils.isNotBlank(provider)) {
+      this.provider = provider;
+    } else if (type != null && type.supportsManagedCatalog()) {
+      this.provider = CatalogProvider.shortNameForManagedCatalog(type);
+    } else {
+      throw new IllegalStateException(
+          "Provider cannot be null for catalog type "
+              + type
+              + " that doesn't support managed "
+              + "catalog");
+    }
   }
 
   /**
@@ -102,5 +113,10 @@ public class CatalogCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(provider) || type.supportsManagedCatalog(),
+        "\"provider\" field is required and cannot be empty for catalog type "
+            + type
+            + " that doesn't support managed catalog");
   }
 }

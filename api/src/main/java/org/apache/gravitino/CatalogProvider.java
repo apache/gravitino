@@ -24,18 +24,32 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * A Catalog provider is a class that provides a short name for a catalog. This short name is used
  * when creating a catalog.
+ *
+ * <p>There are two kinds of catalogs in Gravitino, one is managed catalog and another is external
+ * catalog.
+ *
+ * <p>Managed catalog: A catalog and its subsidiary objects are all managed by Gravitino. Gravitino
+ * takes care of the lifecycle of the catalog and its objects. For those catalogs, Gravitino uses
+ * the type of the catalog as the provider short name. Note that for each catalog type, there is
+ * only one implementation of managed catalog for that type. Currently, Gravitino only has model
+ * catalog that is a managed catalog.
+ *
+ * <p>External catalog: A catalog its subsidiary objects are stored by an external sources, such as
+ * Hive catalog, the DB and tables are stored in HMS. For those catalogs, Gravitino uses a unique
+ * name as the provider short name to load the catalog. For example, Hive catalog uses "hive" as the
+ * provider short name.
  */
 @Evolving
 public interface CatalogProvider {
 
   /**
-   * Form the provider short name for a builtin catalog. The provider short name for a builtin
+   * Form the provider short name for a managed catalog. The provider short name for a managed
    * catalog is the catalog type in lowercase.
    *
    * @param type The catalog type.
-   * @return The provider short name for the builtin catalog.
+   * @return The provider short name for the managed catalog.
    */
-  static String builtinShortName(Catalog.Type type) {
+  static String shortNameForManagedCatalog(Catalog.Type type) {
     return type.name().toLowerCase(Locale.ROOT);
   }
 
