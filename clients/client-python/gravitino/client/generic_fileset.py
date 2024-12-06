@@ -54,5 +54,8 @@ class GenericFileset(Fileset, SupportsCredentials):
   def audit_info(self) -> AuditDTO:
     return self._fileset.audit_info()
 
+  def support_credentials(self)-> SupportsCredentials:
+    return self
+
   def get_credentials(self) -> List[Credential]:
     return self._credential_operations.get_credentials()
