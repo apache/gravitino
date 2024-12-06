@@ -37,7 +37,6 @@ public class CommandEntities {
   public static final String TOPIC = "topic";
   public static final String FILESET = "fileset";
   public static final String ROLE = "role";
-  public static final String OBJECT = "object";
 
   private static final HashSet<String> VALID_ENTITIES = new HashSet<>();
 
@@ -53,7 +52,6 @@ public class CommandEntities {
     VALID_ENTITIES.add(TOPIC);
     VALID_ENTITIES.add(FILESET);
     VALID_ENTITIES.add(ROLE);
-    VALID_ENTITIES.add(OBJECT);
   }
 
   /**

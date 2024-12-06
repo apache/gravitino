@@ -29,7 +29,9 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateRole;
 import org.apache.gravitino.cli.commands.DeleteRole;
+import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.ListRoles;
+import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -131,5 +133,65 @@ class TestRoleCommands {
         .newDeleteRole(GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
+  }
+
+  @Test
+  void testGrantPrivilegesToRole() {
+    GrantPrivilegesToRole mockGrant = mock(GrantPrivilegesToRole.class);
+    String[] privileges = {"create_table","modify_table" };
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.ROLE)).thenReturn("admin");
+    when(mockCommandLine.hasOption(GravitinoOptions.PRIVILEGE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.PRIVILEGE)).thenReturn(privileges);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.GRANT));
+    doReturn(mockGrant)
+        .when(commandLine)
+        .newGrantPrivilegesToRole(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "admin",
+            "catalog",
+            CommandEntities.CATALOG,
+            privileges);
+    commandLine.handleCommandLine();
+    verify(mockGrant).handle();
+  }
+
+  @Test
+  void testRevokePrivilegesFromRole() {
+    RevokePrivilegesFromRole mockRevoke = mock(RevokePrivilegesFromRole.class);
+    String[] privileges = {"create_table","modify_table" };
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.ROLE)).thenReturn("admin");
+    when(mockCommandLine.hasOption(GravitinoOptions.PRIVILEGE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.PRIVILEGE)).thenReturn(privileges);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.REVOKE));
+    doReturn(mockRevoke)
+        .when(commandLine)
+        .newRevokePrivilegesFromRole(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "admin",
+            "catalog",
+            CommandEntities.CATALOG,
+            privileges);
+    commandLine.handleCommandLine();
+    verify(mockRevoke).handle();
   }
 }

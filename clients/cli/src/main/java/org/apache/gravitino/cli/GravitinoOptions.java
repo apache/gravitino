@@ -102,12 +102,12 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
-    options.addOption(createArgOption(null, PRIVILEGE, "privilege"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
     // Properties and tags can have multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
     options.addOption(createArgsOption("t", TAG, "tag name"));
+    options.addOption(createArgsOption(null, PRIVILEGE, "privilege(s)"));
 
     // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
