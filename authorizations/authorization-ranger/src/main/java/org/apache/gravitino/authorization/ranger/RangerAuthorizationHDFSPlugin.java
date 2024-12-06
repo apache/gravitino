@@ -164,7 +164,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               translateMetadataObject(securableObject).names(),
-                              RangerHadoopSQLMetadataObject.Type.PATH,
+                              RangerHDFSMetadataObject.Type.PATH,
                               rangerPrivileges));
                       break;
                     default:
@@ -196,7 +196,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 translateMetadataObject(gravitinoMetadataObject).names(),
-                RangerHadoopSQLMetadataObject.Type.PATH,
+                RangerHDFSMetadataObject.Type.PATH,
                 ownerMappingRule()));
         break;
       default:
@@ -223,7 +223,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     nsMetadataObject.remove(0); // Remove the catalog name
     RangerHDFSMetadataObject rangerHDFSMetadataObject =
         new RangerHDFSMetadataObject(
-            getFileSetPath(metadataObject), RangerHadoopSQLMetadataObject.Type.PATH);
+            getFileSetPath(metadataObject), RangerHDFSMetadataObject.Type.PATH);
     rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
     return rangerHDFSMetadataObject;
   }

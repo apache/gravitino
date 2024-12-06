@@ -98,7 +98,7 @@ public class RangerHDFSMetadataObject implements AuthorizationMetadataObject {
         type != null, "Cannot create a Ranger metadata object with no type");
 
     Preconditions.checkArgument(
-        type == RangerHadoopSQLMetadataObject.Type.PATH, "it must be the PATH type");
+        type == RangerHDFSMetadataObject.Type.PATH, "it must be the PATH type");
 
     for (String name : names) {
       Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");

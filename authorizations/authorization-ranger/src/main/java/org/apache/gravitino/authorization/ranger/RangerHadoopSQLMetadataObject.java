@@ -35,10 +35,7 @@ public class RangerHadoopSQLMetadataObject implements AuthorizationMetadataObjec
     /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
     TABLE(MetadataObject.Type.TABLE),
     /** A column is a sub-collection of the table that represents a group of same type data. */
-    COLUMN(MetadataObject.Type.COLUMN),
-    /** A path is mapped the path of storages like HDFS, S3 etc. */
-    PATH(MetadataObject.Type.FILESET);
-
+    COLUMN(MetadataObject.Type.COLUMN);
     private final MetadataObject.Type metadataType;
 
     Type(MetadataObject.Type type) {
@@ -113,8 +110,8 @@ public class RangerHadoopSQLMetadataObject implements AuthorizationMetadataObjec
         type != null, "Cannot create a Ranger metadata object with no type");
 
     Preconditions.checkArgument(
-        names.size() != 1 || type == RangerHadoopSQLMetadataObject.Type.SCHEMA || type == Type.PATH,
-        "If the length of names is 1, it must be the SCHEMA type of PATH type");
+        names.size() != 1 || type == RangerHadoopSQLMetadataObject.Type.SCHEMA,
+        "If the length of names is 1, it must be the SCHEMA type");
 
     Preconditions.checkArgument(
         names.size() != 2 || type == RangerHadoopSQLMetadataObject.Type.TABLE,
