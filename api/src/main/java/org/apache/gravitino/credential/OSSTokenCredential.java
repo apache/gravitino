@@ -90,7 +90,7 @@ public class OSSTokenCredential implements Credential {
   }
 
   @Override
-  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+  public void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
     String accessKeyId = credentialInfo.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
     String secretAccessKey = credentialInfo.get(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY);
     String securityToken = credentialInfo.get(GRAVITINO_OSS_TOKEN);

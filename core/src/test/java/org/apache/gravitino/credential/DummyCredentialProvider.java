@@ -82,7 +82,7 @@ public class DummyCredentialProvider implements CredentialProvider {
     }
 
     @Override
-    public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+    public void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
       throw new NotSupportedException();
     }
   }

@@ -73,7 +73,7 @@ public class CredentialDTO implements Credential {
   }
 
   @Override
-  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+  public void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
     throw new UnsupportedOperationException("CredentialDTO doesn't support initWithCredentialInfo");
   }
 

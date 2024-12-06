@@ -84,7 +84,7 @@ public class S3TokenCredential implements Credential {
   }
 
   @Override
-  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+  public void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
     String accessKeyId = credentialInfo.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
     String secretAccessKey = credentialInfo.get(GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY);
     String sessionToken = credentialInfo.get(GRAVITINO_S3_TOKEN);

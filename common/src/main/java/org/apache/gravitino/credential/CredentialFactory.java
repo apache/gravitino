@@ -44,7 +44,7 @@ public class CredentialFactory {
     Class<? extends Credential> credentialClz = lookupCredential(credentialType);
     try {
       Credential credential = credentialClz.getDeclaredConstructor().newInstance();
-      credential.initWithCredentialInfo(credentialInfo, expireTimeInMs);
+      credential.initializeWithCredentialInfo(credentialInfo, expireTimeInMs);
       return credential;
     } catch (Exception e) {
       throw new RuntimeException(e);

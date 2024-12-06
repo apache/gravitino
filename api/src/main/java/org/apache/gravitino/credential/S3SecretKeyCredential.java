@@ -75,7 +75,7 @@ public class S3SecretKeyCredential implements Credential {
   }
 
   @Override
-  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+  public void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
     String accessKeyId = credentialInfo.get(GRAVITINO_S3_STATIC_ACCESS_KEY_ID);
     String secretAccessKey = credentialInfo.get(GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY);
     validate(accessKeyId, secretAccessKey, expireTimeInMs);
