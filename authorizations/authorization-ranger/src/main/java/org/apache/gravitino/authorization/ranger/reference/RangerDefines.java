@@ -37,8 +37,8 @@ public class RangerDefines {
     // In the Ranger 2.4.0 agents-common/src/main/resources/service-defs/ranger-servicedef-hive.json
     DATABASE("database"),
     TABLE("table"),
-    COLUMN("column");
-
+    COLUMN("column"),
+    PATH("path");
     private final String name;
 
     PolicyResource(String name) {

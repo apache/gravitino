@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
@@ -81,7 +82,10 @@ public class RangerITEnv {
   // Search filter prefix file path constants
   public static final String SEARCH_FILTER_PATH = SearchFilter.RESOURCE_PREFIX + RESOURCE_PATH;
   public static RangerAuthorizationPlugin rangerAuthHivePlugin;
+  public static RangerAuthorizationPlugin rangerAuthHDFSPlugin;
   protected static RangerHelper rangerHelper;
+
+  protected static RangerHelper rangerHDFSHelper;
 
   public static void init() {
     containerSuite.startRangerContainer();
@@ -104,6 +108,25 @@ public class RangerITEnv {
                 RangerContainer.rangerPassword,
                 AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
+
+    rangerAuthHDFSPlugin =
+        RangerAuthorizationHDFSPlugin.getInstance(
+            "metalake",
+            ImmutableMap.of(
+                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                String.format(
+                    "http://%s:%d",
+                    containerSuite.getRangerContainer().getContainerIpAddress(),
+                    RangerContainer.RANGER_SERVER_PORT),
+                AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                RangerContainer.authType,
+                AuthorizationPropertiesMeta.RANGER_USERNAME,
+                RangerContainer.rangerUserName,
+                AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                RangerContainer.rangerPassword,
+                AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                RangerITEnv.RANGER_HDFS_REPO_NAME));
+
     rangerHelper =
         new RangerHelper(
             rangerClient,
@@ -111,6 +134,14 @@ public class RangerITEnv {
             RangerITEnv.RANGER_HIVE_REPO_NAME,
             rangerAuthHivePlugin.ownerMappingRule(),
             rangerAuthHivePlugin.policyResourceDefinesRule());
+
+    rangerHDFSHelper =
+        new RangerHelper(
+            rangerClient,
+            RangerContainer.rangerUserName,
+            RangerITEnv.RANGER_HDFS_REPO_NAME,
+            rangerAuthHDFSPlugin.ownerMappingRule(),
+            rangerAuthHDFSPlugin.policyResourceDefinesRule());
 
     if (!initRangerService) {
       synchronized (RangerITEnv.class) {
