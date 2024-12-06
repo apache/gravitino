@@ -68,7 +68,8 @@ public class GCSTokenCredential implements Credential {
   }
 
   @Override
-  public void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+  public void initializeWithCredentialInfo(
+      Map<String, String> credentialInfo, long expireTimeInMs) {
     String token = credentialInfo.get(GCS_TOKEN_NAME);
     validate(token, expireTimeInMs);
     this.token = token;
