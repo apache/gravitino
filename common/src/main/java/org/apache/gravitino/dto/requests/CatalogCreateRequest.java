@@ -98,8 +98,7 @@ public class CatalogCreateRequest implements RESTRequest {
       throw new IllegalStateException(
           "Provider cannot be null for catalog type "
               + type
-              + " that doesn't support managed "
-              + "catalog");
+              + " that doesn't support managed catalog");
     }
   }
 
