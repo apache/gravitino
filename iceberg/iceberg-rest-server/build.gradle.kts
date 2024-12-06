@@ -80,7 +80,9 @@ dependencies {
 
   testImplementation(libs.iceberg.aws.bundle)
   testImplementation(libs.iceberg.gcp.bundle)
-  testImplementation(libs.iceberg.azure.bundle)
+  testImplementation(libs.iceberg.azure.bundle) {
+    exclude("com.google.guava", "guava")
+  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
