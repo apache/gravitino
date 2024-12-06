@@ -52,7 +52,7 @@ impl FuseServer {
 
     /// Starts the FUSE filesystem and blocks until it is stopped.
     pub async fn start(&self) -> Result<()> {
-        let fs = Box::new(SimpleFileSystem::new(Box::new(MemoryFileSystem::new())));
+        let fs = SimpleFileSystem::new(MemoryFileSystem::new());
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
         let fs_context = FileSystemContext { uid: uid, gid: gid };

@@ -32,7 +32,6 @@ pub type Result<T> = std::result::Result<T, Errno>;
 /// the `fh` it is the file handle, it is used to identify the opened file, it is used to read or write the file content
 #[async_trait]
 pub trait RawFileSystem: Send + Sync {
-
     async fn init(&self);
 
     async fn get_file_path(&self, file_id: u64) -> String;
@@ -248,18 +247,17 @@ impl FileIdManager {
 // SimpleFileSystem is a simple file system implementation for the file system.
 // it is used to manage the file system metadata and file handle.
 // The operations of the file system are implemented by the PathFileSystem.
-pub struct SimpleFileSystem {
+pub struct SimpleFileSystem<T: PathFileSystem> {
     file_id_manager: RwLock<FileIdManager>,
     file_handle_manager: RwLock<FileHandleManager>,
 
     inode_id_generator: AtomicU64,
 
-    fs: Box<dyn PathFileSystem>,
+    fs: T,
 }
 
-impl SimpleFileSystem {
-
-    pub(crate) fn new(fs: Box<dyn PathFileSystem>) -> Self {
+impl<T: PathFileSystem> SimpleFileSystem<T> {
+    pub(crate) fn new(fs: T) -> Self {
         Self {
             file_id_manager: RwLock::new(FileIdManager::new()),
             file_handle_manager: RwLock::new(FileHandleManager::new()),
@@ -283,7 +281,7 @@ impl SimpleFileSystem {
 }
 
 #[async_trait]
-impl RawFileSystem for SimpleFileSystem {
+impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     async fn init(&self) {
         self.fs.init();
 
@@ -294,9 +292,13 @@ impl RawFileSystem for SimpleFileSystem {
             .write()
             .unwrap()
             .insert(root_dir.inode, &root_dir.path);
-        self.fs.set_attr(&root_dir.path, &root_dir, true).await.unwrap();
+        self.fs
+            .set_attr(&root_dir.path, &root_dir, true)
+            .await
+            .unwrap();
 
-        self.create_file(root_dir.inode, DefaultFileSystemMetadata::FS_META_FILE_NAME).await;
+        self.create_file(root_dir.inode, DefaultFileSystemMetadata::FS_META_FILE_NAME)
+            .await;
     }
 
     async fn get_file_path(&self, file_id: u64) -> String {

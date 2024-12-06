@@ -19,12 +19,12 @@
 use crate::filesystem::{
     join_file_path, FileReader, FileStat, FileWriter, OpenedFile, PathFileSystem, Result,
 };
+use async_trait::async_trait;
 use dashmap::DashMap;
 use fuse3::Errno;
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
-use async_trait::async_trait;
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
 // It is used for testing purposes
@@ -47,10 +47,8 @@ impl MemoryFileSystem {
     pub fn init(&self) {}
 }
 
-
 #[async_trait]
 impl PathFileSystem for MemoryFileSystem {
-
     async fn init(&self) {}
 
     async fn stat(&self, name: &str) -> Result<FileStat> {

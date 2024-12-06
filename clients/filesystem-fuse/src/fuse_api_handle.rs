@@ -34,14 +34,14 @@ use std::ffi::{OsStr, OsString};
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
 
-pub(crate) struct FuseApiHandle {
-    local_fs: Box<dyn RawFileSystem>,
+pub(crate) struct FuseApiHandle<T: RawFileSystem> {
+    local_fs: T,
     default_ttl: Duration,
     fs_context: FileSystemContext,
 }
 
-impl FuseApiHandle {
-    pub fn new(fs: Box<dyn RawFileSystem>, context: FileSystemContext) -> Self {
+impl<T: RawFileSystem> FuseApiHandle<T> {
+    pub fn new(fs: T, context: FileSystemContext) -> Self {
         FuseApiHandle {
             local_fs: fs,
             default_ttl: Duration::from_secs(1),
@@ -60,7 +60,7 @@ impl FuseApiHandle {
         atime: Option<Timestamp>,
         mtime: Option<Timestamp>,
     ) {
-        let file_stat  = self.get_modified_file_stat(inode, size, atime, mtime).await;
+        let file_stat = self.get_modified_file_stat(inode, size, atime, mtime).await;
         if file_stat.is_ok() {
             let file_stat = file_stat.unwrap();
             let _ = self.local_fs.set_attr(inode, &file_stat).await;
@@ -89,7 +89,7 @@ impl FuseApiHandle {
     }
 }
 
-impl Filesystem for FuseApiHandle {
+impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     async fn init(&self, _req: Request) -> fuse3::Result<ReplyInit> {
         self.local_fs.init().await;
         Ok(ReplyInit {
@@ -142,8 +142,9 @@ impl Filesystem for FuseApiHandle {
         fh: Option<u64>,
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
-        let new_file_stat =
-            self.get_modified_file_stat(inode, set_attr.size, set_attr.atime, set_attr.mtime).await?;
+        let new_file_stat = self
+            .get_modified_file_stat(inode, set_attr.size, set_attr.atime, set_attr.mtime)
+            .await?;
         let attr = fstat_to_file_attr(&new_file_stat, &self.fs_context);
         self.local_fs.set_attr(inode, &new_file_stat).await?;
         Ok(ReplyAttr {
@@ -160,7 +161,10 @@ impl Filesystem for FuseApiHandle {
         mode: u32,
         umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
-        let file_handle = self.local_fs.create_dir(parent, name.to_str().unwrap()).await?;
+        let file_handle = self
+            .local_fs
+            .create_dir(parent, name.to_str().unwrap())
+            .await?;
         Ok(ReplyEntry {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
@@ -174,12 +178,17 @@ impl Filesystem for FuseApiHandle {
     }
 
     async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let result = self.local_fs.remove_file(parent, name.to_str().unwrap()).await?;
+        let result = self
+            .local_fs
+            .remove_file(parent, name.to_str().unwrap())
+            .await?;
         Ok(())
     }
 
     async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        self.local_fs.remove_dir(parent, name.to_str().unwrap()).await?;
+        self.local_fs
+            .remove_dir(parent, name.to_str().unwrap())
+            .await?;
         Ok(())
     }
 
@@ -219,7 +228,8 @@ impl Filesystem for FuseApiHandle {
         writer.write(offset, data);
         let file_size = writer.file().size;
         let now = Timestamp::from(SystemTime::now());
-        self.update_file_status(inode, Some(file_size), Some(now), Some(now)).await;
+        self.update_file_status(inode, Some(file_size), Some(now), Some(now))
+            .await;
 
         Ok(ReplyWrite {
             written: data.len() as u32,
@@ -260,7 +270,7 @@ impl Filesystem for FuseApiHandle {
         })
     }
 
-    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>>;
+    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>> where T: 'a;
 
     async fn readdir<'a>(
         &'a self,
@@ -320,22 +330,25 @@ impl Filesystem for FuseApiHandle {
         mode: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyCreated> {
-        let file_handle = self.local_fs.create_file(parent, name.to_str().unwrap()).await?;
-            Ok(ReplyCreated {
-                ttl: self.default_ttl,
-                attr: dummy_file_attr(
-                    file_handle.file_id,
-                    RegularFile,
-                    Timestamp::from(SystemTime::now()),
-                    &self.fs_context,
-                ),
-                generation: 0,
-                fh: file_handle.handle_id,
-                flags: flags,
-            })
+        let file_handle = self
+            .local_fs
+            .create_file(parent, name.to_str().unwrap())
+            .await?;
+        Ok(ReplyCreated {
+            ttl: self.default_ttl,
+            attr: dummy_file_attr(
+                file_handle.file_id,
+                RegularFile,
+                Timestamp::from(SystemTime::now()),
+                &self.fs_context,
+            ),
+            generation: 0,
+            fh: file_handle.handle_id,
+            flags: flags,
+        })
     }
 
-    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>;
+    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>> where T: 'a;
 
     async fn readdirplus<'a>(
         &'a self,
