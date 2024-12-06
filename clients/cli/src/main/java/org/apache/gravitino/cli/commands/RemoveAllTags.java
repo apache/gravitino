@@ -77,20 +77,26 @@ public class RemoveAllTags extends Command {
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
         tags = gTable.supportsTags().listTags();
-        gTable.supportsTags().associateTags(null, tags);
+        if (tags.length > 1) {
+          gTable.supportsTags().associateTags(null, tags);
+        }
         entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
         tags = gSchema.supportsTags().listTags();
-        gSchema.supportsTags().associateTags(null, tags);
+        if (tags.length > 1) {
+          gSchema.supportsTags().associateTags(null, tags);
+        }
         entity = schema;
       } else if (name.hasCatalogName()) {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
         tags = gCatalog.supportsTags().listTags();
-        gCatalog.supportsTags().associateTags(null, tags);
+        if (tags.length > 1) {
+          gCatalog.supportsTags().associateTags(null, tags);
+        }
         entity = catalog;
       }
     } catch (NoSuchMetalakeException err) {
@@ -113,6 +119,8 @@ public class RemoveAllTags extends Command {
     if (tags.length > 1) {
       System.out.println(
           entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
+    } else {
+      System.out.println(entity + " has no tags");
     }
   }
 }
