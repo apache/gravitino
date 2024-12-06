@@ -77,7 +77,7 @@ public class RemoveAllTags extends Command {
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
         tags = gTable.supportsTags().listTags();
-        if (tags.length > 1) {
+        if (tags.length > 0) {
           gTable.supportsTags().associateTags(null, tags);
         }
         entity = table;
@@ -86,7 +86,7 @@ public class RemoveAllTags extends Command {
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
         tags = gSchema.supportsTags().listTags();
-        if (tags.length > 1) {
+        if (tags.length > 0) {
           gSchema.supportsTags().associateTags(null, tags);
         }
         entity = schema;
@@ -94,7 +94,7 @@ public class RemoveAllTags extends Command {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
         tags = gCatalog.supportsTags().listTags();
-        if (tags.length > 1) {
+        if (tags.length > 0) {
           gCatalog.supportsTags().associateTags(null, tags);
         }
         entity = catalog;
@@ -116,7 +116,7 @@ public class RemoveAllTags extends Command {
       return;
     }
 
-    if (tags.length > 1) {
+    if (tags.length > 0) {
       System.out.println(
           entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
     } else {
