@@ -29,7 +29,6 @@ class S3TokenCredential(Credential, ABC):
     _GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY = "s3-secret-access-key"
     _GRAVITINO_S3_TOKEN = "s3-session-token"
 
-    _credential_type = "s3"
     _expire_time_in_ms = 0
     _access_key_id = None
     _secret_access_key = None
@@ -47,7 +46,7 @@ class S3TokenCredential(Credential, ABC):
         Returns:
              the creator of the entity.
         """
-        return self._credential_type
+        return self.S3_TOKEN_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
         """The creation time of the entity.

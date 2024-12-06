@@ -48,11 +48,11 @@ class TestGetCredentials(TestCase):
   def test_get_catalog_credentials(self):
     catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
     credentials = catalog.as_fileset_catalog().support_credentials().get_credentials()
-    self.assertEqual(1, credentials.length)
+    self.assertEqual(1, len(credentials))
     credential = credentials[0]
     self.assertEqual(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, credential.credential_type())
-    self.assertEqual("access_key", credential.access_key_id())
-    self.assertEqual("secret_key", credential.secret_access_key())
+    self.assertEqual("access-id", credential.access_key_id())
+    self.assertEqual("secret-key", credential.secret_access_key())
     self.assertEqual("token", credential.session_token())
 
   def test_get_fileset_credentials(self):
