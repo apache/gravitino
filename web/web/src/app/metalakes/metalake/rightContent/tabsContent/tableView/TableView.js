@@ -42,16 +42,25 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from '../../CreateCatalogDialog'
 import CreateSchemaDialog from '../../CreateSchemaDialog'
 import CreateFilesetDialog from '../../CreateFilesetDialog'
+import CreateTopicDialog from '../../CreateTopicDialog'
 import CreateTableDialog from '../../CreateTableDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { deleteCatalog, deleteFileset, deleteSchema, deleteTable, setCatalogInUse } from '@/lib/store/metalakes'
+import {
+  deleteCatalog,
+  deleteFileset,
+  deleteTopic,
+  deleteSchema,
+  deleteTable,
+  setCatalogInUse
+} from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
 import { getCatalogDetailsApi, switchInUseApi } from '@/lib/api/catalogs'
 import { getSchemaDetailsApi } from '@/lib/api/schemas'
 import { useSearchParams } from 'next/navigation'
 import { getFilesetDetailsApi } from '@/lib/api/filesets'
+import { getTopicDetailsApi } from '@/lib/api/topics'
 import { getTableDetailsApi } from '@/lib/api/tables'
 
 const fonts = Inconsolata({ subsets: ['latin'] })
@@ -105,16 +114,20 @@ const TableView = () => {
   const [openDialog, setOpenDialog] = useState(false)
   const [openSchemaDialog, setOpenSchemaDialog] = useState(false)
   const [openFilesetDialog, setOpenFilesetDialog] = useState(false)
+  const [openTopicDialog, setOpenTopicDialog] = useState(false)
   const [openTableDialog, setOpenTableDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
-  const [isHideSchemaEdit, setIsHideSchemaEdit] = useState(true)
+  const [isHideEdit, setIsHideEdit] = useState(true)
 
   useEffect(() => {
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === catalog)[0]
-      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
-      setIsHideSchemaEdit(isHideSchemaAction)
+
+      const isHideAction =
+        (['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3) ||
+        (currentCatalog?.provider === 'lakehouse-hudi' && paramsSize == 4)
+      setIsHideEdit(isHideAction)
     }
   }, [store.catalogs, store.catalogs.length, paramsSize, catalog])
 
@@ -300,7 +313,7 @@ const TableView = () => {
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
-          {!isHideSchemaEdit && (
+          {!isHideEdit && (
             <IconButton
               title='Edit'
               size='small'
@@ -312,7 +325,7 @@ const TableView = () => {
             </IconButton>
           )}
 
-          {!isHideSchemaEdit && (
+          {!isHideEdit && (
             <IconButton
               title='Delete'
               size='small'
@@ -502,6 +515,16 @@ const TableView = () => {
         setOpenDrawer(true)
         break
       }
+      case 'topic': {
+        const [err, res] = await to(getTopicDetailsApi({ metalake, catalog, schema, topic: row.name }))
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.topic)
+        setOpenDrawer(true)
+        break
+      }
       case 'table': {
         const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table: row.name }))
         if (err || !res) {
@@ -560,6 +583,19 @@ const TableView = () => {
         }
         break
       }
+      case 'topic': {
+        if (metalake && catalog && schema) {
+          const [err, res] = await to(getTopicDetailsApi({ metalake, catalog, schema, topic: data.row?.name }))
+          if (err || !res) {
+            throw new Error(err)
+          }
+
+          setDialogType('update')
+          setDialogData(res.topic)
+          setOpenTopicDialog(true)
+        }
+        break
+      }
       case 'table': {
         if (metalake && catalog && schema) {
           const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table: data.row?.name }))
@@ -600,6 +636,9 @@ const TableView = () => {
         case 'fileset':
           dispatch(deleteFileset({ metalake, catalog, type, schema, fileset: confirmCacheData.name }))
           break
+        case 'topic':
+          dispatch(deleteTopic({ metalake, catalog, type, schema, topic: confirmCacheData.name }))
+          break
         case 'table':
           dispatch(deleteTable({ metalake, catalog, type, schema, table: confirmCacheData.name }))
           break
@@ -627,6 +666,11 @@ const TableView = () => {
         searchParams.has('metalake') &&
         searchParams.has('catalog') &&
         searchParams.get('type') === 'fileset' &&
+        searchParams.has('schema')) ||
+      (paramsSize == 4 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.get('type') === 'messaging' &&
         searchParams.has('schema')) ||
       (paramsSize == 4 &&
         searchParams.has('metalake') &&
@@ -686,6 +730,8 @@ const TableView = () => {
         data={dialogData}
         type={dialogType}
       />
+
+      <CreateTopicDialog open={openTopicDialog} setOpen={setOpenTopicDialog} data={dialogData} type={dialogType} />
 
       <CreateTableDialog open={openTableDialog} setOpen={setOpenTableDialog} data={dialogData} type={dialogType} />
     </Box>
