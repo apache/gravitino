@@ -32,7 +32,8 @@ public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthori
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
+  protected AuthorizationPlugin newPlugin(
+      String metalake, String catalogProvider, Map<String, String> config) {
     return new TestRangerAuthorizationPlugin();
   }
 }

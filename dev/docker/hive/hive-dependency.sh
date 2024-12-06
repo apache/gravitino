@@ -33,9 +33,13 @@ RANGER_VERSION="2.4.0" # Notice: Currently only tested Ranger plugin 2.4.0 in th
 
 HADOOP2_PACKAGE_NAME="hadoop-${HADOOP2_VERSION}.tar.gz"
 HADOOP2_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP2_VERSION}/${HADOOP2_PACKAGE_NAME}"
+HADOOP2_GCS_PACKAGE_NAME="gcs-connector-hadoop2-2.2.23-shaded.jar"
+HADOOP2_GCS_DOWNLOAD_URL="https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.23/gcs-connector-hadoop2-2.2.23-shaded.jar"
 
 HADOOP3_PACKAGE_NAME="hadoop-${HADOOP3_VERSION}.tar.gz"
 HADOOP3_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP3_VERSION}/${HADOOP3_PACKAGE_NAME}"
+HADOOP3_GCS_PACKAGE_NAME="gcs-connector-hadoop3-2.2.23-shaded.jar"
+HADOOP3_GCS_DOWNLOAD_URL="https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.23/gcs-connector-hadoop3-2.2.23-shaded.jar"
 
 HIVE2_PACKAGE_NAME="apache-hive-${HIVE2_VERSION}-bin.tar.gz"
 HIVE2_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE2_VERSION}/${HIVE2_PACKAGE_NAME}"
@@ -90,4 +94,12 @@ fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ]; then
   curl -L -s -o "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ${RANGER_HIVE_DOWNLOAD_URL}
+fi
+
+if [ ! -f "${hive_dir}/packages/${HADOOP2_GCS_PACKAGE_NAME}" ]; then
+  curl -L -s -o "${hive_dir}/packages/${HADOOP2_GCS_PACKAGE_NAME}" ${HADOOP2_GCS_DOWNLOAD_URL}
+fi
+
+if [ ! -f "${hive_dir}/packages/${HADOOP3_GCS_PACKAGE_NAME}" ]; then
+  curl -L -s -o "${hive_dir}/packages/${HADOOP3_GCS_PACKAGE_NAME}" ${HADOOP3_GCS_DOWNLOAD_URL}
 fi

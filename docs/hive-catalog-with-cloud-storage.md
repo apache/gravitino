@@ -11,14 +11,13 @@ license: "This software is licensed under the Apache License version 2."
 
 Since Hive 2.x, Hive has supported S3 as a storage backend, enabling users to store and manage data in Amazon S3 directly through Hive. Gravitino enhances this capability by supporting the Hive catalog with S3, allowing users to efficiently manage the storage locations of files located in S3. This integration simplifies data operations and enables seamless access to S3 data from Hive queries.
 
-For ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)), the integration is similar to S3. The only difference is the configuration properties for ADLS(see below). 
+For ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)) and GCS (Google Cloud Storage), the integration is similar to S3. The only difference is the configuration properties for ADLS and GCS (see below). 
 
-The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 and ADLS as a storage backend, including configuration details and examples for creating databases and tables.
+The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3, ADLS, and GCS as a storage backend, including configuration details and examples for creating databases and tables.
 
 ## Hive metastore configuration
 
-
-The following will mainly focus on configuring the Hive metastore to use S3 as a storage backend. The same configuration can be applied to ADLS with minor changes in the configuration properties. 
+The following will mainly focus on configuring the Hive metastore to use S3 as a storage backend. The same configuration can be applied to ADLS and GCS with minor changes in the configuration properties. 
 
 ### Example Configuration Changes
 
@@ -45,15 +44,14 @@ Below are the essential properties to add or modify in the `hive-site.xml` file 
 definition and table definition, as shown in the examples below. After explicitly setting this
 property, you can omit the location property in the schema and table definitions.
 
-It's also applicable for ADLS.
+It's also applicable for Azure Blob Storage(ADSL) and GCS.
 -->
 <property>
   <name>hive.metastore.warehouse.dir</name>
   <value>S3_BUCKET_PATH</value>
 </property>
 
-
-<!-- The following are for Azure Blob Storage(ADLS) -->
+<!-- The following two configurations are for Azure Blob Storage(ADLS) -->
 <property>
   <name>fs.abfss.impl</name>
   <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
@@ -62,6 +60,18 @@ It's also applicable for ADLS.
 <property>
   <name>fs.azure.account.key.ABS_ACCOUNT_NAME.dfs.core.windows.net</name>
   <value>ABS_ACCOUNT_KEY</value>
+</property>
+
+<!-- The following two configurations are only for Google Cloud Storage(gcs) -->
+<property>
+  <name>fs.gs.auth.service.account.enable</name>
+  <value>true</value>
+</property>
+
+<!-- SERVICE_ACCOUNT_FILE should be a local file or remote file that can be access by hive server -->
+<property>
+  <name>fs.gs.auth.service.account.json.keyfile</name>
+  <value>SERVICE_ACCOUNT_FILE</value>
 </property>
 
 ```
@@ -77,7 +87,6 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 ```
 
 Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath. It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
-
 
 ### Restart Hive metastore
 
@@ -105,6 +114,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
      
      # The following line is for Azure Blob Storage(ADLS)
      # "location": "abfss://container-name@user-account-name.dfs.core.windows.net/path"
+     
+     # The following line is for Google Cloud Storage(GCS)
+     # "location": "gs://bucket-name/path"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
@@ -128,6 +140,9 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     
     // The following line is for Azure Blob Storage(ADLS)
     // .put("location", "abfss://container-name@user-account-name.dfs.core.windows.net/path")
+    
+    // The following lines for Google Cloud Storage(GCS)
+    // .put("location", "gs://bucket-name/path")
     
     .build();
 Schema schema = supportsSchemas.createSchema("hive_schema",
@@ -225,13 +240,17 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
             .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.endpoint", getS3Endpoint)
             .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
-            ## This two is for Azure Blob Storage(ADLS) only
+            // This two is for Azure Blob Storage(ADLS) only
             .config(
                 String.format(
                     "spark.sql.catalog.{hive_catalog_name}.fs.azure.account.key.%s.dfs.core.windows.net",
                     ABS_USER_ACCOUNT_NAME),
                 ABS_USER_ACCOUNT_KEY)
             .config("spark.sql.catalog.{hive_catalog_name}.fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem")
+  
+            // This two is for Google Cloud Storage(GCS) only
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.gs.auth.service.account.enable", "true")
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.gs.auth.service.account.json.keyfile", "SERVICE_ACCOUNT_FILE")
             
             .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.path.style.access", "true")
             .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.connection.ssl.enabled", "false")
@@ -249,6 +268,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 :::Note
 Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
 Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure), [Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob) to be placed in the classpath of the Spark.
+for Google Cloud Storage(GCS), you need to download the [Hadoop GCS jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and place it in the classpath of the Spark.
 :::
 
-By following these instructions, you can effectively manage and access your S3-stored data through both Hive CLI and Spark, leveraging the capabilities of Gravitino for optimal data management.
+By following these instructions, you can effectively manage and access your S3, ADLS or GCS data through both Hive CLI and Spark, leveraging the capabilities of Gravitino for optimal data management.
