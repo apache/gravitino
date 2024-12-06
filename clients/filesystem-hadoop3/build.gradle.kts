@@ -75,6 +75,7 @@ dependencies {
   }
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.hadoop3.aws)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

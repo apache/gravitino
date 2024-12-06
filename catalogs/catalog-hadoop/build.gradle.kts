@@ -94,6 +94,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.hadoop3.aws)
   testImplementation(libs.hadoop3.gcs)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

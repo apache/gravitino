@@ -128,7 +128,7 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.localstack)
-  testImplementation(libs.hadoop2.aws)
+  testImplementation(libs.hadoop210.aws)
   testImplementation(libs.hadoop3.abs)
   testImplementation(libs.hadoop3.gcs)
 
