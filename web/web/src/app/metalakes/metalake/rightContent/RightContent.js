@@ -105,7 +105,7 @@ const RightContent = () => {
         searchParams.has('catalog') &&
         searchParams.get('type') === 'relational' &&
         searchParams.has('schema') &&
-        !['lakehouse-hudi'].includes(currentCatalog?.provider)
+        'lakehouse-hudi' !== currentCatalog?.provider
       setTableBtnVisible(isTableList)
     }
   }, [searchParams, store.catalogs, store.catalogs.length])

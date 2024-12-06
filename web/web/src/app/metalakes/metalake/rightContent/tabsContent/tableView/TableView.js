@@ -118,13 +118,14 @@ const TableView = () => {
   const [openTableDialog, setOpenTableDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
-  const [isHideSchemaEdit, setIsHideSchemaEdit] = useState(true)
+  const [isHideEdit, setIsHideEdit] = useState(true)
 
   useEffect(() => {
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === catalog)[0]
-      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
-      setIsHideSchemaEdit(isHideSchemaAction)
+      
+      const isHideAction = (['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3) || (currentCatalog?.provider === 'lakehouse-hudi' && paramsSize == 4)
+      setIsHideEdit(isHideAction)
     }
   }, [store.catalogs, store.catalogs.length, paramsSize, catalog])
 
@@ -310,7 +311,7 @@ const TableView = () => {
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
-          {!isHideSchemaEdit && (
+          {!isHideEdit && (
             <IconButton
               title='Edit'
               size='small'
@@ -322,7 +323,7 @@ const TableView = () => {
             </IconButton>
           )}
 
-          {!isHideSchemaEdit && (
+          {!isHideEdit && (
             <IconButton
               title='Delete'
               size='small'

@@ -23,20 +23,18 @@ import { useState, forwardRef, useEffect, Fragment } from 'react'
 
 import {
   Box,
-  Grid,
   Button,
   Dialog,
-  TextField,
-  Typography,
-  DialogContent,
   DialogActions,
-  IconButton,
+  DialogContent,
   Fade,
-  Select,
-  MenuItem,
-  InputLabel,
   FormControl,
-  FormHelperText
+  FormHelperText,
+  Grid,
+  IconButton,
+  InputLabel,
+  TextField,
+  Typography
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -88,7 +86,6 @@ const CreateTopicDialog = props => {
   const [innerProps, setInnerProps] = useState([])
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
-  const activatedCatalogDetail = store.activatedDetails
   const [cacheData, setCacheData] = useState()
 
   const {
@@ -389,12 +386,12 @@ const CreateTopicDialog = props => {
                         )}
                         {item.key && item.invalid && (
                           <FormHelperText className={'twc-text-error-main'}>
-                            Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                            characters, underscores, hyphens, or dots.
+                            Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                            underscores, hyphens, or dots.
                           </FormHelperText>
                         )}
                         {!item.key.trim() && (
-                          <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                          <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                         )}
                       </FormControl>
                     </Grid>
