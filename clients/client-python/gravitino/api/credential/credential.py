@@ -18,39 +18,32 @@
 from abc import ABC, abstractmethod
 from typing import Dict
 
+
 class Credential(ABC):
-    """Represents the audit information of an entity."""
+  """Represents the audit information of an entity."""
 
-    @abstractmethod
-    def credential_type(self) -> str:
-        """The creator of the entity.
+  @abstractmethod
+  def credential_type(self) -> str:
+    """The creator of the entity.
 
-        Returns:
-             the creator of the entity.
-        """
-        pass
+    Returns:
+         the creator of the entity.
+    """
+    pass
 
-    @abstractmethod
-    def expire_time_in_ms(self) -> int:
-        """The creation time of the entity.
+  @abstractmethod
+  def expire_time_in_ms(self) -> int:
+    """The creation time of the entity.
 
-        Returns:
-             The creation time of the entity.
-        """
-        pass
+    Returns:
+         The creation time of the entity.
+    """
+    pass
 
-    @abstractmethod
-    def credential_info(self) -> Dict[str, str]:
-        """
-        Returns:
-             The last modifier of the entity.
-        """
-        pass
-
-    @abstractmethod
-    def init_with_credential_info(self) -> None:
-        """
-        Returns:
-             The last modifier of the entity.
-        """
-        pass
+  @abstractmethod
+  def credential_info(self) -> Dict[str, str]:
+    """
+    Returns:
+         The last modifier of the entity.
+    """
+    pass

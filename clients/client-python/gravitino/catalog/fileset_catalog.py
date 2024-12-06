@@ -23,13 +23,9 @@ from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.credential.credential import Credential
 from gravitino.api.fileset import Fileset
 from gravitino.api.fileset_change import FilesetChange
-from gravitino.api.metadata_object import MetadataObject
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.catalog.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_fileset import GenericFileset
-from gravitino.client.metadata_object_credential_operations import \
-    MetadataObjectCredentialOperations
-from gravitino.client.metadata_object_impl import MetadataObjectImpl
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 from gravitino.dto.requests.fileset_update_request import FilesetUpdateRequest

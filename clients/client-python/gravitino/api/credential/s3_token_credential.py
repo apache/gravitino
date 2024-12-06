@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Dict
 
 from gravitino.api.credential.credential import Credential
@@ -35,11 +35,11 @@ class S3TokenCredential(Credential, ABC):
     _secret_access_key = None
     _session_token = None
 
-    def __init__(self, expire_time_in_ms: int, access_key_id: str, secret_access_key: str, session_token: str):
+    def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
+        self._access_key_id = credential_info[self._GRAVITINO_S3_SESSION_ACCESS_KEY_ID]
+        self._secret_access_key = credential_info[self._GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY]
+        self._session_token = credential_info[self._GRAVITINO_S3_TOKEN]
         self._expire_time_in_ms = expire_time_in_ms
-        self._access_key_id = access_key_id
-        self._secret_access_key = secret_access_key
-        self._session_token = session_token
 
     def credential_type(self) -> str:
         """The creator of the entity.
@@ -63,16 +63,6 @@ class S3TokenCredential(Credential, ABC):
              The last modifier of the entity.
         """
         return {self._GRAVITINO_S3_TOKEN: self._session_token, self._GRAVITINO_S3_SESSION_ACCESS_KEY_ID: self._access_key_id, self._GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY: self._secret_access_key }
-
-    def init_with_credential_info(self, credential_info: Dict[str, str], expire_time) -> None:
-        """
-        Returns:
-             The last modifier of the entity.
-        """
-        self._access_key_id = credential_info["access_key_id"]
-        self._secret_access_key = credential_info["secret_access_key"]
-        self._session_token = credential_info["session_token"]
-        self._expire_time_in_ms = expire_time
 
     def access_key_id(self) -> str:
         return self._access_key_id

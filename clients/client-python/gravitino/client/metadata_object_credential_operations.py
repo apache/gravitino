@@ -20,10 +20,12 @@ from typing import List
 from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.credential.credential import Credential
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.dto.credential_dto import CredentialDTO
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.exceptions.handlers.credential_error_handler import \
     CREDENTIAL_ERROR_HANDLER
 from gravitino.utils import HTTPClient
+from gravitino.utils.credential_utils import CredentialUtils
 
 logger = logging.getLogger(__name__)
 
@@ -43,4 +45,13 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
 
         credential_resp = CredentialResponse.from_json(resp.body, infer_missing=True)
         credential_resp.validate()
-        return credential_resp.credentials()
+        credential_dtos = credential_resp.credentials()
+        return self.to_credentials(credential_dtos)
+
+    @staticmethod
+    def to_credentials(self, credentials: List[CredentialDTO]) -> List[Credential]:
+        return [self.to_credential(credential) for credential in credentials]
+
+    @staticmethod
+    def to_credential(credentialDTO: CredentialDTO) -> Credential:
+        return CredentialUtils.to_credential(credentialDTO)
