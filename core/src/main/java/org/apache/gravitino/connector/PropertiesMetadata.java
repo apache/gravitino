@@ -51,6 +51,17 @@ public interface PropertiesMetadata {
   }
 
   /**
+   * Check if the property is wildcard.
+   *
+   * @param propertyName The name of the property.
+   * @return true if the property is existed and wildcard, false otherwise.
+   */
+  default boolean isWildcardProperty(String propertyName) {
+    return propertyEntries().containsKey(propertyName)
+        && propertyEntries().get(propertyName).isWildcard();
+  }
+
+  /**
    * Check if the property is immutable.
    *
    * @param propertyName The name of the property.
