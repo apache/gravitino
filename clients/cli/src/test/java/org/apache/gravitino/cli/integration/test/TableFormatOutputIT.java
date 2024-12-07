@@ -25,6 +25,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.cli.Main;
+import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -75,7 +76,7 @@ public class TableFormatOutputIT extends BaseIT {
       "metalake",
       "list",
       commandArg(GravitinoOptions.OUTPUT),
-      "table",
+      Command.OUTPUT_FORMAT_TABLE,
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -107,7 +108,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.METALAKE),
       "my_metalake",
       commandArg(GravitinoOptions.OUTPUT),
-      "table",
+      Command.OUTPUT_FORMAT_TABLE,
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -141,7 +142,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.NAME),
       "postgres",
       commandArg(GravitinoOptions.OUTPUT),
-      "table",
+      Command.OUTPUT_FORMAT_TABLE,
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -157,6 +158,34 @@ public class TableFormatOutputIT extends BaseIT {
             + "+----------+------------+-----------------+---------+\n"
             + "| postgres | RELATIONAL | jdbc-postgresql | null    |\n"
             + "+----------+------------+-----------------+---------+",
+        output);
+  }
+
+  @Test
+  public void testCatalogListCommand() {
+    // Create a byte array output stream to capture the output of the command
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    PrintStream originalOut = System.out;
+    System.setOut(new PrintStream(outputStream));
+
+    String[] args = {
+      "catalog",
+      "list",
+      commandArg(GravitinoOptions.METALAKE),
+      "my_metalake",
+      commandArg(GravitinoOptions.OUTPUT),
+      Command.OUTPUT_FORMAT_TABLE,
+      commandArg(GravitinoOptions.URL),
+      gravitinoUrl
+    };
+    Main.main(args);
+
+    // Restore the original System.out
+    System.setOut(originalOut);
+    // Get the output and verify it
+    String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        "+----------+\n" + "| catalog  |\n" + "+----------+\n" + "| postgres |\n" + "+----------+",
         output);
   }
 
