@@ -26,9 +26,11 @@ public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthori
 
   public TestRangerAuthorization() {}
 
+  public static String SHORT_NAME = "ranger";
+
   @Override
   public String shortName() {
-    return "ranger";
+    return SHORT_NAME;
   }
 
   @Override
