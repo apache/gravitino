@@ -28,12 +28,47 @@ import java.time.LocalTime;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+
+  protected static final String NOW = "now";
+  Expression DEFAULT_VALUE_OF_NOW = FunctionExpression.of("now");
+
+  public String fromGravitino(Expression defaultValue) {
+    if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {
+      return null;
+    }
+
+    if (defaultValue instanceof FunctionExpression) {
+      FunctionExpression functionExpression = (FunctionExpression) defaultValue;
+      return String.format("(%s)", functionExpression);
+    }
+
+    if (defaultValue instanceof Literal) {
+      Literal<?> literal = (Literal<?>) defaultValue;
+      Type type = literal.dataType();
+      if (defaultValue.equals(Literals.NULL)) {
+        return NULL;
+      } else if (type instanceof Type.NumericType) {
+        return literal.value().toString();
+      } else {
+        Object value = literal.value();
+        if(value instanceof LocalDateTime){
+          value = ((LocalDateTime) value).format(DATE_TIME_FORMATTER);
+        }
+        return String.format("'%s'", value);
+      }
+    }
+
+    throw new IllegalArgumentException("Not a supported column default value: " + defaultValue);
+  }
 
   @Override
   public Expression toGravitino(
@@ -64,74 +99,71 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       }
     }
 
-//    if (!(reallyType.equals(ClickHouseTypeConverter.STRING) || reallyType.equals(
-//        ClickHouseTypeConverter.FIXEDSTRING))) {
-//      if (columnDefaultValue.isEmpty()) {
-//        return Literals.NULL;
-//      }
-//    }
-
+    //TODO clickhouse has bug which isExpression is false when is really expression
     if (isExpression) {
-      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
-        return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+      if (columnDefaultValue.equals(NOW)) {
+        return DEFAULT_VALUE_OF_NOW;
       }
       // The parsing of ClickHouse expressions is complex, so we are not currently undertaking the
       // parsing.
       return UnparsedExpression.of(columnDefaultValue);
     }
 
+    // need exclude begin and end "'"
+    String reallyValue = columnDefaultValue.startsWith("'") ?  columnDefaultValue.substring(1,
+        columnDefaultValue.length() - 1) : columnDefaultValue;
 
-    switch (reallyType) {
-      case ClickHouseTypeConverter.INT8:
-        return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.UINT8:
-        return Literals.unsignedByteLiteral(Short.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.INT16:
-        return Literals.shortLiteral(Short.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.UINT16:
-        return Literals.unsignedShortLiteral(Integer.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.INT32:
-        return Literals.integerLiteral(Integer.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.UINT32:
-        return Literals.unsignedIntegerLiteral(Long.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.INT64:
-        return Literals.longLiteral(Long.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.UINT64:
-        return Literals.unsignedLongLiteral(Decimal.of(columnDefaultValue));
-      case ClickHouseTypeConverter.FLOAT32:
-        return Literals.floatLiteral(Float.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.FLOAT64:
-        return Literals.doubleLiteral(Double.valueOf(columnDefaultValue));
-      case ClickHouseTypeConverter.DECIMAL:
-        if (columnDefaultValue.equals("0.")) {
-          columnDefaultValue = "0.0";
-        }
-        return Literals.decimalLiteral(
-            Decimal.of(
-                columnDefaultValue,
-                Integer.parseInt(type.getColumnSize()),
-                Integer.parseInt(type.getScale())));
-      case ClickHouseTypeConverter.DATE:
-        if (columnDefaultValue.equals("")) {
-          return Literals.NULL;
-        }
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
-      case ClickHouseTypeConverter.DATETIME:
-        columnDefaultValue = columnDefaultValue.substring(1, columnDefaultValue.length() - 1);
-        return CURRENT_TIMESTAMP.equals(columnDefaultValue)
-            ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
-            : Literals.timestampLiteral(
-                LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
-      case ClickHouseTypeConverter.STRING:
-        // need exclude begin and end "'"
-        return Literals.of(columnDefaultValue.substring(1, columnDefaultValue.length() - 1),
-            Types.StringType.get());
-      case ClickHouseTypeConverter.FIXEDSTRING:
-        return Literals.of(
-            columnDefaultValue.substring(1, columnDefaultValue.length() - 1),
-            Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
-      default:
-        return UnparsedExpression.of(columnDefaultValue);
+    try {
+      switch (reallyType) {
+        case ClickHouseTypeConverter.INT8:
+          return Literals.byteLiteral(Byte.valueOf(reallyValue));
+        case ClickHouseTypeConverter.UINT8:
+          return Literals.unsignedByteLiteral(Short.valueOf(reallyValue));
+        case ClickHouseTypeConverter.INT16:
+          return Literals.shortLiteral(Short.valueOf(reallyValue));
+        case ClickHouseTypeConverter.UINT16:
+          return Literals.unsignedShortLiteral(Integer.valueOf(reallyValue));
+        case ClickHouseTypeConverter.INT32:
+          return Literals.integerLiteral(Integer.valueOf(reallyValue));
+        case ClickHouseTypeConverter.UINT32:
+          return Literals.unsignedIntegerLiteral(Long.valueOf(reallyValue));
+        case ClickHouseTypeConverter.INT64:
+          return Literals.longLiteral(Long.valueOf(reallyValue));
+        case ClickHouseTypeConverter.UINT64:
+          return Literals.unsignedLongLiteral(Decimal.of(reallyValue));
+        case ClickHouseTypeConverter.FLOAT32:
+          return Literals.floatLiteral(Float.valueOf(reallyValue));
+        case ClickHouseTypeConverter.FLOAT64:
+          return Literals.doubleLiteral(Double.valueOf(reallyValue));
+        case ClickHouseTypeConverter.DECIMAL:
+          if (reallyValue.equals("0.")) {
+            reallyValue = "0.0";
+          }
+          return Literals.decimalLiteral(
+              Decimal.of(
+                  reallyValue,
+                  Integer.parseInt(type.getColumnSize()),
+                  Integer.parseInt(type.getScale())));
+        case ClickHouseTypeConverter.DATE:
+          if (reallyValue.equals("")) {
+            return Literals.NULL;
+          }
+          return Literals.dateLiteral(LocalDate.parse(reallyValue, DATE_FORMATTER));
+        case ClickHouseTypeConverter.DATETIME:
+          return CURRENT_TIMESTAMP.equals(reallyValue)
+              ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
+              : Literals.timestampLiteral(
+                  LocalDateTime.parse(reallyValue, DATE_TIME_FORMATTER));
+        case ClickHouseTypeConverter.STRING:
+          return Literals.of(reallyValue, Types.StringType.get());
+        case ClickHouseTypeConverter.FIXEDSTRING:
+          return Literals.of(reallyValue,
+              Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
+        default:
+          return UnparsedExpression.of(reallyValue);
+      }
+    } catch (Exception ex) {
+      return UnparsedExpression.of(reallyValue);
     }
   }
 }

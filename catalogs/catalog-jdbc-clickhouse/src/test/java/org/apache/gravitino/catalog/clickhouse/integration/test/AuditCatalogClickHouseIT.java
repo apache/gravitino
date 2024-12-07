@@ -24,10 +24,7 @@ import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseUtils.
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.collect.Maps;
-import java.io.IOException;
-import java.sql.SQLException;
-import java.util.Collections;
-import java.util.Map;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -46,18 +43,19 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
-import org.apache.gravitino.rel.expressions.NamedReference;
-import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.types.Types;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-//@Tag("gravitino-docker-test")
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Collections;
+import java.util.Map;
+
+@Tag("gravitino-docker-test")
 public class AuditCatalogClickHouseIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName =
@@ -171,8 +169,7 @@ public class AuditCatalogClickHouseIT extends BaseIT {
         StringUtils.substring(
             CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
             0,
-            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"))
-            + "/?compress_algorithm=none");
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), CLICKHOUSE_CONTAINER.getUsername());

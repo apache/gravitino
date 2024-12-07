@@ -54,7 +54,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
             "The table engine",
             false,
             ENGINE.class,
-            ENGINE.MERGE_TREE,
+            ENGINE.MERGETREE,
             false,
             false));
     return Collections.unmodifiableMap(map);
@@ -62,22 +62,21 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
 
   /** refer https://clickhouse.com/docs/en/engines/table-engines */
   public enum ENGINE {
-    INNODB("InnoDB"),
-    //    MergeTree
-    MERGE_TREE("MergeTree"),
-    REPLACING_MERGE_TREE("ReplacingMergeTree"),
-    SUMMING_MERGE_TREE("SummingMergeTree"),
-    AGGREGATING_MERGE_TREE("AggregatingMergeTree"),
-    COLLAPSING_MERGE_TREE("CollapsingMergeTree"),
-    VERSIONED_COLLAPSING_MERGE_TREE("VersionedCollapsingMergeTree"),
-    GRAPHITE_MERGE_TREE("GraphiteMergeTree"),
+    //MergeTree
+    MERGETREE("MergeTree"),
+    REPLACINGMERGETREE("ReplacingMergeTree"),
+    SUMMINGMERGETREE("SummingMergeTree"),
+    AGGREGATINGMERGETREE("AggregatingMergeTree"),
+    COLLAPSINGMERGETREE("CollapsingMergeTree"),
+    VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree"),
+    GRAPHITEMERGETREE("GraphiteMergeTree"),
 
-    //    Log
-    TINY_LOG("TinyLog"),
-    STRIPE_LOG("StripeLog"),
+    //Log
+    TINYLOG("TinyLog"),
+    STRIPELOG("StripeLog"),
     LOG("Log"),
 
-    //    Integration Engines
+    //Integration Engines
     ODBC("ODBC"),
     JDBC("JDBC"),
     MySQL("MySQL"),
@@ -86,13 +85,13 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     HDFS("HDFS"),
     S3("S3"),
     KAFKA("Kafka"),
-    EMBEDDED_ROCKSDB("EmbeddedRocksDB"),
+    EMBEDDEDROCKSDB("EmbeddedRocksDB"),
     RABBITMQ("RabbitMQ"),
     POSTGRESQL("PostgreSQL"),
     S3QUEUE("S3Queue"),
     TIMESERIES("TimeSeries"),
 
-    // Special Engines
+    //Special Engines
     DISTRIBUTED("Distributed"),
     DICTIONARY("Dictionary"),
     MERGE("Merge"),

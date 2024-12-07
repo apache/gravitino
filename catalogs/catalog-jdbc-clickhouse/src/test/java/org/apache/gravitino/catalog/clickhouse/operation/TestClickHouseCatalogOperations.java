@@ -24,7 +24,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-//@Tag("gravitino-docker-test")
+@Tag("gravitino-docker-test")
 public class TestClickHouseCatalogOperations extends TestClickHouse {
 
   @Test

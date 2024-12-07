@@ -20,6 +20,27 @@ package org.apache.gravitino.catalog.clickhouse.operation;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseUtils.getSortOrders;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.RandomNameUtils;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -28,30 +49,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.jdbc.JdbcColumn;
-import org.apache.gravitino.catalog.jdbc.JdbcTable;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.TableChange;
-import org.apache.gravitino.rel.expressions.NamedReference;
-import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.literals.Literals;
-import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.sorts.SortOrders;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
-import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.rel.indexes.Indexes;
-import org.apache.gravitino.rel.types.Decimal;
-import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.utils.RandomNameUtils;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
-//@Tag("gravitino-docker-test")
+@Tag("gravitino-docker-test")
 public class TestClickHouseTableOperations extends TestClickHouse {
   private static final Type STRING = Types.StringType.get();
   private static final Type INT = Types.IntegerType.get();
@@ -133,11 +132,14 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         TEST_DB_NAME.toString(),
         newName,
         TableChange.addColumn(
-            new String[] {newColumn.name()},
+            new String[]{newColumn.name()},
             newColumn.dataType(),
             newColumn.comment(),
             TableChange.ColumnPosition.after("col_1"),
-            newColumn.defaultValue())
+            newColumn.nullable(),
+            newColumn.autoIncrement(),
+            newColumn.defaultValue()
+        )
 //        ,
 //        TableChange.setProperty(CLICKHOUSE_ENGINE_KEY, "InnoDB"));
 //    properties.put(CLICKHOUSE_ENGINE_KEY, "InnoDB"
@@ -462,7 +464,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.DateType.get())
             .withNullable(true)
             .withComment("date")
-            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
             .build());
     Map<String, String> properties = new HashMap<>();
 

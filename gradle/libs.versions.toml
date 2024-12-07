@@ -214,7 +214,6 @@ commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
 testcontainers-clickhouse = { group = "org.testcontainers", name = "clickhouse", version.ref = "testcontainers" }
-testcontainers-lz4 = { group = "org.testcontainers", name = "lz4", version.ref = "lz4" }
 testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
 testcontainers-localstack = { group = "org.testcontainers", name = "localstack", version.ref = "testcontainers" }

@@ -44,6 +44,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -53,6 +54,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for ClickHouse. */
@@ -62,6 +64,61 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final String CLICKHOUSE_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+
+  /**
+   * ClickHouse does not support some multiple changes in one statement, So rewrite this method, one
+   * by one to apply TableChange to the table.
+   *
+   * @param databaseName The name of the database.
+   * @param tableName The name of the table.
+   * @param changes The changes to apply to the table.
+   */
+  @Override
+  public void alterTable(String databaseName, String tableName, TableChange... changes)
+      throws NoSuchTableException {
+    LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
+    try (Connection connection = getConnection(databaseName)) {
+      for (TableChange change : changes) {
+        String sql = generateAlterTableSql(databaseName, tableName, change);
+        if (StringUtils.isEmpty(sql)) {
+          LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+          return;
+        }
+        JdbcConnectorUtils.executeUpdate(connection, sql);
+      }
+      LOG.info("Alter table {} from database {}", tableName, databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @Override
+  protected List<Index> getIndexes(Connection connection, String databaseName, String tableName)
+      throws SQLException {
+    //cause clickhouse not impl getPrimaryKeys yet, ref: https://github.com/ClickHouse/clickhouse-java/issues/1625
+    String sql = String.format("SHOW INDEX FROM `%s`.`%s`", databaseName, tableName);
+
+    // get Indexes from SQL
+    try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet resultSet = preparedStatement.executeQuery()) {
+
+      List<Index> indexes = new ArrayList<>();
+      while (resultSet.next()) {
+        String indexName = resultSet.getString("key_name");
+        String columnName = null;
+        try {
+          columnName = resultSet.getString("column_name");
+        } catch (SQLException e) {
+          columnName = resultSet.getString("pk_col");
+        }
+        indexes.add(
+            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][]{{columnName}}));
+      }
+      return indexes;
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
 
   @Override
   protected String generateCreateTableSql(
@@ -97,7 +154,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("CREATE TABLE ")
+        .append(BACK_QUOTE)
         .append(tableName)
+        .append(BACK_QUOTE)
         .append(" (\n");
 
     // Add columns
@@ -106,7 +165,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       sqlBuilder
           .append(SPACE)
           .append(SPACE)
-          .append(column.name());
+          .append(BACK_QUOTE)
+          .append(column.name())
+          .append(BACK_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder, false);
       // Add a comma for the next column, unless it's the last one
@@ -138,7 +199,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             "clickhouse currently do not support nullOrdering: {} and direction: {} of sortOrders,and will ignore these",
             sortOrders[0].nullOrdering(), sortOrders[0].direction());
       }
-      sqlBuilder.append(" \n ORDER BY " + sortOrders[0].expression() + " \n");
+      sqlBuilder.append(
+          " \n ORDER BY " + BACK_QUOTE + sortOrders[0].expression() + BACK_QUOTE + " \n");
     }
 
     // Add table comment if specified
@@ -154,14 +216,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
-    if(indexes == null){
+    if (indexes == null) {
       return;
     }
 
     for (Index index : indexes) {
+      String fieldStr = getIndexFieldStr(index.fieldNames());
+      sqlBuilder.append(",\n");
       switch (index.type()) {
+        case PRIMARY_KEY:
+          if (null != index.name()
+              && !StringUtils.equalsIgnoreCase(
+              index.name(), Indexes.DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME)) {
+            LOG.warn("Primary key name must be PRIMARY in ClickHouse, the name {} will be ignored.",
+                index.name());
+          }
+          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case UNIQUE_KEY:
+          throw new IllegalArgumentException("Gravitino clickHouse doesn't support index : " + index.type());
         default:
-          throw new IllegalArgumentException("ClickHouse doesn't support index : " + index.type());
+          throw new IllegalArgumentException("Gravitino Clickhouse doesn't support index : " + index.type());
       }
     }
   }
@@ -302,7 +377,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("COMMENT '" + newComment + "'");
+      alterSql.add(" MODIFY COMMENT '" + newComment + "'");
     }
 
     if (!setProperties.isEmpty()) {
@@ -424,14 +499,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition
-        .append("ADD COLUMN ")
-        .append(BACK_QUOTE)
-        .append(col)
-        .append(BACK_QUOTE)
-        .append(SPACE)
-        .append(dataType)
-        .append(SPACE);
+    //  [IF NOT EXISTS] name [type] [default_expr] [codec] [AFTER name_after | FIRST]
+    if (!addColumn.isNullable()) {
+      columnDefinition
+          .append("ADD COLUMN ")
+          .append(BACK_QUOTE)
+          .append(col)
+          .append(BACK_QUOTE)
+          .append(SPACE)
+          .append(dataType)
+          .append(SPACE);
+    } else {
+      columnDefinition
+          .append("ADD COLUMN ")
+          .append(BACK_QUOTE)
+          .append(col)
+          .append(BACK_QUOTE)
+          .append(SPACE)
+          .append("Nullable(")
+          .append(dataType)
+          .append(")")
+          .append(SPACE);
+    }
 
     if (addColumn.isAutoIncrement()) {
       Preconditions.checkArgument(
@@ -440,27 +529,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       columnDefinition.append(CLICKHOUSE_AUTO_INCREMENT).append(SPACE);
     }
 
-    if (!addColumn.isNullable()) {
-      columnDefinition.append("NOT NULL ");
-    }
+
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
     // Append default value if available
-    //TODO clickhouse need expression, not only DEFAULT value
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
-      throw new UnsupportedOperationException(
-          "add colum default value of clickhouse not supported");
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
     }
-
-    //    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
-//      columnDefinition
-//          .append("DEFAULT ")
-//          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
-//          .append(SPACE);
-//    }
 
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {

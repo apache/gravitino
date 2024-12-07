@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.clickhouse.integration.test;
 
 import org.junit.jupiter.api.Tag;
 
-//@Tag("gravitino-docker-test")
+@Tag("gravitino-docker-test")
 public class CatalogClickHouseDriverIT extends CatalogClickHouseIT {
   public CatalogClickHouseDriverIT() {
     super();

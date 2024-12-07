@@ -112,7 +112,7 @@ public class ClickHouseContainer extends BaseContainer {
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format(
-        "jdbc:clickhouse://%s:%d/%s?compress_algorithm=none", getContainerIpAddress(),
+        "jdbc:clickhouse://%s:%d/%s", getContainerIpAddress(),
         CLICKHOUSE_PORT, testDatabaseName);
   }
 

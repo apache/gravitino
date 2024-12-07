@@ -56,8 +56,9 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     } catch (NoSuchSchemaException e) {
       return false;
     } catch (Exception e) {
-      if (e.getMessage() != null && e.getMessage()
-          .contains("Database " + databaseName + " does not exist.")) {
+      if (e.getMessage() != null && (
+          e.getMessage().contains("Database " + databaseName + " does not exist.") || e.getMessage()
+              .contains("Database `" + databaseName + "` does not exist."))) {
         return false;
       }
 

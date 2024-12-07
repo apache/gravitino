@@ -170,6 +170,8 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return DATE;
     } else if (type instanceof Types.TimestampType) {
       return DATETIME;
+    } else if (type instanceof Types.TimeType) {
+      return INT64;
     } else if (type instanceof Types.DecimalType) {
       return DECIMAL
           + "("
