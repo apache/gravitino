@@ -40,19 +40,42 @@ public interface Catalog extends Auditable {
   /** The type of the catalog. */
   enum Type {
     /** Catalog Type for Relational Data Structure, like db.table, catalog.db.table. */
-    RELATIONAL,
+    RELATIONAL(false),
 
     /** Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file */
-    FILESET,
+    FILESET(false),
 
     /** Catalog Type for Message Queue, like Kafka://topic */
-    MESSAGING,
+    MESSAGING(false),
 
     /** Catalog Type for ML model */
-    MODEL,
+    MODEL(true),
 
     /** Catalog Type for test only. */
-    UNSUPPORTED;
+    UNSUPPORTED(false);
+
+    private final boolean supportsManagedCatalog;
+
+    Type(boolean supportsManagedCatalog) {
+      this.supportsManagedCatalog = supportsManagedCatalog;
+    }
+
+    /**
+     * A flag to indicate whether the catalog type supports managed catalog. Managed catalog is a
+     * concept in Gravitino, for the details of managed catalog, please refer to the class comment
+     * of {@link CatalogProvider}. If the catalog type supports managed catalog, users can create
+     * managed catalog of this type without specifying the provider, Gravitino will use the type as
+     * the provider to create the managed catalog. If the catalog type does not support managed
+     * catalog, users need to specify the provider when creating the catalog.
+     *
+     * <p>Currently, only the model catalog supports managed catalog.
+     *
+     * @return Whether the catalog type supports managed catalog. Returns true if the catalog type
+     *     supports managed catalog.
+     */
+    public boolean supportsManagedCatalog() {
+      return supportsManagedCatalog;
+    }
 
     /**
      * Convert the string (case-insensitive) to the catalog type.
