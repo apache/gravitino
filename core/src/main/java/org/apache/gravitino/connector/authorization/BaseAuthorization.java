@@ -18,9 +18,14 @@
  */
 package org.apache.gravitino.connector.authorization;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.stream.Collectors;
 
 /**
  * The abstract base class for Authorization implementations.<br>
@@ -56,6 +61,31 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
     }
 
     return plugin;
+  }
+
+  public static BaseAuthorization<?> createAuthorization(
+      ClassLoader classLoader, String authorizationProvider) {
+    try {
+      ServiceLoader<AuthorizationProvider> loader =
+          ServiceLoader.load(AuthorizationProvider.class, classLoader);
+
+      List<Class<? extends AuthorizationProvider>> providers =
+          Streams.stream(loader.iterator())
+              .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
+              .map(AuthorizationProvider::getClass)
+              .collect(Collectors.toList());
+      if (providers.isEmpty()) {
+        throw new IllegalArgumentException(
+            "No authorization provider found for: " + authorizationProvider);
+      } else if (providers.size() > 1) {
+        throw new IllegalArgumentException(
+            "Multiple authorization providers found for: " + authorizationProvider);
+      }
+      return (BaseAuthorization<?>)
+          Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

@@ -74,7 +74,7 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(21, propertyEntryMap.size());
+    Assertions.assertEquals(29, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
@@ -93,6 +93,24 @@ class TestHiveCatalogOperations {
         propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_PASSWORD));
     Assertions.assertTrue(
         propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.getInstance().wildcardNodePropertyKey()));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_CATALOG_PROVIDER));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_CATALOG_PROVIDER));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_PROVIDER));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_ADMIN_URL));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_AUTH_TYPES));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_USERNAME));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_PASSWORD));
+    Assertions.assertTrue(
+            propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_SERVICE_NAME));
 
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());

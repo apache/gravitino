@@ -110,7 +110,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   DEFAULT_LIST_ALL_TABLES,
                   false /* hidden */,
                   false /* reserved */))
-          .putAll(AuthorizationPropertiesMeta.RANGER_AUTHORIZATION_PROPERTY_ENTRIES)
+          .putAll(AuthorizationPropertiesMeta.AUTHORIZATION_PROPERTY_ENTRIES)
           .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 
