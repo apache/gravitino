@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.storage.ADLSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -55,6 +56,13 @@ public class IcebergPropertiesUtils {
     map.put(
         OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
         IcebergConstants.ICEBERG_OSS_ACCESS_KEY_SECRET);
+    // ADLS
+    map.put(
+        ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME,
+        IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME);
+    map.put(
+        ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY,
+        IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
   }
 
