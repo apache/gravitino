@@ -20,6 +20,8 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerClient;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerHelper;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
@@ -33,6 +35,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
@@ -45,6 +48,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.file.Fileset;
@@ -55,6 +59,8 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.ranger.RangerServiceException;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,13 +70,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class RangerFilesetE2EIT extends BaseIT {
-  private static final Logger LOG = LoggerFactory.getLogger(RangerFilesetE2EIT.class);
+public class RangerFilesetIT extends BaseIT {
+  private static final Logger LOG = LoggerFactory.getLogger(RangerFilesetIT.class);
 
   private String RANGER_ADMIN_URL;
-  private String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private String defaultBaseLocation;
-  private String metalakeName = GravitinoITUtils.genRandomName("metalake").toLowerCase();
+  private String metalakeName = "metalake";
   private String catalogName = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_schema");
   private static final String provider = "hadoop";
@@ -89,7 +94,7 @@ public class RangerFilesetE2EIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init();
+    RangerITEnv.init(false);
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =
@@ -131,29 +136,95 @@ public class RangerFilesetE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadWritePath() throws InterruptedException, IOException {
+  void testReadWritePath() throws IOException, RangerServiceException {
     String filename = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_fileset");
-    Fileset fileset = createFileset(filename, Fileset.Type.MANAGED, storageLocation(filename));
+    Fileset fileset =
+        catalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(schemaName, filename),
+                "comment",
+                Fileset.Type.MANAGED,
+                storageLocation(filename),
+                null);
+    Assertions.assertTrue(
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, fileset.name())));
     Assertions.assertTrue(fileSystem.exists(new Path(storageLocation(filename))));
+    List<RangerPolicy> policies =
+        rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
+    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
 
-    Assertions.assertThrows(
-        Exception.class, () -> fileSystem.listFiles(new Path(storageLocation(filename)), true));
-    Assertions.assertThrows(
-        Exception.class, () -> fileSystem.mkdirs(new Path(storageLocation(filename) + "/test")));
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(item -> item.getRoles().contains(RangerHelper.GRAVITINO_OWNER_ROLE))
+            .filter(
+                item ->
+                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+            .count());
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(item -> item.getRoles().contains(RangerHelper.GRAVITINO_OWNER_ROLE))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("write")))
+            .count());
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(item -> item.getRoles().contains(RangerHelper.GRAVITINO_OWNER_ROLE))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("execute")))
+            .count());
 
     String filesetRole = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.parse(
-            fileset.name(),
+            String.format("%s.%s.%s", catalogName, schemaName, fileset.name()),
             MetadataObject.Type.FILESET,
             Lists.newArrayList(Privileges.ReadFileset.allow()));
-    String userName1 = System.getenv(HADOOP_USER_NAME);
     metalake.createRole(filesetRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(filesetRole), userName1);
-    waitForUpdatingPolicies();
-    Assertions.assertNotNull(fileSystem.listFiles(new Path(storageLocation(filename)), true));
-    Assertions.assertThrows(
-        Exception.class, () -> fileSystem.mkdirs(new Path(storageLocation(filename) + "/test")));
+
+    policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
+    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+            .count());
+    Assertions.assertEquals(
+        0,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("write")))
+            .count());
+    Assertions.assertEquals(
+        0,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("execute")))
+            .count());
 
     metalake.grantPrivilegesToRole(
         filesetRole,
@@ -162,9 +233,90 @@ public class RangerFilesetE2EIT extends BaseIT {
             fileset.name(),
             MetadataObject.Type.FILESET),
         Lists.newArrayList(Privileges.WriteFileset.allow()));
-    waitForUpdatingPolicies();
-    Assertions.assertNotNull(fileSystem.listFiles(new Path(storageLocation(filename)), true));
-    Assertions.assertTrue(fileSystem.mkdirs(new Path(storageLocation(filename) + "/test")));
+
+    policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
+    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+            .count());
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("write")))
+            .count());
+    Assertions.assertEquals(
+        1,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("execute")))
+            .count());
+
+    metalake.revokePrivilegesFromRole(
+        filesetRole,
+        MetadataObjects.of(
+            String.format("%s.%s", catalogName, schemaName),
+            fileset.name(),
+            MetadataObject.Type.FILESET),
+        Lists.newArrayList(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
+    policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
+    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
+    Assertions.assertEquals(
+        0,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+            .count());
+    Assertions.assertEquals(
+        0,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("write")))
+            .count());
+    Assertions.assertEquals(
+        0,
+        policies.get(0).getPolicyItems().stream()
+            .filter(
+                item ->
+                    item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
+            .filter(
+                item ->
+                    item.getAccesses().stream()
+                        .anyMatch(access -> access.getType().equals("execute")))
+            .count());
+
+    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, fileset.name()));
+    policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
+    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
   }
 
   private void createCatalogAndSchema() {
@@ -172,10 +324,9 @@ public class RangerFilesetE2EIT extends BaseIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     client.createMetalake(metalakeName, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(metalakeName, loadMetalake.name());
+    metalake = client.loadMetalake(metalakeName);
+    Assertions.assertEquals(metalakeName, metalake.name());
 
-    metalake = loadMetalake;
     metalake.createCatalog(
         catalogName,
         Catalog.Type.FILESET,
@@ -211,7 +362,7 @@ public class RangerFilesetE2EIT extends BaseIT {
       defaultBaseLocation =
           String.format(
               "hdfs://%s:%d/user/hadoop/%s",
-              containerSuite.getHiveContainer().getContainerIpAddress(),
+              containerSuite.getHiveRangerContainer().getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               schemaName.toLowerCase());
     }

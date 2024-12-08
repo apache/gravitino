@@ -328,9 +328,11 @@ public abstract class RangerAuthorizationPlugin
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
-        AuthorizationMetadataObject AuthorizationMetadataObject =
-            translateMetadataObject(metadataObject);
-        doRemoveMetadataObject(AuthorizationMetadataObject);
+        if (metadataObject.type() != MetadataObject.Type.FILESET) {
+          AuthorizationMetadataObject AuthorizationMetadataObject =
+              translateMetadataObject(metadataObject);
+          doRemoveMetadataObject(AuthorizationMetadataObject);
+        }
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
@@ -846,19 +848,34 @@ public abstract class RangerAuthorizationPlugin
    * IF remove the COLUMN, Only need to remove `{schema}.*.*` <br>
    */
   private void doRemoveMetadataObject(AuthorizationMetadataObject authMetadataObject) {
-    switch (authMetadataObject.metadataObjectType()) {
-      case SCHEMA:
-        doRemoveSchemaMetadataObject(authMetadataObject);
-        break;
-      case TABLE:
-        doRemoveTableMetadataObject(authMetadataObject);
-        break;
-      case COLUMN:
-        removePolicyByMetadataObject(authMetadataObject.names());
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "Unsupported metadata object type: " + authMetadataObject.type());
+    if (authMetadataObject instanceof RangerHadoopSQLMetadataObject) {
+      switch (authMetadataObject.metadataObjectType()) {
+        case SCHEMA:
+          doRemoveSchemaMetadataObject(authMetadataObject);
+          break;
+        case TABLE:
+          doRemoveTableMetadataObject(authMetadataObject);
+          break;
+        case COLUMN:
+          removePolicyByMetadataObject(authMetadataObject.names());
+          break;
+        default:
+          throw new IllegalArgumentException(
+              "Unsupported metadata object type: " + authMetadataObject.type());
+      }
+    } else if (authMetadataObject instanceof RangerHDFSMetadataObject) {
+      switch (authMetadataObject.metadataObjectType()) {
+        case FILESET:
+          removePolicyByMetadataObject(authMetadataObject.names());
+          break;
+        default:
+          LOG.info(
+              "type {} do nothing in RangerHDFSMetadataObject",
+              authMetadataObject.metadataObjectType());
+      }
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported authorization Metadata object: " + authMetadataObject);
     }
   }
 
@@ -942,6 +959,9 @@ public abstract class RangerAuthorizationPlugin
         break;
       case COLUMN:
         doRenameColumnMetadataObject(AuthorizationMetadataObject, newAuthMetadataObject);
+        break;
+      case FILESET:
+        // do nothing when fileset is renamed
         break;
       default:
         throw new IllegalArgumentException(

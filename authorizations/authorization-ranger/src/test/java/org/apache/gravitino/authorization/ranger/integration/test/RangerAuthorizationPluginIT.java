@@ -44,7 +44,7 @@ public class RangerAuthorizationPluginIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init();
+    RangerITEnv.init(true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHivePlugin;
   }
 

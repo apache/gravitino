@@ -87,7 +87,7 @@ public class RangerITEnv {
 
   protected static RangerHelper rangerHDFSHelper;
 
-  public static void init() {
+  public static void init(boolean allowAnyoneAccessHDFS) {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
 
@@ -148,7 +148,9 @@ public class RangerITEnv {
         // No IP address set, no impact on testing
         createRangerHdfsRepository("", true);
         createRangerHiveRepository("", true);
-        allowAnyoneAccessHDFS();
+        if (allowAnyoneAccessHDFS) {
+          allowAnyoneAccessHDFS();
+        }
         initRangerService = true;
       }
     }

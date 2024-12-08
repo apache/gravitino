@@ -125,7 +125,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   @Override
   public Set<MetadataObject.Type> allowMetadataObjectTypesRule() {
-    return ImmutableSet.of(MetadataObject.Type.FILESET);
+    return ImmutableSet.of(
+        MetadataObject.Type.FILESET,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.METALAKE);
   }
 
   @Override
@@ -220,12 +224,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
 
-    nsMetadataObject.remove(0); // Remove the catalog name
-    RangerHDFSMetadataObject rangerHDFSMetadataObject =
-        new RangerHDFSMetadataObject(
-            getFileSetPath(metadataObject), RangerHDFSMetadataObject.Type.PATH);
-    rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
-    return rangerHDFSMetadataObject;
+    if (metadataObject.type() == MetadataObject.Type.FILESET) {
+      RangerHDFSMetadataObject rangerHDFSMetadataObject =
+          new RangerHDFSMetadataObject(
+              getFileSetPath(metadataObject), RangerHDFSMetadataObject.Type.PATH);
+      rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
+      return rangerHDFSMetadataObject;
+    } else {
+      return new RangerHDFSMetadataObject("", RangerHDFSMetadataObject.Type.SCHEMA_PATH);
+    }
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {

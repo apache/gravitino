@@ -80,7 +80,7 @@ public class RangerHiveIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init();
+    RangerITEnv.init(true);
 
     rangerAuthHivePlugin = RangerITEnv.rangerAuthHivePlugin;
     rangerHelper = RangerITEnv.rangerHelper;

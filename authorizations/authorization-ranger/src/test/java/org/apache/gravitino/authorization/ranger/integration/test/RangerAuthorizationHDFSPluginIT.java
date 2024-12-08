@@ -43,7 +43,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init();
+    RangerITEnv.init(true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHDFSPlugin;
   }
 
