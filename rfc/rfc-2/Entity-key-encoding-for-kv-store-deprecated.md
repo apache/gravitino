@@ -17,18 +17,18 @@
   under the License.
 -->
 
-# RFC-1: Entity Key Encoding design for KV store (deprecated)
+# RFC-1: Entity Key Encoding design for KV store (removed)
 
 | Revision | Owner |  Date |
 | :------- |-------| ------|
 | v0.1     | Qi Yu | 1/8/2023|
 | v0.2     | Qi Yu | 5/9/2023|
 
-## ⚠️ DEPRECATED
+## ❌️ REMOVED
+
+Removed KV store on: 2024-12
 
 This document is no longer maintained and may contain outdated information.
-
-Deprecated on: 2024-11
 
 ## Background
 Currently, there will be many data to storage, for example, 
