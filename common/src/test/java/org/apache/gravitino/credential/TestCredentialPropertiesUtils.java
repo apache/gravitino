@@ -28,7 +28,7 @@ public class TestCredentialPropertiesUtils {
 
   @Test
   void testToIcebergProperties() {
-    S3TokenCredential s3TokenCredential = new S3TokenCredential("key", "secret", "token", 0);
+    S3TokenCredential s3TokenCredential = new S3TokenCredential("key", "secret", "token", 100);
     Map<String, String> icebergProperties =
         CredentialPropertyUtils.toIcebergProperties(s3TokenCredential);
     Map<String, String> expectedProperties =
