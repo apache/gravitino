@@ -50,7 +50,6 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-rocksdbjni = "7.10.2"
 iceberg = '1.5.2' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4spark = "1.4.1" # used for compile spark connector
 paimon = '0.8.0'
@@ -186,7 +185,6 @@ commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.
 commons-logging = { group = "commons-logging", name = "commons-logging", version.ref = "commons-logging" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
-rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }

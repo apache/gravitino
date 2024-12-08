@@ -46,7 +46,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.kv.KvEntityStore;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -63,14 +62,6 @@ public class TagManager {
   private final SupportsTagOperations supportsTagOperations;
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
-    if (entityStore instanceof KvEntityStore) {
-      String errorMsg =
-          "TagManager cannot run with kv entity store, please configure the entity "
-              + "store to use relational entity store and restart the Gravitino server";
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-
     if (!(entityStore instanceof SupportsTagOperations)) {
       String errorMsg =
           "TagManager cannot run with entity store that does not support tag operations, "

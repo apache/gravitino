@@ -70,7 +70,6 @@ public abstract class TestOperationDispatcher {
 
     entityStore = spy(new TestMemoryEntityStore.InMemoryEntityStore());
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
 
     BaseMetalake metalakeEntity =
         BaseMetalake.builder()

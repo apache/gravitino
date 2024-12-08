@@ -32,7 +32,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Metalake;
@@ -76,9 +75,6 @@ public class TestMemoryEntityStore {
 
     @Override
     public void initialize(Config config) throws RuntimeException {}
-
-    @Override
-    public void setSerDe(EntitySerDe entitySerDe) {}
 
     @Override
     public <E extends Entity & HasIdentifier> List<E> list(
@@ -250,7 +246,6 @@ public class TestMemoryEntityStore {
 
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));
-    store.setSerDe(Mockito.mock(EntitySerDe.class));
 
     store.put(metalake);
     store.put(catalog);
