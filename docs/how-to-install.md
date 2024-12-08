@@ -20,7 +20,7 @@ Gravitino supports running on Java 8, 11, and 17.
 The Gravitino package comprises the Gravitino server and the Gravitino Iceberg REST server.
 You can manage these servers independently or run them concurrently on a single server.
 
-1. Download the latest Gravitino package from [GitHub](https://github.com/apache/gravitino/releases).
+1. Download the latest Gravitino package from [GitHub](https://gravitino.apache.org/downloads).
 
    :::note
    You can also build Gravitino by following the instructions in [How to Build Gravitino](./how-to-build.md).
@@ -67,35 +67,35 @@ For details on initializing the RDBMS, see [How to use relational backend storag
 ### Configure the Gravitino server
 
 The `conf/gravitino.conf` file provides basic configurations for the Gravitino server.
-To configure the Gravitino server, you can update this file.
+You can update this file to customize the Gravitino server settings as needed.
 For a full list of the Gravitino server configurations, see [Gravitino Server Configurations](./gravitino-server-config.md).
 
 ### Configure the Gravitino server log
 
 Gravitino uses [Log4j2](https://logging.apache.org/log4j/2.x/) as the logging system.
-The `conf/log4j2.properties` file provides the Gravitino server log configurations.
-To configure the Gravitino server log, you can update this file.
+The logging configuration for the Gravitino server is defined in the `conf/log4j2.properties` file. 
+To customize the logging behavior, modify this file as needed.
 
 ### Configure the Gravitino server environment variables
 
-Gravitino exposes several environment variables through the `conf/gravitino-env.sh` file.
-To configure these environment variables, you can update this file.
+Gravitino provides a set of environment variables defined in the conf/gravitino-env.sh file. 
+You can configure these environment variables by editing this file.
 
 ### Configure the Gravitino catalogs
 
-Gravitino supports multiple catalogs.
-You can configure the catalog-level configurations by updating the related configuration file in the `catalogs/<catalog-provider>/conf` directory.
-For example, the `catalogs/hive/conf/hive.conf` file provides configurations for the Hive catalog.
-The configurations you set in the catalog configuration file will apply to all the catalogs of the same type that you created.
-For detailed configurations about each catalog, see related catalog documentation.
+Gravitino supports multiple catalogs, each with its own configuration.
+You can configure catalog-level settings by updating the appropriate configuration file in the `catalogs/<catalog-provider>/conf` directory.
+For example, the `catalogs/hive/conf/hive.conf` file contains the configuration options for the Hive catalog.
+The settings specified in a catalog configuration file will apply to all catalogs of the same type that you create.
+Check the related catalog documentation for detailed information about configuring each catalog,
 
 :::note
-Gravitino takes the catalog configurations in the following order of precedence:
+Gravitino applies the catalog configurations in the following order of precedence:
 
 1. Catalog `properties` specified in the catalog creation API or REST API.
 2. Catalog configurations specified in the catalog configuration file.
 
-The catalog `properties` overrides the catalog configurations specified in the configuration file.
+The catalog `properties` override the catalog configurations specified in the configuration file.
 :::
 
 Gravitino supports passing in catalog-specific configurations by adding the `gravitino.bypass.` prefix to the specific catalog configurations.
@@ -108,7 +108,7 @@ You just need to put your `hive-site.xml` file in the `catalogs/hive/conf` direc
 
 - Start the Gravitino server
 
-  After configuring the Gravitino server, run the following command to start the Gravitino server:
+  Once you've configured the Gravitino server, use the following command to start it:
 
    ```shell
    ./bin/gravitino.sh start
@@ -137,10 +137,10 @@ Then create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gra
 
 ### Start the Gravitino Iceberg REST server
 
-You can run the Iceberg REST server either as a standalone server or as an auxiliary service embedded in the Gravitino server.
+You can run the Iceberg REST server either as a standalone server or as an embedded service embedded in the Gravitino server.
 
-- To start the Iceberg REST server as a standalone server, run the `./bin/gravitino-iceberg-rest-server.sh start` command with configurations specified in the `./conf/gravitino-iceberg-rest-server.conf` file.
-- To start the Iceberg REST server as an auxiliary service embedded in the Gravitino server, run the `./bin/gravitino.sh start` command with all configurations in the `conf/gravitino.conf` file.
+- To start the Iceberg REST server as astandalone server, run the `./bin/gravitino-iceberg-rest-server.sh start` command. The configurations specified in the `./conf/gravitino-iceberg-rest-server.conf` file will be used.
+- To start the Iceberg REST server as an embedded service embedded within the Gravitino server, run the `./bin/gravitino.sh start` command. The configurations in the `conf/gravitino.conf` file will be used.
 
 For details about the Gravitino Iceberg REST server, see the [Gravitino Iceberg REST server documentation](./iceberg-rest-service.md).
 
@@ -162,7 +162,7 @@ If you have not installed Docker, download and install it by following the [inst
    ```
 
 2. Visit `http://localhost:8090` in your browser to access the Gravitino server through the Web UI.
-Or, you can run the following command to verify that THE Gravitino server is running.
+Or, you can run the following command to verify that the Gravitino server is running.
 
    ```shell
    curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/version
@@ -170,6 +170,6 @@ Or, you can run the following command to verify that THE Gravitino server is run
 
 ## Install Apache Gravitino using Docker Compose
 
-If you want to try out the whole Gravitino system with other components, use the Docker Compose.
+If you want to try out the whole Gravitino system with other components, use Docker Compose.
 
 For details, see [Gravitino playground repository](https://github.com/apache/gravitino-playground) and [playground example](./how-to-use-the-playground.md).
