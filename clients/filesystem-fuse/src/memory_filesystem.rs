@@ -17,14 +17,15 @@
  * under the License.
  */
 use crate::filesystem::{
-    join_file_path, FileReader, FileStat, FileWriter, OpenedFile, PathFileSystem, Result,
+    FileReader, FileStat, FileWriter, OpenedFile, PathFileSystem, Result,
 };
 use async_trait::async_trait;
 use dashmap::DashMap;
-use fuse3::Errno;
+use fuse3::{Errno, FileType};
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
+use crate::utils::join_file_path;
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
 // It is used for testing purposes
@@ -76,48 +77,61 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(results)
     }
 
-    async fn create_file(&self, parent: &str, name: &str) -> Result<FileStat> {
-        let mut file_map = self.file_map.read().unwrap();
-        if file_map.contains_key(&join_file_path(parent, name)) {
-            return Err(Errno::from(libc::EEXIST));
+    async fn open_file(&self, name: &str, flags : u32) -> Result<OpenedFile> {
+        let file_stat = self.stat(name).await?;
+        let mut file = OpenedFile::new(file_stat.clone());
+        match file.file_stat.kind {
+            FileType::Directory => {
+                Ok(file)
+            }
+            FileType::RegularFile => {
+                let data = self.file_data_map.get(&file.file_stat.path).unwrap().value().clone();
+                file.reader = Some(Box::new(MemoryFileReader {
+                    data: data.clone(),
+                }));
+                file.writer = Some(Box::new(MemoryFileWriter {
+                    data: data,
+                }));
+                Ok(file)
+            }
+            _ => Err(Errno::from(libc::EBADFD)),
         }
-
-        let file_stat = FileStat::new_file(parent, name, 0);
-        self.file_data_map
-            .insert(file_stat.path.clone(), Arc::new(Mutex::new(Vec::new())));
-        Ok(file_stat)
     }
 
-    async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat> {
+    async fn create_file(&self, parent: &str, name: &str) -> Result<OpenedFile> {
         let mut file_map = self.file_map.read().unwrap();
         if file_map.contains_key(&join_file_path(parent, name)) {
             return Err(Errno::from(libc::EEXIST));
         }
 
-        let file_stat = FileStat::new_dir(parent, name);
-        Ok(file_stat)
+        let mut file = OpenedFile::new(FileStat::new_file(parent, name, 0));
+
+        self.file_data_map
+            .insert(file.file_stat.path.clone(), Arc::new(Mutex::new(Vec::new())));
+        let data = self.file_data_map.get(&file.file_stat.path).unwrap().value().clone();
+        file.reader = Some(Box::new(MemoryFileReader {
+            data: data.clone(),
+        }));
+        file.writer = Some(Box::new(MemoryFileWriter {
+            data: data,
+        }));
+        Ok(file)
+    }
+
+    async fn create_dir(&self, parent: &str, name: &str) -> Result<OpenedFile> {
+        let mut file_map = self.file_map.read().unwrap();
+        if file_map.contains_key(&join_file_path(parent, name)) {
+            return Err(Errno::from(libc::EEXIST));
+        }
+
+        let file = OpenedFile::new(FileStat::new_dir(parent, name));
+        Ok(file)
     }
 
     async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()> {
         let mut file_map = self.file_map.write().unwrap();
         file_map.insert(name.to_string(), file_stat.clone());
         Ok(())
-    }
-
-    async fn read(&self, file: &OpenedFile) -> Box<dyn FileReader> {
-        let data = self.file_data_map.get(&file.path).unwrap().clone();
-        Box::new(MemoryFileReader {
-            file: file.clone(),
-            data,
-        })
-    }
-
-    async fn write(&self, file: &OpenedFile) -> Box<dyn FileWriter> {
-        let data = self.file_data_map.get(&file.path).unwrap().clone();
-        Box::new(MemoryFileWriter {
-            file: file.clone(),
-            data,
-        })
     }
 
     async fn remove_file(&self, parent: &str, name: &str) -> Result<()> {
@@ -145,14 +159,10 @@ impl PathFileSystem for MemoryFileSystem {
 }
 
 pub(crate) struct MemoryFileReader {
-    pub(crate) file: OpenedFile,
     pub(crate) data: Arc<Mutex<Vec<u8>>>,
 }
 
 impl FileReader for MemoryFileReader {
-    fn file(&self) -> &OpenedFile {
-        &self.file
-    }
 
     fn read(&mut self, offset: u64, size: u32) -> Vec<u8> {
         let v = self.data.lock().unwrap();
@@ -166,22 +176,16 @@ impl FileReader for MemoryFileReader {
 }
 
 pub(crate) struct MemoryFileWriter {
-    pub(crate) file: OpenedFile,
     pub(crate) data: Arc<Mutex<Vec<u8>>>,
 }
 
 impl FileWriter for MemoryFileWriter {
-    fn file(&self) -> &OpenedFile {
-        &self.file
-    }
 
     fn write(&mut self, offset: u64, data: &[u8]) -> u32 {
         let mut v = self.data.lock().unwrap();
         let start = offset as usize;
         let end = start + data.len();
-        if end > self.file.size as usize {
-            self.file.size = end as u64;
-        }
+
         if v.len() < end {
             v.resize(end, 0);
         }

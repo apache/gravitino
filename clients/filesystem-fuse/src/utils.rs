@@ -16,30 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-mod opened_file_manager;
-mod filesystem;
-mod filesystem_metadata;
-mod fuse_api_handle;
-mod fuse_server;
-mod memory_filesystem;
-mod utils;
 
-use crate::fuse_server::FuseServer;
-use fuse3::Result;
-use log::info;
-use std::sync::Arc;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_env_filter("debug").init();
-
-    let server = Arc::new(FuseServer::new("gvfs"));
-    let clone_server = server.clone();
-    let v = tokio::spawn(async move { clone_server.start().await });
-
-    tokio::signal::ctrl_c().await?;
-    info!("Received Ctrl+C, stopping server...");
-    server.stop().await?;
-    v.await.ok();
-    Ok(())
+pub fn join_file_path(parent: &str, name: &str) -> String {
+    if parent.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", parent, name)
+    }
 }

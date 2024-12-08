@@ -16,27 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::file_handle_manager::FileHandleManager;
+use crate::opened_file_manager::OpenedFileManager;
 use crate::filesystem_metadata::DefaultFileSystemMetadata;
 use async_trait::async_trait;
 use fuse3::{Errno, FileType, Timestamp};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 use std::time::SystemTime;
+use bytes::Bytes;
+use crate::utils::join_file_path;
 
 pub type Result<T> = std::result::Result<T, Errno>;
+
+pub struct FileHandle {
+    pub(crate) file_id : u64,
+    pub(crate) handle_id: u64,
+}
 
 /// RawFileSystem interface for the file system implementation. it use by FuseApiHandle
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system, it is used to identify the file or directory
 /// the `fh` it is the file handle, it is used to identify the opened file, it is used to read or write the file content
+
 #[async_trait]
 pub trait RawFileSystem: Send + Sync {
     async fn init(&self);
 
     async fn get_file_path(&self, file_id: u64) -> String;
 
-    async fn get_opened_file(&self, file_id: u64, fh: u64) -> Result<OpenedFile>;
+    async fn valid_file_id(&self, file_id: u64, fh: u64) -> Result<()>;
 
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
 
@@ -44,15 +52,13 @@ pub trait RawFileSystem: Send + Sync {
 
     async fn read_dir(&self, dir_file_id: u64) -> Result<Vec<FileStat>>;
 
-    async fn open_file(&self, file_id: u64) -> Result<OpenedFile>;
+    async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
 
-    async fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile>;
+    async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle>;
 
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile>;
+    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<FileHandle>;
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
-
-    async fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
@@ -60,9 +66,9 @@ pub trait RawFileSystem: Send + Sync {
 
     async fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
 
-    async fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader>;
+    async fn read(&self, file_id: u64, fh: u64, offset: u64, size : u32) -> Result<Bytes>;
 
-    async fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter>;
+    async fn write(&self, file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32>;
 }
 
 /// PathFileSystem is the interface for the file system implementation, it use to interact with other file system
@@ -77,15 +83,13 @@ pub trait PathFileSystem: Send + Sync {
 
     async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>>;
 
-    async fn create_file(&self, parent: &str, name: &str) -> Result<FileStat>;
+    async fn open_file(&self, name: &str, flags : u32) -> Result<OpenedFile>;
 
-    async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat>;
+    async fn create_file(&self, parent: &str, name: &str) -> Result<OpenedFile>;
+
+    async fn create_dir(&self, parent: &str, name: &str) -> Result<OpenedFile>;
 
     async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
-
-    async fn read(&self, file: &OpenedFile) -> Box<dyn FileReader>;
-
-    async fn write(&self, file: &OpenedFile) -> Box<dyn FileWriter>;
 
     async fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
 
@@ -180,30 +184,62 @@ impl FileStat {
 }
 
 /// Opened file for read or write, it is used to read or write the file content.
-#[derive(Clone, Debug)]
 pub(crate) struct OpenedFile {
-    // file id
-    pub(crate) file_id: u64,
-
-    // file path (full name)
-    pub(crate) path: String,
-
-    // file handle id, open a same file multiple times will have different handle id
+    pub(crate) file_stat: FileStat,
     pub(crate) handle_id: u64,
 
-    // file size
-    pub(crate) size: u64,
+    pub(crate) reader : Option<Box<dyn FileReader>>,
+    pub(crate) writer : Option<Box<dyn FileWriter>>,
+}
+
+impl OpenedFile {
+    pub(crate) fn new(file_stat: FileStat) -> Self {
+        OpenedFile {
+            file_stat: file_stat,
+            handle_id: 0,
+            reader: None,
+            writer: None,
+        }
+    }
+
+    fn read(&mut self, offset: u64, size: u32) -> Vec<u8> {
+        self.file_stat.atime = Timestamp::from(SystemTime::now());
+
+        self.reader.as_mut().unwrap().read(offset, size)
+    }
+
+    fn write(&mut self, offset: u64, data: &[u8]) -> u32 {
+        let end = offset + data.len() as u64;
+
+        if end > self.file_stat.size  {
+            self.file_stat.size = end;
+        }
+        self.file_stat.atime = Timestamp::from(SystemTime::now());
+        self.file_stat.mtime = self.file_stat.atime;
+
+        self.writer.as_mut().unwrap().write(offset, data)
+    }
+
+    fn file_handle(&self) -> FileHandle {
+        FileHandle {
+            file_id: self.file_stat.inode,
+            handle_id: self.handle_id,
+        }
+    }
+
+    pub(crate) fn set_inode(&mut self, parent_file_id: u64, file_id: u64) {
+        self.file_stat.parent_inode = parent_file_id;
+        self.file_stat.inode= file_id;
+    }
 }
 
 /// File reader interface  for read file content
 pub(crate) trait FileReader: Sync + Send {
-    fn file(&self) -> &OpenedFile;
     fn read(&mut self, offset: u64, size: u32) -> Vec<u8>;
 }
 
 /// File writer interface  for write file content
 pub(crate) trait FileWriter: Sync + Send {
-    fn file(&self) -> &OpenedFile;
     fn write(&mut self, offset: u64, data: &[u8]) -> u32;
 }
 
@@ -249,7 +285,7 @@ impl FileIdManager {
 // The operations of the file system are implemented by the PathFileSystem.
 pub struct SimpleFileSystem<T: PathFileSystem> {
     file_id_manager: RwLock<FileIdManager>,
-    file_handle_manager: RwLock<FileHandleManager>,
+    opened_file_manager: OpenedFileManager,
 
     inode_id_generator: AtomicU64,
 
@@ -260,7 +296,7 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
     pub(crate) fn new(fs: T) -> Self {
         Self {
             file_id_manager: RwLock::new(FileIdManager::new()),
-            file_handle_manager: RwLock::new(FileHandleManager::new()),
+            opened_file_manager: OpenedFileManager::new(),
             inode_id_generator: AtomicU64::new(10000),
             fs,
         }
@@ -277,6 +313,26 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
             .unwrap()
             .get_file_name(file_id)
             .ok_or(Errno::from(libc::ENOENT))
+    }
+
+
+    async fn create_file_internal(&self, parent_file_id: u64, name: &str, kind: FileType) -> Result<FileHandle> {
+        let parent_file_path = self.get_file_path(parent_file_id)?;
+        let mut file = match kind {
+            FileType::Directory => self.fs.create_dir(&parent_file_path, name).await?,
+            FileType::RegularFile => self.fs.create_file(&parent_file_path, name).await?,
+            _ => return Err(Errno::from(libc::EINVAL)),
+        };
+
+        file.set_inode(parent_file_id, self.next_inode_id());
+        {
+            let mut file_id_manager = self.file_id_manager.write().unwrap();
+            file_id_manager.insert(file.file_stat.inode, &file.file_stat.path);
+        }
+        self.fs.set_attr(&file.file_stat.path, &file.file_stat, false).await?;
+        let file= self.opened_file_manager.put_file(file);
+        let file = file.lock().await;
+        Ok(file.file_handle())
     }
 }
 
@@ -297,19 +353,22 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
             .await
             .unwrap();
 
-        self.create_file(root_dir.inode, DefaultFileSystemMetadata::FS_META_FILE_NAME)
-            .await;
+        // todo meta file does not need to be created in the original file system
+        self.create_file(root_dir.inode, DefaultFileSystemMetadata::FS_META_FILE_NAME, 0)
+            .await.unwrap();
     }
 
     async fn get_file_path(&self, file_id: u64) -> String {
         self.get_file_path(file_id).unwrap_or("".to_string())
     }
 
-    async fn get_opened_file(&self, _file_id: u64, fh: u64) -> Result<OpenedFile> {
-        let file_handle_map = self.file_handle_manager.read().unwrap();
-        file_handle_map
-            .get_file(fh)
-            .ok_or(Errno::from(libc::ENOENT))
+    async fn valid_file_id(&self, _file_id: u64, fh: u64) -> Result<()> {
+        let file_id = self.opened_file_manager
+            .get_file(fh).ok_or(Errno::from(libc::EBADF))?
+            .lock().await
+            .file_stat.inode;
+
+        (file_id == _file_id).then(|| ()).ok_or(Errno::from(libc::EBADF))
     }
 
     async fn stat(&self, file_id: u64) -> Result<FileStat> {
@@ -327,68 +386,26 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         self.fs.read_dir(&file_path).await
     }
 
-    async fn open_file(&self, file_id: u64) -> Result<OpenedFile> {
+    async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
         let file_path = self.get_file_path(file_id)?;
-        let file_stat = self.fs.stat(&file_path).await?;
-        let file_handle = {
-            let mut file_handle_map = self.file_handle_manager.write().unwrap();
-            file_handle_map.create_file(&file_stat)
-        };
-        Ok(file_handle)
+        let file = self.fs.open_file(&file_path, flags).await?;
+        let file = self.opened_file_manager.put_file(file);
+        let file = file.lock().await;
+        Ok(file.file_handle())
     }
 
-    async fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
-        let parent_file_path = self.get_file_path(parent_file_id)?;
-        let mut file = self.fs.create_file(&parent_file_path, name).await?;
-
-        file.inode = self.next_inode_id();
-        file.parent_inode = parent_file_id;
-
-        {
-            let mut file_id_manager = self.file_id_manager.write().unwrap();
-            file_id_manager.insert(file.inode, &file.path);
-        }
-
-        self.fs.set_attr(&file.path, &file, false).await?;
-
-        let file_handle = {
-            let mut file_handle_map = self.file_handle_manager.write().unwrap();
-            file_handle_map.create_file(&file)
-        };
-
-        Ok(file_handle)
+    async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
+        self.create_file_internal(parent_file_id, name, FileType::RegularFile).await
     }
 
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
-        let parent_file_path = self.get_file_path(parent_file_id)?;
-        let mut dir = self.fs.create_dir(&parent_file_path, name).await?;
-
-        dir.inode = self.next_inode_id();
-        dir.parent_inode = parent_file_id;
-
-        {
-            let mut file_id_manager = self.file_id_manager.write().unwrap();
-            file_id_manager.insert(dir.inode, &dir.path);
-        }
-
-        self.fs.set_attr(&dir.path, &dir, false).await?;
-
-        let file_handle = {
-            let mut file_handle_map = self.file_handle_manager.write().unwrap();
-            file_handle_map.create_file(&dir)
-        };
-
-        Ok(file_handle)
+    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<FileHandle> {
+        self.create_file_internal(parent_file_id, name, FileType::Directory).await
     }
+
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
         let file_path = self.get_file_path(file_id)?;
         self.fs.set_attr(&file_path, file_stat, true).await
-    }
-
-    async fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
-        let file_path = self.get_file_path(file_id)?;
-        self.fs.set_attr(&file_path, file_stat, false).await
     }
 
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
@@ -414,34 +431,35 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
-        let mut file_handle_manager = self.file_handle_manager.write().unwrap();
-        file_handle_manager.remove_file(fh);
+        self.opened_file_manager.remove_file(fh);
         Ok(())
     }
 
-    async fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader> {
-        let file = {
-            let file_handle_map = self.file_handle_manager.read().unwrap();
-            file_handle_map.get_file(fh).unwrap()
+    async fn read(&self, file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
+        let mut file_stat: FileStat;
+        let data = {
+            let mut opened_file = self.opened_file_manager.get_file(fh).ok_or(Errno::from(libc::EBADF))?;
+            let mut opened_file =  opened_file.lock().await;
+            file_stat = opened_file.file_stat.clone();
+            opened_file.read(offset, size)
         };
 
-        self.fs.read(&file).await
+        self.fs.set_attr(&file_stat.path, &file_stat,false).await?;
+
+        Ok(data.into())
     }
 
-    async fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter> {
-        let file = {
-            let file_handle_map = self.file_handle_manager.read().unwrap();
-            file_handle_map.get_file(fh).unwrap()
+    async fn write(&self, file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
+        let (len, file_stat) = {
+            let opened_file = self.opened_file_manager.get_file(fh).ok_or(Errno::from(libc::EBADF))?;
+            let mut opened_file = opened_file.lock().await;
+            let len = opened_file.write(offset, data);
+            (len, opened_file.file_stat.clone())
         };
 
-        self.fs.write(&file).await
+        self.fs.set_attr(&file_stat.path, &file_stat, false).await?;
+
+        Ok(len)
     }
 }
 
-pub fn join_file_path(parent: &str, name: &str) -> String {
-    if parent.is_empty() {
-        name.to_string()
-    } else {
-        format!("{}/{}", parent, name)
-    }
-}

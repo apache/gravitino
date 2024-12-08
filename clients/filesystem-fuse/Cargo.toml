@@ -33,6 +33,7 @@ path = "src/main.rs"
 name="gvfs_fuse"
 
 [dependencies]
+bytes = "1.6.0"
 dashmap = "5.5.3"
 futures-util = "0.3.30"
 fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }

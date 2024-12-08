@@ -16,20 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{FileStat, OpenedFile};
-use std::collections::HashMap;
+use crate::filesystem::OpenedFile;
+use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
+use std::sync::{Arc};
+use tokio::sync::Mutex;
 
-// FileHandleManager is a manager for opened files.
-pub(crate) struct FileHandleManager {
+// OpenedFileManager is a manager for opened files.
+pub(crate) struct OpenedFileManager {
     // file_handle_map is a map of file_handle_id to opned file.
-    file_handle_map: HashMap<u64, OpenedFile>,
+    file_handle_map: DashMap<u64, Arc<Mutex<OpenedFile>>>,
 
     // file_handle_id_generator is used to generate unique file handle IDs.
     handle_id_generator: AtomicU64,
 }
 
-impl FileHandleManager {
+impl OpenedFileManager {
     pub fn new() -> Self {
         Self {
             file_handle_map: Default::default(),
@@ -42,23 +44,20 @@ impl FileHandleManager {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    pub(crate) fn create_file(&mut self, file: &FileStat) -> OpenedFile {
-        let file_handle = OpenedFile {
-            file_id: file.inode,
-            path: file.path.clone(),
-            handle_id: self.next_handle_id(),
-            size: file.size,
-        };
+    pub(crate) fn put_file(&self, mut file: OpenedFile) -> Arc<Mutex<OpenedFile>> {
+        let file_handle_id = self.next_handle_id();
+        file.handle_id = file_handle_id;
+        let file_handle = Arc::new(Mutex::new(file));
         self.file_handle_map
-            .insert(file_handle.handle_id, file_handle.clone());
+            .insert(file_handle_id, file_handle.clone());
         file_handle
     }
 
-    pub(crate) fn get_file(&self, handle_id: u64) -> Option<OpenedFile> {
-        self.file_handle_map.get(&handle_id).map(|x| x.clone())
+    pub(crate) fn get_file(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
+        self.file_handle_map.get(&handle_id).map(|x| x.value().clone())
     }
 
-    pub(crate) fn remove_file(&mut self, handle_id: u64) {
+    pub(crate) fn remove_file(&self, handle_id: u64) {
         self.file_handle_map.remove(&handle_id);
     }
 }

@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{join_file_path, FileStat, Result};
+use crate::filesystem::{FileStat, Result};
 use std::collections::HashMap;
+use crate::utils::join_file_path;
 
 /// DefaultFileSystemMetadata is a simple implementation of FileSystemMetadata
 /// that stores file metadata in memory.

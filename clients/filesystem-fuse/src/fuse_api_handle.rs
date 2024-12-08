@@ -53,20 +53,6 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         self.local_fs.get_file_path(inode).await
     }
 
-    async fn update_file_status(
-        &self,
-        inode: u64,
-        size: Option<u64>,
-        atime: Option<Timestamp>,
-        mtime: Option<Timestamp>,
-    ) {
-        let file_stat = self.get_modified_file_stat(inode, size, atime, mtime).await;
-        if file_stat.is_ok() {
-            let file_stat = file_stat.unwrap();
-            let _ = self.local_fs.set_attr(inode, &file_stat).await;
-        }
-    }
-
     async fn get_modified_file_stat(
         &self,
         inode: u64,
@@ -122,10 +108,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     ) -> fuse3::Result<ReplyAttr> {
         // check the opened file inode is the same as the inode
         if let Some(fh) = fh {
-            let opened_file = self.local_fs.get_opened_file(inode, fh).await?;
-            if opened_file.file_id != inode {
-                return Err(libc::EBADF.into());
-            }
+            self.local_fs.valid_file_id(inode, fh).await?;
         }
 
         let file_stat = self.local_fs.stat(inode).await?;
@@ -161,14 +144,14 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         mode: u32,
         umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
-        let file_handle = self
+        let handle_id = self
             .local_fs
             .create_dir(parent, name.to_str().unwrap())
             .await?;
         Ok(ReplyEntry {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
-                file_handle.file_id,
+                handle_id.file_id,
                 Directory,
                 Timestamp::from(SystemTime::now()),
                 &self.fs_context,
@@ -193,7 +176,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let file_handle = self.local_fs.open_file(inode).await?;
+        let file_handle = self.local_fs.open_file(inode, flags).await?;
         Ok(ReplyOpen {
             fh: file_handle.handle_id,
             flags: flags,
@@ -208,10 +191,8 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         offset: u64,
         size: u32,
     ) -> fuse3::Result<ReplyData> {
-        let mut reader = self.local_fs.read(inode, fh).await;
-        let data = reader.read(offset, size);
-        self.update_file_status(inode, None, Some(Timestamp::from(SystemTime::now())), None);
-        Ok(ReplyData { data: data.into() })
+        let data = self.local_fs.read(inode, fh, offset, size).await?;
+        Ok(ReplyData { data: data })
     }
 
     async fn write(
@@ -224,15 +205,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         write_flags: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyWrite> {
-        let mut writer = self.local_fs.write(inode, fh).await;
-        writer.write(offset, data);
-        let file_size = writer.file().size;
-        let now = Timestamp::from(SystemTime::now());
-        self.update_file_status(inode, Some(file_size), Some(now), Some(now))
-            .await;
-
+        let mut written = self.local_fs.write(inode, fh, offset, data).await?;
         Ok(ReplyWrite {
-            written: data.len() as u32,
+            written: written,
         })
     }
 
@@ -258,12 +233,12 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         lock_owner: u64,
         flush: bool,
     ) -> fuse3::Result<()> {
-        self.local_fs.close_file(inode, fh);
+        let _ = self.local_fs.close_file(inode, fh);
         Ok(())
     }
 
     async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let file_handle = self.local_fs.open_file(inode).await?;
+        let file_handle = self.local_fs.open_file(inode, flags).await?;
         Ok(ReplyOpen {
             fh: file_handle.handle_id,
             flags: flags,
@@ -332,7 +307,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     ) -> fuse3::Result<ReplyCreated> {
         let file_handle = self
             .local_fs
-            .create_file(parent, name.to_str().unwrap())
+            .create_file(parent, name.to_str().unwrap(), flags)
             .await?;
         Ok(ReplyCreated {
             ttl: self.default_ttl,
