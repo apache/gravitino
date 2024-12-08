@@ -712,7 +712,6 @@ public class TestMysqlTableOperations extends TestMysql {
     List<JdbcColumn> columns = new ArrayList<>();
     List<Type> notSupportType =
         Arrays.asList(
-            Types.BooleanType.get(),
             Types.FixedType.of(10),
             Types.IntervalDayType.get(),
             Types.IntervalYearType.get(),

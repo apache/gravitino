@@ -25,6 +25,8 @@ import org.apache.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter {
 
+  static final String BIT = "bit";
+  static final String BIT_UNSIGNED = "bit unsigned";
   static final String TINYINT = "tinyint";
   static final String TINYINT_UNSIGNED = "tinyint unsigned";
   static final String SMALLINT = "smallint";
@@ -43,6 +45,12 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
     switch (typeBean.getTypeName().toLowerCase()) {
+      case BIT:
+      case BIT_UNSIGNED:
+        if (typeBean.getColumnSize() == null || typeBean.getColumnSize() <= 1) {
+          return Types.BooleanType.get();
+        }
+        return Types.BinaryType.get();
       case TINYINT:
         return Types.ByteType.get();
       case TINYINT_UNSIGNED:
@@ -139,6 +147,8 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.BinaryType) {
       return type.simpleString();
+    } else if (type instanceof Types.BooleanType) {
+      return BIT;
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
