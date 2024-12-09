@@ -26,10 +26,10 @@ public class SparkPaimonCatalogFilesystemBackendIT33 extends SparkPaimonCatalogF
   @Test
   void testCatalogClassName() {
     String catalogClass =
-            getSparkSession()
-                    .sessionState()
-                    .conf()
-                    .getConfString("spark.sql.catalog." + getCatalogName());
+        getSparkSession()
+            .sessionState()
+            .conf()
+            .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoPaimonCatalogSpark33.class.getName(), catalogClass);
   }
 }
