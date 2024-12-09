@@ -66,7 +66,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   @Override
   protected boolean supportsReplaceColumns() {
     // Paimon doesn't support replace columns, because it doesn't support drop all fields in table.
-    // And `ALTER TABLE REPLACE COLUMNS` statement will removes all existing columns at first and
+    // And `ALTER TABLE REPLACE COLUMNS` statement will remove all existing columns at first and
     // then adds the new set of columns.
     return false;
   }
