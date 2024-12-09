@@ -23,20 +23,18 @@ import { useState, forwardRef, useEffect, Fragment } from 'react'
 
 import {
   Box,
-  Grid,
   Button,
   Dialog,
-  TextField,
-  Typography,
-  DialogContent,
   DialogActions,
-  IconButton,
+  DialogContent,
   Fade,
-  Select,
-  MenuItem,
-  InputLabel,
   FormControl,
-  FormHelperText
+  FormHelperText,
+  Grid,
+  IconButton,
+  InputLabel,
+  TextField,
+  Typography
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -89,6 +87,10 @@ const CreateSchemaDialog = props => {
   const store = useAppSelector(state => state.metalakes)
   const activatedCatalogDetail = store.activatedDetails
   const [cacheData, setCacheData] = useState()
+
+  const paimonCatalogBackend =
+    activatedCatalogDetail?.provider === 'lakehouse-paimon' &&
+    ['hive', 'jdbc'].includes(activatedCatalogDetail?.properties['catalog-backend'])
 
   const {
     control,
@@ -293,7 +295,8 @@ const CreateSchemaDialog = props => {
               </FormControl>
             </Grid>
 
-            {!['jdbc-mysql', 'lakehouse-paimon', 'jdbc-oceanbase'].includes(activatedCatalogDetail?.provider) && (
+            {(!['jdbc-mysql', 'lakehouse-paimon', 'jdbc-oceanbase'].includes(activatedCatalogDetail?.provider) ||
+              paimonCatalogBackend) && (
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <Controller
@@ -315,12 +318,14 @@ const CreateSchemaDialog = props => {
                     )}
                   />
                 </FormControl>
+                {activatedCatalogDetail?.properties['catalog-backend']}
               </Grid>
             )}
 
-            {!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql', 'jdbc-oceanbase'].includes(
+            {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql', 'jdbc-oceanbase'].includes(
               activatedCatalogDetail?.provider
-            ) && (
+            ) ||
+              paimonCatalogBackend) && (
               <Grid item xs={12} data-refer='schema-props-layout'>
                 <Typography sx={{ mb: 2 }} variant='body2'>
                   Properties
@@ -385,12 +390,12 @@ const CreateSchemaDialog = props => {
                           )}
                           {item.key && item.invalid && (
                             <FormHelperText className={'twc-text-error-main'}>
-                              Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                              characters, underscores, hyphens, or dots.
+                              Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                              underscores, hyphens, or dots.
                             </FormHelperText>
                           )}
                           {!item.key.trim() && (
-                            <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                            <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                           )}
                         </FormControl>
                       </Grid>
@@ -400,9 +405,10 @@ const CreateSchemaDialog = props => {
               </Grid>
             )}
 
-            {!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql', 'jdbc-oceanbase'].includes(
+            {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql', 'jdbc-oceanbase'].includes(
               activatedCatalogDetail?.provider
-            ) && (
+            ) ||
+              paimonCatalogBackend) && (
               <Grid item xs={12}>
                 <Button
                   size='small'

@@ -40,9 +40,9 @@ jobs:
               - '**/*.rs'
               - '**/resources/**'
               - '**/src/**'
-              - '!**.md'
-              - '!**.png'
-              - '!**.svg'
+              - '!**/*.md'
+              - '!**/*.png'
+              - '!**/*.svg'
             spark_connector_changes:
               - spark-connector/**
     outputs:

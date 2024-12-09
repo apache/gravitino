@@ -2,56 +2,56 @@ CREATE SCHEMA gt_hive.gt_decimal_db1;
 
 USE gt_hive.gt_decimal_db1;
 
-CREATE TABLE test_decimal_bounds (amount DECIMAL(10, 2));
+CREATE TABLE tb01 (amount DECIMAL(10, 2));
 
-INSERT INTO test_decimal_bounds VALUES (12345.67), (-9999999.99), (0.01);
+INSERT INTO tb01 VALUES (12345.67), (-9999999.99), (0.01);
 
-INSERT INTO test_decimal_bounds VALUES (123456789.00);  -- Exceeds precision
+INSERT INTO tb01 VALUES (123456789.00);  -- Exceeds precision
 
-SELECT * FROM test_decimal_bounds;
+SELECT * FROM tb01;
 
-CREATE TABLE test_decimal_aggregation (value DECIMAL(12, 3));
+CREATE TABLE tb02 (value DECIMAL(12, 3));
 
-INSERT INTO test_decimal_aggregation VALUES (1234.567), (8901.234), (567.890);
+INSERT INTO tb02 VALUES (1234.567), (8901.234), (567.890);
 
-SELECT SUM(value) FROM test_decimal_aggregation;
+SELECT SUM(value) FROM tb02;
 
-SELECT AVG(value) FROM test_decimal_aggregation;
+SELECT AVG(value) FROM tb02;
 
-CREATE TABLE test_decimal_arithmetic (val1 DECIMAL(5, 2), val2 DECIMAL(4, 1));
+CREATE TABLE tb03 (val1 DECIMAL(5, 2), val2 DECIMAL(4, 1));
 
-INSERT INTO test_decimal_arithmetic VALUES (123.45,10.1);
+INSERT INTO tb03 VALUES (123.45,10.1);
 
-SELECT val1 + val2 FROM test_decimal_arithmetic;
+SELECT val1 + val2 FROM tb03;
 
-SELECT val1 * val2 FROM test_decimal_arithmetic;
+SELECT val1 * val2 FROM tb03;
 
-SELECT val1 / val2 FROM test_decimal_arithmetic;
+SELECT val1 / val2 FROM tb03;
 
-CREATE TABLE test_decimal_max_min (max_min_val DECIMAL(18, 4));
+CREATE TABLE tb04 (max_min_val DECIMAL(18, 4));
 
-INSERT INTO test_decimal_max_min VALUES (99999999999999.9999);
+INSERT INTO tb04 VALUES (99999999999999.9999);
 
-INSERT INTO test_decimal_max_min VALUES (-99999999999999.9999);
+INSERT INTO tb04 VALUES (-99999999999999.9999);
 
-INSERT INTO test_decimal_max_min VALUES (100000000000000.0000); -- Exceeds max
+INSERT INTO tb04 VALUES (100000000000000.0000); -- Exceeds max
 
-SELECT * FROM test_decimal_max_min ORDER BY max_min_val;
+SELECT * FROM tb04 ORDER BY max_min_val;
 
-CREATE TABLE test_decimal_nulls (nullable_val DECIMAL(8, 2));
+CREATE TABLE tb05 (nullable_val DECIMAL(8, 2));
 
-INSERT INTO test_decimal_nulls VALUES (NULL), (123.45), (NULL);
+INSERT INTO tb05 VALUES (NULL), (123.45), (NULL);
 
-SELECT * FROM test_decimal_nulls;
+SELECT * FROM tb05;
 
-DROP TABLE gt_hive.gt_decimal_db1.test_decimal_bounds;
+DROP TABLE gt_hive.gt_decimal_db1.tb01;
 
-DROP TABLE gt_hive.gt_decimal_db1.test_decimal_aggregation;
+DROP TABLE gt_hive.gt_decimal_db1.tb02;
 
-DROP TABLE gt_hive.gt_decimal_db1.test_decimal_arithmetic;
+DROP TABLE gt_hive.gt_decimal_db1.tb03;
 
-DROP TABLE gt_hive.gt_decimal_db1.test_decimal_max_min;
+DROP TABLE gt_hive.gt_decimal_db1.tb04;
 
-DROP TABLE gt_hive.gt_decimal_db1.test_decimal_nulls;
+DROP TABLE gt_hive.gt_decimal_db1.tb05;
 
 DROP SCHEMA gt_hive.gt_decimal_db1;

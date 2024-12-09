@@ -25,6 +25,9 @@ gravitino_uri=""
 mysql_uri=""
 trino_uri=""
 trino_remote_jdbc_uri=""
+hive_uri=""
+postgresql_uri=""
+hdfs_uri=""
 
 while IFS= read -r line; do
   name=$(echo $line | cut -d':' -f1)
@@ -41,7 +44,14 @@ while IFS= read -r line; do
     mysql)
       mysql_uri="--mysql_uri=jdbc:mysql://$ip"
       ;;
+    hive)
+      hive_uri="--hive_uri=thrift://$ip:9083"
+      hdfs_uri="--hdfs_uri=hdfs://$ip:9000"
+      ;;
+    postgresql)
+      postgresql_uri="--postgresql_uri=jdbc:postgresql://$ip:5432"
+      ;;
   esac
 done <<< "$output"
 
-echo "$gravitino_uri $mysql_uri $trino_uri --params=trino_remote_jdbc_uri,$trino_remote_jdbc_uri"
+echo "$gravitino_uri $mysql_uri $trino_uri $hive_uri $postgresql_uri $hdfs_uri --params=trino_remote_jdbc_uri,$trino_remote_jdbc_uri"

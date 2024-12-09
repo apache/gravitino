@@ -40,6 +40,7 @@ hadoop-minikdc = "3.3.0"
 htrace-core4 = "4.1.0-incubating"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
+commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
 commons-logging = "1.2"
@@ -112,6 +113,7 @@ datanucleus-rdbms = "4.1.19"
 datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
+aliyun-credentials = "0.3.12"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -178,6 +180,7 @@ airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.r
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 commons-logging = { group = "commons-logging", name = "commons-logging", version.ref = "commons-logging" }
@@ -263,6 +266,8 @@ jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "
 
 google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
+
+aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
