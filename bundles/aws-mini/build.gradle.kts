@@ -31,8 +31,15 @@ dependencies {
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(libs.hadoop3.common)
 
-  implementation(project(":bundles:aws-mini"))
-  implementation(libs.hadoop3.aws)
+  implementation(libs.guava)
+
+  implementation(libs.aws.iam)
+  implementation(libs.aws.policy)
+  implementation(libs.aws.sts)
+  compileOnly(libs.hadoop3.aws)
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
 }
 
 tasks.withType(ShadowJar::class.java) {

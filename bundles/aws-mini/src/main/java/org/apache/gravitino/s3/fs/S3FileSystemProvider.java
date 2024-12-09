@@ -20,8 +20,10 @@
 package org.apache.gravitino.s3.fs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
@@ -31,8 +33,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class S3FileSystemProvider implements FileSystemProvider {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(S3FileSystemProvider.class);
 
   @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
@@ -41,18 +47,51 @@ public class S3FileSystemProvider implements FileSystemProvider {
           S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, Constants.ACCESS_KEY,
           S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, Constants.SECRET_KEY);
 
+  // We can't use Constants.AWS_CREDENTIALS_PROVIDER directly, as in 2.7, this key does not exist.
+  private static final String S3_CREDENTIAL_KEY = "fs.s3a.aws.credentials.provider";
+  private static final String S3_SIMPLE_CREDENTIAL =
+      "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider";
+
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
-    if (!hadoopConfMap.containsKey(Constants.AWS_CREDENTIALS_PROVIDER)) {
-      configuration.set(
-          Constants.AWS_CREDENTIALS_PROVIDER, Constants.ASSUMED_ROLE_CREDENTIALS_DEFAULT);
+    if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
+      hadoopConfMap.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
+
     hadoopConfMap.forEach(configuration::set);
+
+    // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
+    checkAndSetCredentialProvider(configuration);
+
     return S3AFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  private void checkAndSetCredentialProvider(Configuration configuration) {
+    String provides = configuration.get(S3_CREDENTIAL_KEY);
+    if (provides == null) {
+      return;
+    }
+
+    Splitter splitter = Splitter.on(',').trimResults().omitEmptyStrings();
+    // Split the list of providers
+    List<String> providers = splitter.splitToList(provides);
+
+    for (String provider : providers) {
+      try {
+        Class.forName(provider);
+      } catch (Exception e) {
+        LOGGER.warn(
+            "Credential provider {} not found in the Hadoop runtime, falling back to default",
+            provider);
+        // Set the S3_CREDENTIAL_KEY to the default provider
+        configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+        return;
+      }
+    }
   }
 
   /**

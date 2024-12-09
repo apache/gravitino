@@ -80,3 +80,5 @@ include(":bundles:aws-bundle")
 include(":bundles:gcp-bundle")
 include(":bundles:aliyun-bundle")
 include("bundles:azure-bundle")
+include("bundles:aws-mini")
+findProject(":bundles:aws-mini")?.name = "aws-mini"
