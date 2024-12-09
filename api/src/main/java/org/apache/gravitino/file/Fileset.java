@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -122,5 +123,13 @@ public interface Fileset extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Fileset does not support role operations.");
+  }
+
+  /**
+   * @return The {@link SupportsCredentials} if the fileset supports credential operations.
+   * @throws UnsupportedOperationException If the fileset does not support credential operations.
+   */
+  default SupportsCredentials supportsCredentials() {
+    throw new UnsupportedOperationException("Fileset does not support credential operations.");
   }
 }

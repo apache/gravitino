@@ -62,6 +62,7 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
+  testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
