@@ -24,6 +24,7 @@ plugins {
 
 dependencies {
   implementation(libs.commons.cli.new)
+  implementation(libs.commons.csv)
   implementation(libs.guava)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
@@ -34,7 +35,20 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
 
+  testImplementation(project(":core")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":server")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":server-common")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -57,4 +71,15 @@ tasks.jar {
     .map(::zipTree)
   from(dependencies)
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    // Exclude integration tests
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(tasks.jar)
+    dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
+  }
 }

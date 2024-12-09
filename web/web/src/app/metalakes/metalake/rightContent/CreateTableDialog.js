@@ -72,7 +72,7 @@ import {
 import Icon from '@/components/Icon'
 
 // Import Redux hooks and actions
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { createTable, updateTable } from '@/lib/store/metalakes'
 
 // Import form validation libraries
@@ -85,7 +85,7 @@ import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
-import { tableColumnTypes } from '@/lib/utils/initial'
+import { getRelationalColumnType, getParameterizedColumnType, getRelationalTablePropInfo } from '@/lib/utils/initial'
 
 // Default form values
 const defaultFormValues = {
@@ -101,7 +101,14 @@ const schema = yup.object().shape({
   columns: yup.array().of(
     yup.object().shape({
       name: yup.string().required(),
-      type: yup.string().required(),
+      type: yup
+        .mixed()
+        .test(
+          'is-string-or-object',
+          'type must be a string or an object',
+          value => typeof value === 'string' || typeof value === 'object'
+        )
+        .required(),
       nullable: yup.boolean(),
       comment: yup.string()
     })
@@ -138,7 +145,11 @@ const CreateTableDialog = props => {
   const catalogType = searchParams.get('type')
   const schemaName = searchParams.get('schema')
 
-  // Component state
+  const store = useAppSelector(state => state.metalakes)
+  const currentCatalog = store.catalogs.find(ca => ca.name === catalog)
+  const columnTypes = getRelationalColumnType(currentCatalog?.provider)
+  const propInfo = getRelationalTablePropInfo(currentCatalog?.provider)
+
   const [innerProps, setInnerProps] = useState([])
   const [tableColumns, setTableColumns] = useState([{ name: '', type: '', nullable: true, comment: '' }])
   const [initialTableData, setInitialTableData] = useState()
@@ -183,6 +194,9 @@ const CreateTableDialog = props => {
       updatedProps.forEach(item => (item.hasDuplicateKey = false))
     }
 
+    const isReserved = propInfo.reserved.includes(updatedProps[index].key)
+    updatedProps[index].isReserved = isReserved
+
     setInnerProps(updatedProps)
     setValue('propItems', updatedProps)
   }
@@ -210,7 +224,8 @@ const CreateTableDialog = props => {
     if (field === 'type') {
       updatedColumns[index].typeSuffix = ''
       updatedColumns[index].paramErrors = ''
-      if (tableColumnTypes.find(type => type.key === value)?.params) {
+
+      if (getParameterizedColumnType(value)) {
         updatedColumns[index].paramValues = []
       }
     }
@@ -222,7 +237,7 @@ const CreateTableDialog = props => {
   const transformParamValues = index => {
     let updatedColumns = [...tableColumns]
 
-    const validateParams = tableColumnTypes.find(type => type.key === updatedColumns[index].type)?.validateParams
+    const validateParams = getParameterizedColumnType(updatedColumns[index].type)?.validateParams
     const paramValues = updatedColumns[index].paramValues.filter(param => param !== undefined).map(Number)
     const validateResult = validateParams(paramValues)
 
@@ -262,14 +277,8 @@ const CreateTableDialog = props => {
    * Checks for duplicate keys before adding
    */
   const addProperty = () => {
-    const hasDuplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
-
-    if (hasDuplicateKeys) {
+    const hasError = innerProps.some(prop => prop.hasDuplicateKey || prop.isReserved || prop.invalid)
+    if (hasError) {
       return
     }
 
@@ -316,14 +325,7 @@ const CreateTableDialog = props => {
    * Validates data and dispatches create/update actions
    */
   const submitForm = formData => {
-    const hasDuplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
-
-    const hasInvalidKeys = innerProps.some(prop => prop.invalid)
+    const hasErrorProperties = innerProps.some(prop => prop.hasDuplicateKey || prop.isReserved || prop.invalid)
 
     const hasDuplicateColumnNames = tableColumns
       .filter(col => col.name.trim() !== '')
@@ -334,7 +336,7 @@ const CreateTableDialog = props => {
 
     const hasInvalidColumnTypes = tableColumns.some(col => col.paramErrors)
 
-    if (hasDuplicateKeys || hasInvalidKeys || hasDuplicateColumnNames || hasInvalidColumnTypes) {
+    if (hasErrorProperties || hasDuplicateColumnNames || hasInvalidColumnTypes) {
       return
     }
 
@@ -420,7 +422,7 @@ const CreateTableDialog = props => {
         column.uniqueId = column.name
 
         // Extract type suffix for types with parameters
-        const match = column.type.match(/(\w+)(\([\d,]+\))/)
+        const match = typeof column.type === 'string' && column.type.match(/(\w+)(\([\d,]+\))/)
         if (match && match.length === 3) {
           column.typeSuffix = match[2]
           column.type = match[1]
@@ -437,14 +439,15 @@ const CreateTableDialog = props => {
       const propertyItems = Object.entries(properties).map(([key, value]) => {
         return {
           key,
-          value
+          value,
+          disabled: propInfo.reserved.includes(key) || propInfo.immutable.includes(key)
         }
       })
 
       setInnerProps(propertyItems)
       setValue('propItems', propertyItems)
     }
-  }, [open, data, setValue, type])
+  }, [open, data, setValue, type, propInfo])
 
   // Handle click outside of table rows
   useEffect(() => {
@@ -583,28 +586,50 @@ const CreateTableDialog = props => {
                           <FormControl fullWidth>
                             <Box sx={{ display: 'flex', gap: 1 }}>
                               <Box sx={{ minWidth: 120 }}>
-                                <Select
-                                  size='small'
-                                  fullWidth
-                                  value={column.type}
-                                  onChange={e => handleColumnChange({ index, field: 'type', value: e.target.value })}
-                                  error={!column.type.trim() || column.paramErrors}
-                                  data-refer={`column-type-${index}`}
-                                  renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
-                                >
-                                  {tableColumnTypes.map(type => (
-                                    <MenuItem key={type.key} value={type.key}>
-                                      {type.key}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                                {!column.type.trim() && (
-                                  <FormHelperText className={'twc-text-error-main'}>Type is required</FormHelperText>
-                                )}
-                                {column.paramErrors && (
-                                  <FormHelperText className={'twc-text-error-main'}>
-                                    {column.paramErrors}
-                                  </FormHelperText>
+                                {typeof column.type === 'string' ? (
+                                  <>
+                                    <Select
+                                      size='small'
+                                      fullWidth
+                                      value={column.type}
+                                      onChange={e =>
+                                        handleColumnChange({ index, field: 'type', value: e.target.value })
+                                      }
+                                      error={!column.type.trim() || column.paramErrors}
+                                      data-refer={`column-type-${index}`}
+                                      renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
+                                    >
+                                      {columnTypes.map(type => (
+                                        <MenuItem key={type} value={type}>
+                                          {type}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                    {!column.type.trim() && (
+                                      <FormHelperText className={'twc-text-error-main'}>
+                                        Type is required
+                                      </FormHelperText>
+                                    )}
+                                    {column.paramErrors && (
+                                      <FormHelperText className={'twc-text-error-main'}>
+                                        {column.paramErrors}
+                                      </FormHelperText>
+                                    )}
+                                  </>
+                                ) : (
+                                  <Select
+                                    size='small'
+                                    fullWidth
+                                    value={column.type.type}
+                                    disabled
+                                    sx={{
+                                      '.MuiSelect-icon': {
+                                        display: 'none'
+                                      }
+                                    }}
+                                  >
+                                    <MenuItem value={column.type.type}>{column.type.type}</MenuItem>
+                                  </Select>
                                 )}
                               </Box>
                               {selectedColumnIndex === index &&
@@ -621,28 +646,26 @@ const CreateTableDialog = props => {
                                     })
                                   }
 
-                                  return tableColumnTypes
-                                    .find(t => t.key === column.type)
-                                    ?.params?.map((param, paramIndex) => (
-                                      <TextField
-                                        key={paramIndex}
-                                        size='small'
-                                        type='number'
-                                        sx={{ minWidth: 60 }}
-                                        value={column.paramValues?.[paramIndex] || ''}
-                                        onChange={e => {
-                                          const newParamValues = [...(column.paramValues || [])]
-                                          newParamValues[paramIndex] = e.target.value
-                                          handleColumnChange({ index, field: 'paramValues', value: newParamValues })
-                                        }}
-                                        placeholder={`${param}`}
-                                        data-refer={`column-param-${index}-${paramIndex}`}
-                                        inputProps={{ min: 0 }}
-                                      />
-                                    ))
+                                  return getParameterizedColumnType(column.type)?.params?.map((param, paramIndex) => (
+                                    <TextField
+                                      key={paramIndex}
+                                      size='small'
+                                      type='number'
+                                      sx={{ minWidth: 60 }}
+                                      value={column.paramValues?.[paramIndex] || ''}
+                                      onChange={e => {
+                                        const newParamValues = [...(column.paramValues || [])]
+                                        newParamValues[paramIndex] = e.target.value
+                                        handleColumnChange({ index, field: 'paramValues', value: newParamValues })
+                                      }}
+                                      placeholder={`${param}`}
+                                      data-refer={`column-param-${index}-${paramIndex}`}
+                                      inputProps={{ min: 0 }}
+                                    />
+                                  ))
                                 })()}
                               {selectedColumnIndex !== index &&
-                                tableColumnTypes.find(type => type.key === column.type)?.params &&
+                                getParameterizedColumnType(column.type)?.params &&
                                 column.paramValues &&
                                 transformParamValues(index)}
                             </Box>
@@ -691,9 +714,11 @@ const CreateTableDialog = props => {
             </Grid>
 
             <Grid item xs={12} data-refer='table-props-layout'>
-              <Typography sx={{ mb: 2 }} variant='body2'>
-                Properties
-              </Typography>
+              {(propInfo.allowAdd || innerProps.length > 0) && (
+                <Typography sx={{ mb: 2 }} variant='body2'>
+                  Properties
+                </Typography>
+              )}
               {innerProps.map((item, index) => {
                 return (
                   <Fragment key={index}>
@@ -704,20 +729,22 @@ const CreateTableDialog = props => {
                             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                             data-refer={`table-props-${index}`}
                           >
-                            <Box>
+                            <Box sx={{ width: '30%' }}>
                               <TextField
+                                sx={{ width: '95%' }}
                                 size='small'
                                 name='key'
                                 label='Key'
                                 value={item.key}
                                 disabled={item.disabled}
                                 onChange={event => handlePropertyChange({ index, event })}
-                                error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
+                                error={item.hasDuplicateKey || item.isReserved || item.invalid || !item.key.trim()}
                                 data-refer={`props-key-${index}`}
                               />
                             </Box>
-                            <Box>
+                            <Box sx={{ width: '65%' }}>
                               <TextField
+                                sx={{ width: '95%' }}
                                 size='small'
                                 name='value'
                                 label='Value'
@@ -730,7 +757,7 @@ const CreateTableDialog = props => {
                               />
                             </Box>
 
-                            {!item.disabled ? (
+                            {!item.disabled && (propInfo.allowDelete || type === 'create') ? (
                               <Box sx={{ minWidth: 40 }}>
                                 <IconButton onClick={() => removeProperty(index)}>
                                   <Icon icon='mdi:minus-circle-outline' />
@@ -752,14 +779,17 @@ const CreateTableDialog = props => {
                         {item.hasDuplicateKey && (
                           <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
                         )}
+                        {item.isReserved && (
+                          <FormHelperText className={'twc-text-error-main'}>Key is reserved</FormHelperText>
+                        )}
                         {item.key && item.invalid && (
                           <FormHelperText className={'twc-text-error-main'}>
-                            Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                            characters, underscores, hyphens, or dots.
+                            Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                            underscores, hyphens, or dots.
                           </FormHelperText>
                         )}
                         {!item.key.trim() && (
-                          <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                          <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                         )}
                       </FormControl>
                     </Grid>
@@ -769,15 +799,17 @@ const CreateTableDialog = props => {
             </Grid>
 
             <Grid item xs={12}>
-              <Button
-                size='small'
-                onClick={addProperty}
-                variant='outlined'
-                startIcon={<Icon icon='mdi:plus-circle-outline' />}
-                data-refer='add-table-props'
-              >
-                Add Property
-              </Button>
+              {propInfo.allowAdd && (
+                <Button
+                  size='small'
+                  onClick={addProperty}
+                  variant='outlined'
+                  startIcon={<Icon icon='mdi:plus-circle-outline' />}
+                  data-refer='add-table-props'
+                >
+                  Add Property
+                </Button>
+              )}
             </Grid>
           </Grid>
         </DialogContent>

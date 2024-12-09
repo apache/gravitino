@@ -54,16 +54,15 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       case DOUBLE:
         return Types.DoubleType.get();
       case DECIMAL:
-        return Types.DecimalType.of(
-            Integer.parseInt(typeBean.getColumnSize()), Integer.parseInt(typeBean.getScale()));
+        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case DATE:
         return Types.DateType.get();
       case DATETIME:
-        return Types.TimestampType.withTimeZone();
+        return Types.TimestampType.withoutTimeZone();
       case CHAR:
-        return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+        return Types.FixedCharType.of(typeBean.getColumnSize());
       case VARCHAR:
-        return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+        return Types.VarCharType.of(typeBean.getColumnSize());
       case STRING:
       case TEXT:
         return Types.StringType.get();

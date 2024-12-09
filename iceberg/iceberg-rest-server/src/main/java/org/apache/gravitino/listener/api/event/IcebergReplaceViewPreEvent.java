@@ -39,4 +39,14 @@ public class IcebergReplaceViewPreEvent extends IcebergViewPreEvent {
   public UpdateTableRequest replaceViewRequest() {
     return replaceViewRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_VIEW;
+  }
 }

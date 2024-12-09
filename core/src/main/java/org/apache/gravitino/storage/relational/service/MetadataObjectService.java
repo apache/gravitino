@@ -27,6 +27,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
@@ -70,6 +71,9 @@ public class MetadataObjectService {
       return FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaId, names.get(2));
     } else if (type == MetadataObject.Type.TOPIC) {
       return TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, names.get(2));
+    } else if (type == MetadataObject.Type.MODEL) {
+      return ModelMetaService.getInstance()
+          .getModelIdBySchemaIdAndModelName(schemaId, names.get(2));
     }
 
     long tableId =
@@ -168,6 +172,20 @@ public class MetadataObjectService {
                     ? DOT_JOINER.join(filesetPO.getFilesetName(), fullName)
                     : filesetPO.getFilesetName();
             objectId = filesetPO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case MODEL:
+          ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(objectId);
+          if (modelPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(modelPO.getModelName(), fullName)
+                    : modelPO.getModelName();
+            objectId = modelPO.getSchemaId();
             metadataType = MetadataObject.Type.SCHEMA;
           } else {
             return null;

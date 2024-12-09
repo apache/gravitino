@@ -49,4 +49,14 @@ public final class DropFilesetEvent extends FilesetEvent {
   public boolean isExists() {
     return isExists;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_FILESET;
+  }
 }

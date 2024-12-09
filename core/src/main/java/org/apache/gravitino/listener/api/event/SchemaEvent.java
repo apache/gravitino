@@ -28,4 +28,9 @@ public abstract class SchemaEvent extends Event {
   protected SchemaEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

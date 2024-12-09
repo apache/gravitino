@@ -69,6 +69,8 @@ public interface Entity extends Serializable {
     GROUP("gr", 8),
     ROLE("ro", 9),
     TAG("ta", 10),
+    MODEL("mo", 11),
+    MODEL_VERSION("mv", 12),
 
     AUDIT("au", 65534);
 
@@ -109,12 +111,15 @@ public interface Entity extends Serializable {
         case TABLE:
         case FILESET:
         case TOPIC:
+        case MODEL:
         case USER:
         case GROUP:
         case ROLE:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
         case COLUMN:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);
+        case MODEL_VERSION:
+          return ImmutableList.of(METALAKE, CATALOG, SCHEMA, MODEL);
         default:
           throw new IllegalArgumentException("Unknown entity type: " + entityType);
       }

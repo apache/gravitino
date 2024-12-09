@@ -241,6 +241,14 @@ const CreateCatalogDialog = props => {
       providerSelect === 'lakehouse-paimon'
     ) {
       nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'uri'].includes(item.key))
+    } else if (
+      propItems[0]?.key === 'catalog-backend' &&
+      propItems[0]?.value === 'rest' &&
+      providerSelect === 'lakehouse-iceberg'
+    ) {
+      nextProps = propItems.filter(
+        item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'warehouse'].includes(item.key)
+      )
     }
     const parentField = nextProps.find(i => i.key === 'authentication.type')
     if (!parentField || parentField?.value === 'simple') {
@@ -294,6 +302,12 @@ const CreateCatalogDialog = props => {
             ...others
           }
           uri && (properties['uri'] = uri)
+        } else if (catalogBackend && catalogBackend === 'rest' && providerSelect === 'lakehouse-iceberg') {
+          properties = {
+            'catalog-backend': catalogBackend,
+            uri: uri,
+            ...others
+          }
         } else {
           properties = {
             uri: uri,
@@ -511,9 +525,9 @@ const CreateCatalogDialog = props => {
                       disabled={type === 'update'}
                       data-refer='catalog-type-selector'
                     >
-                      <MenuItem value={'relational'}>relational</MenuItem>
-                      <MenuItem value={'fileset'}>fileset</MenuItem>
-                      <MenuItem value={'messaging'}>messaging</MenuItem>
+                      <MenuItem value={'relational'}>Relational</MenuItem>
+                      <MenuItem value={'fileset'}>Fileset</MenuItem>
+                      <MenuItem value={'messaging'}>Messaging</MenuItem>
                     </Select>
                   )}
                 />
@@ -666,12 +680,12 @@ const CreateCatalogDialog = props => {
                           )}
                           {item.key && item.invalid && (
                             <FormHelperText className={'twc-text-error-main'}>
-                              Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                              characters, underscores, hyphens, or dots.
+                              Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                              underscores, hyphens, or dots.
                             </FormHelperText>
                           )}
                           {!item.key.trim() && (
-                            <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                            <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                           )}
                         </FormControl>
                       </Grid>

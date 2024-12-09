@@ -29,4 +29,9 @@ public class IcebergListViewPreEvent extends IcebergViewPreEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier viewIdentifier) {
     super(icebergRequestContext, viewIdentifier);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_VIEW;
+  }
 }

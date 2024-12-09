@@ -51,4 +51,9 @@ public class IcebergUpdateTableEvent extends IcebergTableEvent {
   public LoadTableResponse loadTableResponse() {
     return loadTableResponse;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_TABLE;
+  }
 }

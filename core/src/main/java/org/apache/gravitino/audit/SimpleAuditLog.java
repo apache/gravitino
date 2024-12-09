@@ -23,8 +23,14 @@ import java.text.SimpleDateFormat;
 import javax.annotation.Nullable;
 import lombok.Builder;
 
-/** The default implementation of the audit log. */
+/**
+ * The first version of implementation of the audit log.
+ *
+ * @deprecated since 0.8.0
+ */
 @Builder
+@Deprecated
+@SuppressWarnings("deprecation")
 public class SimpleAuditLog implements AuditLog {
 
   private String user;

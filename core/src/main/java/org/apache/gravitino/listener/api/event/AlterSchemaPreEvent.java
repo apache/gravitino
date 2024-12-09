@@ -42,4 +42,14 @@ public final class AlterSchemaPreEvent extends SchemaPreEvent {
   public SchemaChange[] schemaChanges() {
     return schemaChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_SCHEMA;
+  }
 }

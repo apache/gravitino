@@ -96,7 +96,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Integer`          | `Int`               |
 | `Unsigned Integer` | `Int Unsigned`      |
 | `Long`             | `Bigint`            |
-| `Unsigned Long`    | `Bigint Unsigned`   | 
+| `Unsigned Long`    | `Bigint Unsigned`   |
 | `Float`            | `Float`             |
 | `Double`           | `Double`            |
 | `String`           | `Text`              |
@@ -160,7 +160,7 @@ Column[] cols = new Column[] {
 };
 Index[] indexes = new Index[] {
     Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-}
+};
 ```
 
 </TabItem>
@@ -170,12 +170,20 @@ Index[] indexes = new Index[] {
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
-| Property Name           | Description                                                                                                                                                                             | Required  | Since version |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|---------------|
-| `engine`                | The engine used by the table. The default value is `InnoDB`. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | No        | 0.4.0         |
-| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                                                         | No        | 0.4.0         |
+:::note
+**Reserved**: Fields that cannot be passed to the Gravitino server.
 
-- Doesn't support remove table properties. You can only modify values, not delete properties.
+**Immutable**: Fields that cannot be modified once set.
+:::
+
+:::caution
+- Doesn't support remove table properties. You can only add or modify properties, not delete properties.
+:::
+
+| Property Name           | Description                                                                                                                                              | Default Value | Required  | Reserved   | Immutable | Since version |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------|------------|-----------|---------------|
+| `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No        | No         | Yes       | 0.4.0         |
+| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |
 
 ### Table indexes
 
@@ -213,7 +221,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
 Index[] indexes = new Index[] {
     Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
     Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-}
+};
 ```
 
 </TabItem>

@@ -25,7 +25,7 @@ import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { initialVersion } from '@/lib/store/sys'
+import { initialVersion, fetchGitHubInfo } from '@/lib/store/sys'
 
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'
@@ -78,11 +78,13 @@ const AuthProvider = ({ children }) => {
 
       if (authType === 'simple') {
         dispatch(initialVersion())
+        dispatch(fetchGitHubInfo())
         goToMetalakeListPage()
       } else if (authType === 'oauth') {
         if (token) {
           dispatch(setAuthToken(token))
           dispatch(initialVersion())
+          dispatch(fetchGitHubInfo())
           goToMetalakeListPage()
         } else {
           router.push('/login')

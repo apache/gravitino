@@ -49,4 +49,14 @@ public final class PurgeTableEvent extends TableEvent {
   public boolean isExists() {
     return isExists;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.PURGE_TABLE;
+  }
 }
