@@ -50,6 +50,17 @@ class Catalog(Auditable):
             self._type_name = type_name
             self._supports_managed_catalog = supports_managed_catalog
 
+        @classmethod
+        def type_serialize(cls, catalog_type):
+            return catalog_type.type_name
+
+        @classmethod
+        def type_deserialize(cls, type_name):
+            for member in cls:
+                if member.type_name == type_name:
+                    return member
+            return cls.UNSUPPORTED
+
         @property
         def supports_managed_catalog(self):
             """
@@ -61,6 +72,13 @@ class Catalog(Auditable):
             not support managed catalog, users need to specify the provider to create the catalog.
             """
             return self._supports_managed_catalog
+
+        @property
+        def type_name(self):
+            """
+            The name of the catalog type.
+            """
+            return self._type_name
 
     PROPERTY_PACKAGE = "package"
     """A reserved property to specify the package location of the catalog. The "package" is a string
