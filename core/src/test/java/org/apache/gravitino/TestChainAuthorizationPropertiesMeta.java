@@ -24,18 +24,19 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENAB
 import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestChainAuthorizationPropertiesMeta {
-  private static final AuthorizationPropertiesMeta authPropertiesMetaInstance =
-      AuthorizationPropertiesMeta.getInstance();
-  private static final String CHAIN_PLUGIN_SHORT_NAME = authPropertiesMetaInstance.secondNodeName();
+  private static final AuthorizationPropertiesMetadata authPropertiesMetaInstance =
+      AuthorizationPropertiesMetadata.getInstance();
+  private static final String CHAIN_PLUGIN_SHORT_NAME =
+      AuthorizationPropertiesMetadata.SECOND_SEGMENT_NAME;
 
   @Test
   void testChainHiveCatalog() {
@@ -47,34 +48,34 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put(AUTHORIZATION_PROVIDER, CHAIN_PLUGIN_SHORT_NAME);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getChainCatalogProviderKey()),
+            pluginName, AuthorizationPropertiesMetadata.getChainCatalogProviderKey()),
         "hive");
     properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), pluginName);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getChainProviderKey()),
+            pluginName, AuthorizationPropertiesMetadata.getChainProviderKey()),
         CHAIN_PLUGIN_SHORT_NAME);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getRangerAuthTypeKey()),
+            pluginName, AuthorizationPropertiesMetadata.getRangerAuthTypeKey()),
         RangerContainer.authType);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getRangerAdminUrlKey()),
+            pluginName, AuthorizationPropertiesMetadata.getRangerAdminUrlKey()),
         "http://localhost:" + RangerContainer.RANGER_SERVER_PORT);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getRangerUsernameKey()),
+            pluginName, AuthorizationPropertiesMetadata.getRangerUsernameKey()),
         RangerContainer.rangerUserName);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getRangerPasswordKey()),
+            pluginName, AuthorizationPropertiesMetadata.getRangerPasswordKey()),
         RangerContainer.rangerPassword);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
-            pluginName, AuthorizationPropertiesMeta.getRangerServiceNameKey()),
+            pluginName, AuthorizationPropertiesMetadata.getRangerServiceNameKey()),
         "hiveDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertDoesNotThrow(
         () ->
             PropertiesMetadataHelpers.validatePropertyForCreate(
@@ -103,7 +104,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     PropertiesMetadataHelpers.validatePropertyForCreate(authorizationPropertiesMeta, properties);
   }
 
@@ -118,7 +119,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertDoesNotThrow(
         () ->
             PropertiesMetadataHelpers.validatePropertyForCreate(
@@ -143,7 +144,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertDoesNotThrow(
         () ->
             PropertiesMetadataHelpers.validatePropertyForCreate(
@@ -168,7 +169,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertDoesNotThrow(
         () ->
             PropertiesMetadataHelpers.validatePropertyForCreate(
@@ -193,7 +194,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -219,7 +220,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -245,7 +246,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.plug3.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -271,7 +272,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -286,7 +287,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger-error.auth.types", "simple");
-    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMeta();
+    PropertiesMetadata authorizationPropertiesMeta = new AuthorizationPropertiesMetadata();
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->

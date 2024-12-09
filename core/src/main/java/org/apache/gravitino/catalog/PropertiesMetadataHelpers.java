@@ -26,7 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.connector.WildcardPropertiesMeta;
+import org.apache.gravitino.connector.WildcardPropertiesMetadata;
 
 /** This class contains helper methods for properties metadata. */
 public class PropertiesMetadataHelpers {
@@ -68,7 +68,7 @@ public class PropertiesMetadataHelpers {
         "Properties are required and must be set: %s",
         absentProperties);
 
-    WildcardPropertiesMeta.validate(propertiesMetadata, properties);
+    WildcardPropertiesMetadata.validate(propertiesMetadata, properties);
 
     // use decode function to validate the property values
     for (Map.Entry<String, String> entry : properties.entrySet()) {

@@ -43,7 +43,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
+import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -84,33 +84,34 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_ADMIN_URL));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.RANGER_ADMIN_URL));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.RANGER_AUTH_TYPE));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_USERNAME));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.RANGER_USERNAME));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_PASSWORD));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.RANGER_PASSWORD));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.RANGER_SERVICE_NAME));
     Assertions.assertTrue(
         propertyEntryMap.containsKey(
-            AuthorizationPropertiesMeta.getInstance().wildcardNodePropertyKey()));
+            AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey()));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_CATALOG_PROVIDER));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_CATALOG_PROVIDER));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_CATALOG_PROVIDER));
-    Assertions.assertTrue(propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_PROVIDER));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_CATALOG_PROVIDER));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_ADMIN_URL));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_PROVIDER));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_AUTH_TYPES));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_RANGER_ADMIN_URL));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_USERNAME));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_RANGER_AUTH_TYPES));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_PASSWORD));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_RANGER_USERNAME));
     Assertions.assertTrue(
-        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.CHAIN_RANGER_SERVICE_NAME));
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_RANGER_PASSWORD));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_RANGER_SERVICE_NAME));
 
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());

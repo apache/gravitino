@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
@@ -35,7 +36,6 @@ import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -91,18 +91,18 @@ public class RangerITEnv {
         RangerAuthorizationHadoopSQLPlugin.getInstance(
             "metalake",
             ImmutableMap.of(
-                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                AuthorizationPropertiesMetadata.RANGER_ADMIN_URL,
                 String.format(
                     "http://%s:%d",
                     containerSuite.getRangerContainer().getContainerIpAddress(),
                     RangerContainer.RANGER_SERVER_PORT),
-                AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                AuthorizationPropertiesMetadata.RANGER_AUTH_TYPE,
                 RangerContainer.authType,
-                AuthorizationPropertiesMeta.RANGER_USERNAME,
+                AuthorizationPropertiesMetadata.RANGER_USERNAME,
                 RangerContainer.rangerUserName,
-                AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                AuthorizationPropertiesMetadata.RANGER_PASSWORD,
                 RangerContainer.rangerPassword,
-                AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                AuthorizationPropertiesMetadata.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
     rangerHelper =
         new RangerHelper(

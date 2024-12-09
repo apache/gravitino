@@ -25,24 +25,29 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 
 /**
  * WildcardPropertiesMeta is a utility class to validate wildcard properties in the properties
  * metadata. <br>
  * <br>
- * WildcardPropertiesMeta interface defines: <br>
- * FirstNode.SecondNode.WildcardNode = "" <br>
- * FirstNode.SecondNode.*.property-key1 = "" <br>
- * FirstNode.SecondNode.*.property-key2 = "" <br>
+ * WildcardPropertiesMetadata interface defines: <br>
+ * Prefix.Wildcard = "" <br>
+ * Prefix.*.properties-key1 = "" <br>
+ * Prefix.*.properties-key2 = "" <br>
+ * NOTE: Prefix support multiple segment, separated by dot. <br>
+ * NOTE: properties-key{N} support multiple segment, separated by dot. <br>
  * <br>
- * Use define a WildcardPropertiesMeta object: <br>
- * FirstNode.SecondNode.WildcardNode = "WildcardValue1,WildcardValue2" <br>
- * FirstNode.SecondNode.{WildcardValue1}.property-key1 = "WildcardValue1 property-key1 value" <br>
- * FirstNode.SecondNode.{WildcardValue1}.property-key2 = "WildcardValue1 property-key2 value" <br>
- * FirstNode.SecondNode.{WildcardValue2}.property-key1 = "WildcardValue2 property-key1 value" <br>
- * FirstNode.SecondNode.{WildcardValue2}.property-key2 = "WildcardValue2 property-key2 value" <br>
+ * Use define a WildcardPropertiesMetadata object: <br>
+ * a1.b1.c1.WildcardNode = "WildcardValue1,WildcardValue2" <br>
+ * a1.b1.c1.{WildcardValue1}.x1.y1.z1 = "WildcardValue1 properties-key1 value" <br>
+ * a1.b1.c1.{WildcardValue1}.x1.y2.z2 = "WildcardValue1 properties-key2 value" <br>
+ * a1.b1.c1.{WildcardValue1}.x1.y2.z3 = "WildcardValue1 properties-key3 value" <br>
+ * a1.b1.c1.{WildcardValue2}.x1.y1.z1 = "WildcardValue2 properties-key1 value" <br>
+ * a1.b1.c1.{WildcardValue2}.x1.y2.z2 = "WildcardValue2 properties-key2 value" <br>
+ * a1.b1.c1.{WildcardValue2}.x1.y2.z3 = "WildcardValue2 properties-key3 value" <br>
  * <br>
- * Configuration Example: {@link AuthorizationPropertiesMeta} <br>
+ * Configuration Example: {@link AuthorizationPropertiesMetadata} <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
  * "authorization.chain.hive1.provider" = "ranger"; <br>
  * "authorization.chain.hive1.catalog-provider" = "hive"; <br>
@@ -59,34 +64,23 @@ import java.util.stream.Collectors;
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
  * "authorization.chain.hdfs1.ranger.service.name" = "hdfsDev"; <br>
  */
-public interface WildcardPropertiesMeta {
+public interface WildcardPropertiesMetadata {
   class Constants {
     public static final String WILDCARD = "*";
     public static final String WILDCARD_CONFIG_VALUES_SPLITTER = ",";
   }
 
-  /** The FirstNode define name */
-  String firstNodeName();
-  /** The SecondNode define name */
-  String secondNodeName();
+  /** The prefix name */
+  String prefixName();
   /** The WildcardNode define name */
-  String wildcardNodeName();
-  /** Generate FirstNode properties key name */
-  default String generateFirstNodePropertyKey(String key) {
-    return String.format("%s.%s", firstNodeName(), key);
-  }
-  /** The `FirstNode.SecondNode` property key name */
-  default String secondNodePropertyKey() {
-    return String.format("%s.%s", firstNodeName(), secondNodeName());
-  }
+  String wildcardName();
   /** The `FirstNode.SecondNode.WildcardNode` properties key name */
   default String wildcardNodePropertyKey() {
-    return String.format("%s.%s.%s", firstNodeName(), secondNodeName(), wildcardNodeName());
+    return String.format("%s.%s", prefixName(), wildcardName());
   }
   /** Get the property value by wildcard value and property key */
   default String getPropertyValue(String wildcardValue, String propertyKey) {
-    return String.format(
-        "%s.%s.%s.%s", firstNodeName(), secondNodeName(), wildcardValue, propertyKey);
+    return String.format("%s.%s.%s", prefixName(), wildcardValue, propertyKey);
   }
 
   /**
@@ -107,7 +101,7 @@ public interface WildcardPropertiesMeta {
       // Find the wildcard config key from the properties
       List<String> wildcardNodePropertyKeys =
           wildcardProperties.stream()
-              .filter(key -> !key.contains(WildcardPropertiesMeta.Constants.WILDCARD))
+              .filter(key -> !key.contains(WildcardPropertiesMetadata.Constants.WILDCARD))
               .collect(Collectors.toList());
       Preconditions.checkArgument(
           wildcardNodePropertyKeys.size() == 1,
@@ -148,8 +142,7 @@ public interface WildcardPropertiesMeta {
               .map(Pattern::compile)
               .collect(Collectors.toList());
 
-      String secondNodePropertyKey =
-          ((WildcardPropertiesMeta) propertiesMetadata).secondNodePropertyKey();
+      String secondNodePropertyKey = ((WildcardPropertiesMetadata) propertiesMetadata).prefixName();
       for (String key :
           properties.keySet().stream()
               .filter(

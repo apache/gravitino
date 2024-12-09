@@ -24,8 +24,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
-import org.apache.gravitino.connector.WildcardPropertiesMeta;
+import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
+import org.apache.gravitino.connector.WildcardPropertiesMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -37,23 +37,22 @@ public class TestAuthorizationPropertiesMeta {
   @Test
   public void checkChainPropertyDefines() throws IllegalAccessException {
     Map<String, String> mapVariable =
-        getPublicStaticVariableFromClass(AuthorizationPropertiesMeta.class);
+        getPublicStaticVariableFromClass(AuthorizationPropertiesMetadata.class);
     List<String> ignoreChecks =
         Arrays.asList(
-            AuthorizationPropertiesMeta.CHAIN_CATALOG_PROVIDER,
-            AuthorizationPropertiesMeta.CHAIN_PROVIDER,
-            AuthorizationPropertiesMeta.getInstance().wildcardNodePropertyKey());
+            AuthorizationPropertiesMetadata.CHAIN_CATALOG_PROVIDER,
+            AuthorizationPropertiesMetadata.CHAIN_PROVIDER,
+            AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey());
     mapVariable.values().stream()
         .forEach(
             value -> {
               if (!ignoreChecks.stream().anyMatch(ignore -> value.equals(ignore))
-                  && value.contains(
-                      AuthorizationPropertiesMeta.getInstance().secondNodePropertyKey())) {
+                  && value.contains(AuthorizationPropertiesMetadata.getInstance().prefixName())) {
                 String pluginPropValue =
                     value.replace(
-                        AuthorizationPropertiesMeta.getInstance()
-                            .getPropertyValue(WildcardPropertiesMeta.Constants.WILDCARD, ""),
-                        AuthorizationPropertiesMeta.getInstance().generateFirstNodePropertyKey(""));
+                        AuthorizationPropertiesMetadata.getInstance()
+                            .getPropertyValue(WildcardPropertiesMetadata.Constants.WILDCARD, ""),
+                        String.format("%s.", AuthorizationPropertiesMetadata.FIRST_SEGMENT_NAME));
                 LOG.info("Checking variable: {}, pluginPropValue: {}", value, pluginPropValue);
                 Assertions.assertTrue(
                     mapVariable.values().contains(pluginPropValue),
