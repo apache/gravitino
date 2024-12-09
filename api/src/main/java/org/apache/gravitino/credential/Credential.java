@@ -60,7 +60,7 @@ public interface Credential {
    * @param credentialInfo The credential information from {@link #credentialInfo}.
    * @param expireTimeInMs The expire-time from {@link #expireTimeInMs()}.
    */
-  void initializeWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs);
+  void initialize(Map<String, String> credentialInfo, long expireTimeInMs);
 
   /**
    * Converts the credential to properties to transfer the credential though API.
