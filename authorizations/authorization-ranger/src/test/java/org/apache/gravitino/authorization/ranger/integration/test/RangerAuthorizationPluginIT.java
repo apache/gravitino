@@ -33,6 +33,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -46,6 +47,11 @@ public class RangerAuthorizationPluginIT {
   public static void setup() {
     RangerITEnv.init(true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHivePlugin;
+  }
+
+  @AfterAll
+  public static void cleanup() {
+    RangerITEnv.cleanup();
   }
 
   @Test

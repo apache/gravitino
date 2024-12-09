@@ -31,6 +31,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHDFSMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -47,22 +48,30 @@ public class RangerAuthorizationHDFSPluginIT {
     rangerAuthPlugin = RangerITEnv.rangerAuthHDFSPlugin;
   }
 
+  @AfterAll
+  public static void cleanup() {
+    RangerITEnv.cleanup();
+  }
+
   @Test
   public void testTranslateMetadataObject() {
     MetadataObject metalake =
         MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> rangerAuthPlugin.translateMetadataObject(metalake));
+    Assertions.assertEquals(
+        RangerHDFSMetadataObject.Type.SCHEMA_PATH,
+        rangerAuthPlugin.translateMetadataObject(metalake).type());
 
     MetadataObject catalog =
         MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> rangerAuthPlugin.translateMetadataObject(catalog));
+    Assertions.assertEquals(
+        RangerHDFSMetadataObject.Type.SCHEMA_PATH,
+        rangerAuthPlugin.translateMetadataObject(catalog).type());
 
     MetadataObject schema =
         MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> rangerAuthPlugin.translateMetadataObject(schema));
+    Assertions.assertEquals(
+        RangerHDFSMetadataObject.Type.SCHEMA_PATH,
+        rangerAuthPlugin.translateMetadataObject(schema).type());
 
     MetadataObject table =
         MetadataObjects.parse(String.format("catalog1.schema1.tab1"), MetadataObject.Type.TABLE);
