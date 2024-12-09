@@ -20,7 +20,6 @@ from typing import List
 from gravitino.api.credential.credential import Credential
 from gravitino.exceptions.base import (
     NoSuchCredentialException,
-    InternalError,
     IllegalStateException,
 )
 
