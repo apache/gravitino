@@ -36,6 +36,11 @@ public class TestProviders {
     assertTrue(Providers.isValidProvider(Providers.MYSQL), "MYSQL should be a valid entity");
     assertTrue(Providers.isValidProvider(Providers.POSTGRES), "POSTGRES should be a valid entity");
     assertTrue(Providers.isValidProvider(Providers.KAFKA), "KAFKA should be a valid entity");
+    assertTrue(Providers.isValidProvider(Providers.DORIS), "DORIS should be a valid entity");
+    assertTrue(Providers.isValidProvider(Providers.PAIMON), "PAIMON should be a valid entity");
+    assertTrue(Providers.isValidProvider(Providers.HUDI), "HUDI should be a valid entity");
+    assertTrue(
+        Providers.isValidProvider(Providers.OCEANBASE), "OCEANBASE should be a valid entity");
   }
 
   @Test
@@ -70,6 +75,10 @@ public class TestProviders {
     assertNotNull(Providers.internal(Providers.MYSQL), "Internal string should not be null");
     assertNotNull(Providers.internal(Providers.POSTGRES), "Internal string should not be null");
     assertNotNull(Providers.internal(Providers.KAFKA), "Internal string should not be null");
+    assertNotNull(Providers.internal(Providers.DORIS), "Internal string should not be null");
+    assertNotNull(Providers.internal(Providers.PAIMON), "Internal string should not be null");
+    assertNotNull(Providers.internal(Providers.HUDI), "Internal string should not be null");
+    assertNotNull(Providers.internal(Providers.OCEANBASE), "Internal string should not be null");
   }
 
   @Test
@@ -88,6 +97,10 @@ public class TestProviders {
     assertNotNull(Providers.catalogType(Providers.MYSQL), "Catalog type should not be null");
     assertNotNull(Providers.catalogType(Providers.POSTGRES), "Catalog type should not be null");
     assertNotNull(Providers.catalogType(Providers.KAFKA), "Catalog type should not be null");
+    assertNotNull(Providers.catalogType(Providers.DORIS), "Catalog type should not be null");
+    assertNotNull(Providers.catalogType(Providers.PAIMON), "Catalog type should not be null");
+    assertNotNull(Providers.catalogType(Providers.HUDI), "Catalog type should not be null");
+    assertNotNull(Providers.catalogType(Providers.OCEANBASE), "Catalog type should not be null");
   }
 
   @Test

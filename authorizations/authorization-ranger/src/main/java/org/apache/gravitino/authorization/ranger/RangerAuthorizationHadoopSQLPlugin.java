@@ -49,16 +49,16 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
       LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
   private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
 
-  private RangerAuthorizationHadoopSQLPlugin(Map<String, String> config) {
-    super(config);
+  private RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
+    super(metalake, config);
   }
 
   public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
-      Map<String, String> config) {
+      String metalake, Map<String, String> config) {
     if (instance == null) {
       synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
         if (instance == null) {
-          instance = new RangerAuthorizationHadoopSQLPlugin(config);
+          instance = new RangerAuthorizationHadoopSQLPlugin(metalake, config);
         }
       }
     }

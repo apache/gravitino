@@ -54,7 +54,7 @@ import {
   updateFilesetApi,
   deleteFilesetApi
 } from '@/lib/api/filesets'
-import { getTopicsApi, getTopicDetailsApi } from '@/lib/api/topics'
+import { getTopicsApi, getTopicDetailsApi, createTopicApi, updateTopicApi, deleteTopicApi } from '@/lib/api/topics'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
   const [err, res] = await to(getMetalakesApi())
@@ -1104,6 +1104,67 @@ export const getTopicDetails = createAsyncThunk(
   }
 )
 
+export const createTopic = createAsyncThunk(
+  'appMetalakes/createTopic',
+  async ({ data, metalake, catalog, type, schema }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(createTopicApi({ data, metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    const { topic: topicItem } = res
+
+    const topicData = {
+      ...topicItem,
+      node: 'topic',
+      id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+      key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+      path: `?${new URLSearchParams({ metalake, catalog, type, schema, topic: topicItem.name }).toString()}`,
+      name: topicItem.name,
+      title: topicItem.name,
+      tables: [],
+      children: []
+    }
+
+    dispatch(fetchTopics({ metalake, catalog, schema, type, init: true }))
+
+    return topicData
+  }
+)
+
+export const updateTopic = createAsyncThunk(
+  'appMetalakes/updateTopic',
+  async ({ metalake, catalog, type, schema, topic, data }, { dispatch }) => {
+    const [err, res] = await to(updateTopicApi({ metalake, catalog, schema, topic, data }))
+    if (err || !res) {
+      return { err: true }
+    }
+    dispatch(fetchTopics({ metalake, catalog, type, schema, init: true }))
+
+    return res.catalog
+  }
+)
+
+export const deleteTopic = createAsyncThunk(
+  'appMetalakes/deleteTopic',
+  async ({ metalake, catalog, type, schema, topic }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteTopicApi({ metalake, catalog, schema, topic }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    dispatch(fetchTopics({ metalake, catalog, type, schema, page: 'topics', init: true }))
+
+    return res
+  }
+)
+
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
   initialState: {
@@ -1346,6 +1407,21 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
+    builder.addCase(createTable.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(updateTable.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteTable.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
     builder.addCase(fetchFilesets.fulfilled, (state, action) => {
       state.filesets = action.payload.filesets
       if (action.payload.init) {
@@ -1366,6 +1442,21 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
+    builder.addCase(createFileset.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(updateFileset.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteFileset.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
     builder.addCase(fetchTopics.fulfilled, (state, action) => {
       state.topics = action.payload.topics
       if (action.payload.init) {
@@ -1382,6 +1473,21 @@ export const appMetalakesSlice = createSlice({
       state.tableData = []
     })
     builder.addCase(getTopicDetails.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(createTopic.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(updateTopic.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteTopic.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
