@@ -26,6 +26,9 @@ plugins {
 
 dependencies {
   compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":catalogs:hadoop-common")) {
+    exclude("*")
+  }
   compileOnly(libs.hadoop3.common)
   implementation(libs.hadoop3.oss)
 

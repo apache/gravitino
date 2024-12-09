@@ -32,7 +32,12 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
+
   implementation(project(":common")) {
+    exclude(group = "*")
+  }
+
+  implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
 

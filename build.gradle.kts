@@ -775,7 +775,7 @@ tasks {
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
-        it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle"
+        it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" && it.name != "hadoop-common"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -797,7 +797,8 @@ tasks {
         !it.name.startsWith("trino-connector") &&
         it.name != "bundled-catalog" &&
         it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
-        it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle"
+        it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
+        it.name != "hadoop-common"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
