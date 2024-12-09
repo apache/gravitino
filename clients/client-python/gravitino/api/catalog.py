@@ -31,17 +31,36 @@ class Catalog(Auditable):
     class Type(Enum):
         """The type of the catalog."""
 
-        RELATIONAL = "relational"
+        RELATIONAL = ("relational", False)
         """"Catalog Type for Relational Data Structure, like db.table, catalog.db.table."""
 
-        FILESET = "fileset"
+        FILESET = ("fileset", False)
         """Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file"""
 
-        MESSAGING = "messaging"
+        MESSAGING = ("messaging", False)
         """Catalog Type for Message Queue, like kafka://topic"""
 
-        UNSUPPORTED = "unsupported"
+        MODEL = ("model", True)
+        """Catalog Type for ML model"""
+
+        UNSUPPORTED = ("unsupported", False)
         """Catalog Type for test only."""
+
+        def __init__(self, type_name, supports_managed_catalog):
+            self._type_name = type_name
+            self._supports_managed_catalog = supports_managed_catalog
+
+        @property
+        def supports_managed_catalog(self):
+            """
+            A flag to indicate if the catalog type supports managed catalog. Managed catalog is a
+            concept in Gravitino, which means Gravitino will manage the lifecycle of the catalog
+            and its subsidiaries. If the catalog type supports managed catalog, users can create
+            managed catalog of this type without specifying the catalog provider, Gravitino will
+            use the type as the provider to create the managed catalog. If the catalog type does
+            not support managed catalog, users need to specify the provider to create the catalog.
+            """
+            return self._supports_managed_catalog
 
     PROPERTY_PACKAGE = "package"
     """A reserved property to specify the package location of the catalog. The "package" is a string

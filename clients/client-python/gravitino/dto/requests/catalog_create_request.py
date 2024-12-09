@@ -60,3 +60,8 @@ class CatalogCreateRequest(RESTRequest):
             raise ValueError('"name" field is required and cannot be empty')
         if not self._type:
             raise ValueError('"catalog_type" field is required and cannot be empty')
+        if not self._provider and not self._type.supports_managed_catalog:
+            raise ValueError(
+                '"provider" field is required and cannot be empty for catalog type '
+                "that does not support managed catalog"
+            )
