@@ -60,9 +60,9 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
     def to_credentials(self, credentials: List[CredentialDTO]) -> List[Credential]:
         return [self.to_credential(credential) for credential in credentials]
 
-    def to_credential(self, credentialDTO: CredentialDTO) -> Credential:
+    def to_credential(self, credential_dto: CredentialDTO) -> Credential:
         return CredentialUtils.to_credential(
-            credentialDTO.credential_type(),
-            credentialDTO.credential_info(),
-            credentialDTO.expire_time_in_ms(),
+            credential_dto.credential_type(),
+            credential_dto.credential_info(),
+            credential_dto.expire_time_in_ms(),
         )

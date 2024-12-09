@@ -17,7 +17,6 @@
 import json
 import unittest
 
-from gravitino.dto.credential_dto import CredentialDTO
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.exceptions.base import IllegalArgumentException

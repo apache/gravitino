@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import ABC, abstractmethod
-from enum import Enum
 from typing import List, ClassVar
 
 from gravitino.api.metadata_object import MetadataObject
@@ -29,7 +27,6 @@ class MetadataObjectImpl(MetadataObject):
     def __init__(self, names: List[str], metadata_object_type: MetadataObject.Type):
         self._name = self._DOT.join(names)
         self._metadata_object_type = metadata_object_type
-        pass
 
     def type(self) -> MetadataObject.Type:
         return self._metadata_object_type

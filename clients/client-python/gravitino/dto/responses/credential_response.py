@@ -15,13 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from dataclasses import dataclass, field
-
-from dataclasses_json import config
 from typing import List
+from dataclasses import dataclass, field
+from dataclasses_json import config
 
 from gravitino.dto.credential_dto import CredentialDTO
 from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -39,4 +39,6 @@ class CredentialResponse(BaseResponse):
         Raises:
             IllegalArgumentException if catalog identifiers are not set.
         """
+        if self._credentials is None:
+            raise IllegalArgumentException("credentials should be set")
         super().validate()

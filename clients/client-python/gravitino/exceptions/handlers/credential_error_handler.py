@@ -19,8 +19,6 @@ from gravitino.constants.error import ErrorConstants
 from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
-    NoSuchFilesetException,
-    NoSuchSchemaException,
     CatalogNotInUseException,
     NoSuchCredentialException,
 )

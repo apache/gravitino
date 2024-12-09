@@ -19,7 +19,6 @@ import json
 from unittest.mock import patch
 
 from gravitino import GravitinoMetalake, Catalog, Fileset
-from gravitino.api.credential.credential import Credential
 from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.dto.credential_dto import CredentialDTO
 from gravitino.dto.fileset_dto import FilesetDTO
@@ -108,12 +107,3 @@ def mock_data(cls):
 def mock_name_identifier_json(name, namespace):
 
     return json.dumps({"name": name, "namespace": namespace}).encode("utf-8")
-
-
-def mock_get_credential(name: str, location: str):
-    credential = CredentialDTO(
-        _credential_type="mock",
-        _expire_time_in_ms=0,
-        _credential_info={"access_id": "id", "secret_key": "secret"},
-    )
-    return credential
