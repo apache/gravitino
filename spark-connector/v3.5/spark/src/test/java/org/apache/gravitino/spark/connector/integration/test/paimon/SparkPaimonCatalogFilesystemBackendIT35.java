@@ -16,17 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.spark.connector.integration.test.hive;
+package org.apache.gravitino.spark.connector.integration.test.paimon;
 
-import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34;
+import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class SparkHiveCatalogIT34 extends SparkHiveCatalogIT {
+public class SparkPaimonCatalogFilesystemBackendIT35 extends SparkPaimonCatalogFilesystemBackendIT {
+
   @Test
   void testCatalogClassName() {
     String catalogClass =
         getSparkSession().sparkContext().conf().get("spark.sql.catalog." + getCatalogName());
-    Assertions.assertEquals(GravitinoHiveCatalogSpark34.class.getName(), catalogClass);
+    Assertions.assertEquals(GravitinoIcebergCatalogSpark35.class.getName(), catalogClass);
   }
 }

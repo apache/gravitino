@@ -76,11 +76,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   protected TableCatalog sparkCatalog;
   protected PropertiesConverter propertiesConverter;
   protected SparkTransformConverter sparkTransformConverter;
+  // The Gravitino catalog client to do schema operations.
+  protected Catalog gravitinoCatalogClient;
   private SparkTypeConverter sparkTypeConverter;
   private SparkTableChangeConverter sparkTableChangeConverter;
 
-  // The Gravitino catalog client to do schema operations.
-  private Catalog gravitinoCatalogClient;
   private String catalogName;
   private final GravitinoCatalogManager gravitinoCatalogManager;
 
