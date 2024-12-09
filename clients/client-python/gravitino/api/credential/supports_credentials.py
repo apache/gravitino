@@ -21,13 +21,20 @@ from gravitino.api.credential.credential import Credential
 
 
 class SupportsCredentials(ABC):
-    """Represents the audit information of an entity."""
+    """Represents interface to get credentials."""
 
     @abstractmethod
     def get_credentials(self) -> List[Credential]:
-        """The creator of the entity.
+        """Retrieves an array of Credential objects.
 
         Returns:
-             the creator of the entity.
+        An array of Credential objects. In most cases the array only contains
+        one credential. If the object like Fileset contains multiple locations
+        for different storages like HDFS, S3, the array will contain multiple
+        credentials. The array could be empty if you request a credential for
+        a catalog but the credential provider couldn't generate the credential
+        for the catalog, like S3 token credential provider only generate
+        credential for the specific object like Fileset,Table. There will be at
+         most one credential for one credential type.
         """
         pass

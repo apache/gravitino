@@ -22,7 +22,7 @@ from gravitino.api.credential.credential import Credential
 
 
 class GCSTokenCredential(Credential, ABC):
-    """Represents the audit information of an entity."""
+    """Represents the S3 token credential."""
 
     GCS_TOKEN_CREDENTIAL_TYPE = "gcs-token"
     _GCS_TOKEN_NAME = "token"
@@ -34,27 +34,34 @@ class GCSTokenCredential(Credential, ABC):
         self._expire_time_in_ms = expire_time_in_ms
 
     def credential_type(self) -> str:
-        """The creator of the entity.
+        """The type of the credential.
 
         Returns:
-             the creator of the entity.
+             the type of the credential.
         """
         return self.GCS_TOKEN_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
-        """The creation time of the entity.
+        """Returns the expiration time of the credential in milliseconds since
+        the epoch, 0 means not expire.
 
         Returns:
-             The creation time of the entity.
+             The expiration time of the credential.
         """
         return self._expire_time_in_ms
 
     def credential_info(self) -> Dict[str, str]:
-        """
+        """The credential information.
+
         Returns:
-             The last modifier of the entity.
+             The credential information.
         """
         return {self._GCS_TOKEN_NAME: self._token}
 
     def token(self) -> str:
+        """The GCS token.
+
+        Returns:
+        The GCS token.
+        """
         return self._token

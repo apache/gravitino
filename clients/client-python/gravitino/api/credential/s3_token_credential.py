@@ -43,25 +43,27 @@ class S3TokenCredential(Credential, ABC):
         self._expire_time_in_ms = expire_time_in_ms
 
     def credential_type(self) -> str:
-        """The creator of the entity.
+        """The type of the credential.
 
         Returns:
-             the creator of the entity.
+             the type of the credential.
         """
         return self.S3_TOKEN_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
-        """The creation time of the entity.
+        """Returns the expiration time of the credential in milliseconds since
+        the epoch, 0 means not expire.
 
         Returns:
-             The creation time of the entity.
+             The expiration time of the credential.
         """
         return self._expire_time_in_ms
 
     def credential_info(self) -> Dict[str, str]:
-        """
+        """The credential information.
+
         Returns:
-             The last modifier of the entity.
+             The credential information.
         """
         return {
             self._GRAVITINO_S3_TOKEN: self._session_token,
@@ -70,10 +72,25 @@ class S3TokenCredential(Credential, ABC):
         }
 
     def access_key_id(self) -> str:
+        """The S3 access key id.
+
+        Returns:
+        The S3 access key id.
+        """
         return self._access_key_id
 
     def secret_access_key(self) -> str:
+        """The s3 secret access key.
+
+        Returns:
+        The S3 secret access key.
+        """
         return self._secret_access_key
 
     def session_token(self) -> str:
+        """The s3 session token.
+
+        Returns:
+        The S3 session token.
+        """
         return self._session_token

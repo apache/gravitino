@@ -20,8 +20,14 @@ from enum import Enum
 
 
 class MetadataObject(ABC):
+    """The MetadataObject is the basic unit of the Gravitino system. It
+    represents the metadata object in the Apache Gravitino system. The object
+    can be a metalake, catalog, schema, table, topic, etc.
+    """
+
     class Type(Enum):
-        """The type of the metadata object."""
+        """The type of object in the Gravitino system. Every type will map one
+        kind of the entity of the underlying system."""
 
         CATALOG = "catalog"
         """"Metadata Type for catalog."""
@@ -31,8 +37,20 @@ class MetadataObject(ABC):
 
     @abstractmethod
     def type(self) -> Type:
+        """
+        The type of the object.
+
+        Returns:
+        The type of the object.
+        """
         pass
 
     @abstractmethod
     def name(self) -> str:
+        """
+        The name of the object.
+
+        Returns:
+         The name of the object.
+        """
         pass

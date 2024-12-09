@@ -38,25 +38,27 @@ class OSSTokenCredential(Credential, ABC):
         self._expire_time_in_ms = expire_time_in_ms
 
     def credential_type(self) -> str:
-        """The creator of the entity.
+        """The type of the credential.
 
         Returns:
-             the creator of the entity.
+             the type of the credential.
         """
         return self.OSS_TOKEN_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
-        """The creation time of the entity.
+        """Returns the expiration time of the credential in milliseconds since
+        the epoch, 0 means not expire.
 
         Returns:
-             The creation time of the entity.
+             The expiration time of the credential.
         """
         return self._expire_time_in_ms
 
     def credential_info(self) -> Dict[str, str]:
-        """
+        """The credential information.
+
         Returns:
-             The last modifier of the entity.
+             The credential information.
         """
         return {
             self._GRAVITINO_OSS_TOKEN: self._security_token,
@@ -65,10 +67,25 @@ class OSSTokenCredential(Credential, ABC):
         }
 
     def access_key_id(self) -> str:
+        """The OSS access key id.
+
+        Returns:
+        The OSS access key id.
+        """
         return self._access_key_id
 
     def secret_access_key(self) -> str:
+        """The OSS secret access key.
+
+        Returns:
+        The OSS secret access key.
+        """
         return self._secret_access_key
 
     def security_token(self) -> str:
+        """The OSS security token.
+
+        Returns:
+        The OSS security token.
+        """
         return self._security_token

@@ -35,10 +35,11 @@ class S3SecretKeyCredential(Credential, ABC):
         ]
 
     def credential_type(self) -> str:
-        """The creator of the entity.
+        """Returns the expiration time of the credential in milliseconds since
+        the epoch, 0 means not expire.
 
         Returns:
-             the creator of the entity.
+             The expiration time of the credential.
         """
         return self.S3_SECRET_KEY_CREDENTIAL_TYPE
 
@@ -51,9 +52,10 @@ class S3SecretKeyCredential(Credential, ABC):
         return 0
 
     def credential_info(self) -> Dict[str, str]:
-        """
+        """The credential information.
+
         Returns:
-             The last modifier of the entity.
+             The credential information.
         """
         return {
             self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
@@ -61,7 +63,17 @@ class S3SecretKeyCredential(Credential, ABC):
         }
 
     def access_key_id(self) -> str:
+        """The S3 access key id.
+
+        Returns:
+        The S3 access key id.
+        """
         return self._access_key_id
 
     def secret_access_key(self) -> str:
+        """The s3 secret access key.
+
+        Returns:
+        The S3 secret access key.
+        """
         return self._secret_access_key

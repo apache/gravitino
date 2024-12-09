@@ -26,7 +26,7 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 @dataclass
 class CredentialResponse(BaseResponse):
-    """Response for credential creation."""
+    """Response for credential response."""
 
     _credentials: List[CredentialDTO] = field(metadata=config(field_name="credentials"))
 
@@ -37,7 +37,7 @@ class CredentialResponse(BaseResponse):
         """Validates the response data.
 
         Raises:
-            IllegalArgumentException if catalog identifiers are not set.
+            IllegalArgumentException if credentials are None.
         """
         if self._credentials is None:
             raise IllegalArgumentException("credentials should be set")
