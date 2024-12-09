@@ -650,7 +650,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           store.list(schemaNamespace, SchemaEntity.class, EntityType.SCHEMA);
       CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
 
-      if (haveAvailableSchemas(schemaEntities, catalogEntity, catalogWrapper) && !force) {
+      if (containsUserCreatedSchemas(schemaEntities, catalogEntity, catalogWrapper) && !force) {
         throw new NonEmptyCatalogException(
             "Catalog %s has schemas, please drop them first or use force option", ident);
       }
@@ -686,15 +686,43 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  private boolean haveAvailableSchemas(
+  /**
+   * Check if the given list of schema entities contains any currently existing user-created
+   * schemas.
+   *
+   * <p>This method determines if there are valid user-created schemas by comparing the provided
+   * schema entities with the actual schemas currently existing in the external catalog. It
+   * excludes:
+   *
+   * <ul>
+   *   <li>1. Automatically generated schemas (such as Kafka catalog's "default" schema or
+   *       JDBC-PostgreSQL catalog's "public" schema).
+   *   <li>2. Schemas that have been dropped externally but still exist in the entity store.
+   * </ul>
+   *
+   * @param schemaEntities The list of schema entities to check.
+   * @param catalogEntity The catalog entity to which the schemas belong.
+   * @param catalogWrapper The catalog wrapper for the catalog.
+   * @return True if the list of schema entities contains any valid user-created schemas, false
+   *     otherwise.
+   * @throws Exception If an error occurs while checking the schemas.
+   */
+  private boolean containsUserCreatedSchemas(
       List<SchemaEntity> schemaEntities, CatalogEntity catalogEntity, CatalogWrapper catalogWrapper)
       throws Exception {
     if (schemaEntities.isEmpty()) {
       return false;
     }
 
-    if (schemaEntities.size() == 1 && catalogEntity.getProvider().equals("kafka")) {
-      return false;
+    if (schemaEntities.size() == 1) {
+      if ("kafka".equals(catalogEntity.getProvider())) {
+        return false;
+
+      } else if ("jdbc-postgresql".equals(catalogEntity.getProvider())) {
+        // PostgreSQL catalog includes the "public" schema, see
+        // https://github.com/apache/gravitino/issues/2314
+        return !schemaEntities.get(0).name().equals("public");
+      }
     }
 
     NameIdentifier[] allSchemas =
