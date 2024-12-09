@@ -104,39 +104,38 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     checkDirExists(partitionPath);
   }
 
+  @Test
+  void testPaimonPartitionManagement() {
+    testPaimonListAndDropPartition();
+    // TODO: replace, add and load partition operations are unsupported in Paimon now.
+  }
 
-    @Test
-    void testPaimonPartitionManagement() {
-        testPaimonListAndDropPartition();
-        // TODO: replace, add and load partition operations are unsupported in Paimon now.
-    }
+  private void testPaimonListAndDropPartition() {
+    String tableName = "test_paimon_drop_partition";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+    sql(createTableSQL);
 
-    private void testPaimonListAndDropPartition() {
-        String tableName = "test_paimon_drop_partition";
-        dropTableIfExists(tableName);
-        String createTableSQL = getCreatePaimonSimpleTableString(tableName);
-        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-        sql(createTableSQL);
+    String insertData =
+        String.format(
+            "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
+            tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult.size());
 
-        String insertData =
-                String.format(
-                        "INSERT into %s values(1,'a','beijing'), (2,'b','beijing'), (3,'c','beijing');",
-                        tableName);
-        sql(insertData);
-        List<String> queryResult = getTableData(tableName);
-        Assertions.assertEquals(3, queryResult.size());
+    List<String> partitions = getQueryData(String.format("show partitions %s", tableName));
+    Assertions.assertEquals(3, partitions.size());
+    Assertions.assertEquals("name=a;name=b;name=c", String.join(";", partitions));
 
-        List<String> partitions = getQueryData(String.format("show partitions %s", tableName));
-        Assertions.assertEquals(3, partitions.size());
-        Assertions.assertEquals("name=a;name=b;name=c", String.join(";", partitions));
+    sql(String.format("ALTER TABLE %s DROP PARTITION (`name`='a')", tableName));
+    partitions = getQueryData(String.format("show partitions %s", tableName));
+    Assertions.assertEquals(2, partitions.size());
+    Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
+  }
 
-        sql(String.format("ALTER TABLE %s DROP PARTITION (`name`='a')", tableName));
-        partitions = getQueryData(String.format("show partitions %s", tableName));
-        Assertions.assertEquals(2, partitions.size());
-        Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
-    }
-
-    private String getCreatePaimonSimpleTableString(String tableName) {
+  private String getCreatePaimonSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
         tableName);
