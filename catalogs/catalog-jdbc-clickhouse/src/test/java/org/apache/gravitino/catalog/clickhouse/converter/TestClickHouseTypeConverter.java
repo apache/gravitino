@@ -44,9 +44,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/**
- * Test class for {@link ClickHouseTypeConverter}
- */
+/** Test class for {@link ClickHouseTypeConverter} */
 public class TestClickHouseTypeConverter {
 
   private static final ClickHouseTypeConverter CLICKHOUSE_TYPE_CONVERTER =

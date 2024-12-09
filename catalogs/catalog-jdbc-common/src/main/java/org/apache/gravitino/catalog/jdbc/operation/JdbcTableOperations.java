@@ -103,7 +103,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException {
-    create(databaseName,
+    create(
+        databaseName,
         tableName,
         columns,
         comment,
@@ -131,7 +132,13 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcConnectorUtils.executeUpdate(
           connection,
           generateCreateTableSql(
-              tableName, columns, comment, properties, partitioning, distribution, indexes,
+              tableName,
+              columns,
+              comment,
+              properties,
+              partitioning,
+              distribution,
+              indexes,
               sortOrders));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
@@ -478,7 +485,8 @@ public abstract class JdbcTableOperations implements TableOperation {
     return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
-  protected abstract String generateCreateTableSql(String tableName,
+  protected abstract String generateCreateTableSql(
+      String tableName,
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
@@ -494,10 +502,10 @@ public abstract class JdbcTableOperations implements TableOperation {
       Transform[] partitioning,
       Distribution distribution,
       Index[] indexes,
-      SortOrder[] sortOrders){
-    if(sortOrders == null || sortOrders.length == 0){
-      return generateCreateTableSql(tableName, columns, comment, properties, partitioning,
-          distribution, indexes);
+      SortOrder[] sortOrders) {
+    if (sortOrders == null || sortOrders.length == 0) {
+      return generateCreateTableSql(
+          tableName, columns, comment, properties, partitioning, distribution, indexes);
     }
 
     throw new UnsupportedOperationException(

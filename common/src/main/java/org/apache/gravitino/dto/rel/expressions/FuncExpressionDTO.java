@@ -18,11 +18,10 @@
  */
 package org.apache.gravitino.dto.rel.expressions;
 
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
-
-import java.util.Arrays;
 
 /** Data transfer object representing a function expression. */
 @EqualsAndHashCode

@@ -23,8 +23,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -60,7 +58,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return literal.value().toString();
       } else {
         Object value = literal.value();
-        if(value instanceof LocalDateTime){
+        if (value instanceof LocalDateTime) {
           value = ((LocalDateTime) value).format(DATE_TIME_FORMATTER);
         }
         return String.format("'%s'", value);
@@ -99,7 +97,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       }
     }
 
-    //TODO clickhouse has bug which isExpression is false when is really expression
+    // TODO clickhouse has bug which isExpression is false when is really expression
     if (isExpression) {
       if (columnDefaultValue.equals(NOW)) {
         return DEFAULT_VALUE_OF_NOW;
@@ -110,8 +108,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
     }
 
     // need exclude begin and end "'"
-    String reallyValue = columnDefaultValue.startsWith("'") ?  columnDefaultValue.substring(1,
-        columnDefaultValue.length() - 1) : columnDefaultValue;
+    String reallyValue =
+        columnDefaultValue.startsWith("'")
+            ? columnDefaultValue.substring(1, columnDefaultValue.length() - 1)
+            : columnDefaultValue;
 
     try {
       switch (reallyType) {
@@ -152,13 +152,12 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         case ClickHouseTypeConverter.DATETIME:
           return CURRENT_TIMESTAMP.equals(reallyValue)
               ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
-              : Literals.timestampLiteral(
-                  LocalDateTime.parse(reallyValue, DATE_TIME_FORMATTER));
+              : Literals.timestampLiteral(LocalDateTime.parse(reallyValue, DATE_TIME_FORMATTER));
         case ClickHouseTypeConverter.STRING:
           return Literals.of(reallyValue, Types.StringType.get());
         case ClickHouseTypeConverter.FIXEDSTRING:
-          return Literals.of(reallyValue,
-              Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
+          return Literals.of(
+              reallyValue, Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
         default:
           return UnparsedExpression.of(reallyValue);
       }

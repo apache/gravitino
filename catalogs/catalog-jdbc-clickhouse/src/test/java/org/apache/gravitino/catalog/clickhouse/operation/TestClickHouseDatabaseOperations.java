@@ -24,22 +24,17 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
-import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
-import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
 
 @Tag("gravitino-docker-test")
 public class TestClickHouseDatabaseOperations extends TestClickHouse {
@@ -90,10 +85,8 @@ public class TestClickHouseDatabaseOperations extends TestClickHouse {
 
     Index[] indexes = new Index[] {};
 
-    SortOrder[] sortOrders = new SortOrders.SortImpl[]{
-        SortOrders.of(
-            NamedReference.field("col_1"), null, null)
-    };
+    SortOrder[] sortOrders =
+        new SortOrders.SortImpl[] {SortOrders.of(NamedReference.field("col_1"), null, null)};
 
     TABLE_OPERATIONS.create(
         databaseName,

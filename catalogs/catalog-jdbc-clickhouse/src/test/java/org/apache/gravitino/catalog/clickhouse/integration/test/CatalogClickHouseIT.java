@@ -27,7 +27,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
+import java.io.IOException;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -73,17 +82,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
-
-import java.io.IOException;
-import java.sql.SQLException;
-import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -184,7 +182,9 @@ public class CatalogClickHouseIT extends BaseIT {
 
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
-        StringUtils.substring(CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME), 0,
+        StringUtils.substring(
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
             CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
@@ -218,8 +218,14 @@ public class CatalogClickHouseIT extends BaseIT {
   private Column[] createColumns() {
     Column col1 = Column.of(CLICKHOUSE_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
     Column col2 = Column.of(CLICKHOUSE_COL_NAME2, Types.DateType.get(), "col_2_comment");
-    Column col3 = Column.of(CLICKHOUSE_COL_NAME3, Types.StringType.get(), "col_3_comment", false,
-        false, DEFAULT_VALUE_NOT_SET);
+    Column col3 =
+        Column.of(
+            CLICKHOUSE_COL_NAME3,
+            Types.StringType.get(),
+            "col_3_comment",
+            false,
+            false,
+            DEFAULT_VALUE_NOT_SET);
 
     return new Column[] {col1, col2, col3};
   }
@@ -378,8 +384,7 @@ public class CatalogClickHouseIT extends BaseIT {
   void testColumnNameWithKeyWords() {
     // Create table from Gravitino API
     Column[] columns = {
-        Column.of("integer", Types.IntegerType.get(), "integer", false, false,
-            DEFAULT_VALUE_NOT_SET),
+      Column.of("integer", Types.IntegerType.get(), "integer", false, false, DEFAULT_VALUE_NOT_SET),
       Column.of("long", Types.LongType.get(), "long"),
       Column.of("float", Types.FloatType.get(), "float"),
       Column.of("double", Types.DoubleType.get(), "double"),
@@ -391,7 +396,6 @@ public class CatalogClickHouseIT extends BaseIT {
     String name = GravitinoITUtils.genRandomName("table") + "_keyword";
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
     Distribution distribution = Distributions.NONE;
-
 
     Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
 
@@ -454,8 +458,14 @@ public class CatalogClickHouseIT extends BaseIT {
 
     NameIdentifier tableIdent =
         NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("clickhouse_it_table"));
-    catalog.asTableCatalog()
-        .createTable(tableIdent, newColumns, null, ImmutableMap.of(), Transforms.EMPTY_TRANSFORM,
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdent,
+            newColumns,
+            null,
+            ImmutableMap.of(),
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             getSortOrders(CLICKHOUSE_COL_NAME1));
     Table createdTable = catalog.asTableCatalog().loadTable(tableIdent);
@@ -466,8 +476,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertEquals(Literals.NULL, createdTable.columns()[2].defaultValue());
     Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
     Assertions.assertEquals(
-        Literals.stringLiteral("now()"),
-        createdTable.columns()[4].defaultValue());
+        Literals.stringLiteral("now()"), createdTable.columns()[4].defaultValue());
   }
 
   @Test
@@ -514,104 +523,100 @@ public class CatalogClickHouseIT extends BaseIT {
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
 
     for (Column column : loadedTable.columns()) {
-//      try {
-        switch (column.name()) {
-          case "int_col_1":
-            Assertions.assertEquals(Literals.integerLiteral(431), column.defaultValue());
-            break;
-          case "int_col_2":
-            Assertions.assertEquals(UnparsedExpression.of("rand()"), column.defaultValue());
-            break;
-          case "int_col_3":
-            Assertions.assertEquals(Literals.integerLiteral(3), column.defaultValue());
-            break;
-          case "unsigned_int_col_1":
-            Assertions.assertEquals(Literals.unsignedIntegerLiteral(1L), column.defaultValue());
-            break;
-          case "unsigned_bigint_col_1":
-            Assertions.assertEquals(
-                Literals.unsignedLongLiteral(Decimal.of("0")), column.defaultValue());
-            break;
-          case "double_col_1":
-            Assertions.assertEquals(Literals.doubleLiteral(123.45), column.defaultValue());
-            break;
-          case "varchar20_col_1":
-            Assertions.assertEquals(Literals.stringLiteral("10"), column.defaultValue());
-            break;
-          case "varchar100_col_1":
-            Assertions.assertEquals(
-                Literals.stringLiteral("now()"), column.defaultValue());
-            break;
-          case "varchar200_col_1":
-            Assertions.assertEquals(Literals.stringLiteral("curdate()"), column.defaultValue());
-            break;
-          case "varchar200_col_2":
-            Assertions.assertEquals(Literals.stringLiteral("today()"), column.defaultValue());
-            break;
-          case "varchar200_col_3":
-            Assertions.assertEquals(Literals.stringLiteral("now()"), column.defaultValue());
-            break;
-          case "datetime_col_1":
-          case "datetime_col_2":
-            Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
-            break;
-          case "datetime_col_3":
-            Assertions.assertEquals(Literals.NULL, column.defaultValue());
-            break;
-          case "datetime_col_4":
-            Assertions.assertEquals(
-                UnparsedExpression.of("19830905"), column.defaultValue());
-            break;
-          case "date_col_1":
-            Assertions.assertEquals(UnparsedExpression.of("today()"), column.defaultValue());
-            break;
-          case "date_col_2":
-            Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
-            break;
-          case "date_col_3":
-            Assertions.assertEquals(
-                UnparsedExpression.of("today() + toIntervalYear(1)"), column.defaultValue());
-            break;
-          case "date_col_4":
-            Assertions.assertEquals(UnparsedExpression.of("today()"), column.defaultValue());
-            break;
-          case "date_col_5":
-            Assertions.assertEquals(
-                Literals.dateLiteral(LocalDate.of(2024, 4, 1)), column.defaultValue());
-            break;
-          case "timestamp_col_1":
-            Assertions.assertEquals(
-                Literals.timestampLiteral("2012-12-31T11:30:45"), column.defaultValue());
-            break;
-          case "timestamp_col_2":
-            Assertions.assertEquals(
-                UnparsedExpression.of("19830905"), column.defaultValue());
-            break;
-          case "timestamp_col_3":
-            Assertions.assertEquals(
-                UnparsedExpression.of("now()"), column.defaultValue());
-            break;
-          case "decimal_6_2_col_1":
-            Assertions.assertEquals(
-                Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
-            break;
-          case "bit_col_1":
-            Assertions.assertEquals(Literals.unsignedLongLiteral(Decimal.of("1")),
-                column.defaultValue());
-            break;
-          default:
-            Assertions.fail(
-                "Unexpected column name: "
-                    + column.name()
-                    + ", default value: "
-                    + column.defaultValue());
-        }
-//      } catch (Throwable ex) {
-//        System.err.println(ex);
-//        for (Object obj : ex.getStackTrace()) {
-//          System.err.println(obj);
-//        }
-//      }
+      //      try {
+      switch (column.name()) {
+        case "int_col_1":
+          Assertions.assertEquals(Literals.integerLiteral(431), column.defaultValue());
+          break;
+        case "int_col_2":
+          Assertions.assertEquals(UnparsedExpression.of("rand()"), column.defaultValue());
+          break;
+        case "int_col_3":
+          Assertions.assertEquals(Literals.integerLiteral(3), column.defaultValue());
+          break;
+        case "unsigned_int_col_1":
+          Assertions.assertEquals(Literals.unsignedIntegerLiteral(1L), column.defaultValue());
+          break;
+        case "unsigned_bigint_col_1":
+          Assertions.assertEquals(
+              Literals.unsignedLongLiteral(Decimal.of("0")), column.defaultValue());
+          break;
+        case "double_col_1":
+          Assertions.assertEquals(Literals.doubleLiteral(123.45), column.defaultValue());
+          break;
+        case "varchar20_col_1":
+          Assertions.assertEquals(Literals.stringLiteral("10"), column.defaultValue());
+          break;
+        case "varchar100_col_1":
+          Assertions.assertEquals(Literals.stringLiteral("now()"), column.defaultValue());
+          break;
+        case "varchar200_col_1":
+          Assertions.assertEquals(Literals.stringLiteral("curdate()"), column.defaultValue());
+          break;
+        case "varchar200_col_2":
+          Assertions.assertEquals(Literals.stringLiteral("today()"), column.defaultValue());
+          break;
+        case "varchar200_col_3":
+          Assertions.assertEquals(Literals.stringLiteral("now()"), column.defaultValue());
+          break;
+        case "datetime_col_1":
+        case "datetime_col_2":
+          Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Literals.NULL, column.defaultValue());
+          break;
+        case "datetime_col_4":
+          Assertions.assertEquals(UnparsedExpression.of("19830905"), column.defaultValue());
+          break;
+        case "date_col_1":
+          Assertions.assertEquals(UnparsedExpression.of("today()"), column.defaultValue());
+          break;
+        case "date_col_2":
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "date_col_3":
+          Assertions.assertEquals(
+              UnparsedExpression.of("today() + toIntervalYear(1)"), column.defaultValue());
+          break;
+        case "date_col_4":
+          Assertions.assertEquals(UnparsedExpression.of("today()"), column.defaultValue());
+          break;
+        case "date_col_5":
+          Assertions.assertEquals(
+              Literals.dateLiteral(LocalDate.of(2024, 4, 1)), column.defaultValue());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(
+              Literals.timestampLiteral("2012-12-31T11:30:45"), column.defaultValue());
+          break;
+        case "timestamp_col_2":
+          Assertions.assertEquals(UnparsedExpression.of("19830905"), column.defaultValue());
+          break;
+        case "timestamp_col_3":
+          Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
+          break;
+        case "decimal_6_2_col_1":
+          Assertions.assertEquals(
+              Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
+          break;
+        case "bit_col_1":
+          Assertions.assertEquals(
+              Literals.unsignedLongLiteral(Decimal.of("1")), column.defaultValue());
+          break;
+        default:
+          Assertions.fail(
+              "Unexpected column name: "
+                  + column.name()
+                  + ", default value: "
+                  + column.defaultValue());
+      }
+      //      } catch (Throwable ex) {
+      //        System.err.println(ex);
+      //        for (Object obj : ex.getStackTrace()) {
+      //          System.err.println(obj);
+      //        }
+      //      }
     }
   }
 
@@ -637,7 +642,7 @@ public class CatalogClickHouseIT extends BaseIT {
             + "  decimal_6_2_col decimal(6, 2),\n"
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
-//            + "  binary_col binary,\n"
+            //            + "  binary_col binary,\n"
             + "  blob_col blob\n"
             + ") order by tinyint_col;\n";
 
@@ -703,8 +708,13 @@ public class CatalogClickHouseIT extends BaseIT {
     Column[] columns = createColumns();
     catalog
         .asTableCatalog()
-        .createTable(NameIdentifier.of(schemaName, tableName), columns, table_comment,
-            createProperties(), Transforms.EMPTY_TRANSFORM, Distributions.NONE,
+        .createTable(
+            NameIdentifier.of(schemaName, tableName),
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
             getSortOrders(CLICKHOUSE_COL_NAME3));
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -769,8 +779,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertNotNull(table.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(table.auditInfo().lastModifier());
 
-    Column col1 = Column.of("name", Types.StringType.get(), "comment", false, false,
-        DEFAULT_VALUE_NOT_SET);
+    Column col1 =
+        Column.of("name", Types.StringType.get(), "comment", false, false, DEFAULT_VALUE_NOT_SET);
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
     Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
 
@@ -837,7 +847,10 @@ public class CatalogClickHouseIT extends BaseIT {
         catalog
             .asTableCatalog()
             .createTable(
-                NameIdentifier.of(schemaName, tableName), columns, null, ImmutableMap.of(),
+                NameIdentifier.of(schemaName, tableName),
+                columns,
+                null,
+                ImmutableMap.of(),
                 Transforms.EMPTY_TRANSFORM,
                 Distributions.NONE,
                 getSortOrders(CLICKHOUSE_COL_NAME1));
@@ -928,8 +941,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Assertions.assertEquals(
         Literals.of("1.2345", Types.FloatType.get()), table.columns()[0].defaultValue());
-    Assertions.assertEquals(
-        UnparsedExpression.of("now()"), table.columns()[1].defaultValue());
+    Assertions.assertEquals(UnparsedExpression.of("now()"), table.columns()[1].defaultValue());
     Assertions.assertEquals(
         Literals.of("hello", Types.StringType.get()), table.columns()[2].defaultValue());
     Assertions.assertEquals(
@@ -962,8 +974,9 @@ public class CatalogClickHouseIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
     Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
-//    Assertions.assertTrue(
-//        excep.getMessage().contains("has sub-entities, you should remove sub-entities first"));
+    //    Assertions.assertTrue(
+    //        excep.getMessage().contains("has sub-entities, you should remove sub-entities
+    // first"));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);
@@ -978,7 +991,6 @@ public class CatalogClickHouseIT extends BaseIT {
           schemas.loadSchema(schemaName);
         });
   }
-
 
   @Test
   public void testSchemaComment() {
@@ -1023,32 +1035,28 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> tableCatalog.loadTable(tableIdentifier));
 
     Assertions.assertDoesNotThrow(
-        () -> tableCatalog.alterTable(
-              tableIdentifier,
-             TableChange.addColumn(
-                new String[]{"int"},
-                Types.StringType.get(),
-                TableChange.ColumnPosition.after("status")))
-        );
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.addColumn(
+                    new String[] {"int"},
+                    Types.StringType.get(),
+                    TableChange.ColumnPosition.after("status"))));
 
     Table table = tableCatalog.loadTable(tableIdentifier);
     for (Column column : table.columns()) {
       System.out.println(column.name());
     }
 
-
     Assertions.assertDoesNotThrow(
-        () ->  tableCatalog.alterTable(
-                tableIdentifier,
-                    TableChange.renameColumn(new String[] {"int"}, "varchar")
-                ));
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.renameColumn(new String[] {"int"}, "varchar")));
 
     Assertions.assertDoesNotThrow(
         () ->
             tableCatalog.alterTable(
-                tableIdentifier,
-                TableChange.deleteColumn(new String[] {"varchar"}, true)
-            ));
+                tableIdentifier, TableChange.deleteColumn(new String[] {"varchar"}, true)));
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
   }
@@ -1367,7 +1375,8 @@ public class CatalogClickHouseIT extends BaseIT {
     // test operate illegal table name from ClickHouse
     clickhouseService.executeQuery(sql);
     String testTableName = "//";
-    sql = String.format("CREATE TABLE `%s`.`%s` (id int) order by id", testSchemaName, testTableName);
+    sql =
+        String.format("CREATE TABLE `%s`.`%s` (id int) order by id", testSchemaName, testTableName);
     clickhouseService.executeQuery(sql);
     NameIdentifier tableIdent = NameIdentifier.of(testSchemaName, testTableName);
 
@@ -1451,7 +1460,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
-//    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
+    //    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"},
+    // {"col_3"}})};
 
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
     SupportsSchemas schemaSupport = catalog.asSchemas();
@@ -1510,7 +1520,8 @@ public class CatalogClickHouseIT extends BaseIT {
   void testUnparsedTypeConverter() {
     String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
     clickhouseService.executeQuery(
-        String.format("CREATE TABLE %s.%s (bit_col IPv4) order by bit_col ;", schemaName, tableName));
+        String.format(
+            "CREATE TABLE %s.%s (bit_col IPv4) order by bit_col ;", schemaName, tableName));
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals(Types.ExternalType.of("IPv4"), loadedTable.columns()[0].dataType());
@@ -1550,7 +1561,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Table table = tableCatalog.loadTable(tableIdentifier);
     newColumns = new Column[] {col1, col2, col3, col4};
 
-//    Assertions.assertEquals(col4.defaultValue(), table.columns()[3].defaultValue());
+    //    Assertions.assertEquals(col4.defaultValue(), table.columns()[3].defaultValue());
 
     ITUtils.assertionsTableInfo(
         tableName,

@@ -62,7 +62,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
 
   /** refer https://clickhouse.com/docs/en/engines/table-engines */
   public enum ENGINE {
-    //MergeTree
+    // MergeTree
     MERGETREE("MergeTree"),
     REPLACINGMERGETREE("ReplacingMergeTree"),
     SUMMINGMERGETREE("SummingMergeTree"),
@@ -71,12 +71,12 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree"),
     GRAPHITEMERGETREE("GraphiteMergeTree"),
 
-    //Log
+    // Log
     TINYLOG("TinyLog"),
     STRIPELOG("StripeLog"),
     LOG("Log"),
 
-    //Integration Engines
+    // Integration Engines
     ODBC("ODBC"),
     JDBC("JDBC"),
     MySQL("MySQL"),
@@ -91,7 +91,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     S3QUEUE("S3Queue"),
     TIMESERIES("TimeSeries"),
 
-    //Special Engines
+    // Special Engines
     DISTRIBUTED("Distributed"),
     DICTIONARY("Dictionary"),
     MERGE("Merge"),

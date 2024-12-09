@@ -113,28 +113,32 @@ public class ITUtils {
           Arrays.stream(indexes).collect(Collectors.toMap(Index::name, index -> index));
 
       for (int i = 0; i < table.index().length; i++) {
-        //some database don't support name primary key, such as clickhouse, mysql.
+        // some database don't support name primary key, such as clickhouse, mysql.
         IndexType tableIndexType = table.index()[i].type();
         if (indexByName.get(table.index()[i].name()) == null) {
           Assertions.assertTrue(table.index()[i].name().equalsIgnoreCase("PRIMARY"));
           Assertions.assertEquals(tableIndexType, IndexType.PRIMARY_KEY);
 
-          Index primKey = indexByName.values().stream()
-              .filter(e -> IndexType.PRIMARY_KEY.equals(e.type())).findFirst().get();
+          Index primKey =
+              indexByName.values().stream()
+                  .filter(e -> IndexType.PRIMARY_KEY.equals(e.type()))
+                  .findFirst()
+                  .get();
           for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
             for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
-              Assertions.assertEquals(primKey.fieldNames()[j][k],
-                  table.index()[i].fieldNames()[j][k]);
+              Assertions.assertEquals(
+                  primKey.fieldNames()[j][k], table.index()[i].fieldNames()[j][k]);
             }
           }
         } else {
           Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
-          Assertions.assertEquals(indexByName.get(table.index()[i].name()).type(),
-              table.index()[i].type());
+          Assertions.assertEquals(
+              indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
 
           for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
             for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
-              Assertions.assertEquals(indexByName.get(table.index()[i].name()).fieldNames()[j][k],
+              Assertions.assertEquals(
+                  indexByName.get(table.index()[i].name()).fieldNames()[j][k],
                   table.index()[i].fieldNames()[j][k]);
             }
           }

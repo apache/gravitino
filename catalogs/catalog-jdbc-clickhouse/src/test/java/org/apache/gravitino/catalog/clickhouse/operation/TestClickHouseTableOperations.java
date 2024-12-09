@@ -22,12 +22,18 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesM
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -41,14 +47,6 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Tag("gravitino-docker-test")
 public class TestClickHouseTableOperations extends TestClickHouse {
@@ -125,25 +123,24 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withName("col_5")
             .withType(STRING)
             .withComment("new_add")
-            .withNullable(false)//
-//            .withDefaultValue(Literals.of("hello test", STRING))
+            .withNullable(false) //
+            //            .withDefaultValue(Literals.of("hello test", STRING))
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
         newName,
         TableChange.addColumn(
-            new String[]{newColumn.name()},
+            new String[] {newColumn.name()},
             newColumn.dataType(),
             newColumn.comment(),
             TableChange.ColumnPosition.after("col_1"),
             newColumn.nullable(),
             newColumn.autoIncrement(),
-            newColumn.defaultValue()
-        )
-//        ,
-//        TableChange.setProperty(CLICKHOUSE_ENGINE_KEY, "InnoDB"));
-//    properties.put(CLICKHOUSE_ENGINE_KEY, "InnoDB"
-    );
+            newColumn.defaultValue())
+        //        ,
+        //        TableChange.setProperty(CLICKHOUSE_ENGINE_KEY, "InnoDB"));
+        //    properties.put(CLICKHOUSE_ENGINE_KEY, "InnoDB"
+        );
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), newName);
     List<JdbcColumn> alterColumns =
         new ArrayList<JdbcColumn>() {
@@ -199,10 +196,11 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be dropped");
 
-    GravitinoRuntimeException exception = Assertions.assertThrows(GravitinoRuntimeException.class,
-        () -> TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName));
-    Assertions.assertTrue(
-        StringUtils.contains(exception.getMessage(), "does not exist"));
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () -> TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName));
+    Assertions.assertTrue(StringUtils.contains(exception.getMessage(), "does not exist"));
   }
 
   @Test
@@ -528,12 +526,12 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.DateType.get())
             .withNullable(false)
             .build());
-//    columns.add(
-//        JdbcColumn.builder()
-//            .withName("col_8")
-//            .withType(Types.TimeType.get())
-//            .withNullable(false)
-//            .build());
+    //    columns.add(
+    //        JdbcColumn.builder()
+    //            .withName("col_8")
+    //            .withType(Types.TimeType.get())
+    //            .withNullable(false)
+    //            .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
@@ -556,12 +554,12 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.StringType.get())
             .withNullable(false)
             .build());
-//    columns.add(
-//        JdbcColumn.builder()
-//            .withName("col_14")
-//            .withType(Types.BinaryType.get())
-//            .withNullable(false)
-//            .build());
+    //    columns.add(
+    //        JdbcColumn.builder()
+    //            .withName("col_14")
+    //            .withType(Types.BinaryType.get())
+    //            .withNullable(false)
+    //            .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_15")

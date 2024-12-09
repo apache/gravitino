@@ -95,7 +95,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName)
       throws SQLException {
-    //cause clickhouse not impl getPrimaryKeys yet, ref: https://github.com/ClickHouse/clickhouse-java/issues/1625
+    // cause clickhouse not impl getPrimaryKeys yet, ref:
+    // https://github.com/ClickHouse/clickhouse-java/issues/1625
     String sql = String.format("SHOW INDEX FROM `%s`.`%s`", databaseName, tableName);
 
     // get Indexes from SQL
@@ -112,7 +113,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           columnName = resultSet.getString("pk_col");
         }
         indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][]{{columnName}}));
+            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
       }
       return indexes;
     } catch (SQLException e) {
@@ -132,6 +133,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     throw new UnsupportedOperationException(
         "generateCreateTableSql with out sortOrders in clickhouse is not supported");
   }
+
   @Override
   protected String generateCreateTableSql(
       String tableName,
@@ -189,15 +191,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     if (ArrayUtils.isNotEmpty(sortOrders)) {
-      if (sortOrders.length > 1 ) {
+      if (sortOrders.length > 1) {
         throw new UnsupportedOperationException(
             "Currently we do not support sortOrders's length > 1");
       } else if (sortOrders[0].nullOrdering() != null || sortOrders[0].direction() != null) {
-        //If no value is set earlier, some default values will be set.
+        // If no value is set earlier, some default values will be set.
         // It is difficult to determine whether the user has set a value.
         LOG.warn(
             "clickhouse currently do not support nullOrdering: {} and direction: {} of sortOrders,and will ignore these",
-            sortOrders[0].nullOrdering(), sortOrders[0].direction());
+            sortOrders[0].nullOrdering(),
+            sortOrders[0].direction());
       }
       sqlBuilder.append(
           " \n ORDER BY " + BACK_QUOTE + sortOrders[0].expression() + BACK_QUOTE + " \n");
@@ -227,16 +230,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case PRIMARY_KEY:
           if (null != index.name()
               && !StringUtils.equalsIgnoreCase(
-              index.name(), Indexes.DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME)) {
-            LOG.warn("Primary key name must be PRIMARY in ClickHouse, the name {} will be ignored.",
+                  index.name(), Indexes.DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME)) {
+            LOG.warn(
+                "Primary key name must be PRIMARY in ClickHouse, the name {} will be ignored.",
                 index.name());
           }
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case UNIQUE_KEY:
-          throw new IllegalArgumentException("Gravitino clickHouse doesn't support index : " + index.type());
+          throw new IllegalArgumentException(
+              "Gravitino clickHouse doesn't support index : " + index.type());
         default:
-          throw new IllegalArgumentException("Gravitino Clickhouse doesn't support index : " + index.type());
+          throw new IllegalArgumentException(
+              "Gravitino Clickhouse doesn't support index : " + index.type());
       }
     }
   }
@@ -249,8 +255,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement(
-        "select * from system.tables where name = ? ")) {
+    try (PreparedStatement statement =
+        connection.prepareStatement("select * from system.tables where name = ? ")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
         while (resultSet.next()) {
@@ -271,7 +277,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
   }
-
 
   @Override
   protected void correctJdbcTableFields(
@@ -460,11 +465,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return "";
-//    return setProperties.stream()
-//        .map(
-//            setProperty ->
-//                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
-//        .collect(Collectors.joining(",\n"));
+    //    return setProperties.stream()
+    //        .map(
+    //            setProperty ->
+    //                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+    //        .collect(Collectors.joining(",\n"));
   }
 
   private String updateColumnCommentFieldDefinition(
@@ -529,7 +534,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       columnDefinition.append(CLICKHOUSE_AUTO_INCREMENT).append(SPACE);
     }
 
-
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
@@ -561,8 +565,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return columnDefinition.toString();
   }
 
-  private String renameColumnFieldDefinition(
-      TableChange.RenameColumn renameColumn) {
+  private String renameColumnFieldDefinition(TableChange.RenameColumn renameColumn) {
     if (renameColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
@@ -669,10 +672,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return appendColumnDefinition(newColumn, sqlBuilder, true).toString();
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder , boolean isUpdateCol) {
+  private StringBuilder appendColumnDefinition(
+      JdbcColumn column, StringBuilder sqlBuilder, boolean isUpdateCol) {
     // Add data type
     sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
-
 
     //     ck no support alter table with set nullable
     if (!isUpdateCol) {

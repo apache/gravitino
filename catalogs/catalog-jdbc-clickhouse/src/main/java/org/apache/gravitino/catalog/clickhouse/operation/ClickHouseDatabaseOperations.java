@@ -19,22 +19,17 @@
 package org.apache.gravitino.catalog.clickhouse.operation;
 
 import com.google.common.collect.ImmutableSet;
-
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-/**
- * Database operations for ClickHouse.
- */
+/** Database operations for ClickHouse. */
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
@@ -56,15 +51,18 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     } catch (NoSuchSchemaException e) {
       return false;
     } catch (Exception e) {
-      if (e.getMessage() != null && (
-          e.getMessage().contains("Database " + databaseName + " does not exist.") || e.getMessage()
-              .contains("Database `" + databaseName + "` does not exist."))) {
+      if (e.getMessage() != null
+          && (e.getMessage().contains("Database " + databaseName + " does not exist.")
+              || e.getMessage().contains("Database `" + databaseName + "` does not exist."))) {
         return false;
       }
 
-      if (e.getMessage() != null && e.getMessage()
-          .contains(
-              "Database " + databaseName + " is not empty, the value of cascade should be true.")) {
+      if (e.getMessage() != null
+          && e.getMessage()
+              .contains(
+                  "Database "
+                      + databaseName
+                      + " is not empty, the value of cascade should be true.")) {
         throw e;
       }
     }
@@ -75,7 +73,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   public List<String> listDatabases() {
     List<String> databaseNames = new ArrayList<>();
     try (final Connection connection = getConnection()) {
-      //It is possible that other catalogs have been deleted,
+      // It is possible that other catalogs have been deleted,
       // causing the following statement to error,
       // so here we manually set a system catalog
       connection.setCatalog(createSysDatabaseNameSet().iterator().next());

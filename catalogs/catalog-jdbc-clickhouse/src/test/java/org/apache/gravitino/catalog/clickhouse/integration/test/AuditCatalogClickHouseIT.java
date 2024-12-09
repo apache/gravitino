@@ -19,12 +19,14 @@
 
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
-
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.collect.Maps;
-
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -49,11 +51,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.sql.SQLException;
-import java.util.Collections;
-import java.util.Map;
 
 @Tag("gravitino-docker-test")
 public class AuditCatalogClickHouseIT extends BaseIT {
@@ -129,8 +126,9 @@ public class AuditCatalogClickHouseIT extends BaseIT {
     Catalog catalog = createCatalog(catalogName);
     Map<String, String> properties = Maps.newHashMap();
 
-    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment", false, false,
-        DEFAULT_VALUE_NOT_SET);
+    Column col1 =
+        Column.of(
+            "col_1", Types.IntegerType.get(), "col_1_comment", false, false, DEFAULT_VALUE_NOT_SET);
 
     catalog.asSchemas().createSchema(schemaName, null, properties);
     Table table =
@@ -143,8 +141,7 @@ public class AuditCatalogClickHouseIT extends BaseIT {
                 properties,
                 null,
                 null,
-                getSortOrders("col_1")
-                );
+                getSortOrders("col_1"));
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
     Assertions.assertNull(table.auditInfo().lastModifier());
     table =

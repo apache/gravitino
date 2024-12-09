@@ -19,7 +19,6 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
@@ -29,13 +28,11 @@ import java.sql.Statement;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
 
 public class ClickHouseContainer extends BaseContainer {
@@ -92,7 +89,8 @@ public class ClickHouseContainer extends BaseContainer {
       String query = String.format("CREATE DATABASE IF NOT EXISTS %s;", testDatabaseName);
       // FIXME: String, which is used in SQL, can be unsafe
       statement.execute(query);
-      LOG.info(String.format("clickHouse container database %s has been created", testDatabaseName));
+      LOG.info(
+          String.format("clickHouse container database %s has been created", testDatabaseName));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -112,8 +110,7 @@ public class ClickHouseContainer extends BaseContainer {
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format(
-        "jdbc:clickhouse://%s:%d/%s", getContainerIpAddress(),
-        CLICKHOUSE_PORT, testDatabaseName);
+        "jdbc:clickhouse://%s:%d/%s", getContainerIpAddress(), CLICKHOUSE_PORT, testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {

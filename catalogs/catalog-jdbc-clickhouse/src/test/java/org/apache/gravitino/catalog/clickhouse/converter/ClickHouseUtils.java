@@ -25,9 +25,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 public class ClickHouseUtils {
 
   public static SortOrder[] getSortOrders(String colName) {
-    return new SortOrders.SortImpl[]{
-        SortOrders.of(
-            NamedReference.field(colName), null, null)
-    };
+    return new SortOrders.SortImpl[] {SortOrders.of(NamedReference.field(colName), null, null)};
   }
 }

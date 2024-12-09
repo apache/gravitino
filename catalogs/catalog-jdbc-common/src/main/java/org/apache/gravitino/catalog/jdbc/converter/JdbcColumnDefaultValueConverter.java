@@ -20,13 +20,12 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.time.format.DateTimeFormatter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
-
-import java.time.format.DateTimeFormatter;
 
 public class JdbcColumnDefaultValueConverter {
 

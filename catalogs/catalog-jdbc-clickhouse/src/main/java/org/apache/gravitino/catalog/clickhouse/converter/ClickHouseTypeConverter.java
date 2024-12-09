@@ -21,11 +21,8 @@ package org.apache.gravitino.catalog.clickhouse.converter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.rel.types.Types.MapType;
 
-/**
- * Type converter for ClickHouse.
- */
+/** Type converter for ClickHouse. */
 public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
   static final String INT8 = "Int8";
@@ -68,7 +65,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   static final String SIMPLEAGGREGATEFUNCTION = "SimpleAggregateFunction";
   static final String GEO = "Geo";
 
-  //bellow is Special Data Types
+  // bellow is Special Data Types
   static final String Domains = "Domains";
   static final String Nested = "Nested";
   static final String Dynamic = "Dynamic";

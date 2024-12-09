@@ -83,7 +83,7 @@ public interface TableOperation {
    * @param indexes The indexes of the table.
    * @param sortOrders The sort orders of the table
    */
-   void create(
+  void create(
       String databaseName,
       String tableName,
       JdbcColumn[] columns,
