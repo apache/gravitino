@@ -148,7 +148,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
       throw e;
     }
     sql("USE " + getCatalogName());
-    createDatabaseIfNotExists(getDefaultDatabase());
+    createDatabaseIfNotExists(getDefaultDatabase(), getProvider());
   }
 
   @BeforeEach
@@ -280,7 +280,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     // test db.table as table identifier
     String databaseName = "db1";
     String tableName = "table1";
-    createDatabaseIfNotExists(databaseName);
+    createDatabaseIfNotExists(databaseName, getProvider());
     String tableIdentifier = String.join(".", databaseName, tableName);
 
     dropTableIfExists(tableIdentifier);
@@ -294,7 +294,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     // use db then create table with table name
     databaseName = "db2";
     tableName = "table2";
-    createDatabaseIfNotExists(databaseName);
+    createDatabaseIfNotExists(databaseName, getProvider());
 
     sql("USE " + databaseName);
     dropTableIfExists(tableName);
@@ -382,7 +382,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String database = "db_list";
     String table3 = "list3";
     String table4 = "list4";
-    createDatabaseIfNotExists(database);
+    createDatabaseIfNotExists(database, getProvider());
     dropTableIfExists(String.join(".", database, table3));
     dropTableIfExists(String.join(".", database, table4));
     createSimpleTable(String.join(".", database, table3));
