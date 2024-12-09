@@ -202,13 +202,13 @@ impl OpenedFile {
         }
     }
 
-    fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
+    async fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
         self.file_stat.atime = Timestamp::from(SystemTime::now());
 
-        self.reader.as_mut().unwrap().read(offset, size).into()
+        self.reader.as_mut().unwrap().read(offset, size).await
     }
 
-    fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
+    async fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
         let end = offset + data.len() as u64;
 
         if end > self.file_stat.size  {
@@ -217,7 +217,7 @@ impl OpenedFile {
         self.file_stat.atime = Timestamp::from(SystemTime::now());
         self.file_stat.mtime = self.file_stat.atime;
 
-        self.writer.as_mut().unwrap().write(offset, data)
+        self.writer.as_mut().unwrap().write(offset, data).await
     }
 
     fn file_handle(&self) -> FileHandle {
@@ -234,13 +234,16 @@ impl OpenedFile {
 }
 
 /// File reader interface  for read file content
+
+#[async_trait]
 pub(crate) trait FileReader: Sync + Send {
-    fn read(&mut self, offset: u64, size: u32) -> Result<Bytes>;
+    async fn read(&mut self, offset: u64, size: u32) -> Result<Bytes>;
 }
 
 /// File writer interface  for write file content
+#[async_trait]
 pub(crate) trait FileWriter: Sync + Send {
-    fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32>;
+    async fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32>;
 }
 
 /// FileIdManager is a manager for file id and file name mapping.
@@ -441,7 +444,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
             let mut opened_file = self.opened_file_manager.get_file(fh).ok_or(Errno::from(libc::EBADF))?;
             let mut opened_file =  opened_file.lock().await;
             file_stat = opened_file.file_stat.clone();
-            opened_file.read(offset, size)
+            opened_file.read(offset, size).await
         };
 
         self.fs.set_attr(&file_stat.path, &file_stat,false).await?;
@@ -453,7 +456,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         let (len, file_stat) = {
             let opened_file = self.opened_file_manager.get_file(fh).ok_or(Errno::from(libc::EBADF))?;
             let mut opened_file = opened_file.lock().await;
-            let len = opened_file.write(offset, data);
+            let len = opened_file.write(offset, data).await;
             (len, opened_file.file_stat.clone())
         };
 

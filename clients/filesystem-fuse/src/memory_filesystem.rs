@@ -163,9 +163,10 @@ pub(crate) struct MemoryFileReader {
     pub(crate) data: Arc<Mutex<Vec<u8>>>,
 }
 
+#[async_trait]
 impl FileReader for MemoryFileReader {
 
-    fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
+    async fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
         let v = self.data.lock().unwrap();
         let start = offset as usize;
         let end = usize::min(start + size as usize, v.len());
@@ -180,9 +181,10 @@ pub(crate) struct MemoryFileWriter {
     pub(crate) data: Arc<Mutex<Vec<u8>>>,
 }
 
+#[async_trait]
 impl FileWriter for MemoryFileWriter {
 
-    fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
+    async fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
         let mut v = self.data.lock().unwrap();
         let start = offset as usize;
         let end = start + data.len();
