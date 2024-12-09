@@ -64,6 +64,7 @@ import org.apache.ranger.plugin.model.RangerPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -75,6 +76,7 @@ public class RangerFilesetIT extends BaseIT {
 
   private String RANGER_ADMIN_URL;
   private String defaultBaseLocation;
+  private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private String metalakeName = "metalake";
   private String catalogName = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_schema");
@@ -136,6 +138,7 @@ public class RangerFilesetIT extends BaseIT {
   }
 
   @Test
+  @Order(0)
   void testReadWritePath() throws IOException, RangerServiceException {
     String filename = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_fileset");
     Fileset fileset =
@@ -317,6 +320,40 @@ public class RangerFilesetIT extends BaseIT {
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
     Assertions.assertEquals(1, policies.size());
     Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
+  }
+
+  @Test
+  @Order(1)
+  void testReadWritePathE2E() throws IOException, RangerServiceException, InterruptedException {
+    String filenameRole = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_fileset");
+    Fileset fileset =
+        catalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(schemaName, filenameRole),
+                "comment",
+                Fileset.Type.MANAGED,
+                storageLocation(filenameRole),
+                null);
+    Assertions.assertTrue(
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, fileset.name())));
+    Assertions.assertTrue(fileSystem.exists(new Path(storageLocation(filenameRole))));
+
+    String filesetRole = currentFunName() + "_testReadWritePathE2E";
+    SecurableObject securableObject =
+        SecurableObjects.parse(
+            String.format("%s.%s.%s", catalogName, schemaName, fileset.name()),
+            MetadataObject.Type.FILESET,
+            Lists.newArrayList(Privileges.ReadFileset.allow()));
+    metalake.createRole(filesetRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.addUser(userName1);
+    metalake.grantRolesToUser(Lists.newArrayList(filesetRole), userName1);
+    waitForUpdatingPolicies();
+    Assertions.assertDoesNotThrow(
+        () -> fileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
+    Assertions.assertThrows(
+        Exception.class, () -> fileSystem.mkdirs(new Path(storageLocation(filenameRole))));
   }
 
   private void createCatalogAndSchema() {
