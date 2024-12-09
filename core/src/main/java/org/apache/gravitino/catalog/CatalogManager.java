@@ -691,7 +691,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * schemas.
    *
    * <p>This method determines if there are valid user-created schemas by comparing the provided
-   * schema entities with the actual schemas currently existing in the external catalog. It
+   * schema entities with the actual schemas currently existing in the external data source. It
    * excludes:
    *
    * <ul>
