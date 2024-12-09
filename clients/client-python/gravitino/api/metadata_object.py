@@ -41,7 +41,7 @@ class MetadataObject(ABC):
         The type of the object.
 
         Returns:
-        The type of the object.
+            The type of the object.
         """
         pass
 
@@ -51,6 +51,6 @@ class MetadataObject(ABC):
         The name of the object.
 
         Returns:
-         The name of the object.
+            The name of the object.
         """
         pass

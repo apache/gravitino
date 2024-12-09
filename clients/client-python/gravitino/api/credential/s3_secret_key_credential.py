@@ -67,7 +67,7 @@ class S3SecretKeyCredential(Credential, ABC):
         """The S3 access key id.
 
         Returns:
-        The S3 access key id.
+            The S3 access key id.
         """
         return self._access_key_id
 
@@ -75,6 +75,6 @@ class S3SecretKeyCredential(Credential, ABC):
         """The s3 secret access key.
 
         Returns:
-        The S3 secret access key.
+            The S3 secret access key.
         """
         return self._secret_access_key

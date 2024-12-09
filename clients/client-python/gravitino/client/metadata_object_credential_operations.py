@@ -44,7 +44,6 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
         self._request_path = (
             f"api/metalakes/{metalake_name}/objects/{t}/{name}/credentials"
         )
-        pass
 
     def get_credentials(self) -> List[Credential]:
         resp = self._rest_client.get(

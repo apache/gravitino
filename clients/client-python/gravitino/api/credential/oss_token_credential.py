@@ -70,7 +70,7 @@ class OSSTokenCredential(Credential, ABC):
         """The OSS access key id.
 
         Returns:
-        The OSS access key id.
+            The OSS access key id.
         """
         return self._access_key_id
 
@@ -78,7 +78,7 @@ class OSSTokenCredential(Credential, ABC):
         """The OSS secret access key.
 
         Returns:
-        The OSS secret access key.
+            The OSS secret access key.
         """
         return self._secret_access_key
 
@@ -86,6 +86,6 @@ class OSSTokenCredential(Credential, ABC):
         """The OSS security token.
 
         Returns:
-        The OSS security token.
+            The OSS security token.
         """
         return self._security_token

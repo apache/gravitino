@@ -141,12 +141,12 @@ class TestErrorHandler(unittest.TestCase):
             )
 
         with self.assertRaises(InternalError):
-            FILESET_ERROR_HANDLER.handle(
+            CREDENTIAL_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(InternalError, "mock error")
             )
 
         with self.assertRaises(RESTException):
-            FILESET_ERROR_HANDLER.handle(
+            CREDENTIAL_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )
 

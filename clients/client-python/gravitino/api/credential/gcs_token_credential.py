@@ -62,6 +62,6 @@ class GCSTokenCredential(Credential, ABC):
         """The GCS token.
 
         Returns:
-        The GCS token.
+            The GCS token.
         """
         return self._token
