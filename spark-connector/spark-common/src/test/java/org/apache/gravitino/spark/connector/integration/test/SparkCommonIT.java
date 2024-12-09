@@ -242,6 +242,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   void testDropSchema() {
     String testDatabaseName = "t_drop";
+    dropDatabaseIfExists(testDatabaseName);
     Set<String> databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
 

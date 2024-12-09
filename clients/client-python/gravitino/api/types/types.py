@@ -123,7 +123,7 @@ class Types:
             return cls(True)
 
         @classmethod
-        def unsigned(cls):
+        def unsigned(cls) -> "ShortType":
             return cls(False)
 
         def name(self) -> Name:

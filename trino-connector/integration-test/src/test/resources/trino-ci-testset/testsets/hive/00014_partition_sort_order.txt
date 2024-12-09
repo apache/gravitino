@@ -1,0 +1,39 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+INSERT: 25 rows
+
+CREATE TABLE
+
+INSERT: 25 rows
+
+INSERT: 25 rows
+
+CREATE TABLE
+
+INSERT: 25 rows
+
+CREATE TABLE
+
+INSERT: 25 rows
+
+CREATE TABLE
+
+INSERT: 25 rows
+
+INSERT: 25 rows
+
+"10"
+
+"2"
+
+"2"
+
+"5"
+
+"25"
+
+"50"

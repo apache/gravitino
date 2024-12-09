@@ -72,6 +72,11 @@ public class TestPaimonCatalog {
         public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Topic properties are not supported");
         }
+
+        @Override
+        public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Model properties are not supported");
+        }
       };
 
   private static String tempDir =

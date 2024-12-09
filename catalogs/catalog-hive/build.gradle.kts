@@ -130,6 +130,7 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.hadoop2.aws)
   testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.gcs)
 
   // You need this to run test CatalogHiveABSIT as it required hadoop3 environment introduced by hadoop3.abs
   // (The protocol `abfss` was first introduced in Hadoop 3.2.0), However, as the there already exists

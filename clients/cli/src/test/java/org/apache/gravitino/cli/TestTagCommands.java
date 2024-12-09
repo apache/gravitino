@@ -35,6 +35,7 @@ import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListEntityTags;
 import org.apache.gravitino.cli.commands.ListTagProperties;
+import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.TagDetails;
@@ -74,7 +75,7 @@ class TestTagCommands {
   }
 
   @Test
-  void testMetalakeDetailsCommand() {
+  void testTagDetailsCommand() {
     TagDetails mockDetails = mock(TagDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -305,6 +306,30 @@ class TestTagCommands {
         .newListTagProperties(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA");
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
+  }
+
+  @Test
+  void testDeleteAllTagCommand() {
+    RemoveAllTags mockRemoveAllTags = mock(RemoveAllTags.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(false);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.table");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.REMOVE));
+    doReturn(mockRemoveAllTags)
+        .when(commandLine)
+        .newRemoveAllTags(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            any(FullName.class),
+            eq(true));
+    commandLine.handleCommandLine();
+    verify(mockRemoveAllTags).handle();
   }
 
   @Test

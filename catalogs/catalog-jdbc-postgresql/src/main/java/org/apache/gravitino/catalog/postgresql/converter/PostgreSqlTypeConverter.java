@@ -69,12 +69,11 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       case TIMESTAMP_TZ:
         return Types.TimestampType.withTimeZone();
       case NUMERIC:
-        return Types.DecimalType.of(
-            Integer.parseInt(typeBean.getColumnSize()), Integer.parseInt(typeBean.getScale()));
+        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
-        return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+        return Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
-        return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+        return Types.FixedCharType.of(typeBean.getColumnSize());
       case TEXT:
         return Types.StringType.get();
       case BYTEA:
