@@ -59,9 +59,9 @@ public class TestOceanBaseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.TimeType.get(), TIME, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(), TIMESTAMP, null, null);
-    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, "10", "2");
-    checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, "20", null);
-    checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), CHAR, "20", null);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2);
+    checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null);
+    checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), CHAR, 20, null);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BINARY, null, null);
     checkJdbcTypeToGravitinoType(
@@ -95,13 +95,13 @@ public class TestOceanBaseTypeConverter {
   }
 
   protected void checkJdbcTypeToGravitinoType(
-      Type gravitinoType, String jdbcTypeName, String columnSize, String scale) {
+      Type gravitinoType, String jdbcTypeName, Integer columnSize, Integer scale) {
     JdbcTypeConverter.JdbcTypeBean typeBean = createTypeBean(jdbcTypeName, columnSize, scale);
     Assertions.assertEquals(gravitinoType, OCEANBASE_TYPE_CONVERTER.toGravitino(typeBean));
   }
 
   protected static JdbcTypeConverter.JdbcTypeBean createTypeBean(
-      String typeName, String columnSize, String scale) {
+      String typeName, Integer columnSize, Integer scale) {
     return new JdbcTypeConverter.JdbcTypeBean(typeName) {
       {
         setColumnSize(columnSize);

@@ -89,6 +89,7 @@ public class RangerITEnv {
 
     rangerAuthHivePlugin =
         RangerAuthorizationHadoopSQLPlugin.getInstance(
+            "metalake",
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(

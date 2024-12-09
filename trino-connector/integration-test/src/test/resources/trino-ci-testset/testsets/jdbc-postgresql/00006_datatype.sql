@@ -21,7 +21,6 @@ CREATE TABLE tb01 (
     f16 TIMESTAMP WITH TIME ZONE
 );
 
-
 SHOW CREATE TABLE tb01;
 
 INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)

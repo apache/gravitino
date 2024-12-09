@@ -1,0 +1,86 @@
+CREATE TABLE
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+"Sample text 1","Text1               ","65","123.456","7.89","12.34","false","1","100","1000","1000","100000","2024-01-01","2024-01-01 08:00:00.000"
+"","","","","","","","","","","","","",""
+
+"CREATE TABLE gt_hive.gt_db1.tb01 (
+   f1 varchar(200),
+   f2 char(20),
+   f3 varbinary,
+   f4 decimal(10, 3),
+   f5 real,
+   f6 double,
+   f7 boolean,
+   f8 tinyint,
+   f9 smallint,
+   f10 integer,
+   f11 integer,
+   f12 bigint,
+   f13 date,
+   f15 timestamp(3)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb01',
+   table_type = 'MANAGED_TABLE'
+)"
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+"[1, 2, 3]"
+"[4, 5, NULL, 7]"
+"[]"
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"[1, 2, 3]","3"
+"[4, 5, NULL, 7]","4"
+"[]","0"
+
+"apple","banana"
+
+"[1, 2, 3]"
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"[1, 2, 3]","[4, 5]","[1, 2, 3, 4, 5]"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"[3, 1, 2]","[1, 2, 3]"
+"[9, 7, 8]","[7, 8, 9]"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"[1, NULL, 3]","3"
+"[NULL, NULL]","2"
+
+CREATE TABLE
+
+INSERT: 4 rows
+
+"[1, 2, 3, 4]"
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"[[a, b], [c, d]]"
