@@ -46,6 +46,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
@@ -60,6 +61,7 @@ import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -830,6 +832,160 @@ public class TestPOConverters {
     assertEquals(1, ownerRelPO.getCurrentVersion());
     assertEquals(1, ownerRelPO.getLastVersion());
     assertEquals(0, ownerRelPO.getDeletedAt());
+  }
+
+  @Test
+  public void testInitModelPO() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    ModelEntity modelEntity =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(Namespace.of("test_metalake", "test_catalog", "test_schema"))
+            .withComment("this is test")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelPO.Builder builder =
+        ModelPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
+    ModelPO modelPO = POConverters.initializeModelPO(modelEntity, builder);
+
+    assertEquals(1, modelPO.getModelId());
+    assertEquals("test", modelPO.getModelName());
+    assertEquals(1, modelPO.getMetalakeId());
+    assertEquals(1, modelPO.getCatalogId());
+    assertEquals(1, modelPO.getSchemaId());
+    assertEquals("this is test", modelPO.getModelComment());
+
+    Map<String, String> resultProperties =
+        JsonUtils.anyFieldMapper().readValue(modelPO.getModelProperties(), Map.class);
+    assertEquals(ImmutableMap.of("key", "value"), resultProperties);
+
+    AuditInfo resultAuditInfo =
+        JsonUtils.anyFieldMapper().readValue(modelPO.getAuditInfo(), AuditInfo.class);
+    assertEquals(auditInfo, resultAuditInfo);
+    assertEquals(1, modelPO.getModelLatestVersion());
+    assertEquals(0, modelPO.getDeletedAt());
+
+    // Test with null fields
+    ModelEntity modelEntityWithNull =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(Namespace.of("test_metalake", "test_catalog", "test_schema"))
+            .withComment(null)
+            .withProperties(null)
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelPO.Builder builderWithNull =
+        ModelPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
+    ModelPO modelPOWithNull = POConverters.initializeModelPO(modelEntityWithNull, builderWithNull);
+
+    assertNull(modelPOWithNull.getModelComment());
+    Map<String, String> resultPropertiesWithNull =
+        JsonUtils.anyFieldMapper().readValue(modelPOWithNull.getModelProperties(), Map.class);
+    assertNull(resultPropertiesWithNull);
+  }
+
+  @Test
+  public void testFromModelPO() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Map<String, String> properties = ImmutableMap.of("key", "value");
+    Map<String, String> emptyProperties = Collections.emptyMap();
+    Namespace namespace = Namespace.of("test_metalake", "test_catalog", "test_schema");
+
+    ModelPO modelPO =
+        ModelPO.builder()
+            .withModelId(1L)
+            .withModelName("test")
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L)
+            .withModelComment("this is test")
+            .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+            .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelLatestVersion(1)
+            .withDeletedAt(0L)
+            .build();
+
+    ModelEntity expectedModel =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(namespace)
+            .withComment("this is test")
+            .withProperties(properties)
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelEntity convertedModel = POConverters.fromModelPO(modelPO, namespace);
+    assertEquals(expectedModel, convertedModel);
+
+    // test null fields
+    ModelPO modelPOWithNull =
+        ModelPO.builder()
+            .withModelId(1L)
+            .withModelName("test")
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L)
+            .withModelComment(null)
+            .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(null))
+            .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelLatestVersion(1)
+            .withDeletedAt(0L)
+            .build();
+
+    ModelEntity expectedModelWithNull =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(namespace)
+            .withComment(null)
+            .withProperties(null)
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelEntity convertedModelWithNull = POConverters.fromModelPO(modelPOWithNull, namespace);
+    assertEquals(expectedModelWithNull, convertedModelWithNull);
+
+    // Test with empty properties
+    ModelPO modelPOWithEmptyProperties =
+        ModelPO.builder()
+            .withModelId(1L)
+            .withModelName("test")
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L)
+            .withModelComment("this is test")
+            .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(emptyProperties))
+            .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelLatestVersion(1)
+            .withDeletedAt(0L)
+            .build();
+
+    ModelEntity expectedModelWithEmptyProperties =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(namespace)
+            .withComment("this is test")
+            .withProperties(emptyProperties)
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelEntity convertedModelWithEmptyProperties =
+        POConverters.fromModelPO(modelPOWithEmptyProperties, namespace);
+    assertEquals(expectedModelWithEmptyProperties, convertedModelWithEmptyProperties);
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

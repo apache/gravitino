@@ -75,9 +75,7 @@ public abstract class SparkUtilIT extends BaseIT {
   // Specify Location explicitly because the default location is local HDFS, Spark will expand the
   // location to HDFS.
   protected void createDatabaseIfNotExists(String database) {
-    sql(
-        String.format(
-            "CREATE DATABASE IF NOT EXISTS %s LOCATION '/user/hive/%s'", database, database));
+    sql(String.format("CREATE DATABASE IF NOT EXISTS %s", database));
   }
 
   protected Map<String, String> getDatabaseMetadata(String database) {

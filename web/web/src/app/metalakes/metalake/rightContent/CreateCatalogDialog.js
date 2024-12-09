@@ -525,9 +525,9 @@ const CreateCatalogDialog = props => {
                       disabled={type === 'update'}
                       data-refer='catalog-type-selector'
                     >
-                      <MenuItem value={'relational'}>relational</MenuItem>
-                      <MenuItem value={'fileset'}>fileset</MenuItem>
-                      <MenuItem value={'messaging'}>messaging</MenuItem>
+                      <MenuItem value={'relational'}>Relational</MenuItem>
+                      <MenuItem value={'fileset'}>Fileset</MenuItem>
+                      <MenuItem value={'messaging'}>Messaging</MenuItem>
                     </Select>
                   )}
                 />
@@ -680,12 +680,12 @@ const CreateCatalogDialog = props => {
                           )}
                           {item.key && item.invalid && (
                             <FormHelperText className={'twc-text-error-main'}>
-                              Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                              characters, underscores, hyphens, or dots.
+                              Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                              underscores, hyphens, or dots.
                             </FormHelperText>
                           )}
                           {!item.key.trim() && (
-                            <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                            <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                           )}
                         </FormControl>
                       </Grid>

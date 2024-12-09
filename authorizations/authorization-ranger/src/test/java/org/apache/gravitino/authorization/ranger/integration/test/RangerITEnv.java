@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,13 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
-import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -90,6 +89,7 @@ public class RangerITEnv {
 
     rangerAuthHivePlugin =
         RangerAuthorizationHadoopSQLPlugin.getInstance(
+            "metalake",
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(
@@ -180,8 +180,7 @@ public class RangerITEnv {
         RANGER_HDFS_REPO_NAME,
         policyName,
         policyResourceMap,
-        Collections.singletonList(policyItem),
-        false);
+        Collections.singletonList(policyItem));
   }
 
   /**
@@ -218,8 +217,7 @@ public class RangerITEnv {
         RANGER_HIVE_REPO_NAME,
         policyName,
         policyResourceMap,
-        Collections.singletonList(policyItem),
-        false);
+        Collections.singletonList(policyItem));
   }
 
   public void createRangerTrinoRepository(String trinoIp) {
@@ -380,7 +378,9 @@ public class RangerITEnv {
     try {
       rangerRole =
           RangerITEnv.rangerClient.getRole(
-              role.name(), rangerAuthPlugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+              rangerHelper.generateGravitinoRoleName(role.name()),
+              rangerAuthPlugin.rangerAdminName,
+              RangerITEnv.RANGER_HIVE_REPO_NAME);
       LOG.info("rangerRole: " + rangerRole.toString());
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
@@ -426,7 +426,7 @@ public class RangerITEnv {
     role.securableObjects()
         .forEach(
             securableObject -> {
-              List<RangerSecurableObject> rangerSecurableObjects =
+              List<AuthorizationSecurableObject> rangerSecurableObjects =
                   rangerAuthPlugin.translatePrivilege(securableObject);
 
               rangerSecurableObjects.forEach(
@@ -471,7 +471,11 @@ public class RangerITEnv {
                                       .allMatch(
                                           policyItem -> {
                                             // Verify role name in Ranger policy item
-                                            return policyItem.getRoles().contains(role.name());
+                                            return policyItem
+                                                .getRoles()
+                                                .contains(
+                                                    RangerHelper.GRAVITINO_ROLE_PREFIX
+                                                        + role.name());
                                           });
                               Assertions.assertTrue(match);
                             });
@@ -515,13 +519,11 @@ public class RangerITEnv {
       String serviceName,
       String policyName,
       Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap,
-      List<RangerPolicy.RangerPolicyItem> policyItems,
-      boolean labelManagedByGravitino) {
+      List<RangerPolicy.RangerPolicyItem> policyItems) {
 
     Map<String, String> resourceFilter = new HashMap<>(); // use to match the precise policy
     Map<String, String> policyFilter = new HashMap<>();
     policyFilter.put(SearchFilter.SERVICE_NAME, serviceName);
-    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, RangerHelper.MANAGED_BY_GRAVITINO);
     final int[] index = {0};
     policyResourceMap.forEach(
         (k, v) -> {
@@ -575,9 +577,6 @@ public class RangerITEnv {
         policy.setServiceType(type);
         policy.setService(serviceName);
         policy.setName(policyName);
-        if (labelManagedByGravitino) {
-          policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
-        }
         policy.setResources(policyResourceMap);
         policy.setPolicyItems(policyItems);
         rangerClient.createPolicy(policy);

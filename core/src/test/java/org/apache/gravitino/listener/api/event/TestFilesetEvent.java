@@ -82,6 +82,14 @@ public class TestFilesetEvent {
     checkFilesetInfo(filesetInfo, fileset);
     Assertions.assertEquals(OperationType.CREATE_FILESET, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateFilesetPreEvent.class, preEvent.getClass());
+    filesetInfo = ((CreateFilesetPreEvent) preEvent).createFilesetRequest();
+    checkFilesetInfo(filesetInfo, fileset);
+    Assertions.assertEquals(OperationType.CREATE_FILESET, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -95,6 +103,12 @@ public class TestFilesetEvent {
     checkFilesetInfo(filesetInfo, fileset);
     Assertions.assertEquals(OperationType.LOAD_FILESET, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadFilesetPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_FILESET, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -111,6 +125,14 @@ public class TestFilesetEvent {
     Assertions.assertEquals(change, ((AlterFilesetEvent) event).filesetChanges()[0]);
     Assertions.assertEquals(OperationType.ALTER_FILESET, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterFilesetPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(1, ((AlterFilesetPreEvent) preEvent).filesetChanges().length);
+    Assertions.assertEquals(change, ((AlterFilesetPreEvent) preEvent).filesetChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_FILESET, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -123,6 +145,12 @@ public class TestFilesetEvent {
     Assertions.assertTrue(((DropFilesetEvent) event).isExists());
     Assertions.assertEquals(OperationType.DROP_FILESET, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropFilesetPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_FILESET, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -135,6 +163,13 @@ public class TestFilesetEvent {
     Assertions.assertEquals(namespace, ((ListFilesetEvent) event).namespace());
     Assertions.assertEquals(OperationType.LIST_FILESET, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListFilesetPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListFilesetPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_FILESET, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -178,6 +213,12 @@ public class TestFilesetEvent {
     Assertions.assertEquals("test", ((GetFileLocationEvent) event1).subPath());
     Assertions.assertEquals(OperationType.GET_FILESET_LOCATION, event1.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event1.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetFileLocationPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(OperationType.GET_FILESET_LOCATION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
