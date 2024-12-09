@@ -22,7 +22,7 @@ from gravitino.api.credential.credential import Credential
 
 
 class OSSTokenCredential(Credential, ABC):
-    """Represents the audit information of an entity."""
+    """Represents OSS token credential."""
 
     OSS_TOKEN_CREDENTIAL_TYPE = "oss-token"
     _GRAVITINO_OSS_SESSION_ACCESS_KEY_ID = "oss-access-key-id"

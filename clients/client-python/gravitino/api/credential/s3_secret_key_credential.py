@@ -22,7 +22,7 @@ from gravitino.api.credential.credential import Credential
 
 
 class S3SecretKeyCredential(Credential, ABC):
-    """Represents the audit information of an entity."""
+    """Represents S3 secret key credential."""
 
     S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key"
     _GRAVITINO_S3_STATIC_ACCESS_KEY_ID = "s3-access-key-id"

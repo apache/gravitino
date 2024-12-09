@@ -22,7 +22,7 @@ from gravitino.api.credential.credential import Credential
 
 
 class GCSTokenCredential(Credential, ABC):
-    """Represents the S3 token credential."""
+    """Represents the GCS token credential."""
 
     GCS_TOKEN_CREDENTIAL_TYPE = "gcs-token"
     _GCS_TOKEN_NAME = "token"
