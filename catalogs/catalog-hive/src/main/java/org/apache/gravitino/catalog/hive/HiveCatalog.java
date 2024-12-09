@@ -29,8 +29,8 @@ import org.apache.gravitino.connector.capability.Capability;
 /** Implementation of an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
-  static final HiveCatalogPropertiesMeta CATALOG_PROPERTIES_METADATA =
-      new HiveCatalogPropertiesMeta();
+  static final HiveCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
+      new HiveCatalogPropertiesMetadata();
 
   static final HiveSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
       new HiveSchemaPropertiesMetadata();
@@ -69,8 +69,8 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
     boolean impersonationEnabled =
         (boolean)
-            new HiveCatalogPropertiesMeta()
-                .getOrDefault(config, HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE);
+            new HiveCatalogPropertiesMetadata()
+                .getOrDefault(config, HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE);
     if (!impersonationEnabled) {
       return Optional.empty();
     }

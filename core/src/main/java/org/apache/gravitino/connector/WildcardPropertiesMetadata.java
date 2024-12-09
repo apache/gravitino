@@ -28,15 +28,14 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 
 /**
- * WildcardPropertiesMeta is a utility class to validate wildcard properties in the properties
- * metadata. <br>
+ * WildcardPropertiesMeta is a interface class to support wildcard in the properties metadata. <br>
  * <br>
  * WildcardPropertiesMetadata interface defines: <br>
  * Prefix.Wildcard = "" <br>
  * Prefix.*.properties-key1 = "" <br>
  * Prefix.*.properties-key2 = "" <br>
  * NOTE: Prefix support multiple segment, separated by dot. <br>
- * NOTE: properties-key{N} support multiple segment, separated by dot. <br>
+ *       properties-key{N} support multiple segment, separated by dot. <br>
  * <br>
  * Use define a WildcardPropertiesMetadata object: <br>
  * a1.b1.c1.WildcardNode = "WildcardValue1,WildcardValue2" <br>
