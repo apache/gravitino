@@ -202,13 +202,13 @@ impl OpenedFile {
         }
     }
 
-    fn read(&mut self, offset: u64, size: u32) -> Vec<u8> {
+    fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
         self.file_stat.atime = Timestamp::from(SystemTime::now());
 
-        self.reader.as_mut().unwrap().read(offset, size)
+        self.reader.as_mut().unwrap().read(offset, size).into()
     }
 
-    fn write(&mut self, offset: u64, data: &[u8]) -> u32 {
+    fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
         let end = offset + data.len() as u64;
 
         if end > self.file_stat.size  {
@@ -235,12 +235,12 @@ impl OpenedFile {
 
 /// File reader interface  for read file content
 pub(crate) trait FileReader: Sync + Send {
-    fn read(&mut self, offset: u64, size: u32) -> Vec<u8>;
+    fn read(&mut self, offset: u64, size: u32) -> Result<Bytes>;
 }
 
 /// File writer interface  for write file content
 pub(crate) trait FileWriter: Sync + Send {
-    fn write(&mut self, offset: u64, data: &[u8]) -> u32;
+    fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32>;
 }
 
 /// FileIdManager is a manager for file id and file name mapping.
@@ -446,7 +446,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
 
         self.fs.set_attr(&file_stat.path, &file_stat,false).await?;
 
-        Ok(data.into())
+        data
     }
 
     async fn write(&self, file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
@@ -459,7 +459,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
 
         self.fs.set_attr(&file_stat.path, &file_stat, false).await?;
 
-        Ok(len)
+        len
     }
 }
 

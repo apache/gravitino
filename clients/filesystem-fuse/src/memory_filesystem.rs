@@ -25,6 +25,7 @@ use fuse3::{Errno, FileType};
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
+use bytes::Bytes;
 use crate::utils::join_file_path;
 
 // MemoryFileSystem is a simple in-memory filesystem implementation
@@ -94,7 +95,7 @@ impl PathFileSystem for MemoryFileSystem {
                 }));
                 Ok(file)
             }
-            _ => Err(Errno::from(libc::EBADFD)),
+            _ => Err(Errno::from(libc::EBADF)),
         }
     }
 
@@ -164,14 +165,14 @@ pub(crate) struct MemoryFileReader {
 
 impl FileReader for MemoryFileReader {
 
-    fn read(&mut self, offset: u64, size: u32) -> Vec<u8> {
+    fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
         let v = self.data.lock().unwrap();
         let start = offset as usize;
         let end = usize::min(start + size as usize, v.len());
         if start >= v.len() {
-            return Vec::new();
+            return Ok(Bytes::default());
         }
-        v[start..end].to_vec()
+        Ok(v[start..end].to_vec().into())
     }
 }
 
@@ -181,7 +182,7 @@ pub(crate) struct MemoryFileWriter {
 
 impl FileWriter for MemoryFileWriter {
 
-    fn write(&mut self, offset: u64, data: &[u8]) -> u32 {
+    fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
         let mut v = self.data.lock().unwrap();
         let start = offset as usize;
         let end = start + data.len();
@@ -190,7 +191,7 @@ impl FileWriter for MemoryFileWriter {
             v.resize(end, 0);
         }
         v[start..end].copy_from_slice(data);
-        data.len() as u32
+        Ok(data.len() as u32)
     }
 }
 
