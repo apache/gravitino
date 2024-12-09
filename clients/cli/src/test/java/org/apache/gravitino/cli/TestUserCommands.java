@@ -86,7 +86,7 @@ class TestUserCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("group");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("admin");
     when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
     GravitinoCommandLine commandLine =
         spy(
@@ -94,7 +94,7 @@ class TestUserCommands {
                 mockCommandLine, mockOptions, CommandEntities.USER, CommandActions.DETAILS));
     doReturn(mockAudit)
         .when(commandLine)
-        .newUserAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "group");
+        .newUserAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
