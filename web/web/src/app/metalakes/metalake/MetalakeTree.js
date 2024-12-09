@@ -64,6 +64,8 @@ const MetalakeTree = props => {
             return 'openmoji:iceberg'
           case 'jdbc-mysql':
             return 'devicon:mysql-wordmark'
+          case 'jdbc-clickhouse':
+            return 'devicon:clickhouse-wordmark'
           case 'jdbc-postgresql':
             return 'devicon:postgresql-wordmark'
           case 'jdbc-doris':
