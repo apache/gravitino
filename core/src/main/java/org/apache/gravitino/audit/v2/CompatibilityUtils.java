@@ -49,6 +49,7 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_SCHEMA, Operation.DROP_SCHEMA)
           .put(OperationType.LOAD_SCHEMA, Operation.LOAD_SCHEMA)
           .put(OperationType.LIST_SCHEMA, Operation.LIST_SCHEMA)
+          .put(OperationType.SCHEMA_EXISTS, Operation.UNKNOWN_OPERATION)
 
           // Table operation
           .put(OperationType.CREATE_TABLE, Operation.CREATE_TABLE)
@@ -58,6 +59,8 @@ public class CompatibilityUtils {
           .put(OperationType.LOAD_TABLE, Operation.LOAD_TABLE)
           .put(OperationType.TABLE_EXISTS, Operation.UNKNOWN_OPERATION)
           .put(OperationType.LIST_TABLE, Operation.LIST_TABLE)
+          .put(OperationType.RENAME_TABLE, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.REGISTER_TABLE, Operation.UNKNOWN_OPERATION)
 
           // Partition operation
           .put(OperationType.ADD_PARTITION, Operation.UNKNOWN_OPERATION)
@@ -82,6 +85,15 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_TOPIC, Operation.DROP_TOPIC)
           .put(OperationType.LOAD_TOPIC, Operation.LOAD_TOPIC)
           .put(OperationType.LIST_TOPIC, Operation.LIST_TOPIC)
+
+          // View operation
+          .put(OperationType.CREATE_VIEW, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.ALTER_VIEW, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.DROP_VIEW, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.LOAD_VIEW, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.VIEW_EXISTS, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.RENAME_VIEW, Operation.UNKNOWN_OPERATION)
+          .put(OperationType.LIST_VIEW, Operation.UNKNOWN_OPERATION)
           .build();
 
   static Operation toAuditLogOperation(OperationType operationType) {

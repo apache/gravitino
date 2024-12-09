@@ -18,7 +18,17 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
+import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
+import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.types.DataTypes;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
@@ -40,7 +50,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsPartition() {
-    return false;
+    return true;
   }
 
   @Override
@@ -50,126 +60,60 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsSchemaEvolution() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportsReplaceColumns() {
+    // Paimon doesn't support replace columns, because it doesn't support drop all fields in table.
+    // And `ALTER TABLE REPLACE COLUMNS` statement will removes all existing columns at first and
+    // then adds the new set of columns.
     return false;
   }
 
-  @Test
   @Override
-  protected void testListTables() {
-    // TODO: implement table operations.
+  protected String getTableLocation(SparkTableInfo table) {
+    Map<String, String> tableProperties = table.getTableProperties();
+    return tableProperties.get(PaimonPropertiesConstants.PAIMON_TABLE_LOCATION);
   }
 
   @Test
-  @Override
-  protected void testCreateSimpleTable() {
-    // TODO: implement table operations.
+  void testPaimonPartitions() {
+    String partitionPathString = "name=a/address=beijing";
+
+    String tableName = "test_paimon_partition_table";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreatePaimonSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name, address);";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getPaimonSimpleTableColumn())
+            .withIdentifyPartition(Collections.singletonList("name"))
+            .withIdentifyPartition(Collections.singletonList("address"));
+    checker.check(tableInfo);
+
+    String insertData = String.format("INSERT into %s values(2,'a','beijing');", tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertEquals("2,a,beijing", queryResult.get(0));
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionPathString);
+    checkDirExists(partitionPath);
   }
 
-  @Test
-  @Override
-  protected void testCreateTableWithDatabase() {
-    // TODO: implement table operations.
+  private String getCreatePaimonSimpleTableString(String tableName) {
+    return String.format(
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
+        tableName);
   }
 
-  @Test
-  @Override
-  protected void testCreateTableWithComment() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testDropTable() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testRenameTable() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testListTable() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableSetAndRemoveProperty() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableUpdateComment() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableAddAndDeleteColumn() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableUpdateColumnType() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableRenameColumn() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testUpdateColumnPosition() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableUpdateColumnComment() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testAlterTableReplaceColumns() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testComplexType() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testCreateTableAsSelect() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testInsertTableAsSelect() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testTableOptions() {
-    // TODO: implement table operations.
-  }
-
-  @Test
-  @Override
-  protected void testDropAndWriteTable() {
-    // TODO: implement table operations.
+  private List<SparkTableInfo.SparkColumnInfo> getPaimonSimpleTableColumn() {
+    return Arrays.asList(
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkTableInfo.SparkColumnInfo.of("address", DataTypes.StringType, ""));
   }
 }

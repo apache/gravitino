@@ -78,7 +78,7 @@ public class IcebergViewOperationExecutor implements IcebergViewOperationDispatc
   public boolean viewExists(IcebergRequestContext context, TableIdentifier viewIdentifier) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .existView(viewIdentifier);
+        .viewExists(viewIdentifier);
   }
 
   @Override

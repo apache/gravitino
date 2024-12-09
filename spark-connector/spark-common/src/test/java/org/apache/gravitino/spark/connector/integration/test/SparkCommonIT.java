@@ -117,6 +117,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsSchemaEvolution();
 
+  protected abstract boolean supportsReplaceColumns();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -256,7 +258,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  protected void testCreateSimpleTable() {
+  void testCreateSimpleTable() {
     String tableName = "simple_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
@@ -273,7 +275,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  protected void testCreateTableWithDatabase() {
+  void testCreateTableWithDatabase() {
     // test db.table as table identifier
     String databaseName = "db1";
     String tableName = "table1";
@@ -304,7 +306,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  protected void testCreateTableWithComment() {
+  void testCreateTableWithComment() {
     String tableName = "comment_table";
     dropTableIfExists(tableName);
     String createTableSql = getCreateSimpleTableString(tableName);
@@ -550,6 +552,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsReplaceColumns")
   protected void testAlterTableReplaceColumns() {
     String tableName = "test_replace_columns_table";
     dropTableIfExists(tableName);
@@ -563,7 +566,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "ALTER TABLE %S REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
+            "ALTER TABLE %s REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
             tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>();
     // change comment for id

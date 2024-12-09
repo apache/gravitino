@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.postgresql.converter;
 
 import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -47,6 +48,9 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
           return new GravitinoRuntimeException(se.getMessage(), se);
       }
     } else {
+      if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
+        return new ConnectionFailedException(se.getMessage(), se);
+      }
       return new GravitinoRuntimeException(se.getMessage(), se);
     }
   }

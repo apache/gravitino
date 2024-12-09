@@ -20,12 +20,14 @@
 package org.apache.gravitino.spark.connector.paimon;
 
 import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.paimon.spark.SparkCatalog;
+import org.apache.paimon.spark.SparkTable;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -53,8 +55,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    throw new UnsupportedOperationException(
-        "`createSparkTable` operation is unsupported for paimon spark connector now.");
+    return new SparkPaimonTable(
+        identifier,
+        gravitinoTable,
+        (SparkTable) sparkTable,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter);
   }
 
   @Override
@@ -65,5 +72,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(true);
+  }
+
+  @Override
+  public boolean dropTable(Identifier ident) {
+    sparkCatalog.invalidateTable(ident);
+    return gravitinoCatalogClient
+        .asTableCatalog()
+        .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
 }

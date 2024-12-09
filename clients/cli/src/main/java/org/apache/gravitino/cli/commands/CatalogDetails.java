@@ -37,9 +37,11 @@ public class CatalogDetails extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param outputFormat The output format.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
-    super(url, ignoreVersions);
+  public CatalogDetails(
+      String url, boolean ignoreVersions, String metalake, String catalog, String outputFormat) {
+    super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
     this.catalog = catalog;
   }
@@ -52,20 +54,13 @@ public class CatalogDetails extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
       result = client.loadCatalog(catalog);
+      output(result);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
-      return;
-    }
-
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
     }
   }
 }
