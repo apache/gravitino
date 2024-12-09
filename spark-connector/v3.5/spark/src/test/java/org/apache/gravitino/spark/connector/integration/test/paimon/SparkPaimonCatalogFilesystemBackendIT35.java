@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
-import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35;
+import org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +28,6 @@ public class SparkPaimonCatalogFilesystemBackendIT35 extends SparkPaimonCatalogF
   void testCatalogClassName() {
     String catalogClass =
         getSparkSession().sparkContext().conf().get("spark.sql.catalog." + getCatalogName());
-    Assertions.assertEquals(GravitinoIcebergCatalogSpark35.class.getName(), catalogClass);
+    Assertions.assertEquals(GravitinoPaimonCatalogSpark35.class.getName(), catalogClass);
   }
 }
