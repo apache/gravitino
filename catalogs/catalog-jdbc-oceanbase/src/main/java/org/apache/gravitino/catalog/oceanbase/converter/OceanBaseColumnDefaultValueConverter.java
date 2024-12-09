@@ -88,10 +88,7 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
       case OceanBaseTypeConverter.NUMERIC:
       case OceanBaseTypeConverter.DECIMAL:
         return Literals.decimalLiteral(
-            Decimal.of(
-                columnDefaultValue,
-                Integer.parseInt(type.getColumnSize()),
-                Integer.parseInt(type.getScale())));
+            Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIME:
@@ -103,11 +100,9 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
             : Literals.timestampLiteral(
                 LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case JdbcTypeConverter.VARCHAR:
-        return Literals.of(
-            columnDefaultValue, Types.VarCharType.of(Integer.parseInt(type.getColumnSize())));
+        return Literals.of(columnDefaultValue, Types.VarCharType.of(type.getColumnSize()));
       case OceanBaseTypeConverter.CHAR:
-        return Literals.of(
-            columnDefaultValue, Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
+        return Literals.of(columnDefaultValue, Types.FixedCharType.of(type.getColumnSize()));
       case JdbcTypeConverter.TEXT:
         return Literals.stringLiteral(columnDefaultValue);
       default:

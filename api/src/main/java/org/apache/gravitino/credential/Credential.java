@@ -53,6 +53,16 @@ public interface Credential {
   Map<String, String> credentialInfo();
 
   /**
+   * Initialize the credential with the credential information.
+   *
+   * <p>This method is invoked to deserialize the credential in client side.
+   *
+   * @param credentialInfo The credential information from {@link #credentialInfo}.
+   * @param expireTimeInMs The expire-time from {@link #expireTimeInMs()}.
+   */
+  void initialize(Map<String, String> credentialInfo, long expireTimeInMs);
+
+  /**
    * Converts the credential to properties to transfer the credential though API.
    *
    * @return a map containing credential properties.

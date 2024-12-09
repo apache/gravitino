@@ -43,13 +43,14 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
    * @return A new instance of AuthorizationHook.
    */
   protected abstract AuthorizationPlugin newPlugin(
-      String catalogProvider, Map<String, String> config);
+      String metalake, String catalogProvider, Map<String, String> config);
 
-  public AuthorizationPlugin plugin(String catalogProvider, Map<String, String> config) {
+  public AuthorizationPlugin plugin(
+      String metalake, String catalogProvider, Map<String, String> config) {
     if (plugin == null) {
       synchronized (this) {
         if (plugin == null) {
-          plugin = newPlugin(catalogProvider, config);
+          plugin = newPlugin(metalake, catalogProvider, config);
         }
       }
     }
