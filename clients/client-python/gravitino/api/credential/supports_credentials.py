@@ -18,6 +18,11 @@
 from abc import ABC, abstractmethod
 from typing import List
 from gravitino.api.credential.credential import Credential
+from gravitino.exceptions.base import (
+    NoSuchCredentialException,
+    InternalError,
+    IllegalStateException,
+)
 
 
 class SupportsCredentials(ABC):
@@ -28,7 +33,7 @@ class SupportsCredentials(ABC):
         """Retrieves an array of Credential objects.
 
         Returns:
-        An array of Credential objects. In most cases the array only contains
+            An array of Credential objects. In most cases the array only contains
         one credential. If the object like Fileset contains multiple locations
         for different storages like HDFS, S3, the array will contain multiple
         credentials. The array could be empty if you request a credential for
@@ -38,3 +43,32 @@ class SupportsCredentials(ABC):
          most one credential for one credential type.
         """
         pass
+
+    def get_credential(self, credential_type: str) -> Credential:
+        """Retrieves Credential object based on the specified credential type.
+
+        Args:
+            credential_type: The type of the credential like s3-token,
+            s3-secret-key which defined in the specific credentials.
+        Returns:
+            An Credential object with the specified credential type.
+        Raises:
+            NoSuchCredentialException If the specific credential cannot be found.
+            IllegalStateException if multiple credential can be found.
+        """
+
+        credentials = self.get_credentials()
+        matched_credentials = [
+            credential
+            for credential in credentials
+            if credential.credential_type == credential_type
+        ]
+        if len(matched_credentials) == 0:
+            raise NoSuchCredentialException(
+                f"No credential found for the credential type: {credential_type}"
+            )
+        if len(matched_credentials) > 1:
+            raise IllegalStateException(
+                f"Multiple credentials found for the credential type: {credential_type}"
+            )
+        return matched_credentials[0]

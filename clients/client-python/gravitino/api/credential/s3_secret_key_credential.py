@@ -44,10 +44,11 @@ class S3SecretKeyCredential(Credential, ABC):
         return self.S3_SECRET_KEY_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
-        """The creation time of the entity.
+        """Returns the expiration time of the credential in milliseconds since
+        the epoch, 0 means not expire.
 
         Returns:
-             The creation time of the entity.
+             The expiration time of the credential.
         """
         return 0
 
