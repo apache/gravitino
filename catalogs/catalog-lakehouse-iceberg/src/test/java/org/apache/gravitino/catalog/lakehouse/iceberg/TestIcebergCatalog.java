@@ -144,6 +144,16 @@ public class TestIcebergCatalog {
 
       Assertions.assertTrue(
           throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
+
+      Map<String, String> map4 = Maps.newHashMap();
+      map4.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "custom");
+      map4.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
+      map4.put(IcebergCatalogPropertiesMetadata.WAREHOUSE, "test");
+      map4.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_IMPL, "test");
+      Assertions.assertDoesNotThrow(
+          () -> {
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map4);
+          });
     }
   }
 }
