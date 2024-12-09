@@ -247,7 +247,7 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
-                  mapper -> mapper.softDeleteModelVersionAliasRelByCatalogId(catalogId)),
+                  mapper -> mapper.softDeleteModelVersionAliasRelsByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,

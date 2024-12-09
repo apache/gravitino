@@ -32,63 +32,63 @@ public interface ModelVersionAliasRelMapper {
 
   @InsertProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "insertModelVersionAliasRel")
-  void insertModelVersionAliasRel(
+      method = "insertModelVersionAliasRels")
+  void insertModelVersionAliasRels(
       @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs);
 
   @SelectProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "selectModelVersionAliasRelByModelId")
-  List<ModelVersionAliasRelPO> selectModelVersionAliasRelByModelId(@Param("modelId") Long modelId);
+      method = "selectModelVersionAliasRelsByModelId")
+  List<ModelVersionAliasRelPO> selectModelVersionAliasRelsByModelId(@Param("modelId") Long modelId);
 
   @SelectProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "selectModelVersionAliasRelByModelIdAndVersion")
-  List<ModelVersionAliasRelPO> selectModelVersionAliasRelByModelIdAndVersion(
+      method = "selectModelVersionAliasRelsByModelIdAndVersion")
+  List<ModelVersionAliasRelPO> selectModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion);
 
   @SelectProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "selectModelVersionAliasRelByModelIdAndAlias")
-  List<ModelVersionAliasRelPO> selectModelVersionAliasRelByModelIdAndAlias(
+      method = "selectModelVersionAliasRelsByModelIdAndAlias")
+  List<ModelVersionAliasRelPO> selectModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelBySchemaIdAndModelName")
-  Integer softDeleteModelVersionAliasRelBySchemaIdAndModelName(
+      method = "softDeleteModelVersionAliasRelsBySchemaIdAndModelName")
+  Integer softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelByModelIdAndVersion")
-  Integer softDeleteModelVersionAliasRelByModelIdAndVersion(
+      method = "softDeleteModelVersionAliasRelsByModelIdAndVersion")
+  Integer softDeleteModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelByModelIdAndAlias")
-  Integer softDeleteModelVersionAliasRelByModelIdAndAlias(
+      method = "softDeleteModelVersionAliasRelsByModelIdAndAlias")
+  Integer softDeleteModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelBySchemaId")
-  Integer softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteModelVersionAliasRelsBySchemaId")
+  Integer softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelByCatalogId")
-  Integer softDeleteModelVersionAliasRelByCatalogId(@Param("catalogId") Long catalogId);
+      method = "softDeleteModelVersionAliasRelsByCatalogId")
+  Integer softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelByMetalakeId")
-  Integer softDeleteModelVersionAliasRelByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteModelVersionAliasRelsByMetalakeId")
+  Integer softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @DeleteProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "deleteModelVersionAliasRelByLegacyTimeline")
-  Integer deleteModelVersionAliasRelByLegacyTimeline(
+      method = "deleteModelVersionAliasRelsByLegacyTimeline")
+  Integer deleteModelVersionAliasRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

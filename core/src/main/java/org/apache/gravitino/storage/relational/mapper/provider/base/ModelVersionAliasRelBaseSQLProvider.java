@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionAliasRelBaseSQLProvider {
 
-  public String insertModelVersionAliasRel(
+  public String insertModelVersionAliasRels(
       @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs) {
     return "<script>"
         + "INSERT INTO "
@@ -40,7 +40,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String selectModelVersionAliasRelByModelId(@Param("modelId") Long modelId) {
+  public String selectModelVersionAliasRelsByModelId(@Param("modelId") Long modelId) {
     return "SELECT model_id AS modelId, model_version AS modelVersion,"
         + " model_version_alias AS modelVersionAlias, deleted_at AS deletedAt"
         + " FROM "
@@ -48,7 +48,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
-  public String selectModelVersionAliasRelByModelIdAndVersion(
+  public String selectModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "SELECT model_id AS modelId, model_version AS modelVersion,"
         + " model_version_alias AS modelVersionAlias, deleted_at AS deletedAt"
@@ -57,7 +57,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
   }
 
-  public String selectModelVersionAliasRelByModelIdAndAlias(
+  public String selectModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
     return "SELECT model_id AS modelId, model_version AS modelVersion,"
         + " model_version_alias AS modelVersionAlias, deleted_at AS deletedAt"
@@ -70,7 +70,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelBySchemaIdAndModelName(
+  public String softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -83,7 +83,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " AND mm.deleted_at = 0) AND mvar.deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelByModelIdAndVersion(
+  public String softDeleteModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -92,7 +92,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelByModelIdAndAlias(
+  public String softDeleteModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -105,7 +105,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId) {
+  public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -116,7 +116,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -127,7 +127,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -138,7 +138,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
-  public String deleteModelVersionAliasRelByLegacyTimeline(
+  public String deleteModelVersionAliasRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME

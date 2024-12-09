@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -79,7 +80,7 @@ public class ModelVersionMetaService {
     List<ModelVersionAliasRelPO> aliasRelPOs =
         SessionUtils.getWithoutCommit(
             ModelVersionAliasRelMapper.class,
-            mapper -> mapper.selectModelVersionAliasRelByModelId(modelEntity.id()));
+            mapper -> mapper.selectModelVersionAliasRelsByModelId(modelEntity.id()));
     Multimap<Integer, ModelVersionAliasRelPO> aliasRelPOsByModelVersion =
         ArrayListMultimap.create();
     aliasRelPOs.forEach(r -> aliasRelPOsByModelVersion.put(r.getModelVersion(), r));
@@ -101,20 +102,15 @@ public class ModelVersionMetaService {
     // Will throw a NoSuchEntityException if the model does not exist.
     ModelEntity modelEntity = ModelMetaService.getInstance().getModelByIdentifier(modelIdent);
 
-    Integer modelVersion;
-    try {
-      modelVersion = Integer.valueOf(ident.name());
-    } catch (NumberFormatException e) {
-      modelVersion = null;
-    }
+    boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
 
-    final Integer copiedModelVersion = modelVersion;
     ModelVersionPO modelVersionPO =
         SessionUtils.getWithoutCommit(
             ModelVersionMetaMapper.class,
             mapper -> {
-              if (copiedModelVersion != null) {
-                return mapper.selectModelVersionMeta(modelEntity.id(), copiedModelVersion);
+              if (isVersionNumber) {
+                return mapper.selectModelVersionMeta(
+                    modelEntity.id(), Integer.valueOf(ident.name()));
               } else {
                 return mapper.selectModelVersionMetaByAlias(modelEntity.id(), ident.name());
               }
@@ -131,11 +127,11 @@ public class ModelVersionMetaService {
         SessionUtils.getWithoutCommit(
             ModelVersionAliasRelMapper.class,
             mapper -> {
-              if (copiedModelVersion != null) {
-                return mapper.selectModelVersionAliasRelByModelIdAndVersion(
-                    modelEntity.id(), copiedModelVersion);
+              if (isVersionNumber) {
+                return mapper.selectModelVersionAliasRelsByModelIdAndVersion(
+                    modelEntity.id(), Integer.valueOf(ident.name()));
               } else {
-                return mapper.selectModelVersionAliasRelByModelIdAndAlias(
+                return mapper.selectModelVersionAliasRelsByModelIdAndAlias(
                     modelEntity.id(), ident.name());
               }
             });
@@ -193,7 +189,7 @@ public class ModelVersionMetaService {
 
             SessionUtils.doWithoutCommit(
                 ModelVersionAliasRelMapper.class,
-                mapper -> mapper.insertModelVersionAliasRel(aliasRelPOs));
+                mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
           },
           () ->
               // If the model version is inserted successfully, update the model latest version.
@@ -219,13 +215,7 @@ public class ModelVersionMetaService {
       return false;
     }
 
-    Integer modelVersion;
-    try {
-      modelVersion = Integer.valueOf(ident.name());
-    } catch (NumberFormatException e) {
-      modelVersion = null;
-    }
-    final Integer copiedModelVersion = modelVersion;
+    boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
 
     AtomicInteger modelVersionDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
@@ -235,9 +225,9 @@ public class ModelVersionMetaService {
                 SessionUtils.doWithoutCommitAndFetchResult(
                     ModelVersionMetaMapper.class,
                     mapper -> {
-                      if (copiedModelVersion != null) {
+                      if (isVersionNumber) {
                         return mapper.softDeleteModelVersionMetaByModelIdAndVersion(
-                            modelEntity.id(), copiedModelVersion);
+                            modelEntity.id(), Integer.valueOf(ident.name()));
                       } else {
                         return mapper.softDeleteModelVersionMetaByModelIdAndAlias(
                             modelEntity.id(), ident.name());
@@ -252,11 +242,11 @@ public class ModelVersionMetaService {
           SessionUtils.doWithoutCommit(
               ModelVersionAliasRelMapper.class,
               mapper -> {
-                if (copiedModelVersion != null) {
-                  mapper.softDeleteModelVersionAliasRelByModelIdAndVersion(
-                      modelEntity.id(), copiedModelVersion);
+                if (isVersionNumber) {
+                  mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
+                      modelEntity.id(), Integer.valueOf(ident.name()));
                 } else {
-                  mapper.softDeleteModelVersionAliasRelByModelIdAndAlias(
+                  mapper.softDeleteModelVersionAliasRelsByModelIdAndAlias(
                       modelEntity.id(), ident.name());
                 }
               });
@@ -281,7 +271,7 @@ public class ModelVersionMetaService {
                 SessionUtils.doWithoutCommitAndFetchResult(
                     ModelVersionAliasRelMapper.class,
                     mapper ->
-                        mapper.deleteModelVersionAliasRelByLegacyTimeline(legacyTimeline, limit)));
+                        mapper.deleteModelVersionAliasRelsByLegacyTimeline(legacyTimeline, limit)));
 
     return modelVersionDeletedCount[0] + modelVersionAliasRelDeletedCount[0];
   }

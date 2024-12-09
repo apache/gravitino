@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRelBaseSQLProvider {
 
   @Override
-  public String softDeleteModelVersionAliasRelBySchemaIdAndModelName(
+  public String softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -40,7 +40,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelByModelIdAndVersion(
+  public String softDeleteModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -50,7 +50,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelByModelIdAndAlias(
+  public String softDeleteModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -64,7 +64,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId) {
+  public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
@@ -76,7 +76,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
@@ -88,7 +88,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"

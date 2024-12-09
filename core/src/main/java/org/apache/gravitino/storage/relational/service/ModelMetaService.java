@@ -119,7 +119,7 @@ public class ModelMetaService {
             SessionUtils.doWithoutCommit(
                 ModelVersionAliasRelMapper.class,
                 mapper ->
-                    mapper.softDeleteModelVersionAliasRelBySchemaIdAndModelName(
+                    mapper.softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
                         schemaId, ident.name())),
 
         // delete model meta

@@ -52,56 +52,56 @@ public class ModelVersionAliasSQLProviderFactory {
     return MODEL_VERSION_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  public static String insertModelVersionAliasRel(
+  public static String insertModelVersionAliasRels(
       @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs) {
-    return getProvider().insertModelVersionAliasRel(modelVersionAliasRelPOs);
+    return getProvider().insertModelVersionAliasRels(modelVersionAliasRelPOs);
   }
 
-  public static String selectModelVersionAliasRelByModelId(@Param("modelId") Long modelId) {
-    return getProvider().selectModelVersionAliasRelByModelId(modelId);
+  public static String selectModelVersionAliasRelsByModelId(@Param("modelId") Long modelId) {
+    return getProvider().selectModelVersionAliasRelsByModelId(modelId);
   }
 
-  public static String selectModelVersionAliasRelByModelIdAndVersion(
+  public static String selectModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
-    return getProvider().selectModelVersionAliasRelByModelIdAndVersion(modelId, modelVersion);
+    return getProvider().selectModelVersionAliasRelsByModelIdAndVersion(modelId, modelVersion);
   }
 
-  public static String selectModelVersionAliasRelByModelIdAndAlias(
+  public static String selectModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return getProvider().selectModelVersionAliasRelByModelIdAndAlias(modelId, alias);
+    return getProvider().selectModelVersionAliasRelsByModelIdAndAlias(modelId, alias);
   }
 
-  public static String softDeleteModelVersionAliasRelBySchemaIdAndModelName(
+  public static String softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
-    return getProvider().softDeleteModelVersionAliasRelBySchemaIdAndModelName(schemaId, modelName);
+    return getProvider().softDeleteModelVersionAliasRelsBySchemaIdAndModelName(schemaId, modelName);
   }
 
-  public static String softDeleteModelVersionAliasRelByModelIdAndVersion(
+  public static String softDeleteModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
-    return getProvider().softDeleteModelVersionAliasRelByModelIdAndVersion(modelId, modelVersion);
+    return getProvider().softDeleteModelVersionAliasRelsByModelIdAndVersion(modelId, modelVersion);
   }
 
-  public static String softDeleteModelVersionAliasRelByModelIdAndAlias(
+  public static String softDeleteModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return getProvider().softDeleteModelVersionAliasRelByModelIdAndAlias(modelId, alias);
+    return getProvider().softDeleteModelVersionAliasRelsByModelIdAndAlias(modelId, alias);
   }
 
-  public static String softDeleteModelVersionAliasRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteModelVersionAliasRelBySchemaId(schemaId);
+  public static String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().softDeleteModelVersionAliasRelsBySchemaId(schemaId);
   }
 
-  public static String softDeleteModelVersionAliasRelByCatalogId(
+  public static String softDeleteModelVersionAliasRelsByCatalogId(
       @Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteModelVersionAliasRelByCatalogId(catalogId);
+    return getProvider().softDeleteModelVersionAliasRelsByCatalogId(catalogId);
   }
 
-  public static String softDeleteModelVersionAliasRelByMetalakeId(
+  public static String softDeleteModelVersionAliasRelsByMetalakeId(
       @Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteModelVersionAliasRelByMetalakeId(metalakeId);
+    return getProvider().softDeleteModelVersionAliasRelsByMetalakeId(metalakeId);
   }
 
-  public static String deleteModelVersionAliasRelByLegacyTimeline(
+  public static String deleteModelVersionAliasRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return getProvider().deleteModelVersionAliasRelByLegacyTimeline(legacyTimeline, limit);
+    return getProvider().deleteModelVersionAliasRelsByLegacyTimeline(legacyTimeline, limit);
   }
 }

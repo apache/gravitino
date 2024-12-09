@@ -234,7 +234,7 @@ public class SchemaMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ModelVersionAliasRelMapper.class,
-                    mapper -> mapper.softDeleteModelVersionAliasRelBySchemaId(schemaId)),
+                    mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     ModelVersionMetaMapper.class,
