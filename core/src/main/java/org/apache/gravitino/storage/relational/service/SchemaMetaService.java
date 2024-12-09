@@ -320,6 +320,8 @@ public class SchemaMetaService {
                   .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
           builder.withCatalogId(parentEntityId);
           break;
+        default:
+          throw new IllegalArgumentException("Unsupported namespace level: " + level);          
       }
     }
   }
