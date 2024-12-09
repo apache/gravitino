@@ -65,6 +65,7 @@ public class UpdateTableName extends Command {
   }
 
   /** Update the name of a table. */
+  @Override
   public void handle() {
     try {
       NameIdentifier tableName = NameIdentifier.of(schema, table);

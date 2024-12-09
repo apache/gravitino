@@ -285,8 +285,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         if (Objects.equals(result.getString("TABLE_NAME"), loadedTable.name())) {
           JdbcTypeConverter.JdbcTypeBean typeBean =
               new JdbcTypeConverter.JdbcTypeBean(result.getString("TYPE_NAME"));
-          typeBean.setColumnSize(result.getString("COLUMN_SIZE"));
-          typeBean.setScale(result.getString("DECIMAL_DIGITS"));
+          typeBean.setColumnSize(result.getInt("COLUMN_SIZE"));
+          typeBean.setScale(result.getInt("DECIMAL_DIGITS"));
           Type gravitinoType = typeConverter.toGravitino(typeBean);
           String columnName = result.getString("COLUMN_NAME");
           columnTypes.put(columnName, gravitinoType);

@@ -29,8 +29,14 @@ class CatalogCreateRequest(RESTRequest):
     """Represents a request to create a catalog."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _type: Catalog.Type = field(metadata=config(field_name="type"))
-    _provider: str = field(metadata=config(field_name="provider"))
+    _type: Catalog.Type = field(
+        metadata=config(
+            field_name="type",
+            encoder=Catalog.Type.type_serialize,
+            decoder=Catalog.Type.type_deserialize,
+        )
+    )
+    _provider: Optional[str] = field(metadata=config(field_name="provider"))
     _comment: Optional[str] = field(metadata=config(field_name="comment"))
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
@@ -60,5 +66,8 @@ class CatalogCreateRequest(RESTRequest):
             raise ValueError('"name" field is required and cannot be empty')
         if not self._type:
             raise ValueError('"catalog_type" field is required and cannot be empty')
-        if not self._provider:
-            raise ValueError('"provider" field is required and cannot be empty')
+        if not self._provider and not self._type.supports_managed_catalog:
+            raise ValueError(
+                '"provider" field is required and cannot be empty for catalog type '
+                "that does not support managed catalog"
+            )

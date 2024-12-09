@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.ws.rs.NotSupportedException;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
@@ -44,6 +45,11 @@ public class DummyCredentialProvider implements CredentialProvider {
     @Override
     public Map<String, String> credentialInfo() {
       return new HashMap<>();
+    }
+
+    @Override
+    public void initialize(Map<String, String> credentialInfo, long expireTimeInMs) {
+      throw new NotSupportedException();
     }
   }
 

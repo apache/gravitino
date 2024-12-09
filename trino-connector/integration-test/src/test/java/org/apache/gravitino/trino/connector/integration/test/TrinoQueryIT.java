@@ -162,7 +162,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     sqls = removeSqlComments(sqls);
 
     Matcher sqlMatcher =
-        Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
+        Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
     while (sqlMatcher.find()) {
       String sql = sqlMatcher.group(1);
       sql = resolveParameters(sql);
@@ -221,7 +221,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     String testResults = TrinoQueryITBase.readFileToString(resultFileName);
 
     Matcher sqlMatcher =
-        Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
+        Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
     Matcher resultMatcher =
         Pattern.compile("((\".*?\")\\n{2,})|((\\S.*?)\\n{2,})", Pattern.DOTALL | Pattern.UNIX_LINES)
             .matcher(testResults);
