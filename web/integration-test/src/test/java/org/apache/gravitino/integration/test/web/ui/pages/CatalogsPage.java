@@ -62,6 +62,36 @@ public class CatalogsPage extends BaseWebIT {
   @FindBy(xpath = "//*[@data-refer='handle-submit-catalog']")
   public WebElement handleSubmitCatalogBtn;
 
+  @FindBy(xpath = "//*[@data-refer='create-schema-btn']")
+  public WebElement createSchemaBtn;
+
+  @FindBy(xpath = "//*[@data-refer='schema-name-field']")
+  public WebElement schemaNameField;
+
+  @FindBy(xpath = "//*[@data-refer='schema-comment-field']")
+  public WebElement schemaCommentField;
+
+  @FindBy(xpath = "//*[@data-refer='handle-submit-schema']")
+  public WebElement handleSubmitSchemaBtn;
+
+  @FindBy(xpath = "//*[@data-refer='create-fileset-btn']")
+  public WebElement createFilesetBtn;
+
+  @FindBy(xpath = "//*[@data-refer='fileset-name-field']")
+  public WebElement filesetNameField;
+
+  @FindBy(xpath = "//*[@data-refer='fileset-storageLocation-field']")
+  public WebElement filesetStorageLocationField;
+
+  @FindBy(xpath = "//*[@data-refer='fileset-comment-field']")
+  public WebElement filesetCommentField;
+
+  @FindBy(xpath = "//button[@data-refer='add-fileset-props']")
+  public WebElement addFilesetPropsBtn;
+  
+  @FindBy(xpath = "//*[@data-refer='handle-submit-fileset']")
+  public WebElement handleSubmitFilesetBtn;
+
   @FindBy(xpath = "//div[@data-refer='tree-view']")
   public WebElement treeView;
 
@@ -146,12 +176,12 @@ public class CatalogsPage extends BaseWebIT {
 
   public void setCatalogCommentField(String nameField) {
     try {
-      WebElement metalakeCommentFieldInput =
+      WebElement catalogCommentFieldInput =
           catalogCommentField.findElement(By.tagName("textarea"));
-      metalakeCommentFieldInput.sendKeys(
+    catalogCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-      metalakeCommentFieldInput.clear();
-      metalakeCommentFieldInput.sendKeys(nameField);
+    catalogCommentFieldInput.clear();
+    catalogCommentFieldInput.sendKeys(nameField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -169,7 +199,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   // set the indexed catalog properties
-  public void setCatalogPropsAt(int index, String key, String value) {
+  public void setPropsAt(int index, String key, String value) {
     try {
       // Set the indexed props key
       String keyPath = "//div[@data-refer='props-key-" + index + "']//input[@name='key']";
@@ -224,6 +254,69 @@ public class CatalogsPage extends BaseWebIT {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setSchemaNameField(String nameField) {
+    try {
+      WebElement schemaNameFieldInput = schemaNameField.findElement(By.tagName("input"));
+      schemaNameFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      schemaNameFieldInput.clear();
+      schemaNameFieldInput.sendKeys(nameField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setSchemaCommentField(String nameField) {
+    try {
+      WebElement schemaCommentFieldInput =
+          schemaCommentField.findElement(By.tagName("textarea"));
+      schemaCommentFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      schemaCommentFieldInput.clear();
+      schemaCommentFieldInput.sendKeys(nameField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setFilesetNameField(String nameField) {
+    try {
+      WebElement filesetNameFieldInput = filesetNameField.findElement(By.tagName("input"));
+      filesetNameFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      filesetNameFieldInput.clear();
+      filesetNameFieldInput.sendKeys(nameField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setFilesetStorageLocationField(String storageLocation) {
+    try {
+      WebElement filesetStorageLocationFieldInput =
+          filesetStorageLocationField.findElement(By.tagName("input"));
+      filesetStorageLocationFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      filesetStorageLocationFieldInput.clear();
+      filesetStorageLocationFieldInput.sendKeys(storageLocation);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setFilesetCommentField(String nameField) {
+    try {
+      WebElement filesetCommentFieldInput =
+          filesetCommentField.findElement(By.tagName("textarea"));
+      filesetCommentFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      filesetCommentFieldInput.clear();
+      filesetCommentFieldInput.sendKeys(nameField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
