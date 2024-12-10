@@ -565,7 +565,27 @@ const relationalColumnTypeMap = {
     'timestamp',
     'timestamp_tz',
     'varchar'
-  ]
+  ],
+  'jdbc-oceanbase': [
+    'binary',
+    'byte',
+    'byte unsigned',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'integer unsigned',
+    'long',
+    'long unsigned',
+    'short',
+    'short unsigned',
+    'string',
+    'time',
+    'timestamp',
+    'varchar'
+  ],
 }
 
 export const getRelationalColumnType = catalog => {
