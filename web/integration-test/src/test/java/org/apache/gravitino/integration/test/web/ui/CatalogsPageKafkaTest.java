@@ -43,7 +43,6 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
-  private static GravitinoMetalake metalake;
 
   protected static String gravitinoUri = "http://127.0.0.1:8090";
   protected static String kafkaUri = "http://127.0.0.1:9092";
@@ -81,7 +80,7 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
     metalakePage.setMetalakeNameField(METALAKE_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // load metalake
-    metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
+    gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create kafka catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);
