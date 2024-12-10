@@ -385,7 +385,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteUser(url, ignore, force, metalake, user).handle();
     } else if (CommandActions.REVOKE.equals(command)) {
-      // Role options supports multiple values
       String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : roles) {
         newRemoveRoleFromUser(url, ignore, metalake, user, role).handle();
@@ -423,7 +422,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteGroup(url, ignore, force, metalake, group).handle();
     } else if (CommandActions.REVOKE.equals(command)) {
-      // Role options supports multiple values
       String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : roles) {
         newRemoveRoleFromGroup(url, ignore, metalake, group, role).handle();

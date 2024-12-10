@@ -102,7 +102,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
-    // Properties and tags can have multiple values
+    // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
     options.addOption(createArgsOption("t", TAG, "tag name"));
     options.addOption(createArgsOption("r", ROLE, "role name"));
