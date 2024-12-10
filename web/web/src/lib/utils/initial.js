@@ -585,7 +585,7 @@ const relationalColumnTypeMap = {
     'time',
     'timestamp',
     'varchar'
-  ],
+  ]
 }
 
 export const getRelationalColumnType = catalog => {
