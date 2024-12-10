@@ -17,7 +17,7 @@
  * under the License.
  */
 
-use crate::filesystem::{FileStat, FileSystemContext, IFileSystem};
+use crate::filesystem::{FileStat, FileSystemContext, RawFileSystem};
 use crate::fuse_api_handle::FuseApiHandle;
 use fuse3::path::prelude::{ReplyData, ReplyOpen, ReplyStatFs, ReplyWrite};
 use fuse3::path::Request;
@@ -31,23 +31,23 @@ use fuse3::{Errno, FileType, Inode, SetAttr, Timestamp};
 use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
 use futures_util::{stream, FutureExt};
-use log::{debug, error};
+use log::{debug, error, info};
 use std::ffi::{OsStr, OsString};
 use std::future::Future;
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
 
-pub(crate) struct LogFuseApiHandle {
-    handle: FuseApiHandle,
+pub(crate) struct LogFuseApiHandle<T: RawFileSystem> {
+    handle: FuseApiHandle<T>,
 }
 
-impl LogFuseApiHandle {
-    pub fn new(handle: FuseApiHandle) -> Self {
+impl<T: RawFileSystem> LogFuseApiHandle<T> {
+    pub fn new(handle: FuseApiHandle<T>) -> Self {
         Self { handle: handle }
     }
 }
 
-impl Filesystem for LogFuseApiHandle {
+impl<T: RawFileSystem> Filesystem for LogFuseApiHandle<T> {
     async fn init(&self, req: Request) -> fuse3::Result<ReplyInit> {
         debug!(
             "INIT req_id={} pid={} [{},{}]",
@@ -84,7 +84,7 @@ impl Filesystem for LogFuseApiHandle {
             req.pid,
             req.uid,
             req.gid,
-            self.handle.get_file_path(parent),
+            self.handle.get_file_path(parent).await,
             parent,
             name.to_string_lossy(),
         );
@@ -177,7 +177,7 @@ impl Filesystem for LogFuseApiHandle {
             req.pid,
             req.uid,
             req.gid,
-            self.handle.get_file_path(parent),
+            self.handle.get_file_path(parent).await,
             parent,
             name.to_string_lossy(),
             mode,
@@ -211,7 +211,7 @@ impl Filesystem for LogFuseApiHandle {
             req.pid,
             req.uid,
             req.gid,
-            self.handle.get_file_path(parent),
+            self.handle.get_file_path(parent).await,
             parent,
             name.to_string_lossy()
         );
@@ -237,7 +237,7 @@ impl Filesystem for LogFuseApiHandle {
             req.pid,
             req.uid,
             req.gid,
-            self.handle.get_file_path(parent),
+            self.handle.get_file_path(parent).await,
             parent,
             name.to_string_lossy()
         );
@@ -430,7 +430,10 @@ impl Filesystem for LogFuseApiHandle {
         result
     }
 
-    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>>;
+    type DirEntryStream<'a>
+        = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+    where
+        T: 'a;
 
     async fn readdir<'a>(
         &'a self,
@@ -498,7 +501,7 @@ impl Filesystem for LogFuseApiHandle {
             req.pid,
             req.uid,
             req.gid,
-            self.handle.get_file_path(parent),
+            self.handle.get_file_path(parent).await,
             parent,
             name.to_string_lossy(),
             mode,
@@ -525,7 +528,10 @@ impl Filesystem for LogFuseApiHandle {
         result
     }
 
-    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>;
+    type DirEntryPlusStream<'a>
+        = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
+    where
+        T: 'a;
 
     async fn readdirplus<'a>(
         &'a self,

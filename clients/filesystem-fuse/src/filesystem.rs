@@ -22,6 +22,7 @@ use crate::utils::join_file_path;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::{Errno, FileType, Timestamp};
+use futures_util::{FutureExt, TryFutureExt};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Mutex, RwLock};
@@ -103,6 +104,8 @@ pub trait PathFileSystem: Send + Sync {
     async fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
 
     async fn remove_dir(&self, parent: &str, name: &str) -> Result<()>;
+
+    fn get_capacity(&self) -> Result<FileSystemCapacity>;
 }
 
 pub struct FileSystemContext {
@@ -120,6 +123,34 @@ impl FileSystemContext {
 }
 
 pub struct OpenFileFlags(u32);
+
+impl OpenFileFlags {
+    pub fn is_read(&self) -> bool {
+        self.0 & libc::O_RDONLY as u32 == 0 || self.0 & libc::O_RDWR as u32 == 0
+    }
+
+    pub fn is_write(&self) -> bool {
+        self.0 & libc::O_WRONLY as u32 == 0 || self.0 & libc::O_RDWR as u32 == 0
+    }
+
+    pub fn is_append(&self) -> bool {
+        self.0 & libc::O_APPEND as u32 != 0
+    }
+
+    pub fn is_create(&self) -> bool {
+        self.0 & libc::O_CREAT as u32 != 0
+    }
+
+    pub fn is_truncate(&self) -> bool {
+        self.0 & libc::O_TRUNC as u32 != 0
+    }
+
+    pub fn is_exclusive(&self) -> bool {
+        self.0 & libc::O_EXCL as u32 != 0
+    }
+}
+
+pub struct FileSystemCapacity {}
 
 #[derive(Clone, Debug)]
 pub struct FileStat {
@@ -155,6 +186,9 @@ pub struct FileStat {
 
     // file link count
     pub(crate) nlink: u32,
+
+    // filestat timestamp after retrieved from original file system
+    pub(crate) timestamp: Timestamp,
 }
 
 impl FileStat {
@@ -191,6 +225,7 @@ impl FileStat {
             mtime: atime,
             ctime: atime,
             nlink: 1,
+            timestamp: atime,
         }
     }
 
@@ -208,6 +243,7 @@ impl FileStat {
             mtime: atime,
             ctime: atime,
             nlink: 1,
+            timestamp: atime,
         }
     }
 
@@ -622,3 +658,201 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         len
     }
 }
+
+/*
+pub struct BasicFileSystem {
+    // meta is the metadata of the filesystem
+    meta: RwLock<DefaultFileSystemMetadata>,
+
+    // file_handle_manager is a manager for opened files.
+    file_handle_manager: RwLock<FileHandleManager>,
+
+    inode_id_generator: AtomicU64,
+
+    fs: Box<dyn PathFileSystem>,
+}
+
+impl BasicFileSystem {
+    const FILE_STAT_EXPIRE_TIME: i32 = 0;
+
+    pub fn new(fs: Box<dyn PathFileSystem>) -> Self {
+        Self {
+            meta: RwLock::new(DefaultFileSystemMetadata::new()),
+            file_handle_manager: RwLock::new(FileHandleManager::new()),
+            inode_id_generator: AtomicU64::new(10000),
+            fs,
+        }
+    }
+
+    fn next_inode_id(&self) -> u64 {
+        self.inode_id_generator
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn get_and_update_file_stat(&self, file_id: u64) -> Result<FileStat> {
+        let file_stat = self
+            .meta
+            .read()
+            .unwrap()
+            .get_file(file_id)
+            .ok_or(Errno::from(libc::ENOENT))?;
+
+        if timestamp_diff_from_now(&file_stat.timestamp) < Self::FILE_STAT_EXPIRE_TIME {
+            Ok(file_stat)
+        } else {
+            match file_stat.kind {
+                FileType::Directory => self.handle_file_stat_expired(&file_stat),
+                FileType::RegularFile => self.handle_file_stat_expired(&file_stat),
+                _ => Err(Errno::from(libc::ENOSYS)),
+            }
+        }
+    }
+
+    fn handle_file_stat_expired(&self, old_file: &FileStat) -> Result<FileStat> {
+        self.fs.stat(&old_file.path).map(|new_stat| {
+            self.meta
+                .write()
+                .unwrap()
+                .update_file(old_file.inode, &new_stat);
+            new_stat
+        })
+    }
+
+    fn handle_dir_stat_expired(&self, old_dir: &FileStat) -> Result<FileStat> {
+        self.handle_file_stat_expired(old_dir);
+        let childs = self.fs.read_dir(&old_dir.path)?;
+        todo!()
+    }
+}
+
+#[async_trait]
+impl RawFileSystem for BasicFileSystem {
+    async fn init(&self) {
+        let mut meta = self.meta.write().unwrap();
+        meta.init_root_dir();
+    }
+
+    async fn get_file_path(&self, file_id: u64) -> String {
+        let meta = self.meta.read().unwrap();
+        meta.get_file_path(file_id)
+    }
+
+    async fn get_opened_file(&self, _file_id: u64, fh: u64) -> Result<OpenedFile> {
+        let file_handle_map = self.file_handle_manager.read().unwrap();
+        file_handle_map
+            .get_file(fh)
+            .ok_or(Errno::from(libc::ENOENT))
+    }
+
+    async fn stat(&self, file_id: u64) -> Result<FileStat> {
+        self.get_and_update_file_stat(file_id)
+    }
+
+    async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
+        self.get_and_update_file_stat(parent_file_id)?;
+        self.meta
+            .read()
+            .unwrap()
+            .find_file(parent_file_id, name)
+            .ok_or(Errno::from(libc::ENOENT))
+    }
+
+    async fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
+        self.get_and_update_file_stat(file_id)?;
+        let meta = self.meta.read().unwrap();
+        Ok(meta.get_dir_childs(file_id))
+    }
+
+    async fn open_file(&self, file_id: u64) -> Result<OpenedFile> {
+        let meta = self.meta.read().unwrap();
+        let file_stat = meta.get_file(file_id).ok_or(Errno::from(libc::ENOENT))?;
+        let mut file_handle_map = self.file_handle_manager.write().unwrap();
+        let file_handle = file_handle_map.create_file(&file_stat);
+        Ok(file_handle)
+    }
+
+    async fn create_file(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
+        let dir_stat = self.get_and_update_file_stat(parent_file_id)?;
+
+        let mut file_stat = self.fs.create_file(&dir_stat.path, name)?;
+        file_stat.inode = self.next_inode_id();
+        file_stat.parent_inode = parent_file_id;
+
+        let mut meta = self.meta.write().unwrap();
+        meta.put_file(&file_stat);
+
+        let mut file_handle_map = self.file_handle_manager.write().unwrap();
+        let file_handle = file_handle_map.create_file(&file_stat);
+
+        Ok(file_handle)
+    }
+
+    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<OpenedFile> {
+        let dir_stat = self.get_and_update_file_stat(parent_file_id)?;
+
+        let mut file_stat = self.fs.create_dir(&dir_stat.path, name)?;
+        file_stat.parent_inode = parent_file_id;
+
+        let mut meta = self.meta.write().unwrap();
+        meta.put_dir(&file_stat);
+
+        let mut file_handle_map = self.file_handle_manager.write().unwrap();
+        let file_handle = file_handle_map.create_file(&file_stat);
+        Ok(file_handle)
+    }
+
+    async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
+        let mut meta = self.meta.write().unwrap();
+        meta.update_file(file_id, file_stat);
+        self.fs.set_attr(&file_stat.name, file_stat, true)
+    }
+
+    async fn update_file_status(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
+        let mut meta = self.meta.write().unwrap();
+        meta.update_file(file_id, file_stat);
+        self.fs.set_attr(&file_stat.name, file_stat, false)
+    }
+
+    async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
+        let mut meta = self.meta.write().unwrap();
+        let dir_stat = meta
+            .get_file(parent_file_id)
+            .ok_or(Errno::from(libc::ENOENT))?;
+        meta.remove_file(parent_file_id, name);
+        self.fs.remove_file(&dir_stat.path, name)
+    }
+
+    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
+        let mut meta = self.meta.write().unwrap();
+        let dir_stat = meta
+            .get_file(parent_file_id)
+            .ok_or(Errno::from(libc::ENOENT))?;
+        meta.remove_dir(parent_file_id, name);
+        self.fs.remove_dir(&dir_stat.path, name)
+    }
+
+    async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
+        let mut file_handle_manager = self.file_handle_manager.write().unwrap();
+        file_handle_manager.remove_file(fh);
+        Ok(())
+    }
+
+    async fn read(&self, file_id: u64, fh: u64) -> Box<dyn FileReader> {
+        let file = {
+            let file_handle_map = self.file_handle_manager.read().unwrap();
+            file_handle_map.get_file(fh).unwrap()
+        };
+
+        self.fs.read(&file)
+    }
+
+    async fn write(&self, file_id: u64, fh: u64) -> Box<dyn FileWriter> {
+        let file = {
+            let file_handle_map = self.file_handle_manager.read().unwrap();
+            file_handle_map.get_file(fh).unwrap()
+        };
+
+        self.fs.write(&file)
+    }
+}
+ */

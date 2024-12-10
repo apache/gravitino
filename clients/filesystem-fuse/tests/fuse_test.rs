@@ -22,6 +22,7 @@ use log::info;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread::sleep;
@@ -56,6 +57,7 @@ impl FuseTest {
 
         while start_time.elapsed() < timeout {
             if let Ok(exists) = fs::exists(&test_file) {
+                info!("Wait for fuse server ready: {}", exists);
                 if exists {
                     return true;
                 }
@@ -92,7 +94,12 @@ fn test_fuse_system_with_auto() {
     test_fuse_filesystem(mount_point);
 }
 
+fn test_fuse_system_with_manual() {
+    test_fuse_filesystem("build/gvfs");
+}
+
 fn test_fuse_filesystem(mount_point: &str) {
+    info!("Test startup");
     let base_path = Path::new(mount_point);
 
     //test create file

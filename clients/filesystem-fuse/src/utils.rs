@@ -16,6 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use std::fmt;
+use fuse3::Timestamp;
+use std::time::SystemTime;
+use crate::error::GravitinoError;
+
+pub type GravitinoResult<T> = Result<T, GravitinoError>;
+
+pub enum StorageFileSystemType {
+    S3,
+}
+
+impl fmt::Display for StorageFileSystemType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StorageFileSystemType::S3 => write!(f, "s3"),
+        }
+    }
+}
 
 pub fn join_file_path(parent: &str, name: &str) -> String {
     if parent.is_empty() {
@@ -24,3 +42,46 @@ pub fn join_file_path(parent: &str, name: &str) -> String {
         format!("{}/{}", parent, name)
     }
 }
+
+pub fn timestamp_diff_from_now(timestamp: Timestamp) -> i64 {
+    let now = Timestamp::from(SystemTime::now());
+    timestamp.sec - now.sec
+}
+
+
+pub fn extract_fileset(path: &str) -> Option<(String, String, String)> {
+    let prefix = "gvfs://fileset/";
+    if !path.starts_with(prefix) {
+        return None;
+    }
+
+    let path_without_prefix = &path[prefix.len()..];
+
+    let parts: Vec<&str> = path_without_prefix.split('/').collect();
+
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let catalog = parts[0].to_string();
+    let schema = parts[1].to_string();
+    let fileset = parts[2].to_string();
+
+    Some((catalog, schema, fileset))
+}
+
+pub fn extract_storage_filesystem(path: &str) -> Option<(StorageFileSystemType, String)> {
+    if let Some(pos) = path.find("://") {
+        let protocol = &path[..pos];
+        let location = &path[pos + 3..];
+        match protocol {
+            "s3" => {
+                Some((StorageFileSystemType::S3, location.to_string()))
+            },
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
