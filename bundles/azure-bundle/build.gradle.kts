@@ -27,9 +27,18 @@ plugins {
 dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
 
   compileOnly(libs.hadoop3.common)
+
+  implementation(libs.azure.identity) {
+    exclude(group = "com.azure", module = "azure-core-http-netty")
+  }
+  implementation(libs.azure.storage.file.datalake) {
+    exclude(group = "com.azure", module = "azure-core-http-netty")
+  }
+  implementation(libs.azure.core.http.okhttp)
 
   implementation(libs.commons.lang3)
   // runtime used

@@ -65,6 +65,7 @@ dependencies {
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:azure-bundle"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -79,6 +80,9 @@ dependencies {
 
   testImplementation(libs.iceberg.aws.bundle)
   testImplementation(libs.iceberg.gcp.bundle)
+  testImplementation(libs.iceberg.azure.bundle) {
+    exclude("com.google.guava", "guava")
+  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
