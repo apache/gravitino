@@ -30,6 +30,7 @@ import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateRole;
 import org.apache.gravitino.cli.commands.DeleteRole;
 import org.apache.gravitino.cli.commands.ListRoles;
+import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,6 +77,25 @@ class TestRoleCommands {
         .newRoleDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
+  }
+
+  @Test
+  void testRoleAuditCommand() {
+    RoleAudit mockAudit = mock(RoleAudit.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.ROLE)).thenReturn("group");
+    when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DETAILS));
+    doReturn(mockAudit)
+        .when(commandLine)
+        .newRoleAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "group");
+    commandLine.handleCommandLine();
+    verify(mockAudit).handle();
   }
 
   @Test
