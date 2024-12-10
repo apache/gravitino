@@ -33,12 +33,8 @@ public class Configs {
 
   private Configs() {}
 
-  public static final String KV_STORE_KEY = "kv";
   public static final String RELATIONAL_ENTITY_STORE = "relational";
   public static final String ENTITY_STORE_KEY = "gravitino.entity.store";
-
-  public static final String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
-  public static final String ENTITY_KV_STORE_KEY = "gravitino.entity.store.kv";
 
   public static final String DEFAULT_ENTITY_RELATIONAL_STORE = "JDBCBackend";
   public static final String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
@@ -55,18 +51,13 @@ public class Configs {
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
 
-  public static final String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY =
-      "gravitino.entity.store.kv.rocksdbPath";
-
-  public static final Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days
-  public static final String KV_DELETE_AFTER_TIME_KEY =
-      "gravitino.entity.store.kv.deleteAfterTimeMs";
+  public static final Long DEFAULT_DELETE_AFTER_TIME = 604800000L; // 7 days
 
   // Config for data keep time after soft deletion, in milliseconds.
   public static final String STORE_DELETE_AFTER_TIME_KEY =
       "gravitino.entity.store.deleteAfterTimeMs";
   // using the fallback default value
-  public static final Long DEFAULT_STORE_DELETE_AFTER_TIME = DEFAULT_KV_DELETE_AFTER_TIME;
+  public static final Long DEFAULT_STORE_DELETE_AFTER_TIME = DEFAULT_DELETE_AFTER_TIME;
   // The maximum allowed keep time for data deletion, in milliseconds. Equivalent to 30 days.
   public static final Long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L;
   // The minimum allowed keep time for data deletion, in milliseconds. Equivalent to 10 minutes.
@@ -81,10 +72,6 @@ public class Configs {
   public static final Long MAX_VERSION_RETENTION_COUNT = 10L;
   // The minimum allowed count of versions to be retained
   public static final Long MIN_VERSION_RETENTION_COUNT = 1L;
-
-  // Default path for RocksDB backend is "${GRAVITINO_HOME}/data/rocksdb"
-  public static final String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
-      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PATH =
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "jdbc");
@@ -110,13 +97,6 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault(RELATIONAL_ENTITY_STORE);
-
-  public static final ConfigEntry<String> ENTITY_KV_STORE =
-      new ConfigBuilder(ENTITY_KV_STORE_KEY)
-          .doc("Detailed implementation of Kv storage")
-          .version(ConfigConstants.VERSION_0_1_0)
-          .stringConf()
-          .createWithDefault(DEFAULT_ENTITY_KV_STORE);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_STORE =
       new ConfigBuilder(ENTITY_RELATIONAL_STORE_KEY)
@@ -168,24 +148,6 @@ public class Configs {
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
 
-  public static final ConfigEntry<String> ENTITY_KV_ROCKSDB_BACKEND_PATH =
-      new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
-          .doc(
-              "The storage path for RocksDB storage implementation. It supports both absolute and"
-                  + " relative path, if the value is a relative path, the final path is "
-                  + "`${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is "
-                  + "`${GRAVITINO_HOME}/data/rocksdb`")
-          .version(ConfigConstants.VERSION_0_1_0)
-          .stringConf()
-          .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);
-
-  public static final ConfigEntry<String> ENTITY_SERDE =
-      new ConfigBuilder("gravitino.entity.serde")
-          .doc("The entity SerDe to use")
-          .version(ConfigConstants.VERSION_0_1_0)
-          .stringConf()
-          .createWithDefault("proto");
-
   public static final ConfigEntry<Long> CATALOG_CACHE_EVICTION_INTERVAL_MS =
       new ConfigBuilder("gravitino.catalog.cache.evictionIntervalMs")
           .doc("The interval in milliseconds to evict the catalog cache")
@@ -232,24 +194,6 @@ public class Configs {
           .longConf()
           .createWithDefault(2000L);
 
-  public static final ConfigEntry<Long> KV_DELETE_AFTER_TIME =
-      new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
-          .doc(
-              String.format(
-                  "The maximum time in milliseconds that the deleted data and old version data is kept, "
-                      + "max delete time allow is %s ms(30 days), "
-                      + "min delete time allow is %s ms(10 minutes)",
-                  MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
-          .version(ConfigConstants.VERSION_0_5_0)
-          .deprecated()
-          .longConf()
-          .checkValue(
-              v -> v >= MIN_DELETE_TIME_ALLOW && v <= MAX_DELETE_TIME_ALLOW,
-              String.format(
-                  "The value of %s is out of range, which must be between %s and %s",
-                  KV_DELETE_AFTER_TIME_KEY, MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW))
-          .createWithDefault(DEFAULT_KV_DELETE_AFTER_TIME);
-
   public static final ConfigEntry<Long> STORE_DELETE_AFTER_TIME =
       new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
           .doc(
@@ -259,7 +203,6 @@ public class Configs {
                       + "min delete time allow is %s ms(10 minutes)",
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_5_0)
-          .alternatives(Lists.newArrayList(KV_DELETE_AFTER_TIME_KEY))
           .longConf()
           .checkValue(
               v -> v >= MIN_DELETE_TIME_ALLOW && v <= MAX_DELETE_TIME_ALLOW,

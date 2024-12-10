@@ -50,10 +50,6 @@ public abstract class Config {
   // we should add it here.
   private final DeprecatedConfig[] deprecatedConfigs = {
     new DeprecatedConfig(
-        "gravitino.entity.store.kv.deleteAfterTimeMs",
-        "0.5.0",
-        "Please use gravitino.entity.store.deleteAfterTimeMs instead."),
-    new DeprecatedConfig(
         "gravitino.authenticator", "0.6.0", "Please use gravitino.authenticators instead.")
   };
 
