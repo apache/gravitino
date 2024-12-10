@@ -42,10 +42,12 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+
   testImplementation(project(":bundles:gcp-bundle"))
   testImplementation(project(":bundles:aliyun-bundle"))
-  testImplementation(project(":bundles:aws-bundle"))
+  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle"))
+
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
