@@ -20,10 +20,7 @@
 package org.apache.gravitino.integration.test.web.ui;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -76,35 +73,6 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
     catalogsPage = new CatalogsPage(driver);
   }
 
-  /**
-   * Creates a Kafka topic within the specified Metalake, Catalog, Schema, and Topic names.
-   *
-   * @param metalakeName The name of the Metalake.
-   * @param catalogName The name of the Catalog.
-   * @param schemaName The name of the Schema.
-   * @param topicName The name of the Kafka topic.
-   */
-  void createTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
-    Catalog catalog_kafka = metalake.loadCatalog(catalogName);
-    catalog_kafka
-        .asTopicCatalog()
-        .createTopic(
-            NameIdentifier.of(schemaName, topicName), "comment", null, Collections.emptyMap());
-  }
-
-  /**
-   * Drops a Kafka topic from the specified Metalake, Catalog, and Schema.
-   *
-   * @param metalakeName The name of the Metalake where the topic resides.
-   * @param catalogName The name of the Catalog that contains the topic.
-   * @param schemaName The name of the Schema under which the topic exists.
-   * @param topicName The name of the Kafka topic to be dropped.
-   */
-  void dropTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
-    Catalog catalog_kafka = metalake.loadCatalog(catalogName);
-    catalog_kafka.asTopicCatalog().dropTopic(NameIdentifier.of(schemaName, topicName));
-  }
-
   @Test
   @Order(0)
   public void testCreateKafkaCatalog() throws InterruptedException {
@@ -145,14 +113,17 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
   @Test
   @Order(2)
   public void testKafkaTopicTreeNode() throws InterruptedException {
-    // 1. create topic of kafka catalog
-    createTopic(METALAKE_NAME, KAFKA_CATALOG_NAME, SCHEMA_NAME, TOPIC_NAME);
-    // 2. click schema tree node
+    // 1. click schema tree node
     String kafkaSchemaNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, KAFKA_CATALOG_NAME, CATALOG_TYPE_MESSAGING, SCHEMA_NAME);
     catalogsPage.clickTreeNode(kafkaSchemaNode);
+    // 2. create topic of kafka catalog
+    clickAndWait(catalogsPage.createTopicBtn);
+    catalogsPage.setTopicNameField(TOPIC_NAME);
+    catalogsPage.setTopicCommentField("topic comment");
+    clickAndWait(catalogsPage.handleSubmitTopicBtn);
     // 3. verify show table title、 default schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TOPIC_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TOPIC_NAME, false));
@@ -187,14 +158,15 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
   @Test
   @Order(4)
   public void testDropKafkaTopic() throws InterruptedException {
-    // delete topic of kafka catalog
-    dropTopic(METALAKE_NAME, KAFKA_CATALOG_NAME, SCHEMA_NAME, TOPIC_NAME);
     // click schema tree node
     String kafkaSchemaNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, KAFKA_CATALOG_NAME, CATALOG_TYPE_MESSAGING, SCHEMA_NAME);
     catalogsPage.clickTreeNode(kafkaSchemaNode);
+    // delete topic of kafka catalog
+    catalogsPage.clickDeleteBtn(TOPIC_NAME);
+    clickAndWait(catalogsPage.confirmDeleteBtn);
     // verify empty topic list
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
   }

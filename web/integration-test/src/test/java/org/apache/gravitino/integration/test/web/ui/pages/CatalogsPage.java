@@ -92,6 +92,18 @@ public class CatalogsPage extends BaseWebIT {
   @FindBy(xpath = "//*[@data-refer='handle-submit-fileset']")
   public WebElement handleSubmitFilesetBtn;
 
+  @FindBy(xpath = "//*[@data-refer='create-topic-btn']")
+  public WebElement createTopicBtn;
+
+  @FindBy(xpath = "//*[@data-refer='topic-name-field']")
+  public WebElement topicNameField;
+
+  @FindBy(xpath = "//*[@data-refer='topic-comment-field']")
+  public WebElement topicCommentField;
+
+  @FindBy(xpath = "//*[@data-refer='handle-submit-topic']")
+  public WebElement handleSubmitTopicBtn;
+
   @FindBy(xpath = "//div[@data-refer='tree-view']")
   public WebElement treeView;
 
@@ -246,7 +258,7 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
-  public void clickDeleteCatalogBtn(String name) {
+  public void clickDeleteBtn(String name) {
     try {
       String xpath = "//button[@data-refer='delete-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
@@ -307,13 +319,37 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
-  public void setFilesetCommentField(String nameField) {
+  public void setFilesetCommentField(String commentField) {
     try {
       WebElement filesetCommentFieldInput = filesetCommentField.findElement(By.tagName("textarea"));
       filesetCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
       filesetCommentFieldInput.clear();
-      filesetCommentFieldInput.sendKeys(nameField);
+      filesetCommentFieldInput.sendKeys(commentField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setTopicNameField(String nameField) {
+    try {
+      WebElement topicNameFieldInput = topicNameField.findElement(By.tagName("input"));
+      topicNameFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      topicNameFieldInput.clear();
+      topicNameFieldInput.sendKeys(nameField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setTopicCommentField(String commentField) {
+    try {
+      WebElement topicCommentFieldInput = topicCommentField.findElement(By.tagName("textarea"));
+      topicCommentFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      topicCommentFieldInput.clear();
+      topicCommentFieldInput.sendKeys(commentField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
