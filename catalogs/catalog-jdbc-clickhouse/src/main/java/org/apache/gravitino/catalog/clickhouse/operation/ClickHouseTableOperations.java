@@ -98,21 +98,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       throws SQLException {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
-    String sql = String.format("SHOW INDEX FROM `%s`.`%s`", databaseName, tableName);
+    String sql = "SELECT NULL AS TABLE_CAT, " +
+        "system.tables.database AS TABLE_SCHEM, " +
+        "system.tables.name AS TABLE_NAME, " +
+        "trim(c.1) AS COLUMN_NAME, " +
+        "c.2 AS KEY_SEQ, " +
+        "'PRIMARY' AS PK_NAME " +
+        "FROM system.tables " +
+        "ARRAY JOIN arrayZip(splitByChar(',', primary_key), arrayEnumerate(splitByChar(',', primary_key))) as c "
+        +
+        "WHERE system.tables.primary_key <> '' " +
+        "AND system.tables.database = '" + databaseName + "' " +
+        "AND system.tables.name = '" + tableName + "' " +
+        "ORDER BY COLUMN_NAME";
 
-    // get Indexes from SQL
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
       List<Index> indexes = new ArrayList<>();
       while (resultSet.next()) {
-        String indexName = resultSet.getString("key_name");
-        String columnName = null;
-        try {
-          columnName = resultSet.getString("column_name");
-        } catch (SQLException e) {
-          columnName = resultSet.getString("pk_col");
-        }
+        String indexName = resultSet.getString("PK_NAME");
+        String columnName = resultSet.getString("COLUMN_NAME");
         indexes.add(
             Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
       }
