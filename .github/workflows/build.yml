@@ -23,38 +23,26 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
-              - api/**
-              - authorizations/**
-              - bin/**
-              - catalogs/**
-              - clients/cli/**
-              - clients/client-java/**
-              - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
-              - common/**
-              - conf/**
-              - core/**
-              - dev/**
-              - docs/open-api/**
-              - bundles/**
-              - docs/build.gradle.kts
-              - flink-connector/**
-              - gradle/**
-              - iceberg/**
-              - integration-test-common/**
-              - meta/**
-              - scripts/**
-              - server/**
-              - server-common/**
-              - spark-connector/**
-              - trino-connector/**
-              - web/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - setting.gradle.kts
+              - '.github/**'
+              - 'catalogs/**'
+              - 'clients/**'
+              - 'conf/**'
+              - 'dev/**'
+              - 'docs/open-api/**'
+              - 'gradle/**'
+              - 'gradle.properties'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'web/**'
+              - '**/*.java'
+              - '**/*.kts'
+              - '**/*.py'
+              - '**/*.rs'
+              - '**/resources/**'
+              - '**/src/**'
+              - '!**/*.md'
+              - '!**/*.png'
+              - '!**/*.svg'
             spark_connector_changes:
               - spark-connector/**
     outputs:

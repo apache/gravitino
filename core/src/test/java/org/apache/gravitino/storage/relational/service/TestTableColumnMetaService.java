@@ -28,10 +28,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
-import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -53,7 +50,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   public void testInsertAndGetTableColumns() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
 
     // Create a table entity without columns
     TableEntity createdTable =
@@ -154,7 +151,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   public void testUpdateTable() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
 
     // Create a table entity without columns
     TableEntity createdTable =
@@ -331,7 +328,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   public void testCreateAndDeleteTable() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
 
     // Create a table entity with column
     ColumnEntity column =
@@ -378,7 +375,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   public void testDeleteMetalake() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
 
     // Create a table entity with column
     ColumnEntity column =
@@ -425,7 +422,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   public void testGetColumnIdAndPO() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
 
     // Create a table entity with column
     ColumnEntity column =
@@ -549,28 +546,5 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
           Assertions.assertEquals(expectedColumn.defaultValue(), column.defaultValue());
           Assertions.assertEquals(expectedColumn.auditInfo(), column.auditInfo());
         });
-  }
-
-  private void createParentEntities(String metalakeName, String catalogName, String schemaName)
-      throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
-
-    CatalogEntity catalog =
-        createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName),
-            catalogName,
-            auditInfo);
-    backend.insert(catalog, false);
-
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name()),
-            schemaName,
-            auditInfo);
-    backend.insert(schema, false);
   }
 }

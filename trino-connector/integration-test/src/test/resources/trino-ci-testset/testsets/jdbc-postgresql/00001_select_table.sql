@@ -24,4 +24,6 @@ drop table gt_postgresql.gt_db1.tb02;
 
 drop table gt_postgresql.gt_db1.tb01;
 
+drop table IF EXISTS gt_postgresql.gt_db1.tb01;
+
 drop schema gt_postgresql.gt_db1;

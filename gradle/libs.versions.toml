@@ -40,6 +40,7 @@ hadoop-minikdc = "3.3.0"
 htrace-core4 = "4.1.0-incubating"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
+commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
 commons-logging = "1.2"
@@ -49,7 +50,6 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-rocksdbjni = "7.10.2"
 iceberg = '1.5.2' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4spark = "1.4.1" # used for compile spark connector
 paimon = '0.8.0'
@@ -114,6 +114,7 @@ datanucleus-rdbms = "4.1.19"
 datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
+aliyun-credentials = "0.3.12"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -180,12 +181,12 @@ airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.r
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 commons-logging = { group = "commons-logging", name = "commons-logging", version.ref = "commons-logging" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
-rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
@@ -268,6 +269,8 @@ jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "
 
 google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
+
+aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]

@@ -29,7 +29,13 @@ class CatalogDTO(Catalog):
     """Data transfer object representing catalog information."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _type: Catalog.Type = field(metadata=config(field_name="type"))
+    _type: Catalog.Type = field(
+        metadata=config(
+            field_name="type",
+            encoder=Catalog.Type.type_serialize,
+            decoder=Catalog.Type.type_deserialize,
+        )
+    )
     _provider: str = field(metadata=config(field_name="provider"))
     _comment: str = field(metadata=config(field_name="comment"))
     _properties: Dict[str, str] = field(metadata=config(field_name="properties"))

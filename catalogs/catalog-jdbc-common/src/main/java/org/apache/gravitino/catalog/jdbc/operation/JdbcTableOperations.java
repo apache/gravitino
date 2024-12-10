@@ -637,8 +637,8 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected JdbcColumn.Builder getBasicJdbcColumnInfo(ResultSet column) throws SQLException {
     JdbcTypeConverter.JdbcTypeBean typeBean =
         new JdbcTypeConverter.JdbcTypeBean(column.getString("TYPE_NAME"));
-    typeBean.setColumnSize(column.getString("COLUMN_SIZE"));
-    typeBean.setScale(column.getString("DECIMAL_DIGITS"));
+    typeBean.setColumnSize(column.getInt("COLUMN_SIZE"));
+    typeBean.setScale(column.getInt("DECIMAL_DIGITS"));
     String comment = column.getString("REMARKS");
     boolean nullable = column.getBoolean("NULLABLE");
 
