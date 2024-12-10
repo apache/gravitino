@@ -39,6 +39,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationPrivilegesMappingProvider;
+import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
@@ -52,7 +53,6 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -88,12 +88,12 @@ public abstract class RangerAuthorizationPlugin
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
-    String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
-    String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
-    rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
+    String rangerUrl = config.get(AuthorizationPropertiesMetadata.RANGER_ADMIN_URL);
+    String authType = config.get(AuthorizationPropertiesMetadata.RANGER_AUTH_TYPE);
+    rangerAdminName = config.get(AuthorizationPropertiesMetadata.RANGER_USERNAME);
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
-    String password = config.get(AuthorizationPropertiesMeta.RANGER_PASSWORD);
-    rangerServiceName = config.get(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME);
+    String password = config.get(AuthorizationPropertiesMetadata.RANGER_PASSWORD);
+    rangerServiceName = config.get(AuthorizationPropertiesMetadata.RANGER_SERVICE_NAME);
     Preconditions.checkArgument(rangerUrl != null, "Ranger admin URL is required");
     Preconditions.checkArgument(authType != null, "Ranger auth type is required");
     Preconditions.checkArgument(rangerAdminName != null, "Ranger username is required");
