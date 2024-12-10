@@ -28,7 +28,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -79,11 +78,6 @@ public class RelationalEntityStore
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
-  }
-
-  @Override
-  public void setSerDe(EntitySerDe entitySerDe) {
-    throw new UnsupportedOperationException("Unsupported operation in relational entity store.");
   }
 
   @Override
