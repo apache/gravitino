@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.gcs.fs;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -47,7 +46,7 @@ public class GCSFileSystemProvider implements FileSystemProvider {
     FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY)
         .forEach(configuration::set);
     LOGGER.info("Creating GCS file system with config: {}", config);
-    return GoogleHadoopFileSystem.newInstance(path.toUri(), configuration);
+    return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override

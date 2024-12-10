@@ -47,6 +47,7 @@ tasks.withType(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
 }
 
 tasks.jar {

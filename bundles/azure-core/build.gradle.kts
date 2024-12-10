@@ -25,8 +25,19 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:azure-core"))
-  implementation(libs.hadoop3.abs)
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.abs)
+
+  implementation(libs.guava)
+  implementation(libs.commons.lang3)
+  // runtime used
+  implementation(libs.commons.logging)
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
 }
 
 tasks.withType(ShadowJar::class.java) {

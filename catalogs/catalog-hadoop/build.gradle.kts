@@ -78,9 +78,11 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:gcp-bundle"))
-  testImplementation(project(":bundles:aliyun-bundle"))
-  testImplementation(project(":bundles:azure-bundle"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
+
+//  testImplementation(libs.guava)
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
