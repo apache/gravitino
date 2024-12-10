@@ -35,7 +35,7 @@ import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
  * Prefix.*.properties-key1 = "" <br>
  * Prefix.*.properties-key2 = "" <br>
  * NOTE: Prefix support multiple segment, separated by dot. <br>
- *       properties-key{N} support multiple segment, separated by dot. <br>
+ * NOTE: properties-key{N} support multiple segment, separated by dot. <br>
  * <br>
  * Use define a WildcardPropertiesMetadata object: <br>
  * a1.b1.c1.WildcardNode = "WildcardValue1,WildcardValue2" <br>
