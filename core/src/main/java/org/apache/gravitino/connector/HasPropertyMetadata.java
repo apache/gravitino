@@ -63,4 +63,12 @@ public interface HasPropertyMetadata {
    * @throws UnsupportedOperationException if the entity does not support topic properties.
    */
   PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException;
+
+  /**
+   * Returns the model property metadata.
+   *
+   * @return The model property metadata.
+   * @throws UnsupportedOperationException if the entity does not support model properties.
+   */
+  PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException;
 }
