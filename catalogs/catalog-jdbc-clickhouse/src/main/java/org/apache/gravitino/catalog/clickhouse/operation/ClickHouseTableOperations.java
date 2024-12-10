@@ -24,6 +24,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -276,6 +277,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             "Table %s does not exist in %s.", tableName, connection.getCatalog());
       }
     }
+  }
+
+  protected ResultSet getTables(Connection connection) throws SQLException {
+    final DatabaseMetaData metaData = connection.getMetaData();
+    String catalogName = connection.getCatalog();
+    String schemaName = connection.getSchema();
+    //CK tables include : DICTIONARY", "LOG TABLE", "MEMORY TABLE",
+    //"REMOTE TABLE", "TABLE", "VIEW", "SYSTEM TABLE", "TEMPORARY TABLE
+    return metaData.getTables(catalogName, schemaName, null, null);
   }
 
   @Override
