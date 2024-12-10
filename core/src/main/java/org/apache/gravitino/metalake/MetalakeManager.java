@@ -40,6 +40,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -121,14 +123,18 @@ public class MetalakeManager implements MetalakeDispatcher {
    */
   @Override
   public BaseMetalake[] listMetalakes() {
-    try {
-      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
-          .map(this::newMetalakeWithResolvedProperties)
-          .toArray(BaseMetalake[]::new);
-    } catch (IOException ioe) {
-      LOG.error("Listing Metalakes failed due to storage issues.", ioe);
-      throw new RuntimeException(ioe);
-    }
+    return TreeLockUtils.doWithRootTreeLock(
+        LockType.READ,
+        () -> {
+          try {
+            return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
+                .map(this::newMetalakeWithResolvedProperties)
+                .toArray(BaseMetalake[]::new);
+          } catch (IOException ioe) {
+            LOG.error("Listing Metalakes failed due to storage issues.", ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   /**
@@ -205,16 +211,20 @@ public class MetalakeManager implements MetalakeDispatcher {
                     .build())
             .build();
 
-    try {
-      store.put(metalake, false /* overwritten */);
-      return metalake;
-    } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
-      LOG.warn("Metalake {} already exists", ident, e);
-      throw new MetalakeAlreadyExistsException("Metalake %s already exists", ident);
-    } catch (IOException ioe) {
-      LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
-      throw new RuntimeException(ioe);
-    }
+    return TreeLockUtils.doWithRootTreeLock(
+        LockType.WRITE,
+        () -> {
+          try {
+            store.put(metalake, false /* overwritten */);
+            return metalake;
+          } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
+            LOG.warn("Metalake {} already exists", ident, e);
+            throw new MetalakeAlreadyExistsException("Metalake %s already exists", ident);
+          } catch (IOException ioe) {
+            LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   /**
@@ -230,120 +240,140 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    try {
-      if (!metalakeInUse(store, ident)) {
-        throw new MetalakeNotInUseException(
-            "Metalake %s is not in use, please enable it first", ident);
-      }
+    return TreeLockUtils.doWithRootTreeLock(
+        LockType.WRITE,
+        () -> {
+          try {
+            if (!metalakeInUse(store, ident)) {
+              throw new MetalakeNotInUseException(
+                  "Metalake %s is not in use, please enable it first", ident);
+            }
 
-      return store.update(
-          ident,
-          BaseMetalake.class,
-          EntityType.METALAKE,
-          metalake -> {
-            BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-            Map<String, String> newProps =
-                metalake.properties() == null
-                    ? Maps.newHashMap()
-                    : Maps.newHashMap(metalake.properties());
-            builder = updateEntity(builder, newProps, changes);
+            return store.update(
+                ident,
+                BaseMetalake.class,
+                EntityType.METALAKE,
+                metalake -> {
+                  BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+                  Map<String, String> newProps =
+                      metalake.properties() == null
+                          ? Maps.newHashMap()
+                          : Maps.newHashMap(metalake.properties());
+                  builder = updateEntity(builder, newProps, changes);
 
-            return builder.build();
-          });
+                  return builder.build();
+                });
 
-    } catch (NoSuchEntityException ne) {
-      LOG.warn("Metalake {} does not exist", ident, ne);
-      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+          } catch (NoSuchEntityException ne) {
+            LOG.warn("Metalake {} does not exist", ident, ne);
+            throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
 
-    } catch (IllegalArgumentException iae) {
-      LOG.warn("Altering Metalake {} failed due to invalid changes", ident, iae);
-      throw iae;
+          } catch (IllegalArgumentException iae) {
+            LOG.warn("Altering Metalake {} failed due to invalid changes", ident, iae);
+            throw iae;
 
-    } catch (IOException ioe) {
-      LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
-      throw new RuntimeException(ioe);
-    }
+          } catch (IOException ioe) {
+            LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   @Override
   public boolean dropMetalake(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, MetalakeInUseException {
-    try {
-      boolean inUse = metalakeInUse(store, ident);
-      if (inUse && !force) {
-        throw new MetalakeInUseException(
-            "Metalake %s is in use, please disable it first or use force option", ident);
-      }
+    return TreeLockUtils.doWithRootTreeLock(
+        LockType.WRITE,
+        () -> {
+          try {
+            boolean inUse = metalakeInUse(store, ident);
+            if (inUse && !force) {
+              throw new MetalakeInUseException(
+                  "Metalake %s is in use, please disable it first or use force option", ident);
+            }
 
-      List<CatalogEntity> catalogEntities =
-          store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
-      if (!catalogEntities.isEmpty() && !force) {
-        throw new NonEmptyMetalakeException(
-            "Metalake %s has catalogs, please drop them first or use force option", ident);
-      }
+            List<CatalogEntity> catalogEntities =
+                store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
+            if (!catalogEntities.isEmpty() && !force) {
+              throw new NonEmptyMetalakeException(
+                  "Metalake %s has catalogs, please drop them first or use force option", ident);
+            }
 
-      return store.delete(ident, EntityType.METALAKE, true);
-    } catch (NoSuchMetalakeException e) {
-      return false;
+            return store.delete(ident, EntityType.METALAKE, true);
+          } catch (NoSuchMetalakeException e) {
+            return false;
 
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   @Override
   public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    try {
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () -> {
+          try {
+            boolean inUse = metalakeInUse(store, ident);
+            if (!inUse) {
+              store.update(
+                  ident,
+                  BaseMetalake.class,
+                  EntityType.METALAKE,
+                  metalake -> {
+                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
 
-      boolean inUse = metalakeInUse(store, ident);
-      if (!inUse) {
-        store.update(
-            ident,
-            BaseMetalake.class,
-            EntityType.METALAKE,
-            metalake -> {
-              BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+                    Map<String, String> newProps =
+                        metalake.properties() == null
+                            ? Maps.newHashMap()
+                            : Maps.newHashMap(metalake.properties());
+                    newProps.put(PROPERTY_IN_USE, "true");
+                    builder.withProperties(newProps);
 
-              Map<String, String> newProps =
-                  metalake.properties() == null
-                      ? Maps.newHashMap()
-                      : Maps.newHashMap(metalake.properties());
-              newProps.put(PROPERTY_IN_USE, "true");
-              builder.withProperties(newProps);
+                    return builder.build();
+                  });
+            }
 
-              return builder.build();
-            });
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+            return null;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   @Override
   public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    try {
-      boolean inUse = metalakeInUse(store, ident);
-      if (inUse) {
-        store.update(
-            ident,
-            BaseMetalake.class,
-            EntityType.METALAKE,
-            metalake -> {
-              BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () -> {
+          try {
+            boolean inUse = metalakeInUse(store, ident);
+            if (inUse) {
+              store.update(
+                  ident,
+                  BaseMetalake.class,
+                  EntityType.METALAKE,
+                  metalake -> {
+                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
 
-              Map<String, String> newProps =
-                  metalake.properties() == null
-                      ? Maps.newHashMap()
-                      : Maps.newHashMap(metalake.properties());
-              newProps.put(PROPERTY_IN_USE, "false");
-              builder.withProperties(newProps);
+                    Map<String, String> newProps =
+                        metalake.properties() == null
+                            ? Maps.newHashMap()
+                            : Maps.newHashMap(metalake.properties());
+                    newProps.put(PROPERTY_IN_USE, "false");
+                    builder.withProperties(newProps);
 
-              return builder.build();
-            });
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+                    return builder.build();
+                  });
+            }
+            return null;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private BaseMetalake.Builder newMetalakeBuilder(BaseMetalake metalake) {

@@ -86,8 +86,7 @@ public class MetalakeOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Metalake[] metalakes =
-                TreeLockUtils.doWithRootTreeLock(LockType.READ, metalakeDispatcher::listMetalakes);
+            Metalake[] metalakes = metalakeDispatcher.listMetalakes();
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
@@ -114,11 +113,8 @@ public class MetalakeOperations {
             request.validate();
             NameIdentifier ident = NameIdentifierUtil.ofMetalake(request.getName());
             Metalake metalake =
-                TreeLockUtils.doWithRootTreeLock(
-                    LockType.WRITE,
-                    () ->
-                        metalakeDispatcher.createMetalake(
-                            ident, request.getComment(), request.getProperties()));
+                metalakeDispatcher.createMetalake(
+                    ident, request.getComment(), request.getProperties());
             Response response = Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
             LOG.info("Metalake created: {}", metalake.name());
             return response;
@@ -166,17 +162,11 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            TreeLockUtils.doWithTreeLock(
-                identifier,
-                LockType.WRITE,
-                () -> {
-                  if (request.isInUse()) {
-                    metalakeDispatcher.enableMetalake(identifier);
-                  } else {
-                    metalakeDispatcher.disableMetalake(identifier);
-                  }
-                  return null;
-                });
+            if (request.isInUse()) {
+              metalakeDispatcher.enableMetalake(identifier);
+            } else {
+              metalakeDispatcher.disableMetalake(identifier);
+            }
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} metalake: {}",
@@ -209,9 +199,7 @@ public class MetalakeOperations {
                 updatesRequest.getUpdates().stream()
                     .map(MetalakeUpdateRequest::metalakeChange)
                     .toArray(MetalakeChange[]::new);
-            Metalake updatedMetalake =
-                TreeLockUtils.doWithRootTreeLock(
-                    LockType.WRITE, () -> metalakeDispatcher.alterMetalake(identifier, changes));
+            Metalake updatedMetalake = metalakeDispatcher.alterMetalake(identifier, changes);
             Response response =
                 Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
             LOG.info("Metalake altered: {}", updatedMetalake.name());
@@ -237,9 +225,7 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            boolean dropped =
-                TreeLockUtils.doWithRootTreeLock(
-                    LockType.WRITE, () -> metalakeDispatcher.dropMetalake(identifier, force));
+            boolean dropped = metalakeDispatcher.dropMetalake(identifier, force);
             if (!dropped) {
               LOG.warn("Failed to drop metalake by name {}", metalakeName);
             }

@@ -46,8 +46,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.TableResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -85,11 +83,7 @@ public class TableOperations {
           httpRequest,
           () -> {
             Namespace tableNS = NamespaceUtil.ofTable(metalake, catalog, schema);
-            NameIdentifier[] idents =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog, schema),
-                    LockType.READ,
-                    () -> dispatcher.listTables(tableNS));
+            NameIdentifier[] idents = dispatcher.listTables(tableNS);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
@@ -190,11 +184,7 @@ public class TableOperations {
                 request.getUpdates().stream()
                     .map(TableUpdateRequest::tableChange)
                     .toArray(TableChange[]::new);
-            Table t =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () -> dispatcher.alterTable(ident, changes));
+            Table t = dispatcher.alterTable(ident, changes);
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
             LOG.info("Table altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
             return response;
@@ -228,11 +218,7 @@ public class TableOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
-            boolean dropped =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () -> purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident));
+            boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
             if (!dropped) {
               LOG.warn("Failed to drop table {} under schema {}", table, schema);
             }
