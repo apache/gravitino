@@ -45,20 +45,22 @@ import org.apache.gravitino.storage.S3Properties;
  */
 public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
-  @VisibleForTesting public static final String GRAVITINO_CATALOG_BACKEND = "catalog-backend";
-  public static final String PAIMON_METASTORE = "metastore";
-  public static final String WAREHOUSE = "warehouse";
-  public static final String URI = "uri";
-  public static final String GRAVITINO_JDBC_USER = "jdbc-user";
-  public static final String PAIMON_JDBC_USER = "jdbc.user";
-  public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
-  public static final String PAIMON_JDBC_PASSWORD = "jdbc.password";
-  public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
+  @VisibleForTesting
+  public static final String GRAVITINO_CATALOG_BACKEND = PaimonConstants.CATALOG_BACKEND;
+
+  public static final String PAIMON_METASTORE = PaimonConstants.METASTORE;
+  public static final String WAREHOUSE = PaimonConstants.WAREHOUSE;
+  public static final String URI = PaimonConstants.URI;
+  public static final String GRAVITINO_JDBC_USER = PaimonConstants.GRAVITINO_JDBC_USER;
+  public static final String PAIMON_JDBC_USER = PaimonConstants.PAIMON_JDBC_USER;
+  public static final String GRAVITINO_JDBC_PASSWORD = PaimonConstants.GRAVITINO_JDBC_PASSWORD;
+  public static final String PAIMON_JDBC_PASSWORD = PaimonConstants.PAIMON_JDBC_PASSWORD;
+  public static final String GRAVITINO_JDBC_DRIVER = PaimonConstants.GRAVITINO_JDBC_DRIVER;
 
   // S3 properties needed by Paimon
-  public static final String S3_ENDPOINT = "s3.endpoint";
-  public static final String S3_ACCESS_KEY = "s3.access-key";
-  public static final String S3_SECRET_KEY = "s3.secret-key";
+  public static final String S3_ENDPOINT = PaimonConstants.S3_ENDPOINT;
+  public static final String S3_ACCESS_KEY = PaimonConstants.S3_ACCESS_KEY;
+  public static final String S3_SECRET_KEY = PaimonConstants.S3_SECRET_KEY;
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.of(

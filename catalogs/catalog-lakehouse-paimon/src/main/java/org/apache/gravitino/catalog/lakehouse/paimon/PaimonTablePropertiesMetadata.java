@@ -35,14 +35,14 @@ import org.apache.gravitino.connector.PropertyEntry;
  */
 public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
 
-  public static final String COMMENT = "comment";
-  public static final String OWNER = "owner";
-  public static final String BUCKET_KEY = "bucket-key";
-  public static final String MERGE_ENGINE = "merge-engine";
-  public static final String SEQUENCE_FIELD = "sequence.field";
-  public static final String ROWKIND_FIELD = "rowkind.field";
-  public static final String PRIMARY_KEY = "primary-key";
-  public static final String PARTITION = "partition";
+  public static final String COMMENT = PaimonConstants.COMMENT;
+  public static final String OWNER = PaimonConstants.OWNER;
+  public static final String BUCKET_KEY = PaimonConstants.BUCKET_KEY;
+  public static final String MERGE_ENGINE = PaimonConstants.MERGE_ENGINE;
+  public static final String SEQUENCE_FIELD = PaimonConstants.SEQUENCE_FIELD;
+  public static final String ROWKIND_FIELD = PaimonConstants.ROWKIND_FIELD;
+  public static final String PRIMARY_KEY = PaimonConstants.PRIMARY_KEY;
+  public static final String PARTITION = PaimonConstants.PARTITION;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 

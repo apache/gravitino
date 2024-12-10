@@ -16,17 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.spark.connector.integration.test.hive;
+package org.apache.gravitino.spark.connector.paimon;
 
-import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.SparkTypeConverter34;
 
-public class SparkHiveCatalogIT34 extends SparkHiveCatalogIT {
-  @Test
-  void testCatalogClassName() {
-    String catalogClass =
-        getSparkSession().sparkContext().conf().get("spark.sql.catalog." + getCatalogName());
-    Assertions.assertEquals(GravitinoHiveCatalogSpark34.class.getName(), catalogClass);
+public class GravitinoPaimonCatalogSpark34 extends GravitinoPaimonCatalog {
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter() {
+    return new SparkTypeConverter34();
+  }
+
+  @Override
+  protected SparkTableChangeConverter getSparkTableChangeConverter(
+      SparkTypeConverter sparkTypeConverter) {
+    return new SparkTableChangeConverter34(sparkTypeConverter);
   }
 }

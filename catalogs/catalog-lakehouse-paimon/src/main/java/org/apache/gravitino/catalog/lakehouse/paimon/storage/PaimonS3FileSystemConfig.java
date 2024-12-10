@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -29,9 +30,9 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class PaimonS3FileSystemConfig extends Config {
   // S3 related properties
-  public static final String S3_ENDPOINT = "s3.endpoint";
-  public static final String S3_ACCESS_KEY = "s3.access-key";
-  public static final String S3_SECRET_KEY = "s3.secret-key";
+  public static final String S3_ENDPOINT = PaimonConstants.S3_ENDPOINT;
+  public static final String S3_ACCESS_KEY = PaimonConstants.S3_ACCESS_KEY;
+  public static final String S3_SECRET_KEY = PaimonConstants.S3_SECRET_KEY;
 
   public PaimonS3FileSystemConfig(Map<String, String> properties) {
     super(false);
