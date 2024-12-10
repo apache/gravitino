@@ -88,7 +88,7 @@ public class CatalogsPage extends BaseWebIT {
 
   @FindBy(xpath = "//button[@data-refer='add-fileset-props']")
   public WebElement addFilesetPropsBtn;
-  
+
   @FindBy(xpath = "//*[@data-refer='handle-submit-fileset']")
   public WebElement handleSubmitFilesetBtn;
 
@@ -176,12 +176,11 @@ public class CatalogsPage extends BaseWebIT {
 
   public void setCatalogCommentField(String nameField) {
     try {
-      WebElement catalogCommentFieldInput =
-          catalogCommentField.findElement(By.tagName("textarea"));
-    catalogCommentFieldInput.sendKeys(
+      WebElement catalogCommentFieldInput = catalogCommentField.findElement(By.tagName("textarea"));
+      catalogCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-    catalogCommentFieldInput.clear();
-    catalogCommentFieldInput.sendKeys(nameField);
+      catalogCommentFieldInput.clear();
+      catalogCommentFieldInput.sendKeys(nameField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -273,8 +272,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void setSchemaCommentField(String nameField) {
     try {
-      WebElement schemaCommentFieldInput =
-          schemaCommentField.findElement(By.tagName("textarea"));
+      WebElement schemaCommentFieldInput = schemaCommentField.findElement(By.tagName("textarea"));
       schemaCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
       schemaCommentFieldInput.clear();
@@ -311,8 +309,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void setFilesetCommentField(String nameField) {
     try {
-      WebElement filesetCommentFieldInput =
-          filesetCommentField.findElement(By.tagName("textarea"));
+      WebElement filesetCommentFieldInput = filesetCommentField.findElement(By.tagName("textarea"));
       filesetCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
       filesetCommentFieldInput.clear();
