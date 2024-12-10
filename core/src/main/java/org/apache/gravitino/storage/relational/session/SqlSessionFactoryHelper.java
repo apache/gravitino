@@ -34,6 +34,8 @@ import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -126,6 +128,8 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(TagMetadataObjectRelMapper.class);
     configuration.addMapper(OwnerMetaMapper.class);
     configuration.addMapper(ModelMetaMapper.class);
+    configuration.addMapper(ModelVersionMetaMapper.class);
+    configuration.addMapper(ModelVersionAliasRelMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.meta;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
@@ -27,10 +28,16 @@ import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 
 @ToString
-public class ModelVersionEntity implements Entity, Auditable {
+public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
 
+  public static final Field MODEL_IDENT =
+      Field.required(
+          "model_ident", NameIdentifier.class, "The name identifier of the model entity.");
   public static final Field VERSION =
       Field.required("version", Integer.class, "The version of the model entity.");
   public static final Field COMMENT =
@@ -43,6 +50,8 @@ public class ModelVersionEntity implements Entity, Auditable {
       Field.optional("properties", Map.class, "The properties of the model entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the model entity.");
+
+  private NameIdentifier modelIdent;
 
   private Integer version;
 
@@ -61,6 +70,7 @@ public class ModelVersionEntity implements Entity, Auditable {
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
+    fields.put(MODEL_IDENT, modelIdent);
     fields.put(VERSION, version);
     fields.put(COMMENT, comment);
     fields.put(ALIASES, aliases);
@@ -69,6 +79,10 @@ public class ModelVersionEntity implements Entity, Auditable {
     fields.put(AUDIT_INFO, auditInfo);
 
     return Collections.unmodifiableMap(fields);
+  }
+
+  public NameIdentifier modelIdentifier() {
+    return modelIdent;
   }
 
   public Integer version() {
@@ -102,6 +116,23 @@ public class ModelVersionEntity implements Entity, Auditable {
   }
 
   @Override
+  public String name() {
+    return String.valueOf(version);
+  }
+
+  @Override
+  public Namespace namespace() {
+    List<String> levels = Lists.newArrayList(modelIdent.namespace().levels());
+    levels.add(modelIdent.name());
+    return Namespace.of(levels.toArray(new String[0]));
+  }
+
+  @Override
+  public Long id() {
+    throw new UnsupportedOperationException("Model version entity does not have an ID.");
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -113,6 +144,7 @@ public class ModelVersionEntity implements Entity, Auditable {
 
     ModelVersionEntity that = (ModelVersionEntity) o;
     return Objects.equals(version, that.version)
+        && Objects.equals(modelIdent, that.modelIdent)
         && Objects.equals(comment, that.comment)
         && Objects.equals(aliases, that.aliases)
         && Objects.equals(uri, that.uri)
@@ -122,7 +154,7 @@ public class ModelVersionEntity implements Entity, Auditable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(version, comment, aliases, uri, properties, auditInfo);
+    return Objects.hash(modelIdent, version, comment, aliases, uri, properties, auditInfo);
   }
 
   public static Builder builder() {
@@ -134,6 +166,11 @@ public class ModelVersionEntity implements Entity, Auditable {
 
     private Builder() {
       model = new ModelVersionEntity();
+    }
+
+    public Builder withModelIdentifier(NameIdentifier modelIdent) {
+      model.modelIdent = modelIdent;
+      return this;
     }
 
     public Builder withVersion(int version) {
@@ -168,6 +205,7 @@ public class ModelVersionEntity implements Entity, Auditable {
 
     public ModelVersionEntity build() {
       model.validate();
+      model.aliases = model.aliases == null ? Collections.emptyList() : model.aliases;
       return model;
     }
   }
