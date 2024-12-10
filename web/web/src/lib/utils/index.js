@@ -45,6 +45,13 @@ export const loggerVersion = version => {
   )
 }
 
+export const loggerGitHubInfo = (stars, forks) => {
+  console.log(
+    `Gravitino GitHubInfo: %c Stars ${stars}, Forks ${forks}`,
+    `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
+  )
+}
+
 export const genUpdates = (originalData, newData) => {
   const updates = []
 
@@ -102,7 +109,7 @@ export const genUpdates = (originalData, newData) => {
           newFieldName: newColumnsMap[key].name
         })
       }
-      if (originalColumnsMap[key].type !== newColumnsMap[key].type) {
+      if ((originalColumnsMap[key].type + originalColumnsMap[key].typeSuffix || '') !== newColumnsMap[key].type) {
         updates.push({
           '@type': 'updateColumnType',
           fieldName: [newColumnsMap[key].name],
@@ -226,4 +233,14 @@ export const findInTree = (tree, key, value) => {
   }
 
   return result
+}
+
+export const formatNumber = num => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  }
+
+  return num.toString()
 }

@@ -52,4 +52,14 @@ public final class CreateFilesetEvent extends FilesetEvent {
   public FilesetInfo createdFilesetInfo() {
     return createdFilesetInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_FILESET;
+  }
 }

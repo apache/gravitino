@@ -22,6 +22,7 @@ package org.apache.gravitino.credential;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 /** S3 secret key credential. */
 public class S3SecretKeyCredential implements Credential {
@@ -33,8 +34,8 @@ public class S3SecretKeyCredential implements Credential {
   /** The static secret access key used to access S3 data. */
   public static final String GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-secret-access-key";
 
-  private final String accessKeyId;
-  private final String secretAccessKey;
+  private String accessKeyId;
+  private String secretAccessKey;
 
   /**
    * Constructs an instance of {@link S3SecretKeyCredential} with the static S3 access key ID and
@@ -44,12 +45,16 @@ public class S3SecretKeyCredential implements Credential {
    * @param secretAccessKey The S3 static secret access key.
    */
   public S3SecretKeyCredential(String accessKeyId, String secretAccessKey) {
-    Preconditions.checkNotNull(accessKeyId, "S3 access key Id should not null");
-    Preconditions.checkNotNull(secretAccessKey, "S3 secret access key should not null");
-
+    validate(accessKeyId, secretAccessKey, 0);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
   }
+
+  /**
+   * This is the constructor that is used by credential factory to create an instance of credential
+   * according to the credential information.
+   */
+  public S3SecretKeyCredential() {}
 
   @Override
   public String credentialType() {
@@ -69,6 +74,15 @@ public class S3SecretKeyCredential implements Credential {
         .build();
   }
 
+  @Override
+  public void initialize(Map<String, String> credentialInfo, long expireTimeInMs) {
+    String accessKeyId = credentialInfo.get(GRAVITINO_S3_STATIC_ACCESS_KEY_ID);
+    String secretAccessKey = credentialInfo.get(GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY);
+    validate(accessKeyId, secretAccessKey, expireTimeInMs);
+    this.accessKeyId = accessKeyId;
+    this.secretAccessKey = secretAccessKey;
+  }
+
   /**
    * Get S3 static access key ID.
    *
@@ -85,5 +99,14 @@ public class S3SecretKeyCredential implements Credential {
    */
   public String secretAccessKey() {
     return secretAccessKey;
+  }
+
+  private void validate(String accessKeyId, String secretAccessKey, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessKeyId), "S3 access key Id should not empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(secretAccessKey), "S3 secret access key should not empty");
+    Preconditions.checkArgument(
+        expireTimeInMs == 0, "The expire time of S3SecretKeyCredential is not 0");
   }
 }

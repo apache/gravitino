@@ -38,4 +38,9 @@ public class IcebergViewExistsEvent extends IcebergViewEvent {
   public boolean isExists() {
     return isExists;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.VIEW_EXISTS;
+  }
 }

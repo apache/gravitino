@@ -26,12 +26,12 @@ cp "$trino_conf_dir/config/config.properties" /etc/trino/config.properties
 cp "$trino_conf_dir/config/jvm.config" /etc/trino/jvm.config
 cp "$trino_conf_dir/config/log4j2.properties" /etc/trino/log4j2.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
+cp /usr/lib/trino/plugin/mysql/mysql-connector-j-8.2.0.jar /usr/lib/trino/plugin/iceberg
 #
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties
 # Update `gravitino.metalake = GRAVITINO_METALAKE_NAME` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" /etc/trino/catalog/gravitino.properties
-
 
 # Check the number of Gravitino connector plugins present in the Trino plugin directory
 num_of_gravitino_connector=$(ls /usr/lib/trino/plugin/gravitino | grep gravitino-trino-connector-* | wc -l)

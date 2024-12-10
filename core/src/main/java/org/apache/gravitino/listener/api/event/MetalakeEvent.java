@@ -39,4 +39,9 @@ public abstract class MetalakeEvent extends Event {
   protected MetalakeEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

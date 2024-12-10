@@ -168,6 +168,12 @@ Changelog
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+- apache/gravitino-ci:hive-0.1.16
+  - Add GCS related configuration in the `hive-site.xml` file.
+  - Add GCS bundle jar in the `${HADOOP_HOME}/share/hadoop/common/lib/`
+
+- apache/gravitino-ci:hive-0.1.15
+  - Add Azure Blob Storage(ADLS) related configurations in the `hive-site.xml` file.
 
 - apache/gravitino-ci:hive-0.1.14 
   - Add amazon S3 related configurations in the `hive-site.xml` file.

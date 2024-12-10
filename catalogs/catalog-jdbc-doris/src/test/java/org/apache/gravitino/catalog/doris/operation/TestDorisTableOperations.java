@@ -433,6 +433,11 @@ public class TestDorisTableOperations extends TestDoris {
         JdbcColumn.builder().withName("col_11").withType(Types.FixedCharType.of(10)).build());
     columns.add(JdbcColumn.builder().withName("col_12").withType(Types.VarCharType.of(10)).build());
     columns.add(JdbcColumn.builder().withName("col_13").withType(Types.StringType.get()).build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_14")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .build());
 
     Distribution distribution =
         Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));

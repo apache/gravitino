@@ -51,4 +51,14 @@ public class GetPartitionEvent extends PartitionEvent {
   public PartitionInfo partitionInfo() {
     return partitionInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_PARTITION;
+  }
 }

@@ -18,24 +18,37 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import java.util.List;
-import org.apache.gravitino.annotation.Unstable;
+import java.util.Set;
+import org.apache.gravitino.authorization.AuthorizationMetadataObject;
+import org.apache.gravitino.authorization.AuthorizationPrivilege;
+import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 
-/**
- * The Ranger securable object is the entity which access can be granted. Unless allowed by a grant,
- * access is denied. <br>
- * You can use the helper class `RangerSecurableObjects` to create the Ranger securable object which
- * you need. <br>
- * There is a clear difference between Ranger's Securable Object and Gravitino's Securable Object,
- * Ranger's Securable Object does not have the concept of `METALAKE`, so it needs to be defined
- * specifically.
- */
-@Unstable
-public interface RangerSecurableObject extends RangerMetadataObject {
+/** The helper class for {@link RangerSecurableObject}. */
+public class RangerSecurableObject extends RangerMetadataObject
+    implements AuthorizationSecurableObject {
+  private final List<AuthorizationPrivilege> privileges;
+
   /**
-   * The privileges of the Ranger securable object.
+   * Create the Ranger securable object with the given name, parent and type.
    *
-   * @return The privileges of the securable object.
+   * @param parent The parent of the metadata object
+   * @param name The name of the metadata object
+   * @param type The type of the metadata object
    */
-  List<RangerPrivilege> privileges();
+  public RangerSecurableObject(
+      String parent,
+      String name,
+      AuthorizationMetadataObject.Type type,
+      Set<AuthorizationPrivilege> privileges) {
+    super(parent, name, type);
+    this.privileges = ImmutableList.copyOf(Sets.newHashSet(privileges));
+  }
+
+  @Override
+  public List<AuthorizationPrivilege> privileges() {
+    return privileges;
+  }
 }

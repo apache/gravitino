@@ -45,6 +45,7 @@ public class DummyAuditLog implements AuditLog {
     return user;
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public Operation operation() {
     return operation;
@@ -60,6 +61,7 @@ public class DummyAuditLog implements AuditLog {
     return timestamp;
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public Status status() {
     return status;

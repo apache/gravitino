@@ -17,9 +17,10 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
-- Supports credential vending for `S3` and `GCS`.
+- Supports credential vending for `S3`、`GCS` and `OSS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS` and provides the capability to support other storages.
 - Supports event listener.
+- Supports Audit log.
 - Supports OAuth2 and HTTPS.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 
@@ -127,16 +128,22 @@ To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse
 
 #### OSS configuration
 
-Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access OSS data.
+Gravitino Iceberg REST service supports using static access-key-id and secret-access-key or generating temporary token to access OSS data.
 
-| Configuration item                             | Description                                                                                           | Default value | Required | Since Version    |
-|------------------------------------------------|-------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl`               | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS. | (none)        | No       | 0.6.0-incubating |
-| `gravitino.iceberg-rest.oss-access-key-id`     | The static access key ID used to access OSS data.                                                     | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.oss-secret-access-key` | The static secret access key used to access OSS data.                                                 | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                   | (none)        | No       | 0.7.0-incubating |
+| Configuration item                                | Description                                                                                                      | Default value   | Required | Since Version    |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS.            | (none)          | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                                | (none)          | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                            | (none)          | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-endpoint`             | The endpoint of Aliyun OSS service.                                                                              | (none)          | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-provider-type` is `oss-token`. | (none)          | No       | 0.8.0-incubating |
+| `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data, only used when `credential-provider-type` is `oss-token`.            | (none)          | No       | 0.8.0-incubating |
+| `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token, only used when `credential-provider-type` is `oss-token`.                 | (none)          | No       | 0.8.0-incubating |
+| `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs,  only used when `credential-provider-type` is `oss-token`.           | 3600            | No       | 0.8.0-incubating |
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.iceberg-rest.client.security-token`.
+
+If you set `credential-provider-type` explicitly, please downloading [Gravitino Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/aliyun-bundle), and place it to the classpath of Iceberg REST server.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
@@ -316,6 +323,10 @@ The `clients` property for example:
 ### Event listener
 
 Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, please refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
+
+### Audit log
+
+Gravitino provides a pluggable audit log mechanism, please refer to [Audit log configuration](gravitino-server-config.md#audit-log-configuration).
 
 ### Apache Iceberg metrics store configuration
 

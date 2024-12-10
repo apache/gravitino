@@ -61,14 +61,16 @@ public class Properties {
   public Map<String, String> parse(String[] inputs) {
     HashMap<String, String> map = new HashMap<>();
 
-    for (String input : inputs) {
-      // Split the input by the delimiter into key-value pairs
-      String[] pairs = input.split(delimiter);
-      for (String pair : pairs) {
-        // Split each key-value pair by the separator
-        String[] keyValue = pair.split(keyValueSeparator, 2);
-        if (keyValue.length == 2) {
-          map.put(keyValue[0].trim(), keyValue[1].trim());
+    if (inputs != null) {
+      for (String input : inputs) {
+        // Split the input by the delimiter into key-value pairs
+        String[] pairs = input.split(delimiter);
+        for (String pair : pairs) {
+          // Split each key-value pair by the separator
+          String[] keyValue = pair.split(keyValueSeparator, 2);
+          if (keyValue.length == 2) {
+            map.put(keyValue[0].trim(), keyValue[1].trim());
+          }
         }
       }
     }
