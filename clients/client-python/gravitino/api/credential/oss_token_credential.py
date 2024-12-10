@@ -47,7 +47,8 @@ class OSSTokenCredential(Credential, ABC):
             self._security_token, "The OSS security token should be empty"
         )
         Precondition.check_argument(
-            self._expire_time_in_ms > 0, "The expire time should be greater than 0"
+            self._expire_time_in_ms > 0,
+            "The expiration time of OSS token credential should greater than 0",
         )
 
     def credential_type(self) -> str:

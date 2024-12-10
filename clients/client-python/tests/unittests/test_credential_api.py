@@ -32,7 +32,7 @@ from tests.unittests import mock_base
 @mock_base.mock_data
 class TestCredentialApi(unittest.TestCase):
 
-    def test_get_credential(self, *mock_method):
+    def test_get_credentials(self, *mock_method):
         json_str = self._get_s3_token_str()
         mock_resp = self._get_mock_http_resp(json_str)
 
@@ -102,3 +102,4 @@ class TestCredentialApi(unittest.TestCase):
         self.assertEqual("access_id", s3_credential.access_key_id())
         self.assertEqual("secret_key", s3_credential.secret_access_key())
         self.assertEqual("token", s3_credential.session_token())
+        self.assertEqual(1000, s3_credential.expire_time_in_ms())

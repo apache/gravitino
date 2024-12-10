@@ -25,6 +25,14 @@ from gravitino.utils.precondition import Precondition
 
 class TestPrecondition(unittest.TestCase):
 
+    def test_check_argument(self):
+        with self.assertRaises(IllegalArgumentException):
+            Precondition.check_argument(False, "error")
+        try:
+            Precondition.check_argument(True, "error")
+        except IllegalArgumentException:
+            self.fail("should not raise IllegalArgumentException")
+
     def test_check_string_empty(self):
         with self.assertRaises(IllegalArgumentException):
             Precondition.check_string_not_empty("", "empty")
