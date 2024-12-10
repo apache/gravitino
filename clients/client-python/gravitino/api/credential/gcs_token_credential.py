@@ -43,7 +43,7 @@ class GCSTokenCredential(Credential, ABC):
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since
-        the epoch, 0 means not expire.
+        the epoch, 0 means not expiration time.
 
         Returns:
              The expiration time of the credential.
