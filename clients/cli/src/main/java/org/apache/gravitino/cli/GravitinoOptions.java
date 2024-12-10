@@ -100,7 +100,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(AUTO, "column value auto-increments (true/false)"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
-    options.addOption(createArgOption("r", ROLE, "role name"));
+    options.addOption(createArgsOption("r", ROLE, "role name"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
     // Properties and tags can have multiple values
