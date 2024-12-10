@@ -22,7 +22,6 @@ package org.apache.gravitino.integration.test.web.ui;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
