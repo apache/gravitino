@@ -28,25 +28,29 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
 
 /**
- * WildcardPropertiesMeta is a interface class to support wildcard in the properties metadata. <br>
+ * WildcardPropertiesMeta is a metadata interface for defining wildcard properties in the properties
+ * metadata. <br>
  * <br>
  * WildcardPropertiesMetadata interface defines: <br>
- * Prefix.Wildcard = "" <br>
+ * Prefix.Wildcard = "WildcardValue1,WildcardValue2" <br>
  * Prefix.*.properties-key1 = "" <br>
  * Prefix.*.properties-key2 = "" <br>
- * NOTE: Prefix support multiple segment, separated by dot. <br>
- * NOTE: properties-key{N} support multiple segment, separated by dot. <br>
+ * NOTE: Prefix name support multiple segment, separated by dot. for example: "a1.b1.c1" <br>
+ * NOTE: Suffix properties-key{N} support multiple segment, separated by dot. for example:
+ * "x1.y1.z1" <br>
  * <br>
  * Use define a WildcardPropertiesMetadata object: <br>
- * a1.b1.c1.WildcardNode = "WildcardValue1,WildcardValue2" <br>
- * a1.b1.c1.{WildcardValue1}.x1.y1.z1 = "WildcardValue1 properties-key1 value" <br>
- * a1.b1.c1.{WildcardValue1}.x1.y2.z2 = "WildcardValue1 properties-key2 value" <br>
- * a1.b1.c1.{WildcardValue1}.x1.y2.z3 = "WildcardValue1 properties-key3 value" <br>
- * a1.b1.c1.{WildcardValue2}.x1.y1.z1 = "WildcardValue2 properties-key1 value" <br>
- * a1.b1.c1.{WildcardValue2}.x1.y2.z2 = "WildcardValue2 properties-key2 value" <br>
- * a1.b1.c1.{WildcardValue2}.x1.y2.z3 = "WildcardValue2 properties-key3 value" <br>
+ * a1.b1.c1.Wildcard = "WildcardValue1,WildcardValue2" <br>
+ * a1.b1.c1.{WildcardValue1}.x1.y1.z1 = "WildcardValue1 property value" <br>
+ * a1.b1.c1.{WildcardValue1}.x1.y2.z2 = "WildcardValue1 property value" <br>
+ * a1.b1.c1.{WildcardValue1}.x1.y2.z3 = "WildcardValue1 property value" <br>
+ * a1.b1.c1.{WildcardValue2}.x1.y1.z1 = "WildcardValue2 property value" <br>
+ * a1.b1.c1.{WildcardValue2}.x1.y2.z2 = "WildcardValue2 property value" <br>
+ * a1.b1.c1.{WildcardValue2}.x1.y2.z3 = "WildcardValue2 property value" <br>
  * <br>
- * Configuration Example: {@link AuthorizationPropertiesMetadata} <br>
+ * Configuration Example: {@link AuthorizationPropertiesMetadata}, <br>
+ * The Prefix is "authorization.chain", <br>
+ * The Wildcard is "plugins" <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
  * "authorization.chain.hive1.provider" = "ranger"; <br>
  * "authorization.chain.hive1.catalog-provider" = "hive"; <br>
@@ -64,19 +68,20 @@ import org.apache.gravitino.authorization.AuthorizationPropertiesMetadata;
  * "authorization.chain.hdfs1.ranger.service.name" = "hdfsDev"; <br>
  */
 public interface WildcardPropertiesMetadata {
-  class Constants {
-    public static final String WILDCARD = "*";
-    public static final String WILDCARD_CONFIG_VALUES_SPLITTER = ",";
-  }
+  String WILDCARD = "*";
+  String WILDCARD_CONFIG_VALUES_SPLITTER = ",";
 
   /** The prefix name */
   String prefixName();
+
   /** The WildcardNode define name */
   String wildcardName();
-  /** The `FirstNode.SecondNode.WildcardNode` properties key name */
-  default String wildcardNodePropertyKey() {
+
+  /** The `Prefix.Wildcard` properties key name */
+  default String wildcardPropertyKey() {
     return String.format("%s.%s", prefixName(), wildcardName());
   }
+
   /** Get the property value by wildcard value and property key */
   default String getPropertyValue(String wildcardValue, String propertyKey) {
     return String.format("%s.%s.%s", prefixName(), wildcardValue, propertyKey);
@@ -100,7 +105,7 @@ public interface WildcardPropertiesMetadata {
       // Find the wildcard config key from the properties
       List<String> wildcardNodePropertyKeys =
           wildcardProperties.stream()
-              .filter(key -> !key.contains(WildcardPropertiesMetadata.Constants.WILDCARD))
+              .filter(key -> !key.contains(WildcardPropertiesMetadata.WILDCARD))
               .collect(Collectors.toList());
       Preconditions.checkArgument(
           wildcardNodePropertyKeys.size() == 1,
@@ -114,7 +119,7 @@ public interface WildcardPropertiesMetadata {
 
       // Get the wildcard values from the properties
       List<String> wildcardValues =
-          Arrays.stream(wildcardValue.split(Constants.WILDCARD_CONFIG_VALUES_SPLITTER))
+          Arrays.stream(wildcardValue.split(WILDCARD_CONFIG_VALUES_SPLITTER))
               .map(String::trim)
               .collect(Collectors.toList());
       wildcardValues.stream()
@@ -134,10 +139,10 @@ public interface WildcardPropertiesMetadata {
       // Get all wildcard properties with wildcard values
       List<Pattern> patterns =
           wildcardProperties.stream()
-              .filter(k -> k.contains(Constants.WILDCARD))
+              .filter(k -> k.contains(WILDCARD))
               .collect(Collectors.toList())
               .stream()
-              .map(wildcard -> wildcard.replace(".", "\\.").replace(Constants.WILDCARD, "([^.]+)"))
+              .map(wildcard -> wildcard.replace(".", "\\.").replace(WILDCARD, "([^.]+)"))
               .map(Pattern::compile)
               .collect(Collectors.toList());
 

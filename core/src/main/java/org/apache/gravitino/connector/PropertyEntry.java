@@ -54,6 +54,7 @@ public final class PropertyEntry<T> {
    * @param encoder Encode the java type to the string value
    * @param hidden Whether this property is hidden from user, such as password
    * @param reserved This property is reserved and cannot be set by user
+   * @param wildcard This property is a wildcard property
    */
   private PropertyEntry(
       String name,

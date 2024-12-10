@@ -42,7 +42,7 @@ public class TestAuthorizationPropertiesMeta {
         Arrays.asList(
             AuthorizationPropertiesMetadata.CHAIN_CATALOG_PROVIDER,
             AuthorizationPropertiesMetadata.CHAIN_PROVIDER,
-            AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey());
+            AuthorizationPropertiesMetadata.getInstance().wildcardPropertyKey());
     mapVariable.values().stream()
         .forEach(
             value -> {
@@ -51,7 +51,7 @@ public class TestAuthorizationPropertiesMeta {
                 String pluginPropValue =
                     value.replace(
                         AuthorizationPropertiesMetadata.getInstance()
-                            .getPropertyValue(WildcardPropertiesMetadata.Constants.WILDCARD, ""),
+                            .getPropertyValue(WildcardPropertiesMetadata.WILDCARD, ""),
                         String.format("%s.", AuthorizationPropertiesMetadata.FIRST_SEGMENT_NAME));
                 LOG.info("Checking variable: {}, pluginPropValue: {}", value, pluginPropValue);
                 Assertions.assertTrue(

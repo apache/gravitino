@@ -95,7 +95,7 @@ class TestHiveCatalogOperations {
         propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.RANGER_SERVICE_NAME));
     Assertions.assertTrue(
         propertyEntryMap.containsKey(
-            AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey()));
+            AuthorizationPropertiesMetadata.getInstance().wildcardPropertyKey()));
     Assertions.assertTrue(
         propertyEntryMap.containsKey(AuthorizationPropertiesMetadata.CHAIN_CATALOG_PROVIDER));
     Assertions.assertTrue(

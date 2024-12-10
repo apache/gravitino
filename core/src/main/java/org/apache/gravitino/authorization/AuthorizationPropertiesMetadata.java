@@ -45,7 +45,7 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
   /** Ranger admin web URIs */
   private static final String RANGER_ADMIN_URL_KEY = "ranger.admin.url";
 
-  public static final String getRangerAdminUrlKey() {
+  public static String getRangerAdminUrlKey() {
     return RANGER_ADMIN_URL_KEY;
   }
 
@@ -54,7 +54,7 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
   /** Ranger authentication type kerberos or simple */
   private static final String RANGER_AUTH_TYPE_KEY = "ranger.auth.type";
 
-  public static final String getRangerAuthTypeKey() {
+  public static String getRangerAuthTypeKey() {
     return RANGER_AUTH_TYPE_KEY;
   }
 
@@ -65,7 +65,7 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
    */
   private static final String RANGER_USERNAME_KEY = "ranger.username";
 
-  public static final String getRangerUsernameKey() {
+  public static String getRangerUsernameKey() {
     return RANGER_USERNAME_KEY;
   }
 
@@ -77,7 +77,7 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
    */
   private static final String RANGER_PASSWORD_KEY = "ranger.password";
 
-  public static final String getRangerPasswordKey() {
+  public static String getRangerPasswordKey() {
     return RANGER_PASSWORD_KEY;
   }
 
@@ -87,7 +87,7 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
   /** Ranger service name */
   private static final String RANGER_SERVICE_NAME_KEY = "ranger.service.name";
 
-  public static final String getRangerServiceNameKey() {
+  public static String getRangerServiceNameKey() {
     return RANGER_SERVICE_NAME_KEY;
   }
 
@@ -97,62 +97,51 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
   /** Chain authorization plugin provider */
   private static final String CHAIN_CATALOG_PROVIDER_KEY = "catalog-provider";
 
-  public static final String getChainCatalogProviderKey() {
+  public static String getChainCatalogProviderKey() {
     return CHAIN_CATALOG_PROVIDER_KEY;
   }
 
   public static final String CHAIN_CATALOG_PROVIDER =
       AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, CHAIN_CATALOG_PROVIDER_KEY);
+          .getPropertyValue(WILDCARD, CHAIN_CATALOG_PROVIDER_KEY);
 
   /** Chain authorization plugin provider */
   private static final String CHAIN_PROVIDER_KEY = "provider";
 
-  public static final String getChainProviderKey() {
+  public static String getChainProviderKey() {
     return CHAIN_PROVIDER_KEY;
   }
 
   public static final String CHAIN_PROVIDER =
-      AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, CHAIN_PROVIDER_KEY);
+      AuthorizationPropertiesMetadata.getInstance().getPropertyValue(WILDCARD, CHAIN_PROVIDER_KEY);
   /** Chain authorization Ranger admin web URIs */
   public static final String CHAIN_RANGER_ADMIN_URL =
       AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, RANGER_ADMIN_URL_KEY);
+          .getPropertyValue(WILDCARD, RANGER_ADMIN_URL_KEY);
   /** Chain authorization Ranger authentication type kerberos or simple */
   public static final String CHAIN_RANGER_AUTH_TYPES =
       AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, RANGER_AUTH_TYPE_KEY);
+          .getPropertyValue(WILDCARD, RANGER_AUTH_TYPE_KEY);
   /** Chain authorization Ranger username */
   public static final String CHAIN_RANGER_USERNAME =
-      AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, RANGER_USERNAME_KEY);
+      AuthorizationPropertiesMetadata.getInstance().getPropertyValue(WILDCARD, RANGER_USERNAME_KEY);
   /**
    * Chain authorization Ranger admin web login user password(auth_type=simple), or path of the
    * keytab file(auth_type=kerberos)
    */
   public static final String CHAIN_RANGER_PASSWORD =
-      AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, RANGER_PASSWORD_KEY);
+      AuthorizationPropertiesMetadata.getInstance().getPropertyValue(WILDCARD, RANGER_PASSWORD_KEY);
   /** Chain authorization Ranger service name */
   public static final String CHAIN_RANGER_SERVICE_NAME =
       AuthorizationPropertiesMetadata.getInstance()
-          .getPropertyValue(Constants.WILDCARD, RANGER_SERVICE_NAME_KEY);
-
-  public static String chainKeyToPluginKey(String chainKey, String plugin) {
-    return chainKey.replace(
-        String.format(
-            "%s.%s",
-            AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey(), plugin),
-        AuthorizationPropertiesMetadata.FIRST_SEGMENT_NAME);
-  }
+          .getPropertyValue(WILDCARD, RANGER_SERVICE_NAME_KEY);
 
   public static final Map<String, PropertyEntry<?>> AUTHORIZATION_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
-              AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey(),
+              AuthorizationPropertiesMetadata.getInstance().wildcardPropertyKey(),
               PropertyEntry.wildcardPropertyEntry(
-                  AuthorizationPropertiesMetadata.getInstance().wildcardNodePropertyKey(),
+                  AuthorizationPropertiesMetadata.getInstance().wildcardPropertyKey(),
                   "The Chain authorization plugins"))
           .put(
               CHAIN_CATALOG_PROVIDER,

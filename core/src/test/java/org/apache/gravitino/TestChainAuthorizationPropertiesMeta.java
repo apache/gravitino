@@ -50,7 +50,7 @@ public class TestChainAuthorizationPropertiesMeta {
         authPropertiesMetaInstance.getPropertyValue(
             pluginName, AuthorizationPropertiesMetadata.getChainCatalogProviderKey()),
         "hive");
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), pluginName);
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), pluginName);
     properties.put(
         authPropertiesMetaInstance.getPropertyValue(
             pluginName, AuthorizationPropertiesMetadata.getChainProviderKey()),
@@ -89,7 +89,7 @@ public class TestChainAuthorizationPropertiesMeta {
     properties.put(IMPERSONATION_ENABLE, "true");
 
     properties.put(AUTHORIZATION_PROVIDER, CHAIN_PLUGIN_SHORT_NAME);
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1,hdfs1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1,hdfs1");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -111,7 +111,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginsOne() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -129,7 +129,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginsTwo() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1,hdfs1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1,hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -154,7 +154,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginsHasSpace() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1, hdfs1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1, hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -179,7 +179,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginsOneButHasTowPluginConfig() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -205,7 +205,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginsHasPoint() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "plug.1, hdfs1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "plug.1, hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.plug.1.ranger.auth.type", "simple");
@@ -231,7 +231,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginErrorPluginName() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1,hdfs1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1,hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -257,7 +257,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginDuplicationPluginName() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1,hive1,hdfs1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1,hive1,hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
@@ -283,7 +283,7 @@ public class TestChainAuthorizationPropertiesMeta {
   @Test
   void testWildcardPropertyChainPluginErrorPropertyKey() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(authPropertiesMetaInstance.wildcardNodePropertyKey(), "hive1");
+    properties.put(authPropertiesMetaInstance.wildcardPropertyKey(), "hive1");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger-error.auth.types", "simple");
