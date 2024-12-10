@@ -206,9 +206,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         flags: u32,
     ) -> fuse3::Result<ReplyWrite> {
         let mut written = self.local_fs.write(inode, fh, offset, data).await?;
-        Ok(ReplyWrite {
-            written: written,
-        })
+        Ok(ReplyWrite { written: written })
     }
 
     async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {

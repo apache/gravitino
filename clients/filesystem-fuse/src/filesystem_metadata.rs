@@ -17,8 +17,8 @@
  * under the License.
  */
 use crate::filesystem::{FileStat, Result};
-use std::collections::HashMap;
 use crate::utils::join_file_path;
+use std::collections::HashMap;
 
 /// DefaultFileSystemMetadata is a simple implementation of FileSystemMetadata
 /// that stores file metadata in memory.
@@ -35,7 +35,7 @@ pub struct DefaultFileSystemMetadata {
 
 impl DefaultFileSystemMetadata {
     pub const ROOT_DIR_PARENT_FILE_ID: u64 = 0;
-    pub const ROOT_DIR_PARENT_FILE_NAME: &'static str = "";
+    pub const ROOT_DIR_NAME: &'static str = "";
     pub const ROOT_DIR_FILE_ID: u64 = 1;
     pub const FS_META_FILE_NAME: &'static str = ".gvfs_meta";
 

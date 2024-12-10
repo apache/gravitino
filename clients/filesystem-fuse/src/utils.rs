@@ -17,7 +17,6 @@
  * under the License.
  */
 
-
 pub fn join_file_path(parent: &str, name: &str) -> String {
     if parent.is_empty() {
         name.to_string()

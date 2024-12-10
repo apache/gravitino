@@ -19,7 +19,7 @@
 use crate::filesystem::OpenedFile;
 use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 // OpenedFileManager is a manager for opened files.
@@ -54,7 +54,9 @@ impl OpenedFileManager {
     }
 
     pub(crate) fn get_file(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
-        self.file_handle_map.get(&handle_id).map(|x| x.value().clone())
+        self.file_handle_map
+            .get(&handle_id)
+            .map(|x| x.value().clone())
     }
 
     pub(crate) fn remove_file(&self, handle_id: u64) {
