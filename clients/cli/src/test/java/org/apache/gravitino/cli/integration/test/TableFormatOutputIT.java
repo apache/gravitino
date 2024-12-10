@@ -169,7 +169,12 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+----------+\n" + "| catalog  |\n" + "+----------+\n" + "| postgres |\n" + "+----------+",
+        "+-----------+\n"
+            + "| catalog   |\n"
+            + "+-----------+\n"
+            + "| postgres  |\n"
+            + "| postgres2 |\n"
+            + "+-----------+",
         output);
   }
 
