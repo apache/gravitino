@@ -104,6 +104,18 @@ public class CatalogsPage extends BaseWebIT {
   @FindBy(xpath = "//*[@data-refer='handle-submit-topic']")
   public WebElement handleSubmitTopicBtn;
 
+  @FindBy(xpath = "//*[@data-refer='create-table-btn']")
+  public WebElement createTableBtn;
+
+  @FindBy(xpath = "//*[@data-refer='table-name-field']")
+  public WebElement tableNameField;
+
+  @FindBy(xpath = "//*[@data-refer='table-comment-field']")
+  public WebElement tableCommentField;
+
+  @FindBy(xpath = "//*[@data-refer='handle-submit-table']")
+  public WebElement handleSubmitTableBtn;
+
   @FindBy(xpath = "//div[@data-refer='tree-view']")
   public WebElement treeView;
 
@@ -186,13 +198,13 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
-  public void setCatalogCommentField(String nameField) {
+  public void setCatalogCommentField(String commentField) {
     try {
       WebElement catalogCommentFieldInput = catalogCommentField.findElement(By.tagName("textarea"));
       catalogCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
       catalogCommentFieldInput.clear();
-      catalogCommentFieldInput.sendKeys(nameField);
+      catalogCommentFieldInput.sendKeys(commentField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -350,6 +362,50 @@ public class CatalogsPage extends BaseWebIT {
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
       topicCommentFieldInput.clear();
       topicCommentFieldInput.sendKeys(commentField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setTableNameField(String nameField) {
+    try {
+      WebElement tableNameFieldInput = tableNameField.findElement(By.tagName("input"));
+      tableNameFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      tableNameFieldInput.clear();
+      tableNameFieldInput.sendKeys(nameField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void setTableCommentField(String commentField) {
+    try {
+      WebElement tableCommentFieldInput = tableCommentField.findElement(By.tagName("textarea"));
+      tableCommentFieldInput.sendKeys(
+          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
+      tableCommentFieldInput.clear();
+      tableCommentFieldInput.sendKeys(commentField);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  // set the indexed table columns
+  public void setTableColumnsAt(int index, String name, String type) {
+    try {
+      // Set the indexed column name
+      String columnName = "//div[@data-refer='column-name-" + index + "']//input";
+      WebElement keyInput = driver.findElement(By.xpath(columnName));
+      keyInput.sendKeys(name);
+      // Set the indexed column type
+      String columnType = "//div[@data-refer='column-type-" + index + "']";
+      WebElement typeSelect = driver.findElement(By.xpath(columnType));
+      clickAndWait(typeSelect);
+      WebElement typeList =
+          driver.findElement(By.xpath("//ul[@aria-labelledby='select-column-type']"));
+      WebElement typeItem = typeList.findElement(By.xpath(".//li[@data-value='" + type + "']"));
+      clickAndWait(typeItem);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -665,6 +721,32 @@ public class CatalogsPage extends BaseWebIT {
       }
 
       if (!texts.contains(itemName)) {
+        LOG.error("table list: {} does not include itemName: {}", texts, itemName);
+        return false;
+      }
+
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyNoDataItemInList(String itemName, Boolean isColumnLevel) {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      String xpath =
+          "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
+      if (isColumnLevel) {
+        xpath = xpath + "//p";
+      }
+      List<WebElement> list = driver.findElements(By.xpath(xpath));
+      List<String> texts = new ArrayList<>();
+      for (WebElement element : list) {
+        texts.add(element.getText());
+      }
+
+      if (texts.contains(itemName)) {
         LOG.error("table list: {} does not include itemName: {}", texts, itemName);
         return false;
       }

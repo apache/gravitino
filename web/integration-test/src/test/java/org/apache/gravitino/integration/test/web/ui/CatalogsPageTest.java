@@ -92,6 +92,7 @@ public class CatalogsPageTest extends BaseWebIT {
   private static final String FILESET_NAME = "fileset1";
   private static final String TABLE_NAME = "table1";
   private static final String TABLE_NAME_2 = "table2";
+  private static final String TABLE_NAME_3 = "table3";
   private static final String COLUMN_NAME = "column";
   private static final String COLUMN_NAME_2 = "column_2";
   private static final String PROPERTIES_KEY1 = "key1";
@@ -542,6 +543,33 @@ public class CatalogsPageTest extends BaseWebIT {
 
   @Test
   @Order(19)
+  public void testCreateTableByUI() throws InterruptedException {
+    String schemaNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL, SCHEMA_NAME);
+    catalogsPage.clickTreeNode(schemaNode);
+    // 1. create table in hive catalog without partition/sort order/distribution
+    clickAndWait(catalogsPage.createTableBtn);
+    catalogsPage.setTableNameField(TABLE_NAME_3);
+    catalogsPage.setTableCommentField("table comment for ui");
+    catalogsPage.setTableColumnsAt(0, COLUMN_NAME, "byte");
+    clickAndWait(catalogsPage.handleSubmitTableBtn);
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME_3, false));
+  }
+
+  @Test
+  @Order(20)
+  public void testDropTableByUI() throws InterruptedException {
+    // delete table of hive catalog
+    catalogsPage.clickDeleteBtn(TABLE_NAME_3);
+    clickAndWait(catalogsPage.confirmDeleteBtn);
+    // verify table list without table name 3
+    Assertions.assertTrue(catalogsPage.verifyNoDataItemInList(TABLE_NAME_3, false));
+  }
+
+  @Test
+  @Order(21)
   public void testOtherRelationalCatalogTreeNode() throws InterruptedException {
     String icebergNode =
         String.format(
@@ -561,7 +589,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(20)
+  @Order(22)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
@@ -571,7 +599,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(21)
+  @Order(23)
   public void testCreateFilesetSchema() throws InterruptedException {
     // 1. click fileset catalog tree node
     String filesetCatalogNode =
@@ -598,7 +626,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(22)
+  @Order(24)
   public void testCreateFileset() throws InterruptedException {
     // 1. click schema tree node
     String filesetSchemaNode =
@@ -649,7 +677,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(23)
+  @Order(25)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
