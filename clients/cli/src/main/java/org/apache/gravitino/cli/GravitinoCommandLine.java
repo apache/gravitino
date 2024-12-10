@@ -385,14 +385,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteUser(url, ignore, force, metalake, user).handle();
     } else if (CommandActions.REVOKE.equals(command)) {
-      // Retrieve values of the role option from the command line, e.g., ["role1", "role2"]
+      // Role options supports multiple values
       String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : roles) {
         newRemoveRoleFromUser(url, ignore, metalake, user, role).handle();
       }
       System.out.printf("Remove roles %s from user %s%n", COMMA_JOINER.join(roles), user);
     } else if (CommandActions.GRANT.equals(command)) {
-      // Retrieve values of the role option from the command line, e.g., ["role1", "role2"]
       String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : roles) {
         newAddRoleToUser(url, ignore, metalake, user, role).handle();
@@ -424,14 +423,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteGroup(url, ignore, force, metalake, group).handle();
     } else if (CommandActions.REVOKE.equals(command)) {
-      // Retrieve values of the role option from the command line, e.g., ["role1", "role2"]
+      // Role options supports multiple values
       String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : roles) {
         newRemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
       }
       System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(roles), group);
     } else if (CommandActions.GRANT.equals(command)) {
-      // Retrieve values of the role option from the command line, e.g., ["role1", "role2"]
       String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : roles) {
         newAddRoleToGroup(url, ignore, metalake, group, role).handle();
