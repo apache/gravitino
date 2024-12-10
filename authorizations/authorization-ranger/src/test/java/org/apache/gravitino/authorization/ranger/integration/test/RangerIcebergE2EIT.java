@@ -71,7 +71,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init();
+    RangerITEnv.init(true);
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =
