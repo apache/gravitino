@@ -1,0 +1,29 @@
+gcli topic [list|details|create|delete|update|properties|set|remove]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Display a topic's details
+gcli topic details --name kafka.default.topic3
+
+Create a topic
+gcli topic create --name kafka.default.topic3
+
+List all topics
+gcli topic list --name kafka.default
+
+Delete a topic
+gcli topic delete --name kafka.default.topic3
+
+Change a topic's comment
+gcli topic update --name kafka.default.topic3 --comment new_comment
+
+Display a topics's properties
+gcli topic properties --name kafka.default.topic3
+
+Set a topics's property
+gcli topic set --name kafka.default.topic3 --property test --value value
+
+Remove a topics's property
+gcli topic remove --name kafka.default.topic3 --property test
