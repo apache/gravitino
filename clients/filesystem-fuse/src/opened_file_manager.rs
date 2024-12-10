@@ -59,7 +59,7 @@ impl OpenedFileManager {
             .map(|x| x.value().clone())
     }
 
-    pub(crate) fn remove_file(&self, handle_id: u64) {
-        self.file_handle_map.remove(&handle_id);
+    pub(crate) fn remove_file(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
+        self.file_handle_map.remove(&handle_id).map(|x| x.1)
     }
 }

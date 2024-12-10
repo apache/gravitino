@@ -126,6 +126,10 @@ impl PathFileSystem for MemoryFileSystem {
         }
     }
 
+    async fn open_dir(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile> {
+        self.open_file(name, flags).await
+    }
+
     async fn create_file(
         &self,
         parent: &str,

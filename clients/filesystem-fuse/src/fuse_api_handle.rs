@@ -231,19 +231,21 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         lock_owner: u64,
         flush: bool,
     ) -> fuse3::Result<()> {
-        let _ = self.local_fs.close_file(inode, fh);
-        Ok(())
+        self.local_fs.close_file(inode, fh).await
     }
 
     async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let file_handle = self.local_fs.open_file(inode, flags).await?;
+        let file_handle = self.local_fs.open_dir(inode, flags).await?;
         Ok(ReplyOpen {
             fh: file_handle.handle_id,
             flags: flags,
         })
     }
 
-    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>> where T: 'a;
+    type DirEntryStream<'a>
+        = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+    where
+        T: 'a;
 
     async fn readdir<'a>(
         &'a self,
@@ -321,7 +323,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         })
     }
 
-    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>> where T: 'a;
+    type DirEntryPlusStream<'a>
+        = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
+    where
+        T: 'a;
 
     async fn readdirplus<'a>(
         &'a self,

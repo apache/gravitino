@@ -54,6 +54,8 @@ pub trait RawFileSystem: Send + Sync {
 
     async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
 
+    async fn open_dir(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
+
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle>;
 
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<FileHandle>;
@@ -84,6 +86,8 @@ pub trait PathFileSystem: Send + Sync {
     async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>>;
 
     async fn open_file(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+
+    async fn open_dir(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     async fn create_file(
         &self,
@@ -250,6 +254,24 @@ impl OpenedFile {
         self.writer.as_mut().unwrap().write(offset, data).await
     }
 
+    async fn close(&mut self) -> Result<()> {
+        if let Some(mut reader) = self.reader.take() {
+            reader.close().await?;
+        }
+        if let Some(mut writer) = self.writer.take() {
+            self.flush().await?;
+            writer.close().await?
+        }
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<()> {
+        if let Some(writer) = &mut self.writer {
+            writer.flush().await?;
+        }
+        Ok(())
+    }
+
     fn file_handle(&self) -> FileHandle {
         FileHandle {
             file_id: self.file_stat.inode,
@@ -266,12 +288,21 @@ impl OpenedFile {
 #[async_trait]
 pub trait FileReader: Sync + Send {
     async fn read(&mut self, offset: u64, size: u32) -> Result<Bytes>;
+    async fn close(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// File writer interface  for write file content
 #[async_trait]
 pub trait FileWriter: Sync + Send {
     async fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32>;
+    async fn close(&mut self) -> Result<()> {
+        Ok(())
+    }
+    async fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -409,6 +440,35 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
         let file = file.lock().await;
         Ok(file.file_handle())
     }
+
+    async fn open_file_internal(
+        &self,
+        file_id: u64,
+        flags: u32,
+        kind: FileType,
+    ) -> Result<FileHandle> {
+        let file_node = self.get_file_node(file_id)?;
+
+        let mut file = {
+            match kind {
+                FileType::Directory => {
+                    self.fs
+                        .open_dir(&file_node.file_name, OpenFileFlags(flags))
+                        .await?
+                }
+                FileType::RegularFile => {
+                    self.fs
+                        .open_file(&file_node.file_name, OpenFileFlags(flags))
+                        .await?
+                }
+                _ => return Err(Errno::from(libc::EINVAL)),
+            }
+        };
+        file.set_inode(file_node.parent_file_id, file_id);
+        let file = self.opened_file_manager.put_file(file);
+        let file = file.lock().await;
+        Ok(file.file_handle())
+    }
 }
 
 #[async_trait]
@@ -467,15 +527,13 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
-        let file_node = self.get_file_node(file_id)?;
-        let mut file = self
-            .fs
-            .open_file(&file_node.file_name, OpenFileFlags(flags))
-            .await?;
-        file.set_inode(file_node.parent_file_id, file_id);
-        let file = self.opened_file_manager.put_file(file);
-        let file = file.lock().await;
-        Ok(file.file_handle())
+        self.open_file_internal(file_id, flags, FileType::RegularFile)
+            .await
+    }
+
+    async fn open_dir(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
+        self.open_file_internal(file_id, flags, FileType::Directory)
+            .await
     }
 
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
@@ -522,7 +580,12 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
-        self.opened_file_manager.remove_file(fh);
+        let file = self
+            .opened_file_manager
+            .remove_file(fh)
+            .ok_or(Errno::from(libc::EBADF))?;
+        let mut file = file.lock().await;
+        file.close().await?;
         Ok(())
     }
 
