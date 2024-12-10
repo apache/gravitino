@@ -22,18 +22,21 @@ import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthorization> {
+public class TestRangerAuthorizationHadoopSQL
+    extends BaseAuthorization<TestRangerAuthorizationHadoopSQL> {
 
-  public TestRangerAuthorization() {}
+  public static final String SHORT_NAME = "test_ranger_hadoop_sql";
+
+  public TestRangerAuthorizationHadoopSQL() {}
 
   @Override
   public String shortName() {
-    return "ranger";
+    return SHORT_NAME;
   }
 
   @Override
   protected AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
-    return new TestRangerAuthorizationPlugin();
+    return new TestRangerAuthorizationHadoopSQLPlugin();
   }
 }

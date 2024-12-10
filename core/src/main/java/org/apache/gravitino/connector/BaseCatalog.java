@@ -19,22 +19,16 @@
 package org.apache.gravitino.connector;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Streams;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.AuthorizationProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -209,28 +203,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       authorization =
           classLoader.withClassLoader(
               cl -> {
-                try {
-                  ServiceLoader<AuthorizationProvider> loader =
-                      ServiceLoader.load(AuthorizationProvider.class, cl);
-
-                  List<Class<? extends AuthorizationProvider>> providers =
-                      Streams.stream(loader.iterator())
-                          .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
-                          .map(AuthorizationProvider::getClass)
-                          .collect(Collectors.toList());
-                  if (providers.isEmpty()) {
-                    throw new IllegalArgumentException(
-                        "No authorization provider found for: " + authorizationProvider);
-                  } else if (providers.size() > 1) {
-                    throw new IllegalArgumentException(
-                        "Multiple authorization providers found for: " + authorizationProvider);
-                  }
-                  return (BaseAuthorization<?>)
-                      Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
-                } catch (Exception e) {
-                  LOG.error("Failed to create authorization instance", e);
-                  throw new RuntimeException(e);
-                }
+                return BaseAuthorization.createAuthorization(cl, authorizationProvider);
               });
     } catch (Exception e) {
       LOG.error("Failed to load authorization with class loader", e);

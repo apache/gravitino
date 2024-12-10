@@ -16,5 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQL
-org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFS
+org.apache.gravitino.authorization.chain.ChainAuthorization
