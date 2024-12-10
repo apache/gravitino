@@ -19,6 +19,7 @@ from abc import ABC
 from typing import Dict
 
 from gravitino.api.credential.credential import Credential
+from gravitino.utils.precondition import Precondition
 
 
 class GCSTokenCredential(Credential, ABC):
@@ -32,6 +33,13 @@ class GCSTokenCredential(Credential, ABC):
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
         self._token = credential_info[self._GCS_TOKEN_NAME]
         self._expire_time_in_ms = expire_time_in_ms
+        Precondition.check_string_not_empty(
+            self._token, "GCS token should not be empty"
+        )
+        Precondition.check_argument(
+            self._expire_time_in_ms > 0,
+            "The expiration time of GCS token credential should greater than 0",
+        )
 
     def credential_type(self) -> str:
         """The type of the credential.

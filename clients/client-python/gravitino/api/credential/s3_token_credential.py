@@ -19,6 +19,7 @@ from abc import ABC
 from typing import Dict
 
 from gravitino.api.credential.credential import Credential
+from gravitino.utils.precondition import Precondition
 
 
 class S3TokenCredential(Credential, ABC):
@@ -41,6 +42,19 @@ class S3TokenCredential(Credential, ABC):
         ]
         self._session_token = credential_info[self._GRAVITINO_S3_TOKEN]
         self._expire_time_in_ms = expire_time_in_ms
+        Precondition.check_string_not_empty(
+            self._access_key_id, "The S3 access key ID should not be empty"
+        )
+        Precondition.check_string_not_empty(
+            self._secret_access_key, "The S3 secret access key should not be empty"
+        )
+        Precondition.check_string_not_empty(
+            self._session_token, "The S3 session token should not be empty"
+        )
+        Precondition.check_argument(
+            self.expire_time_in_ms,
+            "The expiration time of S3 token credential should greater than 0",
+        )
 
     def credential_type(self) -> str:
         """The type of the credential.

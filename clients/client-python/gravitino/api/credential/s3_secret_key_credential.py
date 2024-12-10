@@ -19,6 +19,7 @@ from abc import ABC
 from typing import Dict
 
 from gravitino.api.credential.credential import Credential
+from gravitino.utils.precondition import Precondition
 
 
 class S3SecretKeyCredential(Credential, ABC):
@@ -28,11 +29,21 @@ class S3SecretKeyCredential(Credential, ABC):
     _GRAVITINO_S3_STATIC_ACCESS_KEY_ID = "s3-access-key-id"
     _GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-secret-access-key"
 
-    def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
+    def __init__(self, credential_info: Dict[str, str], expire_time: int):
         self._access_key_id = credential_info[self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID]
         self._secret_access_key = credential_info[
             self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY
         ]
+        Precondition.check_string_not_empty(
+            self._access_key_id, "S3 access key id should not be empty"
+        )
+        Precondition.check_string_not_empty(
+            self._secret_access_key, "S3 secret access key should not be empty"
+        )
+        Precondition.check_argument(
+            expire_time == 0,
+            "The expiration time of S3 secret key credential should be 0",
+        )
 
     def credential_type(self) -> str:
         """Returns the expiration time of the credential in milliseconds since

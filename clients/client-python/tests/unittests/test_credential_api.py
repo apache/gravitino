@@ -30,7 +30,7 @@ from tests.unittests import mock_base
 
 
 @mock_base.mock_data
-class TestGetCredentialApi(unittest.TestCase):
+class TestCredentialApi(unittest.TestCase):
 
     def test_get_credential(self, *mock_method):
         json_str = self._get_s3_token_str()

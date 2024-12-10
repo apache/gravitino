@@ -19,6 +19,7 @@ from abc import ABC
 from typing import Dict
 
 from gravitino.api.credential.credential import Credential
+from gravitino.utils.precondition import Precondition
 
 
 class OSSTokenCredential(Credential, ABC):
@@ -36,6 +37,18 @@ class OSSTokenCredential(Credential, ABC):
         ]
         self._security_token = credential_info[self._GRAVITINO_OSS_TOKEN]
         self._expire_time_in_ms = expire_time_in_ms
+        Precondition.check_string_not_empty(
+            self._access_key_id, "The OSS access key ID should not be empty"
+        )
+        Precondition.check_string_not_empty(
+            self._secret_access_key, "The OSS secret access key should not be empty"
+        )
+        Precondition.check_string_not_empty(
+            self._security_token, "The OSS security token should be empty"
+        )
+        Precondition.check_argument(
+            self._expire_time_in_ms > 0, "The expire time should be greater than 0"
+        )
 
     def credential_type(self) -> str:
         """The type of the credential.

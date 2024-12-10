@@ -44,13 +44,14 @@ class TestCredentialUtils(unittest.TestCase):
         self.assertEqual("access_key", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
         self.assertEqual("session_token", check_credential.session_token())
+        self.assertEqual(1000, check_credential.expire_time_in_ms())
 
     def test_s3_secret_key_credential(self):
         s3_credential_info = {
             S3SecretKeyCredential._GRAVITINO_S3_STATIC_ACCESS_KEY_ID: "access_key",
             S3SecretKeyCredential._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: "secret_key",
         }
-        s3_credential = S3SecretKeyCredential(s3_credential_info, 1000)
+        s3_credential = S3SecretKeyCredential(s3_credential_info, 0)
         credential_info = s3_credential.credential_info()
         expire_time = s3_credential.expire_time_in_ms()
 
@@ -59,6 +60,7 @@ class TestCredentialUtils(unittest.TestCase):
         )
         self.assertEqual("access_key", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
+        self.assertEqual(0, check_credential.expire_time_in_ms())
 
     def test_gcs_token_credential(self):
         credential_info = {GCSTokenCredential._GCS_TOKEN_NAME: "token"}
@@ -74,6 +76,7 @@ class TestCredentialUtils(unittest.TestCase):
             check_credential.credential_type(),
         )
         self.assertEqual("token", check_credential.token())
+        self.assertEqual(1000, check_credential.expire_time_in_ms())
 
     def test_oss_token_credential(self):
         credential_info = {
@@ -95,3 +98,4 @@ class TestCredentialUtils(unittest.TestCase):
         self.assertEqual("token", check_credential.security_token())
         self.assertEqual("access_id", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
+        self.assertEqual(1000, check_credential.expire_time_in_ms())
