@@ -782,7 +782,7 @@ tasks {
         it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
         it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "aws-mini"
+        it.name != "aws-core"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -805,7 +805,7 @@ tasks {
         it.name != "bundled-catalog" &&
         it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
         it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "docs" && it.name != "aws-mini"
+        it.name != "docs" && it.name != "aws-core"
 
       ) {
         dependsOn("${it.name}:build")

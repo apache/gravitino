@@ -30,16 +30,15 @@ dependencies {
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(libs.hadoop3.common)
-
-  implementation(libs.guava)
-
-  implementation(libs.aws.iam)
-  implementation(libs.aws.policy)
-  implementation(libs.aws.sts)
   compileOnly(libs.hadoop3.aws)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(libs.guava)
+  implementation(libs.aws.iam)
+  implementation(libs.aws.policy)
+  implementation(libs.aws.sts)
 }
 
 tasks.withType(ShadowJar::class.java) {

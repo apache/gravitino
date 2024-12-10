@@ -25,7 +25,7 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:aws-mini"))
+  implementation(project(":bundles:aws-core"))
   implementation(libs.hadoop3.aws)
 }
 
