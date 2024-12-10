@@ -108,12 +108,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       case FLOAT64:
         return Types.DoubleType.get();
       case DECIMAL:
-        return Types.DecimalType.of(
-            Integer.parseInt(typeBean.getColumnSize()), Integer.parseInt(typeBean.getScale()));
+        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case STRING:
         return Types.StringType.get();
       case FIXEDSTRING:
-        return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+        return Types.FixedCharType.of(typeBean.getColumnSize());
       case DATE:
         return Types.DateType.get();
       case DATE32:

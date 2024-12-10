@@ -98,19 +98,23 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       throws SQLException {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
-    String sql = "SELECT NULL AS TABLE_CAT, " +
-        "system.tables.database AS TABLE_SCHEM, " +
-        "system.tables.name AS TABLE_NAME, " +
-        "trim(c.1) AS COLUMN_NAME, " +
-        "c.2 AS KEY_SEQ, " +
-        "'PRIMARY' AS PK_NAME " +
-        "FROM system.tables " +
-        "ARRAY JOIN arrayZip(splitByChar(',', primary_key), arrayEnumerate(splitByChar(',', primary_key))) as c "
-        +
-        "WHERE system.tables.primary_key <> '' " +
-        "AND system.tables.database = '" + databaseName + "' " +
-        "AND system.tables.name = '" + tableName + "' " +
-        "ORDER BY COLUMN_NAME";
+    String sql =
+        "SELECT NULL AS TABLE_CAT, "
+            + "system.tables.database AS TABLE_SCHEM, "
+            + "system.tables.name AS TABLE_NAME, "
+            + "trim(c.1) AS COLUMN_NAME, "
+            + "c.2 AS KEY_SEQ, "
+            + "'PRIMARY' AS PK_NAME "
+            + "FROM system.tables "
+            + "ARRAY JOIN arrayZip(splitByChar(',', primary_key), arrayEnumerate(splitByChar(',', primary_key))) as c "
+            + "WHERE system.tables.primary_key <> '' "
+            + "AND system.tables.database = '"
+            + databaseName
+            + "' "
+            + "AND system.tables.name = '"
+            + tableName
+            + "' "
+            + "ORDER BY COLUMN_NAME";
 
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
@@ -289,8 +293,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     final DatabaseMetaData metaData = connection.getMetaData();
     String catalogName = connection.getCatalog();
     String schemaName = connection.getSchema();
-    //CK tables include : DICTIONARY", "LOG TABLE", "MEMORY TABLE",
-    //"REMOTE TABLE", "TABLE", "VIEW", "SYSTEM TABLE", "TEMPORARY TABLE
+    // CK tables include : DICTIONARY", "LOG TABLE", "MEMORY TABLE",
+    // "REMOTE TABLE", "TABLE", "VIEW", "SYSTEM TABLE", "TEMPORARY TABLE
     return metaData.getTables(catalogName, schemaName, null, null);
   }
 

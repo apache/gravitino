@@ -42,8 +42,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           JdbcConfig.USERNAME.getKey(),
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
-          JdbcConfig.POOL_MAX_SIZE.getKey(),
-          JdbcConfig.TEST_ON_BORROW.getKey());
+          JdbcConfig.POOL_MAX_SIZE.getKey());
 
   static {
     List<PropertyEntry<?>> propertyEntries =

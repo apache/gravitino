@@ -190,7 +190,6 @@ public class CatalogClickHouseIT extends BaseIT {
         JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), CLICKHOUSE_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), CLICKHOUSE_CONTAINER.getPassword());
-    catalogProperties.put(JdbcConfig.TEST_ON_BORROW.getKey(), "true");
 
     Catalog createdCatalog =
         metalake.createCatalog(

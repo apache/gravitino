@@ -140,10 +140,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
             reallyValue = "0.0";
           }
           return Literals.decimalLiteral(
-              Decimal.of(
-                  reallyValue,
-                  Integer.parseInt(type.getColumnSize()),
-                  Integer.parseInt(type.getScale())));
+              Decimal.of(reallyValue, type.getColumnSize(), type.getScale()));
         case ClickHouseTypeConverter.DATE:
           if (reallyValue.equals("")) {
             return Literals.NULL;
@@ -156,8 +153,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         case ClickHouseTypeConverter.STRING:
           return Literals.of(reallyValue, Types.StringType.get());
         case ClickHouseTypeConverter.FIXEDSTRING:
-          return Literals.of(
-              reallyValue, Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
+          return Literals.of(reallyValue, Types.FixedCharType.of(type.getColumnSize()));
         default:
           return UnparsedExpression.of(reallyValue);
       }

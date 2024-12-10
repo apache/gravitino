@@ -67,11 +67,11 @@ public class TestClickHouseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE32, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME64, null, null);
-    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, "10", "2");
-    checkJdbcTypeToGravitinoType(Types.StringType.get(), STRING, "20", null);
-    checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), FIXEDSTRING, "20", null);
-    checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, "20", null);
-    checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, "20", null);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), STRING, 20, null);
+    checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), FIXEDSTRING, 20, null);
+    checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, 20, null);
+    checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, 20, null);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
   }
@@ -107,13 +107,13 @@ public class TestClickHouseTypeConverter {
   }
 
   protected void checkJdbcTypeToGravitinoType(
-      Type gravitinoType, String jdbcTypeName, String columnSize, String scale) {
+      Type gravitinoType, String jdbcTypeName, Integer columnSize, Integer scale) {
     JdbcTypeConverter.JdbcTypeBean typeBean = createTypeBean(jdbcTypeName, columnSize, scale);
     Assertions.assertEquals(gravitinoType, CLICKHOUSE_TYPE_CONVERTER.toGravitino(typeBean));
   }
 
   protected static JdbcTypeConverter.JdbcTypeBean createTypeBean(
-      String typeName, String columnSize, String scale) {
+      String typeName, Integer columnSize, Integer scale) {
     return new JdbcTypeConverter.JdbcTypeBean(typeName) {
       {
         setColumnSize(columnSize);
