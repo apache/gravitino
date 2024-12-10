@@ -55,7 +55,6 @@ public class TestMetalakeManager {
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
 
     metalakeManager = new MetalakeManager(entityStore, new RandomIdGenerator());
   }

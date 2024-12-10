@@ -25,7 +25,6 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
-import static org.apache.gravitino.Configs.ENTITY_SERDE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
@@ -189,7 +188,6 @@ public class TestHadoopCatalogOperations {
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-    when(config.get(ENTITY_SERDE)).thenReturn("proto");
 
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);

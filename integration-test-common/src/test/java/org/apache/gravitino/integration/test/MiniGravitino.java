@@ -19,7 +19,6 @@
 package org.apache.gravitino.integration.test;
 
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
-import static org.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
@@ -32,7 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -201,8 +199,6 @@ public class MiniGravitino {
     restClient.close();
     try {
       FileUtils.deleteDirectory(mockConfDir);
-      FileUtils.deleteDirectory(
-          FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
     } catch (Exception e) {
       // Ignore
     }
@@ -241,8 +237,6 @@ public class MiniGravitino {
     configMap.put(
         GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
-    configMap.put(
-        Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/gravitino-" + UUID.randomUUID());
 
     configMap.putAll(getIcebergRestServiceConfigs());
     configMap.putAll(context.customConfig);

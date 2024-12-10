@@ -41,14 +41,6 @@ public interface EntityStore extends Closeable {
   void initialize(Config config) throws RuntimeException;
 
   /**
-   * Set the {@link EntitySerDe} for the entity store. {@link EntitySerDe} will be used to serialize
-   * and deserialize the entities to the target format, and vice versa.
-   *
-   * @param entitySerDe the entity serde to set
-   */
-  void setSerDe(EntitySerDe entitySerDe);
-
-  /**
    * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
    * deserialize them into the specified {@link Entity} object.
    *

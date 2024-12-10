@@ -33,7 +33,6 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.storage.kv.KvEntityStore;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,13 +47,7 @@ public class OwnerManager {
   private final EntityStore store;
 
   public OwnerManager(EntityStore store) {
-    if (store instanceof KvEntityStore) {
-      String errorMsg =
-          "OwnerManager cannot run with kv entity store, please configure the entity "
-              + "store to use relational entity store and restart the Gravitino server";
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    } else if (store instanceof SupportsRelationOperations) {
+    if (store instanceof SupportsRelationOperations) {
       this.store = store;
     } else {
       String errorMsg =

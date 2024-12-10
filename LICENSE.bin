@@ -384,7 +384,6 @@
 
    JSR305
    LevelDB JNI
-   RocksDB JNI
    JCraft
    Javolution
    ANTLR4

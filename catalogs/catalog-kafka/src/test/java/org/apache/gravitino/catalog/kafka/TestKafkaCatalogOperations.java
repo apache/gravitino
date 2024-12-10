@@ -19,17 +19,13 @@
 package org.apache.gravitino.catalog.kafka;
 
 import static org.apache.gravitino.Catalog.Type.MESSAGING;
-import static org.apache.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
-import static org.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
-import static org.apache.gravitino.Configs.ENTITY_KV_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
-import static org.apache.gravitino.Configs.ENTITY_SERDE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
@@ -53,7 +49,6 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.NameIdentifier;
@@ -131,12 +126,6 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   @BeforeAll
   public static void setUp() {
     Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(STORE_PATH);
-
-    Assertions.assertEquals(STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
@@ -156,7 +145,6 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-    when(config.get(ENTITY_SERDE)).thenReturn("proto");
 
     // Mock
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
