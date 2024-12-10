@@ -20,7 +20,6 @@
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -157,7 +156,6 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, accessKey);
     conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, secretKey);
     conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
-    conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 
   @AfterAll

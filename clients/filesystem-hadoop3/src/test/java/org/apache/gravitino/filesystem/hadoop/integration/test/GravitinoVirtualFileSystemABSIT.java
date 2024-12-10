@@ -95,7 +95,6 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
-    conf.set("fs.gvfs.filesystem.providers", AzureFileSystemProvider.ABS_PROVIDER_NAME);
     // Pass this configuration to the real file system
     conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
