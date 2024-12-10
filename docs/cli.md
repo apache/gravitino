@@ -228,7 +228,7 @@ gcli metalake list
 gcli metalake details
 ```
 
-#### Show a metalake audit information
+#### Show a metalake's audit information
 
 ```bash
 gcli metalake details --audit
@@ -290,7 +290,7 @@ gcli catalog list
 gcli catalog details --name catalog_postgres
 ```
 
-#### Show a catalog audit information
+#### Show a catalog's audit information
 
 ```bash
 gcli catalog details --name catalog_postgres --audit
@@ -404,7 +404,7 @@ gcli schema list --name catalog_postgres
 gcli schema details --name catalog_postgres.hr
 ```
 
-#### Show schema audit information
+#### Show schema's audit information
 
 ```bash
 gcli schema details --name catalog_postgres.hr --audit
@@ -419,7 +419,7 @@ gcli schema create --name catalog_postgres.new_db
 #### Display schema properties
 
 ```bash
-gcli schema properties --name catalog_postgres.hr -i
+gcli schema properties --name catalog_postgres.hr
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
@@ -526,6 +526,12 @@ gcli user details --user new_user
 gcli user list
 ```
 
+#### Show a roles's audit information
+
+```bash
+gcli user details --user new_user --audit
+```
+
 #### Delete a user
 
 ```bash
@@ -552,6 +558,12 @@ gcli group details --group new_group
 gcli group list
 ```
 
+#### Show a groups's audit information
+
+```bash
+gcli group details --group new_group --audit
+```
+
 #### Delete a group
 
 ```bash
@@ -569,10 +581,10 @@ gcli tag details --tag tagA
 #### Create tags
 
 ```bash
- gcli tag create --tag tagA tagB
- ```
+gcli tag create --tag tagA tagB
+```
 
-#### List all tag
+#### List all tags
 
 ```bash
 gcli tag list
@@ -672,6 +684,12 @@ gcli role details --role admin
 gcli role list
 ```
 
+#### Show a roles's audit information
+
+```bash
+gcli role details --role admin --audit
+```
+
 #### Create a role
 
 ```bash
@@ -715,7 +733,7 @@ gcli group revoke --group groupA --role admin
 gcli topic details --name kafka.default.topic3
 ```
 
-#### Create a tag
+#### Create a topic
 
 ```bash
 gcli topic create --name kafka.default.topic3
@@ -820,7 +838,20 @@ Note that some commands are not supported depending on what the database support
 When setting the datatype of a column the following basic types are currently supported:
 null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
 
-In addition decimal(precision,scale) and varchar(length).
+In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).
+
+
+#### Show all columns
+
+```bash
+gcli column list --name catalog_postgres.hr.departments
+```
+
+#### Show column's audit information
+
+```bash
+gcli column details --name catalog_postgres.hr.departments.name --audit
+```
 
 #### Add a column
 

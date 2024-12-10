@@ -1,0 +1,33 @@
+gcli column [list|details|create|delete|update]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Note that some commands are not supported depending on what the database supports.
+
+When setting the datatype of a column the following basic types are currently supported:
+null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
+
+In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).
+
+Example commands
+
+Show all columns
+gcli column list --name catalog_postgres.hr.departments
+
+Show column's audit information
+gcli column details --name catalog_postgres.hr.departments.name --audit
+
+Add a column
+gcli column create --name catalog_postgres.hr.departments.value --datatype long
+gcli column create --name catalog_postgres.hr.departments.money --datatype "decimal(10,2)"
+gcli column create --name catalog_postgres.hr.departments.name --datatype "varchar(100)"
+gcli column create --name catalog_postgres.hr.departments.fullname --datatype "varchar(250)" --default "Fred Smith" --null=false
+
+Delete a column
+gcli  column delete --name catalog_postgres.hr.departments.money
+
+Update a column
+gcli column update --name catalog_postgres.hr.departments.value --rename values
+gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
+gcli column update --name catalog_postgres.hr.departments.values --position name
+gcli column update --name catalog_postgres.hr.departments.name --null true
