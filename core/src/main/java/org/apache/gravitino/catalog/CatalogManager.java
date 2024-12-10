@@ -680,7 +680,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     } catch (GravitinoRuntimeException e) {
       throw e;
-
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
