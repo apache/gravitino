@@ -159,6 +159,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
+    ListOptions listOptions = new ListOptions(outputFormat);
 
     Command.setAuthenticationMode(auth, userName);
 
@@ -166,10 +167,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newMetalakeAudit(url, ignore, metalake).handle();
       } else {
-        newMetalakeDetails(url, ignore, outputFormat, metalake).handle();
+        newMetalakeDetails(url, ignore, listOptions, metalake).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
-      newListMetalakes(url, ignore, outputFormat).handle();
+      newListMetalakes(url, ignore, listOptions).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
@@ -208,11 +209,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
+    ListOptions listOptions = new ListOptions(outputFormat);
 
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, metalake, outputFormat).handle();
+      newListCatalogs(url, ignore, metalake, listOptions).handle();
       return;
     }
 
@@ -222,7 +224,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newCatalogAudit(url, ignore, metalake, catalog).handle();
       } else {
-        newCatalogDetails(url, ignore, outputFormat, metalake, catalog).handle();
+        newCatalogDetails(url, ignore, listOptions, metalake, catalog).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
