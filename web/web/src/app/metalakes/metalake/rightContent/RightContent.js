@@ -164,7 +164,7 @@ const RightContent = () => {
               startIcon={<Icon icon='mdi:plus-box' />}
               onClick={handleCreateFileset}
               sx={{ width: 200 }}
-              data-refer='create-schema-btn'
+              data-refer='create-fileset-btn'
             >
               Create Fileset
             </Button>
