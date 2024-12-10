@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.cli.ListOptions;
 import org.apache.gravitino.client.GravitinoAdminClient;
 
 /** Lists all metalakes. */
@@ -30,10 +31,10 @@ public class ListMetalakes extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param outputFormat The output format.
+   * @param listOptions The list options.
    */
-  public ListMetalakes(String url, boolean ignoreVersions, String outputFormat) {
-    super(url, ignoreVersions, outputFormat);
+  public ListMetalakes(String url, boolean ignoreVersions, ListOptions listOptions) {
+    super(url, ignoreVersions, listOptions);
   }
 
   /** Lists all metalakes. */
