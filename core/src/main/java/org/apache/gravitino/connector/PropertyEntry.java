@@ -279,17 +279,18 @@ public final class PropertyEntry<T> {
     return booleanPropertyEntry(name, description, false, true, defaultValue, hidden, true);
   }
 
-  public static PropertyEntry<String> wildcardPropertyEntry(String name, String description) {
+  public static PropertyEntry<String> wildcardPropertyEntry(
+      String name, String description, boolean immutable, boolean hidden) {
     return new Builder<String>()
         .withName(name)
         .withDescription(description)
         .withRequired(false)
-        .withImmutable(false)
+        .withImmutable(immutable)
         .withJavaType(String.class)
         .withDefaultValue(null)
         .withDecoder(Function.identity())
         .withEncoder(Function.identity())
-        .withHidden(false)
+        .withHidden(hidden)
         .withReserved(false)
         .withWildcard(true)
         .build();

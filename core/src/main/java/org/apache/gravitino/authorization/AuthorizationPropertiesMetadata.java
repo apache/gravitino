@@ -142,40 +142,55 @@ public class AuthorizationPropertiesMetadata extends BasePropertiesMetadata
               AuthorizationPropertiesMetadata.getInstance().wildcardPropertyKey(),
               PropertyEntry.wildcardPropertyEntry(
                   AuthorizationPropertiesMetadata.getInstance().wildcardPropertyKey(),
-                  "The Chain authorization plugins"))
+                  "The Chain authorization plugins",
+                  true,
+                  false))
           .put(
               CHAIN_CATALOG_PROVIDER,
               PropertyEntry.wildcardPropertyEntry(
-                  CHAIN_PROVIDER, "The Chain sub entity catalog provider"))
+                  CHAIN_PROVIDER, "The Chain sub entity catalog provider", true, false))
           .put(
               CHAIN_PROVIDER,
               PropertyEntry.wildcardPropertyEntry(
-                  CHAIN_PROVIDER, "The Chain sub entity authorization plugin provider"))
+                  CHAIN_PROVIDER,
+                  "The Chain sub entity authorization plugin provider",
+                  true,
+                  false))
           .put(
               CHAIN_RANGER_SERVICE_NAME,
               PropertyEntry.wildcardPropertyEntry(
                   CHAIN_RANGER_SERVICE_NAME,
-                  "The Chain sub entity authorization Ranger service name"))
+                  "The Chain sub entity authorization Ranger service name",
+                  true,
+                  false))
           .put(
               CHAIN_RANGER_ADMIN_URL,
               PropertyEntry.wildcardPropertyEntry(
                   CHAIN_RANGER_ADMIN_URL,
-                  "The Chain sub entity authorization Ranger admin web URIs"))
+                  "The Chain sub entity authorization Ranger admin web URIs",
+                  true,
+                  false))
           .put(
               CHAIN_RANGER_AUTH_TYPES,
               PropertyEntry.wildcardPropertyEntry(
                   CHAIN_RANGER_AUTH_TYPES,
-                  "The Chain sub entity authorization Ranger admin web auth type (kerberos/simple)"))
+                  "The Chain sub entity authorization Ranger admin web auth type (kerberos/simple)",
+                  true,
+                  false))
           .put(
               CHAIN_RANGER_USERNAME,
               PropertyEntry.wildcardPropertyEntry(
                   CHAIN_RANGER_USERNAME,
-                  "The Chain sub entity authorization Ranger admin web login username"))
+                  "The Chain sub entity authorization Ranger admin web login username",
+                  true,
+                  false))
           .put(
               CHAIN_RANGER_PASSWORD,
               PropertyEntry.wildcardPropertyEntry(
                   CHAIN_RANGER_PASSWORD,
-                  "The Chain sub entity authorization Ranger admin web login password"))
+                  "The Chain sub entity authorization Ranger admin web login password",
+                  true,
+                  false))
           .put(
               RANGER_SERVICE_NAME,
               PropertyEntry.stringOptionalPropertyEntry(
