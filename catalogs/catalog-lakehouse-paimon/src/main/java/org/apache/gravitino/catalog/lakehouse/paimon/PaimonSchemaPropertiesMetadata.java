@@ -34,7 +34,7 @@ import org.apache.gravitino.connector.PropertyEntry;
  */
 public class PaimonSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
-  public static final String COMMENT = "comment";
+  public static final String COMMENT = PaimonConstants.COMMENT;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
