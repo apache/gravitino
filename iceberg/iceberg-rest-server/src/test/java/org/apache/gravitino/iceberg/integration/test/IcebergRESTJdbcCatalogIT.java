@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -88,5 +89,10 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
                   HiveContainer.HDFS_DEFAULTFS_PORT)));
     }
     return configMap;
+  }
+
+  protected String getFromEnvOrDefault(String envVar, String defaultValue) {
+    String envValue = System.getenv(envVar);
+    return Optional.ofNullable(envValue).orElse(defaultValue);
   }
 }

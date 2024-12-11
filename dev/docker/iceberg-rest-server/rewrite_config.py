@@ -28,7 +28,12 @@ env_map = {
   "GRAVITINO_S3_SECRET_KEY" : "s3-secret-access-key",
   "GRAVITINO_S3_REGION" : "s3-region",
   "GRAVITINO_S3_ROLE_ARN" : "s3-role-arn",
-  "GRAVITINO_S3_EXTERNAL_ID" : "s3-external-id"
+  "GRAVITINO_S3_EXTERNAL_ID" : "s3-external-id",
+  "GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME" : "adls-storage-account-name",
+  "GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY" : "adls-storage-account-key",
+  "GRAVITINO_ADLS_TENANT_ID" : "adls-tenant-id",
+  "GRAVITINO_ADLS_CLIENT_ID" : "adls-client-id",
+  "GRAVITINO_ADLS_CLIENT_SECRET" : "adls-client-secret",
 }
 
 init_config = {
