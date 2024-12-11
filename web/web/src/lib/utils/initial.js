@@ -288,31 +288,31 @@ export const providers = [
   },
   {
     label: 'ClickHouse',
-        value: 'jdbc-clickhouse',
-      defaultProps: [
-    {
-      key: 'jdbc-driver',
-      value: '',
-      required: true,
-      description: 'e.g. com.clickhouse.jdbc.ClickHouseDriver'
-    },
-    {
-      key: 'jdbc-url',
-      value: '',
-      required: true,
-      description: 'e.g. jdbc:clickhouse://localhost'
-    },
-    {
-      key: 'jdbc-user',
-      value: '',
-      required: true
-    },
-    {
-      key: 'jdbc-password',
-      value: '',
-      required: true
-    }
-  ]
+    value: 'jdbc-clickhouse',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.clickhouse.jdbc.ClickHouseDriver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:clickhouse://localhost'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
   },
   {
     label: 'OceanBase',
