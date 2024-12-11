@@ -20,6 +20,7 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -38,6 +39,13 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.credential.CatalogCredentialContext;
+import org.apache.gravitino.credential.CatalogCredentialOperations;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialContext;
+import org.apache.gravitino.credential.CredentialRequest;
+import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.SupportsCredentialOperation;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -50,17 +58,19 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("removal")
 public class SecureHadoopCatalogOperations
-    implements CatalogOperations, SupportsSchemas, FilesetCatalog {
+    implements CatalogOperations, SupportsSchemas, FilesetCatalog, SupportsCredentialOperation {
 
   public static final Logger LOG = LoggerFactory.getLogger(SecureHadoopCatalogOperations.class);
 
   private final HadoopCatalogOperations hadoopCatalogOperations;
+  private CatalogCredentialOperations catalogCredentialOperations;
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
 
@@ -68,6 +78,7 @@ public class SecureHadoopCatalogOperations
 
   public SecureHadoopCatalogOperations() {
     this.hadoopCatalogOperations = new HadoopCatalogOperations();
+    this.catalogCredentialOperations = new CatalogCredentialOperations();
   }
 
   public SecureHadoopCatalogOperations(EntityStore store) {
@@ -176,6 +187,7 @@ public class SecureHadoopCatalogOperations
             config,
             hadoopCatalogOperations.getHadoopConf(),
             info);
+    catalogCredentialOperations.init(info.properties());
   }
 
   @Override
@@ -258,5 +270,30 @@ public class SecureHadoopCatalogOperations
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
     subject.getPrincipals().add(new UserPrincipal(apiUser));
+  }
+
+  @Override
+  public String getCredentialType(NameIdentifier nameIdentifier, String credentialType) {
+    return credentialType;
+  }
+
+  @Override
+  public CredentialContext getCredentialContext(NameIdentifier nameIdentifier) {
+    if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
+      return new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
+    }
+    Fileset fileset = loadFileset(nameIdentifier);
+    String location = fileset.storageLocation();
+    CredentialContext credentialContext =
+        new PathBasedCredentialContext(
+            PrincipalUtils.getCurrentUserName(), ImmutableSet.of(location), ImmutableSet.of());
+    return credentialContext;
+  }
+
+  @Override
+  public Credential getCredential(CredentialRequest request) {
+    CredentialContext context = getCredentialContext(request.identifier);
+    String credentialType = getCredentialType(request.identifier, request.credentialType);
+    return catalogCredentialOperations.getCredential(context, credentialType);
   }
 }
