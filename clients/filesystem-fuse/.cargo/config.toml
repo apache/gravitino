@@ -17,4 +17,4 @@
 
 [build]
 target-dir = "build"
-
+rustflags = ["-Adead_code",  "-Aclippy::redundant-field-names"]
