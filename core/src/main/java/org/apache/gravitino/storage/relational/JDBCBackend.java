@@ -67,6 +67,8 @@ import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
@@ -75,6 +77,8 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
   private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
       ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
@@ -162,7 +166,12 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof ModelEntity) {
       ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
     } else if (e instanceof ModelVersionEntity) {
-      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e, overwritten);
+      if (overwritten) {
+        LOG.warn(
+            "'overwritten' is not supported for model version meta, ignoring this flag and "
+                + "inserting the new model version.");
+      }
+      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());

@@ -87,7 +87,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
 
     // Test if the model version can be retrieved by the identifier
     Assertions.assertEquals(
@@ -113,7 +113,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelEntity.nameIdentifier(), 1, "model_path", null, null, null, auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
 
     // Test if the new model version can be retrieved by the identifier
     Assertions.assertEquals(
@@ -183,7 +183,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
 
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity3, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity3));
   }
 
   @Test
@@ -216,7 +216,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
 
     List<ModelVersionEntity> modelVersions =
         ModelVersionMetaService.getInstance()
@@ -230,7 +230,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelEntity.nameIdentifier(), 1, "model_path", null, null, null, auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
 
     List<ModelVersionEntity> modelVersions2 =
         ModelVersionMetaService.getInstance()
@@ -280,7 +280,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
 
     // Test using a non-exist model version to delete
     Assertions.assertFalse(
@@ -327,7 +327,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
     ModelVersionEntity registeredModelVersionEntity =
         ModelVersionMetaService.getInstance()
             .getModelVersionByIdentifier(
@@ -400,14 +400,14 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
 
     ModelVersionEntity modelVersionEntity1 =
         createModelVersionEntity(
             modelEntity.nameIdentifier(), 1, "model_path", null, null, null, auditInfo);
 
     Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1, false));
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1));
 
     if (input.equals("model")) {
       // Test delete the model

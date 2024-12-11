@@ -52,8 +52,8 @@ public class ModelVersionMetaSQLProviderFactory {
   }
 
   public static String insertModelVersionMeta(
-      @Param("modelVersionMeta") ModelVersionPO modelVersionPO) {
-    return getProvider().insertModelVersionMeta(modelVersionPO);
+      @Param("modelId") Long modelId, @Param("modelVersionMeta") ModelVersionPO modelVersionPO) {
+    return getProvider().insertModelVersionMeta(modelId, modelVersionPO);
   }
 
   public static String listModelVersionMetasByModelId(@Param("modelId") Long modelId) {

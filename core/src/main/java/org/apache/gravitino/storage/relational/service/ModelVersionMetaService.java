@@ -36,7 +36,6 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
-import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -45,12 +44,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.guava.Lists;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ModelVersionMetaService {
-
-  private static final Logger LOG = LoggerFactory.getLogger(ModelVersionMetaService.class);
 
   private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
 
@@ -139,54 +134,32 @@ public class ModelVersionMetaService {
     return POConverters.fromModelVersionPO(modelIdent, modelVersionPO, aliasRelPOs);
   }
 
-  public void insertModelVersion(ModelVersionEntity modelVersionEntity, boolean overwrite)
-      throws IOException {
-    if (overwrite) {
-      LOG.warn(
-          "Overwrite is not supported for model version meta, ignoring this flag and "
-              + "inserting the new model version.");
-    }
-
+  public void insertModelVersion(ModelVersionEntity modelVersionEntity) throws IOException {
     NameIdentifier modelIdent = modelVersionEntity.modelIdentifier();
     NameIdentifierUtil.checkModel(modelIdent);
 
-    // Will throw a NoSuchEntityException if the model does not exist.
-    ModelPO modelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
-    Integer newVersion = modelPO.getModelLatestVersion();
-    ModelVersionEntity entityWithNewVersion =
-        ModelVersionEntity.builder()
-            .withVersion(newVersion)
-            .withModelIdentifier(modelIdent)
-            .withAliases(modelVersionEntity.aliases())
-            .withComment(modelVersionEntity.comment())
-            .withUri(modelVersionEntity.uri())
-            .withProperties(modelVersionEntity.properties())
-            .withAuditInfo(modelVersionEntity.auditInfo())
-            .build();
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(modelIdent.namespace());
+    Long modelId =
+        ModelMetaService.getInstance()
+            .getModelIdBySchemaIdAndModelName(schemaId, modelIdent.name());
 
     ModelVersionPO.Builder builder = ModelVersionPO.builder();
-    builder
-        .withModelId(modelPO.getModelId())
-        .withMetalakeId(modelPO.getMetalakeId())
-        .withCatalogId(modelPO.getCatalogId())
-        .withSchemaId(modelPO.getSchemaId());
     ModelVersionPO modelVersionPO =
-        POConverters.initializeModelVersionPO(entityWithNewVersion, builder);
-
+        POConverters.initializeModelVersionPO(modelVersionEntity, builder);
     List<ModelVersionAliasRelPO> aliasRelPOs =
-        POConverters.initializeModelVersionAliasRelPO(entityWithNewVersion, modelPO.getModelId());
+        POConverters.initializeModelVersionAliasRelPO(modelVersionEntity, modelId);
 
     try {
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
-                  mapper -> mapper.insertModelVersionMeta(modelVersionPO)),
+                  mapper -> mapper.insertModelVersionMeta(modelId, modelVersionPO)),
           () -> {
             if (aliasRelPOs.isEmpty()) {
               return;
             }
-
             SessionUtils.doWithoutCommit(
                 ModelVersionAliasRelMapper.class,
                 mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
@@ -194,8 +167,7 @@ public class ModelVersionMetaService {
           () ->
               // If the model version is inserted successfully, update the model latest version.
               SessionUtils.doWithoutCommit(
-                  ModelMetaMapper.class,
-                  mapper -> mapper.updateModelLatestVersion(modelPO.getModelId())));
+                  ModelMetaMapper.class, mapper -> mapper.updateModelLatestVersion(modelId)));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL_VERSION, modelVersionEntity.modelIdentifier().toString());

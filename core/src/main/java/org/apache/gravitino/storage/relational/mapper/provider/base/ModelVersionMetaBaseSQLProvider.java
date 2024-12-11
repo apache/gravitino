@@ -26,17 +26,20 @@ import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionMetaBaseSQLProvider {
 
-  public String insertModelVersionMeta(@Param("modelVersionMeta") ModelVersionPO modelVersionPO) {
+  public String insertModelVersionMeta(
+      @Param("modelId") Long modelId, @Param("modelVersionMeta") ModelVersionPO modelVersionPO) {
     return "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
         + "(metalake_id, catalog_id, schema_id, model_id, version,"
         + " model_version_comment, model_version_properties, model_version_uri,"
         + " audit_info, deleted_at)"
-        + " VALUES (#{modelVersionMeta.metalakeId}, #{modelVersionMeta.catalogId},"
-        + " #{modelVersionMeta.schemaId}, #{modelVersionMeta.modelId},"
-        + " #{modelVersionMeta.modelVersion}, #{modelVersionMeta.modelVersionComment},"
-        + " #{modelVersionMeta.modelVersionProperties}, #{modelVersionMeta.modelVersionUri},"
-        + " #{modelVersionMeta.auditInfo}, #{modelVersionMeta.deletedAt})";
+        + " SELECT metalake_id, catalog_id, schema_id, model_id, model_latest_version,"
+        + " #{modelVersionMeta.modelVersionComment}, #{modelVersionMeta.modelVersionProperties},"
+        + " #{modelVersionMeta.modelVersionUri}, #{modelVersionMeta.auditInfo},"
+        + " #{modelVersionMeta.deletedAt}"
+        + " FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
   public String listModelVersionMetasByModelId(@Param("modelId") Long modelId) {
