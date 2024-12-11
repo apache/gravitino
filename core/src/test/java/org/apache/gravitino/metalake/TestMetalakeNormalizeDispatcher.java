@@ -42,7 +42,6 @@ public class TestMetalakeNormalizeDispatcher {
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
 
     MetalakeManager metalakeManager = new MetalakeManager(entityStore, new RandomIdGenerator());
     metalakeNormalizeDispatcher = new MetalakeNormalizeDispatcher(metalakeManager);

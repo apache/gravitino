@@ -303,51 +303,49 @@ subprojects {
     }
   }
 
-  if (project.name != "meta") {
-    apply(plugin = "net.ltgt.errorprone")
-    dependencies {
-      errorprone("com.google.errorprone:error_prone_core:2.10.0")
-    }
+  apply(plugin = "net.ltgt.errorprone")
+  dependencies {
+    errorprone("com.google.errorprone:error_prone_core:2.10.0")
+  }
 
-    tasks.withType<JavaCompile>().configureEach {
-      options.errorprone.isEnabled.set(true)
-      options.errorprone.disableWarningsInGeneratedCode.set(true)
-      options.errorprone.disable(
-        "AlmostJavadoc",
-        "CanonicalDuration",
-        "CheckReturnValue",
-        "ComparableType",
-        "ConstantOverflow",
-        "DoubleBraceInitialization",
-        "EqualsUnsafeCast",
-        "EmptyBlockTag",
-        "FutureReturnValueIgnored",
-        "InconsistentCapitalization",
-        "InconsistentHashCode",
-        "JavaTimeDefaultTimeZone",
-        "JdkObsolete",
-        "LockNotBeforeTry",
-        "MissingSummary",
-        "MissingOverride",
-        "MutableConstantField",
-        "NonOverridingEquals",
-        "ObjectEqualsForPrimitives",
-        "OperatorPrecedence",
-        "ReturnValueIgnored",
-        "SameNameButDifferent",
-        "StaticAssignmentInConstructor",
-        "StringSplitter",
-        "ThreadPriorityCheck",
-        "ThrowIfUncheckedKnownChecked",
-        "TypeParameterUnusedInFormals",
-        "UnicodeEscape",
-        "UnnecessaryParentheses",
-        "UnsafeReflectiveConstructionCast",
-        "UnusedMethod",
-        "VariableNameSameAsType",
-        "WaitNotInLoop"
-      )
-    }
+  tasks.withType<JavaCompile>().configureEach {
+    options.errorprone.isEnabled.set(true)
+    options.errorprone.disableWarningsInGeneratedCode.set(true)
+    options.errorprone.disable(
+      "AlmostJavadoc",
+      "CanonicalDuration",
+      "CheckReturnValue",
+      "ComparableType",
+      "ConstantOverflow",
+      "DoubleBraceInitialization",
+      "EqualsUnsafeCast",
+      "EmptyBlockTag",
+      "FutureReturnValueIgnored",
+      "InconsistentCapitalization",
+      "InconsistentHashCode",
+      "JavaTimeDefaultTimeZone",
+      "JdkObsolete",
+      "LockNotBeforeTry",
+      "MissingSummary",
+      "MissingOverride",
+      "MutableConstantField",
+      "NonOverridingEquals",
+      "ObjectEqualsForPrimitives",
+      "OperatorPrecedence",
+      "ReturnValueIgnored",
+      "SameNameButDifferent",
+      "StaticAssignmentInConstructor",
+      "StringSplitter",
+      "ThreadPriorityCheck",
+      "ThrowIfUncheckedKnownChecked",
+      "TypeParameterUnusedInFormals",
+      "UnicodeEscape",
+      "UnnecessaryParentheses",
+      "UnsafeReflectiveConstructionCast",
+      "UnusedMethod",
+      "VariableNameSameAsType",
+      "WaitNotInLoop"
+    )
   }
 
   tasks.withType<Javadoc> {
@@ -826,7 +824,8 @@ tasks {
       ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      ":catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig",
+      ":catalogs:catalog-model:copyLibAndConfig"
     )
   }
 
@@ -924,7 +923,7 @@ fun printMacDockerTip() {
 
 fun checkMacDockerConnector() {
   if (!OperatingSystem.current().isMacOsX()) {
-    // Only MacOs requires the use of `docker-connector`
+    // Only macOS requires the use of `docker-connector`
     return
   }
 
