@@ -35,6 +35,8 @@ public class TableFormat {
       new MetalakesTableFormat().output((Metalake[]) object);
     } else if (object instanceof Catalog) {
       new CatalogTableFormat().output((Catalog) object);
+    } else if (object instanceof Catalog[]) {
+      new CatalogsTableFormat().output((Catalog[]) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -75,6 +77,19 @@ public class TableFormat {
               catalog.type().toString(),
               catalog.provider(),
               catalog.comment() + ""));
+      TableFormatImpl tableFormat = new TableFormatImpl();
+      tableFormat.print(headers, rows);
+    }
+  }
+
+  static final class CatalogsTableFormat implements OutputFormat<Catalog[]> {
+    @Override
+    public void output(Catalog[] catalogs) {
+      List<String> headers = Collections.singletonList("catalog");
+      List<List<String>> rows = new ArrayList<>();
+      for (int i = 0; i < catalogs.length; i++) {
+        rows.add(Arrays.asList(catalogs[i].name()));
+      }
       TableFormatImpl tableFormat = new TableFormatImpl();
       tableFormat.print(headers, rows);
     }
