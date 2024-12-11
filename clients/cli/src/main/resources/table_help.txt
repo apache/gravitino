@@ -1,0 +1,49 @@
+gcli table [list|details|create|delete|properties|set|remove]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+When creating a table the columns are specified in CSV file specifying the name of the column, the datatype, a comment, true or false if the column is nullable, true or false if the column is auto incremented, a default value and a default type. Not all of the columns need to be specifed just the name and datatype columns. If not specified comment default to null, nullability to true and auto increment to false. If only the default value is specified it defaults to the same data type as the column.
+
+Example CSV file
+Name,Datatype,Comment,Nullable,AutoIncrement,DefaultValue,DefaultType
+name,String,person's name
+ID,Integer,unique id,false,true
+location,String,city they work in,false,false,Sydney,String
+
+Example commands
+
+Show all tables
+gcli table list --name catalog_postgres.hr
+
+Show tables details
+gcli table details --name catalog_postgres.hr.departments
+
+Show tables audit information
+gcli table details --name catalog_postgres.hr.departments --audit
+
+Show tables distribution information
+gcli table details --name catalog_postgres.hr.departments --distribution
+
+Show tables partition information
+gcli table details --name catalog_postgres.hr.departments --partition
+
+Show tables sort order information
+gcli table details --name catalog_postgres.hr.departments --sortorder
+
+Show table indexes
+gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
+
+Create a table
+gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
+
+Delete a table
+gcli table delete --name catalog_postgres.hr.salaries
+
+Display a tables's properties
+gcli table properties --name catalog_postgres.hr.salaries
+
+Set a tables's property
+gcli table set --name catalog_postgres.hr.salaries --property test --value value
+
+Remove a tables's property
+gcli table remove --name catalog_postgres.hr.salaries --property test

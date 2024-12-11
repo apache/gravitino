@@ -1,0 +1,44 @@
+gcli tag [list|details|create|delete|update|set|remove|properties]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Display a tag's details
+gcli tag details --tag tagA
+
+Create tags
+gcli tag create --tag tagA tagB
+ 
+List all tags
+gcli tag list
+
+Delete tags
+gcli tag delete --tag tagA tagB
+
+Add tags to an entity
+gcli tag set --name catalog_postgres.hr --tag tagA tagB
+
+Remove tags from an entity
+gcli tag remove --name catalog_postgres.hr --tag tagA tagB
+
+Remove all tags from an entity
+gcli tag remove --name catalog_postgres.hr
+
+List all tags on an entity
+gcli tag list --name catalog_postgres.hr
+
+List the properties of a tag
+gcli tag properties --tag tagA
+
+Set a properties of a tag
+gcli tag set --tag tagA --property test --value value
+
+Delete a property of a tag
+gcli tag remove --tag tagA --property test
+
+Rename a tag
+gcli tag update --tag tagA --rename newTag
+
+Update a tag's comment
+gcli tag update --tag tagA --comment "new comment"
