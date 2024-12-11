@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cli.ErrorMessages;
 
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
@@ -48,6 +49,10 @@ public class ListTables extends TableCommand {
   /** List the names of all tables in a schema. */
   @Override
   public void handle() {
+    if (metalake == null || catalog == null || schema == null) {
+      showUnSpecifiedMessage();
+      return;
+    }
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
     try {
@@ -64,6 +69,16 @@ public class ListTables extends TableCommand {
 
     String all = Joiner.on(System.lineSeparator()).join(tableNames);
 
-    System.out.println(all.toString());
+    System.out.println(all);
+  }
+
+  private void showUnSpecifiedMessage() {
+    if (metalake == null) {
+      System.err.println(ErrorMessages.UNSPECIFIED_METALAKE);
+    } else if (catalog == null) {
+      System.err.println(ErrorMessages.UNSPECIFIED_CATALOG);
+    } else {
+      System.err.println(ErrorMessages.UNSPECIFIED_SCHEMA);
+    }
   }
 }
