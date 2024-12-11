@@ -8,25 +8,29 @@ last_update:
 license: 'This software is licensed under the Apache License version 2.'
 ---
 
-This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
+This document provides guidance on managing metadata within Apache Gravitino using
+the Command Line Interface (CLI). The CLI offers a terminal based alternative to
+using code or the REST API for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs,
+schemas, tables, users, roles, groups, tags, topics and filesets.
+Future updates will expand on these capabilities.
 
 ## Running the CLI
 
-You can configure an alias for the CLI for ease of use, with the following command:
+You can configure an alias for the CLI for ease of use.
 
 ```bash
 alias gcli='java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
 ```
 
-Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run the CLI.
+Or you use the `gcli.sh` script located in the `clients/cli/bin/` directory.
 
 ## Usage
 
-The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
+The general syntax for the Gravitino CLI is `gcli entity command [options]`.
 
- ```bash
+```none
   usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
   Options
  usage: gcli
@@ -64,54 +68,60 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -x,--index              display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
- ```
+```
 
-## Commands
+## Commands Actions
 
 The following commands are used for entity management:
 
-- list: List available entities
-- details: Show detailed information about an entity
-- create: Create a new entity
-- delete: Delete an existing entity
-- update: Update an existing entity
-- set: Set a property on an entity
-- remove: Remove a property from an entity
-- properties: Display an entities properties
+- `list`: List available entities
+- `details`: Show detailed information about an entity
+- `create`: Create a new entity
+- `delete`: Delete an existing entity
+- `update`: Update an existing entity
+- `set`: Set a property on an entity
+- `remove`: Remove a property from an entity
+- `properties`: Display an entities properties
 
 ### Setting the Metalake name
 
-As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways so it doesn't need to be passed on the command line.
+Considering that managing a metalake is a typical scenario, you can set the metalake
+name in several ways so it doesn't need to be passed on the command line.
 
-1. Passed in on the command line via the `--metalake` parameter.
-2. Set via the `GRAVITINO_METALAKE` environment variable.
-3. Stored in the Gravitino CLI configuration file.
+1. Specify the `--metalake` argument on the command line.
+1. Set the `GRAVITINO_METALAKE` environment variable.
+1. Place it in the Gravitino [CLI configuration file](#config-file).
 
-The command line option overrides the environment variable and the environment variable overrides the configuration file.
+The command line option overrides the environment variable and the environment variable
+takes precedence over the configuration file.
 
 ### Setting the Gravitino URL
 
-As you need to set the Gravitino URL for every command, you can set the URL in several ways.
+To avoid specifying the Gravitino URL using `--url` argument for every command,
+you can persist the URL setting.
 
-1. Passed in on the command line via the `--url` parameter.
-2. Set via the 'GRAVITINO_URL' environment variable.
-3. Stored in the Gravitino CLI configuration file.
+1. Set the `GRAVITINO_URL` environment variable.
+1. Place it in the Gravitino [CLI configuration file](#config-file).
 
-The command line option overrides the environment variable and the environment variable overrides the configuration file.
+The command line option overrides the environment variable and the environment variable
+overrides the configuration file.
 
 ### Setting the Gravitino Authentication Type
 
 The authentication type can also be set in several ways.
 
-1. Passed in on the command line via the `--simple` flag.
-2. Set via the 'GRAVITINO_AUTH' environment variable.
-3. Stored in the Gravitino CLI configuration file.
+1. Specify the `--simple` argument in the command line.
+1. Set the `GRAVITINO_AUTH` environment variable.
+1. Place it in the Gravitino [CLI configuration file](#config-file).
 
-### Gravitino CLI configuration file
+<!--TODO: link to docs on auth type-->
 
-The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
+### Gravitino CLI configuration file {#config-file}
 
-```text
+The gravitino CLI can read commonly used CLI options from a configuration file.
+By default, the file is `.gravitino` in the user's home directory.
+
+```ini
 #
 # Gravitino CLI configuration file
 #
@@ -127,12 +137,12 @@ ignore=true
 
 # Authentication
 auth=simple
-
 ```
 
-OAuth authentication can also be configured via the configuration file.
+The OAuth authentication can also be configured in the configuration file,
+as shown in the following example:
 
-```text
+```ini
 # Authentication
 auth=oauth
 serverURI=http://127.0.0.1:1082
@@ -141,9 +151,10 @@ token=test
 scope=token/test
 ```
 
-Kerberos authentication can also be configured via the configuration file.
+The Kerberos authentication can be configured in the configuration file,
+as shown in the following example:
 
-```text
+```ini
 # Authentication
 auth=kerberos
 principal=user/admin@foo.com
@@ -152,283 +163,214 @@ keytabFile=file.keytab
 
 ### Potentially unsafe operations
 
-For operations that delete data or rename a metalake the user with be prompted to make sure they wish to run this command. The `--force` option can be specified to override this behaviour.
+For operations that delete data or rename a metalake, the users will be prompted to
+make sure they wish to run this command.
+The `--force` option can be specified to override this behaviour.
 
 ### Manage metadata
 
 All the commands are performed by using the [Java API](api/java-api) internally.
 
-### Display help
+### Show help
 
-To display help on command usage:
+To view the help on command usage:
 
 ```bash
 gcli --help
 ```
 
-### Display client version
+### Show version
 
-To display the client version:
+`gcli --version`
+: Show the client version.
 
-```bash
-gcli --version
-```
+`gcli --server`
+: Show the server version.
 
-### Display server version
+:::note
+**Client/server version mismatch**
 
-To display the server version:
+If the client and server are running different versions of the Gravitino software,
+you may need to ignore the client/server version check for the command to be run.
+This can be done in several ways:
 
-```bash
-gcli --server
-```
-
-### Client/server version mismatch
-
-If the client and server are running different versions of the Gravitino software then you may need to ignore the client/server version check for the command to run. This can be done in several ways:
-
-1. Passed in on the command line via the `--ignore` parameter.
-2. Set via the `GRAVITINO_IGNORE` environment variable.
-3. Stored in the Gravitino CLI configuration file.
+1. Specify the `--ignore` argument in the command line.
+1. Set the `GRAVITINO_IGNORE` environment variable.
+1. Place it in the Gravitino CLI configuration file.
+:::
 
 ### Multiple properties
 
 For commands that accept multiple properties they can be specified in a couple of different ways:
 
-1. gcli --properties n1=v1,n2=v2,n3=v3
-
-2. gcli --properties n1=v1 n2=v2 n3=v3
-
-3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
+1. `gcli --properties n1=v1,n2=v2,n3=v3`
+1. `gcli --properties n1=v1 n2=v2 n3=v3`
+1. `gcli --properties n1=v1 --properties n2=v2 --properties n3=v3`
 
 ### Setting properties and tags
 
- Different options are needed to add a tag and set a property of a tag with `gcli tag set`. To add a
- tag, specify the tag (via --tag) and the entity to tag (via --name). To set the property of a tag
- (via --tag) you need to specify the property (via --property) and value (via --value) you want to
- set.
+Different options are needed to add a tag or to set a property for a tag using `gcli tag set`.
+To add a tag, specify the tag (via `--tag`) and the entity to tag (via `--name`).
+To set the property of a tag (via `--tag`) you need to specify the property (via `--property`)
+and value (via `--value`) you want to set.
 
- To delete a tag, again, you need to specify the tag and entity, to remove a tag's property you need
- to select the tag and property.
+To delete a tag, again, you need to specify the tag and the entity; to remove a tag's property,
+you need to select the tag and property.
 
-### CLI commands
+## Command examples
 
-Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+Please set the metalake in the Gravitino configuration file or the environment variable before
+running any of these commands.
 
 ### Metalake commands
 
-#### Show all metalakes
+`gcli metalake create --metalake <name> --comment <comment>`
+: Create a metalake.
 
-```bash
-gcli metalake list
-```
+`gcli metalake properties`
+: Show the properties for a metalake.
 
-#### Show a metalake details
+`gcli metalake delete`
+: Delete a metalake.
 
-```bash
-gcli metalake details
-```
+`gcli metalake list`
+: List all metalakes
 
-#### Show a metalake's audit information
+`gcli metalake details`
+: Check the details of a specific a metalake.
 
-```bash
-gcli metalake details --audit
-```
+`gcli metalake details --audit`
+: Show the audit information for a metalake
 
-#### Create a metalake
+`gcli metalake update --rename <new-name>`
+: Rename a metalake
 
-```bash
-gcli metalake create --metalake my_metalake --comment "This is my metalake"
-```
+`gcli metalake update --comment "<new comment>"`
+: Update the comment for a metalake
 
-#### Delete a metalake
+`gcli metalake set --property <property> --value <value>`
+: Set the property for a metalake.
 
-```bash
-gcli metalake delete
-```
-
-#### Rename a metalake
-
-```bash
-gcli metalake update --rename demo
-```
-
-#### Update a metalake's comment
-
-```bash
-gcli metalake update --comment "new comment"
-```
-
-#### Display a metalake's properties
-
-```bash
-gcli metalake properties
-```
-
-#### Set a metalake's property
-
-```bash
-gcli metalake set --property test --value value
-```
-
-#### Remove a metalake's property
-
-```bash
-gcli metalake remove --property test
-```
+`gcli metalake remove --property <name>`
+: Remove the specified property from a metalake.
 
 ### Catalog commands
 
-#### Show all catalogs in a metalake
+`gcli catalog list`
+: Show all catalogs in a metalake
 
-```bash
-gcli catalog list
-```
+`gcli catalog details --name <name>`
+: Show a catalog details
 
-#### Show a catalog details
-
-```bash
-gcli catalog details --name catalog_postgres
-```
-
-#### Show a catalog's audit information
-
-```bash
-gcli catalog details --name catalog_postgres --audit
-```
+`gcli catalog details --name <name> --audit`
+: Show a catalog audit information
 
 #### Creating a catalog
 
-The type of catalog to be created is specified by the `--provider` option. Different catalogs require different properties, for example, a Hive catalog requires a metastore-uri property.
+The type of catalog to be created is specified by the `--provider` option.
 
-##### Create a Hive catalog
+`gcli catalog create --provider hive --name <name> --properties <property key-value pairs>`
+: Create a catalog.
 
-```bash
-gcli catalog create --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
-```
+Different catalogs require different properties.
+For example, a Hive catalog requires a `--metastore-uris` property.
+ 
+- For a Hive catalog, you need to specify the `metastore.uris` property. For example:
 
-##### Create an Iceberg catalog
+  `metastore.uris=thrift://hive-host:9083`
 
-```bash
-gcli catalog create  -name iceberg --provider iceberg --properties uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse
-```
+- For an Icebeg catalog, you need to specify the `uri`property. For example:
 
-##### Create a MySQL catalog
+  `uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse`
 
-```bash
-gcli catalog create  -name mysql --provider mysql --properties jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver
-```
+- For a MySQL Postgres catalog, you need to specify the `jdbc-url`, `jdbc-user`, `jdbc-password`,
+  `jdbc-driver` property. For example:
 
-##### Create a Postgres catalog
+  `jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver`
+ 
+- For a Postgres catalog, you need to specify the `jdbc-url`, `jdbc-user`, `jdbc-password`,
+  `jdbc-driver`, `db` property. For example:
 
-```bash
-gcli catalog create  -name postgres --provider postgres --properties jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver
-```
+  `jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver`
 
-##### Create a Kafka catalog
+- For a Kafka catalog, you need to specify the `boostrap.servers` property. For example:
 
-```bash
-gcli catalog create --name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
-```
+  `bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092`
 
-##### Create a Doris catalog
+- For a Doris catalog, you need to specify the `jdbc-driver`, `jdbc-url`, `jdbc-user`, `jdb-password` property.
+  For example:
 
-```bash
-gcli catalog create --name doris --provider doris --properties jdbc-url=jdbc:mysql://localhost:9030,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
-```
+  `jdbc-url=jdbc:mysql://localhost:9030,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password`
 
-##### Create a Paimon catalog
+- For a Paimon catalog, you need to specify the `catalog-backend`, `uri`, `authentication.type` properties.
+  For example:
 
-```bash
-gcli catalog create --name paimon --provider paimon --properties catalog-backend=jdbc,uri=jdbc:mysql://127.0.0.1:3306/metastore_db,authentication.type=simple
-```
+  `catalog-backend=jdbc,uri=jdbc:mysql://127.0.0.1:3306/metastore_db,authentication.type=simple`
 
-#### Create a Hudi catalog
+- For a Hudi catalog, you need to specify the `catalog-backend`, `uri` properties. For example:
 
-```bash
-gcli catalog create --name hudi --provider hudi --properties catalog-backend=hms,uri=thrift://127.0.0.1:9083
-```
+   `catalog-backend=hms,uri=thrift://127.0.0.1:9083`
 
-#### Create an Oceanbase catalog
+- For an Oceanbase catalog, you need to specify the `jdbc-driver`, `jdbc-url`, `jdbc-user`, and
+  `jdbc-password` properties. For example:
 
-```bash
-gcli catalog create --name oceanbase --provider oceanbase --properties jdbc-url=jdbc:mysql://localhost:2881,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
-```
+  `jdbc-url=jdbc:mysql://localhost:2881,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password`
 
-#### Delete a catalog
+`gcli catalog delete --name <name>`
+: Delete a catalog.
 
-```bash
-gcli catalog delete --name hive
-```
+`gcli catalog update --name <old-name> --rename <new-name>`
+:Rename a catalog.
 
-#### Rename a catalog
+`gcli catalog update --name <name> --comment "<new comment>"`
+: Change the comment for a catalog.
 
-```bash
-gcli catalog update --name catalog_mysql --rename mysql
-```
+`gcli catalog properties --name <name>`
+: List the properties for a catalog.
 
-#### Change a catalog comment
+`gcli catalog set --name <name> --property <property> --value <value>`
+: Set a property for a catalog.
 
-```bash
-gcli catalog update --name catalog_mysql --comment "new comment"
-```
-
-#### Display a catalog's properties
-
-```bash
-gcli catalog properties --name catalog_mysql
-```
-
-#### Set a catalog's property
-
-```bash
-gcli catalog set --name catalog_mysql --property test --value value
-```
-
-#### Remove a catalog's property
-
-```bash
-gcli catalog remove --name catalog_mysql --property test
-```
+`gcli catalog remove --name <name> --property <property>`
+: Remove a property from a catalog.
 
 ### Schema commands
 
-#### Show all schemas in a catalog
+`gcli schema create --name <schema>`
+: Create a schema.
 
-```bash
-gcli schema list --name catalog_postgres
-```
+`gcli schema properties --name <schema> -i`
+: Display the properties about a schema.
 
-#### Show schema details
+`gcli schema list --name <catalog>`
+: List all schemas in the specified catalog.
 
-```bash
-gcli schema details --name catalog_postgres.hr
-```
+`gcli schema details --name <schema>`
+: Show the details about schemas
 
-#### Show schema's audit information
+`gcli schema details --name <schema> --audit`
+: Show schema audit information
 
-```bash
-gcli schema details --name catalog_postgres.hr --audit
-```
-
-#### Create a schema
-
-```bash
-gcli schema create --name catalog_postgres.new_db
-```
-
-#### Display schema properties
-
-```bash
-gcli schema properties --name catalog_postgres.hr
-```
-
-Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
+:::note
+Setting and removing schema properties is currently not supported in the Java API
+or the Gravitino CLI.
+:::
 
 ### Table commands
 
-When creating a table the columns are specified in CSV file specifying the name of the column, the datatype, a comment, true or false if the column is nullable, true or false if the column is auto incremented, a default value and a default type. Not all of the columns need to be specifed just the name and datatype columns. If not specified comment default to null, nullability to true and auto increment to false. If only the default value is specified it defaults to the same data type as the column.
+When creating a table, the columns are specified in a CSV file containing the properties
+of each column, including
 
-Example CSV file
+- the column name (required)
+- the data type (required)
+- the comment string that defaults to null
+- a string format boolean indicating whether the column can be null (default=true)
+- a string format boolean indicating whether the column is auto-incremented (default=false)
+- the default value
+- the default data type, defaults to the column data type if a default value is specified.
+ 
+Example CSV file:
+
 ```text
 Name,Datatype,Comment,Nullable,AutoIncrement,DefaultValue,DefaultType
 name,String,person's name
@@ -436,482 +378,294 @@ ID,Integer,unique id,false,true
 location,String,city they work in,false,false,Sydney,String
 ```
 
-#### Show all tables
+In the commands below, note that the table name is in the format
+`<catalog>.<schema>.<table>`.
 
-```bash
-gcli table list --name catalog_postgres.hr
-```
+`gcli table create --name <table> --comment "<comment>" --columnfile <csv-file>`
+: Create a table. Note that the table name is in the format `<catalog>.<schema>.<table>`.
 
-#### Show tables details
+`gcli table list --name <schema>`
+: List all tables for a schema.
 
-```bash
-gcli table details --name catalog_postgres.hr.departments
-```
+`gcli table details --name <table>`
+: Show the details about a table. 
 
-#### Show tables audit information
+`gcli table details --name <table> --audit`
+: Show the audit information for a specified table.
 
-```bash
-gcli table details --name catalog_postgres.hr.departments --audit
-```
+`gcli table details --name <table> --distribution`
+: Show distribution information for a specified table.
 
-#### Show tables distribution information
-```bash
-gcli table details --name catalog_postgres.hr.departments --distribution
-```
+`gcli table details --name <table> --partition`
+: Show the partition information for a specified table.
 
-#### Show tables partition information
-```bash
-gcli table details --name catalog_postgres.hr.departments --partition
-```
+`gcli table details --name <table> --sortorder`
+: Show the sorting order for the table specified.
 
-#### Show tables sort order information
-```bash
-gcli table details --name catalog_postgres.hr.departments --sortorder
-```
+`gcli table details --name <table> --index`
+: Show the index information for the table specified.
 
-### Show table indexes
+`gcli table delete --name <table>`
+: Delete a table.
 
-```bash
-gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
-```
+`gcli table properties --name <table>`
+: Show the properties for a specific table.
 
-#### Delete a table
+`gcli table set --name <table> --property <property> --value <value>`
+: Set a property for a specific table.
 
-```bash
-gcli table delete --name catalog_postgres.hr.salaries
-```
-
-
-#### Display a tables's properties
-
-```bash
-gcli table properties --name catalog_postgres.hr.salaries
-```
-
-#### Set a tables's property
-
-```bash
-gcli table set --name catalog_postgres.hr.salaries --property test --value value
-```
-
-#### Remove a tables's property
-
-```bash
-gcli table remove --name catalog_postgres.hr.salaries --property test
-```
-
-#### Create a table
-
-```bash
-gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
-```
+`gcli table remove --name <table> --property <property>`
+: Remove the specified property from the specified table.
 
 ### User commands
 
-#### Create a user
+`gcli user create --user <user>`
+: Create a new user.
 
-```bash
-gcli user create --user new_user
-```
+`gcli user details --user <user>`
+: Show the details about the specified user.
 
-#### Show a user's details
+`gcli user details --user <user> --audit`
+: Show a roles's audit information
 
-```bash
-gcli user details --user new_user
-```
+`gcli user list`
+: List all users
 
-#### List all users
-
-```bash
-gcli user list
-```
-
-#### Show a roles's audit information
-
-```bash
-gcli user details --user new_user --audit
-```
-
-#### Delete a user
-
-```bash
-gcli user delete --user new_user
-```
+`gcli user delete --user <user>`
+: Delete the specified user.
 
 ### Group commands
 
-#### Create a group
+`gcli group create --group <group>`
+: Create a group.
 
-```bash
-gcli group create --group new_group
-```
+`gcli group details --group <group>`
+: Display the details about a group.
 
-#### Display a group's details
+`gcli group details --group new_group --audit`
+: Show a groups's audit information.
 
-```bash
-gcli group details --group new_group
-```
+`gcli group list`
+: List all groups.
 
-#### List all groups
-
-```bash
-gcli group list
-```
-
-#### Show a groups's audit information
-
-```bash
-gcli group details --group new_group --audit
-```
-
-#### Delete a group
-
-```bash
-gcli group delete --group new_group
-```
+`gcli group delete --group <group>`
+: Delete a group.
 
 ### Tag commands
 
-#### Display a tag's details
+`gcli tag create --tag <tag-A> <tag-B>`
+: Create tags.
 
-```bash
-gcli tag details --tag tagA
-```
+`gcli tag details --tag <tag>`
+: Display the details about a tag.
 
-#### Create tags
+`gcli tag list`
+: List all tags.
 
-```bash
-gcli tag create --tag tagA tagB
-```
+`gcli tag delete --tag <tag-A> <tag-B>`
+: Delete tags.
 
-#### List all tags
+`gcli tag set --name <entity> --tag tagA tagB`
+: Add tags to an entity. The type of the entity is implied by its name.
 
-```bash
-gcli tag list
-```
+`gcli tag remove --name <entity> --tag <tagA> <tagB>`
+: Remove tags from an entity. The type of the entity is implied by its name.
 
-#### Delete tags
+`gcli tag remove --name <entity>`
+: Remove all tags from an entity. The type of the entity is implied by its name.
 
-```bash
-gcli tag delete --tag tagA tagB
-```
+`gcli tag list --name <entity>`
+: List all tags on an entity
 
-#### Add tags to an entity
+`gcli tag properties --tag <tag>`
+: List the properties of a tag.
 
-```bash
-gcli tag set --name catalog_postgres.hr --tag tagA tagB
-```
+`gcli tag set --tag <tag> --property <property> --value <value>`
+: Set a property for a tag.
 
-#### Remove tags from an entity
+`gcli tag remove --tag <tag> --property <property>`
+: Delete a property from a tag.
 
-```bash
-gcli tag remove --name catalog_postgres.hr --tag tagA tagB
-```
+`gcli tag update --tag <tag> --rename <new-name>`
+: Rename a tag.
 
-#### Remove all tags from an entity
-
-```bash
-gcli tag remove --name catalog_postgres.hr
-```
-
-#### List all tags on an entity
-
-```bash
-gcli tag list --name catalog_postgres.hr
-```
-
-#### List the properties of a tag
-
-```bash
-gcli tag properties --tag tagA
-```
-
-#### Set a properties of a tag
-
-```bash
-gcli tag set --tag tagA --property test --value value
-```
-
-#### Delete a property of a tag
-
-```bash
-gcli tag remove --tag tagA --property test
-```
-
-#### Rename a tag
-
-```bash
-gcli tag update --tag tagA --rename newTag
-```
-
-#### Update a tag's comment
-
-```bash
-gcli tag update --tag tagA --comment "new comment"
-```
+`gcli tag update --tag <tag> --comment "<new-comment>"`
+: Update the comment for a tag.
 
 ### Owner commands
 
-#### List an owner
+`gcli catalog details --name <catalog> --owner`
+: Show the details about the owner for a catalog.
 
-```bash
-gcli catalog details --owner --name postgres
-```
+`gcli catalog set --name <catalog> --owner --user <user>`
+: Set the specified user as the owner of the specified catalog.
 
-#### Set an owner to a user
-
-```bash
-gcli catalog set --owner --user admin --name postgres
-```
-
-#### Set an owner to a group
-
-```bash
-gcli catalog set --owner --group groupA --name postgres
-```
+`gcli catalog set --name <catalog> --owner --group <group>`
+: Set the specified group as the owner of the catalog.
 
 ### Role commands
 
 When granting or revoking privileges the following privileges can be used.
 
-create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants
+- `create_catalog`
+- `use_catalog`
+- `create_schema`
+- `use_schema`
+- `create_table`
+- `modify_table`
+- `select_table`
+- `create_fileset`
+- `write_fileset`
+- `read_fileset`
+- `create_topic`
+- `produce_topic`
+- `consume_topic`
+- `manage_users`
+- `create_role`
+- `manage_grants`
 
 Note that some are only valid for certain entities.
 
-#### Display role details
+`gcli role create --role <role>`
+: Create a role.
 
-```bash
-gcli role details --role admin
-```
+`gcli role details --role <role>`
+: Display the details about a role.
 
-#### List all roles
+`gcli role details --role <role> --audit`
+: Show a roles's audit information
 
-```bash
-gcli role list
-```
+`gcli role list`
+: List all roles.
 
-#### Show a roles's audit information
+`gcli role delete --role <role>` 
+: Delete a role.
 
-```bash
-gcli role details --role admin --audit
-```
+`gcli user grant --user <user> --role <role>`
+: Grant a specified role to the specified user.
 
-#### Create a role
+`gcli user revoke --user <user> --role <role>`
+: Revoke a role from a user.
 
-```bash
-gcli role create --role admin
-```
+`gcli group grant --group <group> --role <role>`
+: Grant a role to a group.
 
-#### Delete a role
+`gcli group revoke --group <group> --role <role>`
+: Revoke a role from a group.
 
-```bash
-gcli role delete --role admin
-```
+`gcli role grant --name <entity> --role <role> --privilege <privilege1> <privilege2> ...`
+: Grant some privileges to a role.
 
-#### Add a role to a user
-
-```bash
-gcli user grant --user new_user --role admin
-```
-
-#### Remove a role from a user
-
-```bash
-gcli user revoke --user new_user --role admin
-```
-
-#### Add a role to a group
-
-```bash
-gcli group grant --group groupA --role admin
-```
-
-#### Remove a role from a group
-
-```bash
-gcli group revoke --group groupA --role admin
-```
-
-### Grant a privilege
-
-```bash
-gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
-```
-
-### Revoke a privilege
-
-```bash
-gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
-```
+`gcli role revoke --metalake <metalake> --name <name> --role <role> --privilege <privilege1> <privilege2> ...`
+: Revoke some privileges from a role.
 
 ### Topic commands
 
-#### Display a topic's details
+The name of a topic is in the format `<catalog>.<schema>.<topic>`.
+For Kafka, the `<schema>` is always `default`.
 
-```bash
-gcli topic details --name kafka.default.topic3
-```
+`gcli topic create --name <topic>`
+: Create a topic.
 
-#### Create a topic
+`gcli topic details --name <topic>`
+: Display the details for a topic.
 
-```bash
-gcli topic create --name kafka.default.topic3
-```
+`gcli topic list --name <schema>`
+: List all topics under the specified schema.
 
-#### List all topics
+`gcli topic delete --name <topic>`
+: Delete the specified topic.
 
-```bash
-gcli topic list --name kafka.default
-```
+`gcli topic update --name <topic> --comment "<new-comment>"`
+: Change the comment for a topic.
 
-#### Delete a topic
+`gcli topic properties --name <topic>`
+: List the properties for a topic
 
-```bash
-gcli topic delete --name kafka.default.topic3
-```
+`gcli topic set --name <topic>--property <property> --value <value>`
+: Add a property to the specified topic.
 
-#### Change a topic's comment
-
-```bash
-gcli topic update --name kafka.default.topic3 --comment new_comment
-```
-
-#### Display a topics's properties
-
-```bash
-gcli topic properties --name kafka.default.topic3
-```
-
-#### Set a topics's property
-
-```bash
-gcli topic set --name kafka.default.topic3 --property test --value value
-```
-
-#### Remove a topics's property
-
-```bash
-gcli topic remove --name kafka.default.topic3 --property test
-```
+`gcli topic remove --name <topic> --property <property>`
+: Remove the specified property from the specified topic.
 
 ### Fileset commands
 
-#### Create a fileset
+The name of a fileset is in the format of `<catalog>.<schema>.<fileset>`.
 
-```bash
-gcli fileset create --name hadoop.schema.fileset --properties managed=true,location=file:/tmp/root/schema/example
-```
+`gcli fileset create --name <name> --properties <key-value pairs>`
+: Create a fileset.
 
-#### List filesets
+`gcli fileset list --name hadoop.schema`
+: List filesets under the specified schema.
 
-```bash
-gcli fileset list --name hadoop.schema
-```
+`gcli fileset details --name <fileset>`
+: Display the details for a fileset.
 
-#### Display a fileset's details
+`gcli fileset delete --name <fileset>`
+: Delete the specified fileset.
 
-```bash
-gcli fileset details --name hadoop.schema.fileset
-```
+`gcli fileset update --name <fileset> --comment "<new-comment>"`
+: Change the comment for a fileset
 
-#### Delete a fileset
+`gcli fileset update --name <fileset> --rename <new-name>`
+: Rename an existing fileset.
 
-```bash
-gcli fileset delete --name hadoop.schema.fileset
-```
+`gcli fileset properties --name <fileset>`
+: List the properties for a fileset.
 
-#### Update a fileset's comment
+`gcli fileset set  --name <fileset> --property <property> --value <value>`
+: Add or update a property on a fileset.
 
-```bash
-gcli fileset update --name hadoop.schema.fileset --comment new_comment
-```
-
-#### Rename a fileset
-
-```bash
-gcli fileset update --name hadoop.schema.fileset --rename new_name
-```
-
-#### Display a fileset's properties
-
-```bash
-gcli fileset properties --name hadoop.schema.fileset 
-```
-
-#### Set a fileset's property
-
-```bash
-gcli fileset set  --name hadoop.schema.fileset --property test --value value
-```
-
-#### Remove a fileset's property
-
-```bash
-gcli fileset remove --name hadoop.schema.fileset --property test
-```
+`gcli fileset remove --name <fileset> --property <property>`
+: Remove a property from a fileset.
 
 ### Column commands
 
-Note that some commands are not supported depending on what the database supports.
+Note that some commands are not supported on all databases.
 
-When setting the datatype of a column the following basic types are currently supported:
-null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
+When setting the data type of a column, the following basic types are currently supported:
+`null`, `boolean`, `byte`, `ubyte`, `short`, `ushort`, `integer`, `uinteger`, `long`, `ulong`,
+`float`, `double`, `date`, `time`, `timestamp`, `tztimestamp`, `intervalyear`, `intervalday`,
+`uuid`, `string`, `binary`.
 
-In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).
+In addition `decimal(precision,scale)`, `fixed(length)`, `fixedchar(length)`
+and `varchar(length)` are supported.
 
+The name of a column is of the format `<catalog>.<schema>.<table>.<column>`.
 
-#### Show all columns
+`gcli column create --name <column> --datatype long`
+: Create a column. You can specify the default value using the `--default` property,
+  and you can specify whether the column can be null using the `--null` option.
+  For example:
+  <br/><br/>
+  `gcli column create --name catalog_postgres.hr.departments.fullname --datatype "varchar(250)" --default "Fred Smith" --null=false`
 
-```bash
-gcli column list --name catalog_postgres.hr.departments
-```
+`gcli column delete --name <column>`
+: Delete a column.
 
-#### Show column's audit information
+`gcli column list --name <table>`
+: List all columns for a table.
 
-```bash
-gcli column details --name catalog_postgres.hr.departments.name --audit
-```
+`gcli column details --name <table> --audit`
+: Show column's audit information
 
-#### Show a column's audit information
+`gcli column update --name <column> --rename <new-name>`
+: Rename an existing column.
 
-```bash
-gcli column details --name catalog_postgres.hr.departments.name --audit
-```
+`gcli column update --name <column> --datatype <datatype>`
+: Change the data type for the specified column.
 
-#### Add a column
+`gcli column update --name <column> --position <position>`
+: Change the position for the specified column.
 
-```bash
-gcli column create --name catalog_postgres.hr.departments.value --datatype long
-gcli column create --name catalog_postgres.hr.departments.money --datatype "decimal(10,2)"
-gcli column create --name catalog_postgres.hr.departments.name --datatype "varchar(100)"
-gcli column create --name catalog_postgres.hr.departments.fullname --datatype "varchar(250)" --default "Fred Smith" --null=false
-```
+`gcli column update --name <column>--null true`
+: Change the nullability of the specified column.
 
-#### Delete a column
+### Authentication Support
 
-```bash
-gcli  column delete --name catalog_postgres.hr.departments.money
-```
+`gcli <command> --simple`
+: Authenticate using the simple authentication type.
 
-#### Update a column
+`gcli <command> --simple --login <user>`
+: Simple authentication with the specified user name.
 
-```bash
-gcli column update --name catalog_postgres.hr.departments.value --rename values
-gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
-gcli column update --name catalog_postgres.hr.departments.values --position name
-gcli column update --name catalog_postgres.hr.departments.name --null true
-```
-
-#### Simple authentication
-
-```bash
-gcli <normal command> --simple
-```
-
-### Authentication
-
-#### Simple authentication with user name
-
-```bash
-gcli <normal command> --simple --login userName
-```
