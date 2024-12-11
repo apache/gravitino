@@ -45,6 +45,7 @@ public class GravitinoOptions {
   public static final String OWNER = "owner";
   public static final String PARTITION = "partition";
   public static final String POSITION = "position";
+  public static final String PRIVILEGE = "privilege";
   public static final String PROPERTIES = "properties";
   public static final String PROPERTY = "property";
   public static final String PROVIDER = "provider";
@@ -105,6 +106,7 @@ public class GravitinoOptions {
     // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
     options.addOption(createArgsOption("t", TAG, "tag name"));
+    options.addOption(createArgsOption(null, PRIVILEGE, "privilege(s)"));
     options.addOption(createArgsOption("r", ROLE, "role name"));
 
     // Force delete entities and rename metalake operations

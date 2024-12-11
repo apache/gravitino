@@ -127,6 +127,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
       handleOwnerCommand();
+    } else if (line.hasOption(GravitinoOptions.PRIVILEGE)) {
+      handlePrivilegeCommand();
     } else if (entity.equals(CommandEntities.COLUMN)) {
       handleColumnCommand();
     } else if (entity.equals(CommandEntities.TABLE)) {
@@ -672,6 +674,33 @@ public class GravitinoCommandLine extends TestableCommandLine {
       } else {
         System.err.println(ErrorMessages.INVALID_SET_COMMAND);
       }
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+    }
+  }
+
+  /**
+   * Handles the command execution for Objects based on command type and the command line options.
+   */
+  private void handlePrivilegeCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String role = line.getOptionValue(GravitinoOptions.ROLE);
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String entityName = line.getOptionValue(GravitinoOptions.NAME);
+
+    Command.setAuthenticationMode(auth, userName);
+
+    System.err.println("handlePrivilegeCommand");
+    if (CommandActions.GRANT.equals(command)) {
+      newGrantPrivilegesToRole(url, ignore, metalake, role, entityName, entity, privileges)
+          .handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      newRevokePrivilegesFromRole(url, ignore, metalake, role, entityName, entity, privileges)
+          .handle();
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }

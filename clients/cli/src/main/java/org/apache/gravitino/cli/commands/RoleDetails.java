@@ -20,7 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -65,9 +65,12 @@ public class RoleDetails extends Command {
       return;
     }
 
-    // TODO expand in securable objects PR
-    String all = objects.stream().map(SecurableObject::name).collect(Collectors.joining(","));
-
-    System.out.println(all.toString());
+    for (SecurableObject object : objects) {
+      System.out.print(object.name() + "," + object.type() + ",");
+      for (Privilege privilege : object.privileges()) {
+        System.out.print(privilege.simpleString() + " ");
+      }
+    }
+    System.out.println("");
   }
 }
