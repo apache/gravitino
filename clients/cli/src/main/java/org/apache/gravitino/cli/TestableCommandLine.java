@@ -198,8 +198,8 @@ public class TestableCommandLine {
   }
 
   protected ListCatalogs newListCatalogs(
-      String url, boolean ignore, String metalake, String outputFormat) {
-    return new ListCatalogs(url, ignore, metalake, outputFormat);
+      String url, boolean ignore, String outputFormat, String metalake) {
+    return new ListCatalogs(url, ignore, outputFormat, metalake);
   }
 
   protected CreateCatalog newCreateCatalog(
