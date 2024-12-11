@@ -66,7 +66,7 @@ class S3TokenCredential(Credential, ABC):
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since
-        the epoch, 0 means not expiration time.
+        the epoch, 0 means it will never expire.
 
         Returns:
              The expiration time of the credential.

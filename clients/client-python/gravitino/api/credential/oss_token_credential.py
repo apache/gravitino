@@ -44,11 +44,11 @@ class OSSTokenCredential(Credential, ABC):
             self._secret_access_key, "The OSS secret access key should not be empty"
         )
         Precondition.check_string_not_empty(
-            self._security_token, "The OSS security token should be empty"
+            self._security_token, "The OSS security token should not be empty"
         )
         Precondition.check_argument(
             self._expire_time_in_ms > 0,
-            "The expiration time of OSS token credential should greater than 0",
+            "The expiration time of OSS token credential should be greater than 0",
         )
 
     def credential_type(self) -> str:
@@ -61,7 +61,7 @@ class OSSTokenCredential(Credential, ABC):
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since
-        the epoch, 0 means not expiration time.
+        the epoch, 0 means it will never expire.
 
         Returns:
              The expiration time of the credential.

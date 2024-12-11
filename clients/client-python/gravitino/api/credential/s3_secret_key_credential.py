@@ -47,7 +47,7 @@ class S3SecretKeyCredential(Credential, ABC):
 
     def credential_type(self) -> str:
         """Returns the expiration time of the credential in milliseconds since
-        the epoch, 0 means not expiration time.
+        the epoch, 0 means it will never expire.
 
         Returns:
              The expiration time of the credential.

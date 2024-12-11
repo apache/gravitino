@@ -38,7 +38,7 @@ class GCSTokenCredential(Credential, ABC):
         )
         Precondition.check_argument(
             self._expire_time_in_ms > 0,
-            "The expiration time of GCS token credential should greater than 0",
+            "The expiration time of GCS token credential should be greater than 0",
         )
 
     def credential_type(self) -> str:
@@ -51,7 +51,7 @@ class GCSTokenCredential(Credential, ABC):
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since
-        the epoch, 0 means not expiration time.
+        the epoch, 0 means it will never expire.
 
         Returns:
              The expiration time of the credential.
