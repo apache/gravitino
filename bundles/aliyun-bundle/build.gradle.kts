@@ -29,6 +29,9 @@ dependencies {
   compileOnly(project(":core"))
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":catalogs:hadoop-common")) {
+    exclude("*")
+  }
   compileOnly(libs.hadoop3.common)
 
   implementation(libs.aliyun.credentials.sdk)
