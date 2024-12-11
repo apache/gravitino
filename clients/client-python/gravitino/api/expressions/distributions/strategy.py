@@ -36,22 +36,17 @@ class Strategy(Enum):
     EVEN = "EVEN"
 
     @staticmethod
-    def get_by_name(name: str):
-        """
-        Get the distribution strategy by name.
-
-        Args:
-            name (str): The name of the distribution strategy.
-
-        Returns:
-            Strategy: The distribution strategy.
-
-        Raises:
-            ValueError: If the name does not correspond to a valid strategy.
-        """
+    def get_by_name(name: str) -> "Strategy":
         upper_name = name.upper()
-        if upper_name in ("NONE", "HASH", "RANGE", "EVEN", "RANDOM"):
-            return Strategy["EVEN"] if upper_name == "RANDOM" else Strategy[upper_name]
-        raise ValueError(
-            f"Invalid distribution strategy: {name}. Valid values are: {[e.value for e in Strategy]}"
-        )
+        if upper_name == "NONE":
+            return Strategy.NONE
+        elif upper_name == "HASH":
+            return Strategy.HASH
+        elif upper_name == "RANGE":
+            return Strategy.RANGE
+        elif upper_name in {"EVEN", "RANDOM"}:
+            return Strategy.EVEN
+        else:
+            raise ValueError(
+                f"Invalid distribution strategy: {name}. Valid values are: {[s.value for s in Strategy]}"
+            )

@@ -22,12 +22,16 @@ from gravitino.api.expressions.named_reference import NamedReference
 
 
 class DistributionImpl(Distribution):
-    def __init__(self, strategy: str, number: int, expressions: list[Expression]):
+    _strategy: Strategy
+    _number: int
+    _expressions: list[Expression]
+
+    def __init__(self, strategy: Strategy, number: int, expressions: list[Expression]):
         self._strategy = strategy
         self._number = number
         self._expressions = expressions
 
-    def strategy(self) -> str:
+    def strategy(self) -> Strategy:
         return self._strategy
 
     def number(self) -> int:
@@ -43,9 +47,9 @@ class DistributionImpl(Distribution):
         if not isinstance(other, DistributionImpl):
             return False
         return (
-            self._strategy == other._strategy
-            and self._number == other._number
-            and self._expressions == other._expressions
+            self._strategy == other.strategy()
+            and self._number == other.number()
+            and self._expressions == other.expressions()
         )
 
     def __hash__(self) -> int:
@@ -53,27 +57,72 @@ class DistributionImpl(Distribution):
 
 
 class Distributions:
-    NONE = DistributionImpl(Strategy.NONE, 0, [Expression.EMPTY_EXPRESSION])
-    HASH = DistributionImpl(Strategy.HASH, 0, [Expression.EMPTY_EXPRESSION])
-    RANGE = DistributionImpl(Strategy.RANGE, 0, [Expression.EMPTY_EXPRESSION])
+    NONE: Distribution = DistributionImpl(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION)
+    """NONE is used to indicate that there is no distribution."""
+    HASH: Distribution = DistributionImpl(Strategy.HASH, 0, Expression.EMPTY_EXPRESSION)
+    """List bucketing strategy hash, TODO: #1505 Separate the bucket number from the Distribution."""
+    RANGE: Distribution = DistributionImpl(
+        Strategy.RANGE, 0, Expression.EMPTY_EXPRESSION
+    )
+    """List bucketing strategy range, TODO: #1505 Separate the bucket number from the Distribution."""
 
     @staticmethod
     def even(number: int, *expressions: Expression) -> Distribution:
+        """
+        Create a distribution by evenly distributing the data across the number of buckets.
+
+        :param number: The number of buckets.
+        :param expressions: The expressions to distribute by.
+        :return: The created even distribution.
+        """
         return DistributionImpl(Strategy.EVEN, number, list(expressions))
 
     @staticmethod
     def hash(number: int, *expressions: Expression) -> Distribution:
+        """
+        Create a distribution by hashing the data across the number of buckets.
+
+        :param number: The number of buckets.
+        :param expressions: The expressions to distribute by.
+        :return: The created hash distribution.
+        """
         return DistributionImpl(Strategy.HASH, number, list(expressions))
 
     @staticmethod
-    def of(strategy: str, number: int, *expressions: Expression) -> Distribution:
+    def of(strategy: Strategy, number: int, *expressions: Expression) -> Distribution:
+        """
+        Create a distribution by the given strategy.
+
+        :param strategy: The strategy to use.
+        :param number: The number of buckets.
+        :param expressions: The expressions to distribute by.
+        :return: The created distribution.
+        """
         return DistributionImpl(strategy, number, list(expressions))
 
     @staticmethod
-    def fields(strategy: str, number: int, *field_names: list[str]) -> Distribution:
-        expressions = [
-            NamedReference.field(name)
-            for name_list in field_names
-            for name in name_list
-        ]
+    def fields(
+        strategy: Strategy, number: int, *field_names: list[str]
+    ) -> Distribution:
+        """
+        Create a distribution on columns. Like distribute by (a) or (a, b), for complex like
+        distributing by (func(a), b) or (func(a), func(b)), please use DistributionImpl.Builder to create.
+
+        NOTE: a, b, c are column names.
+
+        SQL syntax: distribute by hash(a, b) buckets 5
+        fields(Strategy.HASH, 5, ["a"], ["b"])
+
+        SQL syntax: distribute by hash(a, b, c) buckets 10
+        fields(Strategy.HASH, 10, ["a"], ["b"], ["c"])
+
+        SQL syntax: distribute by EVEN(a) buckets 128
+        fields(Strategy.EVEN, 128, ["a"])
+
+        :param strategy: The strategy to use.
+        :param number: The number of buckets.
+        :param field_names: The field names to distribute by.
+        :return: The created distribution.
+        """
+        expressions = [NamedReference.field(name) for name in field_names]
         return Distributions.of(strategy, number, *expressions)

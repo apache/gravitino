@@ -14,25 +14,30 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+from abc import abstractmethod
+from gravitino.api.expressions.distributions.strategy import Strategy
 from gravitino.api.expressions.expression import Expression
 
 
-class Distribution:
+class Distribution(Expression):
     """
     An interface that defines how data is distributed across partitions.
     """
 
-    def strategy(self) -> str:
-        raise NotImplementedError
+    @abstractmethod
+    def strategy(self) -> Strategy:
+        """Return the distribution strategy name."""
 
+    @abstractmethod
     def number(self) -> int:
-        raise NotImplementedError
+        """Return The number of buckets/distribution. For example, if the distribution strategy is HASH
+        and the number is 10, then the data is distributed across 10 buckets."""
 
-    def expressions(self) -> list["Expression"]:
-        raise NotImplementedError
+    @abstractmethod
+    def expressions(self) -> list[Expression]:
+        """Return The expressions passed to the distribution function."""
 
-    def children(self) -> list["Expression"]:
+    def children(self) -> list[Expression]:
         """
         Returns the child expressions.
         """

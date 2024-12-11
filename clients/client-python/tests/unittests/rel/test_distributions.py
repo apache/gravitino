@@ -24,12 +24,11 @@ from gravitino.api.expressions.distributions.strategy import Strategy
 from gravitino.api.expressions.expression import Expression
 
 
-class MockExpression:
+class MockExpression(Expression):
     """Mock class to simulate an Expression"""
 
-    @staticmethod
-    def empty_expression():
-        return MockExpression()
+    def children(self) -> list[Expression]:
+        return Expression.EMPTY_EXPRESSION
 
 
 class TestDistributions(unittest.TestCase):
@@ -44,21 +43,21 @@ class TestDistributions(unittest.TestCase):
         distribution = Distributions.NONE
         self.assertEqual(distribution.strategy(), Strategy.NONE)
         self.assertEqual(distribution.number(), 0)
-        self.assertEqual(distribution.expressions(), [Expression.EMPTY_EXPRESSION])
+        self.assertEqual(distribution.expressions(), Expression.EMPTY_EXPRESSION)
 
     def test_hash_distribution(self):
         # Test the HASH distribution
         distribution = Distributions.HASH
         self.assertEqual(distribution.strategy(), Strategy.HASH)
         self.assertEqual(distribution.number(), 0)
-        self.assertEqual(distribution.expressions(), [Expression.EMPTY_EXPRESSION])
+        self.assertEqual(distribution.expressions(), Expression.EMPTY_EXPRESSION)
 
     def test_range_distribution(self):
         # Test the RANGE distribution
         distribution = Distributions.RANGE
         self.assertEqual(distribution.strategy(), Strategy.RANGE)
         self.assertEqual(distribution.number(), 0)
-        self.assertEqual(distribution.expressions(), [Expression.EMPTY_EXPRESSION])
+        self.assertEqual(distribution.expressions(), Expression.EMPTY_EXPRESSION)
 
     def test_even_distribution(self):
         # Test the EVEN distribution with multiple expressions
