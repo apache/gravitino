@@ -45,12 +45,16 @@ public class OSSSecretKeyCredential implements Credential {
    * @param secretAccessKey The OSS static secret access key.
    */
   public OSSSecretKeyCredential(String accessKeyId, String secretAccessKey) {
-    Preconditions.checkNotNull(accessKeyId, "OSS access key Id should not null");
-    Preconditions.checkNotNull(secretAccessKey, "OSS secret access key should not null");
-
+    validate(accessKeyId, secretAccessKey, 0);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
   }
+
+  /**
+   * This is the constructor that is used by credential factory to create an instance of credential
+   * according to the credential information.
+   */
+  public OSSSecretKeyCredential() {}
 
   @Override
   public String credentialType() {
