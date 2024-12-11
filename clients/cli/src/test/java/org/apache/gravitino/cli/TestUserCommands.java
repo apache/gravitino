@@ -32,6 +32,7 @@ import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
+import org.apache.gravitino.cli.commands.UserAudit;
 import org.apache.gravitino.cli.commands.UserDetails;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,6 +79,25 @@ class TestUserCommands {
         .newUserDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
+  }
+
+  @Test
+  void testUserAuditCommand() {
+    UserAudit mockAudit = mock(UserAudit.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("admin");
+    when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.USER, CommandActions.DETAILS));
+    doReturn(mockAudit)
+        .when(commandLine)
+        .newUserAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
+    commandLine.handleCommandLine();
+    verify(mockAudit).handle();
   }
 
   @Test

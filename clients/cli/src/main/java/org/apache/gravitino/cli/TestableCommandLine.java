@@ -49,6 +49,7 @@ import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.FilesetDetails;
+import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
@@ -83,6 +84,7 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
@@ -122,6 +124,7 @@ import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
 import org.apache.gravitino.cli.commands.UpdateTagName;
 import org.apache.gravitino.cli.commands.UpdateTopicComment;
+import org.apache.gravitino.cli.commands.UserAudit;
 import org.apache.gravitino.cli.commands.UserDetails;
 
 /*
@@ -391,6 +394,10 @@ public class TestableCommandLine {
     return new ListUsers(url, ignore, metalake);
   }
 
+  protected UserAudit newUserAudit(String url, boolean ignore, String metalake, String user) {
+    return new UserAudit(url, ignore, metalake, user);
+  }
+
   protected CreateUser newCreateUser(String url, boolean ignore, String metalake, String user) {
     return new CreateUser(url, ignore, metalake, user);
   }
@@ -418,6 +425,10 @@ public class TestableCommandLine {
     return new ListGroups(url, ignore, metalake);
   }
 
+  protected GroupAudit newGroupAudit(String url, boolean ignore, String metalake, String group) {
+    return new GroupAudit(url, ignore, metalake, group);
+  }
+
   protected CreateGroup newCreateGroup(String url, boolean ignore, String metalake, String user) {
     return new CreateGroup(url, ignore, metalake, user);
   }
@@ -443,6 +454,10 @@ public class TestableCommandLine {
 
   protected ListRoles newListRoles(String url, boolean ignore, String metalake) {
     return new ListRoles(url, ignore, metalake);
+  }
+
+  protected RoleAudit newRoleAudit(String url, boolean ignore, String metalake, String role) {
+    return new RoleAudit(url, ignore, metalake, role);
   }
 
   protected CreateRole newCreateRole(String url, boolean ignore, String metalake, String role) {
