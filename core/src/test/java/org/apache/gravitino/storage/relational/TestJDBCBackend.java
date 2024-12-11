@@ -57,6 +57,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -69,6 +70,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -1387,6 +1389,25 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withComment(comment)
         .withLatestVersion(latestVersion)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static ModelVersionEntity createModelVersionEntity(
+      NameIdentifier modelId,
+      Integer version,
+      String modelUri,
+      List<String> aliases,
+      String comment,
+      Map<String, String> properties,
+      AuditInfo auditInfo) {
+    return ModelVersionEntity.builder()
+        .withModelIdentifier(modelId)
+        .withVersion(version)
+        .withUri(modelUri)
+        .withAliases(aliases)
+        .withComment(comment)
         .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();

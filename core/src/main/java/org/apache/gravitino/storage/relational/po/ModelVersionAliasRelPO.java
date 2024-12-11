@@ -31,7 +31,7 @@ public class ModelVersionAliasRelPO {
 
   private Integer modelVersion;
 
-  private String modelAlias;
+  private String modelVersionAlias;
 
   private Long deletedAt;
 
@@ -59,8 +59,8 @@ public class ModelVersionAliasRelPO {
       return this;
     }
 
-    public Builder withModelAlias(String modelAlias) {
-      modelVersionAliasRelPO.modelAlias = modelAlias;
+    public Builder withModelVersionAlias(String modelVersionAlias) {
+      modelVersionAliasRelPO.modelVersionAlias = modelVersionAlias;
       return this;
     }
 
@@ -74,7 +74,8 @@ public class ModelVersionAliasRelPO {
       Preconditions.checkArgument(
           modelVersionAliasRelPO.modelVersion != null, "modelVersion is required");
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(modelVersionAliasRelPO.modelAlias), "modelAlias is required");
+          StringUtils.isNotBlank(modelVersionAliasRelPO.modelVersionAlias),
+          "modelVersionAlias is required");
       Preconditions.checkArgument(
           modelVersionAliasRelPO.deletedAt != null, "deletedAt is required");
       return modelVersionAliasRelPO;

@@ -134,4 +134,11 @@ public class ModelMetaBaseSQLProvider {
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String updateModelLatestVersion(@Param("modelId") Long modelId) {
+    return "UPDATE "
+        + ModelMetaMapper.TABLE_NAME
+        + " SET model_latest_version = model_latest_version + 1"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+  }
 }
