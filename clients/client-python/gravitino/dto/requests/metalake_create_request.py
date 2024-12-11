@@ -48,4 +48,4 @@ class MetalakeCreateRequest(RESTRequest):
 
     def validate(self):
         if not self._name:
-            raise ValueError('"name" field is required and cannot be empty')
+            raise ValueError("The 'name' field is required and cannot be empty. Please provide a valid name for the Metalake.")
