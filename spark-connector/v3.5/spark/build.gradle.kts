@@ -31,6 +31,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4spark.get()
+val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
@@ -45,6 +46,9 @@ dependencies {
   }
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.spark")
+  }
 
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
@@ -124,6 +128,9 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.spark")
+  }
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
@@ -136,6 +143,9 @@ dependencies {
     exclude("com.fasterxml.jackson.core")
   }
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
+  testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -154,6 +164,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
     dependsOn(":iceberg:iceberg-rest-server:jar")
+    dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
   }
 }
 

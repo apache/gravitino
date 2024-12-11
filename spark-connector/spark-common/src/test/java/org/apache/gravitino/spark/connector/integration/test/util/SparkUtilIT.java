@@ -74,10 +74,13 @@ public abstract class SparkUtilIT extends BaseIT {
 
   // Specify Location explicitly because the default location is local HDFS, Spark will expand the
   // location to HDFS.
-  protected void createDatabaseIfNotExists(String database) {
-    sql(
-        String.format(
-            "CREATE DATABASE IF NOT EXISTS %s LOCATION '/user/hive/%s'", database, database));
+  // However, Paimon does not support create a database with a specified location.
+  protected void createDatabaseIfNotExists(String database, String provider) {
+    String locationClause =
+        "lakehouse-paimon".equalsIgnoreCase(provider)
+            ? ""
+            : String.format("LOCATION '/user/hive/%s'", database);
+    sql(String.format("CREATE DATABASE IF NOT EXISTS %s %s", database, locationClause));
   }
 
   protected Map<String, String> getDatabaseMetadata(String database) {
