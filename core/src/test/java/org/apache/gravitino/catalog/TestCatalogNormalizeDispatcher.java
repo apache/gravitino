@@ -64,7 +64,6 @@ public class TestCatalogNormalizeDispatcher {
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
 
     entityStore.put(metalakeEntity, true);
 

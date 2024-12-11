@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -49,6 +50,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
+  // This joiner is used to join multiple outputs to be displayed, e.g. roles or groups
+  private static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
   /**
    * Gravitino Command line.
@@ -471,17 +474,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.REVOKE:
-        String revokeRole = line.getOptionValue(GravitinoOptions.ROLE);
-        if (revokeRole != null) {
-          newRemoveRoleFromUser(url, ignore, metalake, user, revokeRole).handle();
+        String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
+        for (String role : revokeRoles) {
+          newRemoveRoleFromUser(url, ignore, metalake, user, role).handle();
         }
+        System.out.printf("Remove roles %s from user %s%n", COMMA_JOINER.join(revokeRoles), user);
         break;
 
       case CommandActions.GRANT:
-        String grantRole = line.getOptionValue(GravitinoOptions.ROLE);
-        if (grantRole != null) {
-          newAddRoleToUser(url, ignore, metalake, user, grantRole).handle();
+        String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
+        for (String role : grantRoles) {
+          newAddRoleToUser(url, ignore, metalake, user, role).handle();
         }
+        System.out.printf("Grant roles %s to user %s%n", COMMA_JOINER.join(grantRoles), user);
         break;
 
       default:
@@ -520,17 +525,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.REVOKE:
-        String revokeRole = line.getOptionValue(GravitinoOptions.ROLE);
-        if (revokeRole != null) {
-          newRemoveRoleFromGroup(url, ignore, metalake, group, revokeRole).handle();
+        String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
+        for (String role : revokeRoles) {
+          newRemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
         }
+        System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
         break;
 
       case CommandActions.GRANT:
-        String grantRole = line.getOptionValue(GravitinoOptions.ROLE);
-        if (grantRole != null) {
-          newAddRoleToGroup(url, ignore, metalake, group, grantRole).handle();
+        String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
+        for (String role : grantRoles) {
+          newAddRoleToGroup(url, ignore, metalake, group, role).handle();
         }
+        System.out.printf("Grant roles %s to group %s%n", COMMA_JOINER.join(grantRoles), group);
         break;
 
       default:
