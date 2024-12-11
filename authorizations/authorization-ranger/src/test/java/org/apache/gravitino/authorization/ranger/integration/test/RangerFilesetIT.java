@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -59,6 +60,8 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.junit.jupiter.api.AfterAll;
@@ -76,7 +79,6 @@ public class RangerFilesetIT extends BaseIT {
 
   private String RANGER_ADMIN_URL;
   private String defaultBaseLocation;
-  private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private String metalakeName = "metalake";
   private String catalogName = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("RangerFilesetE2EIT_schema");
@@ -218,7 +220,7 @@ public class RangerFilesetIT extends BaseIT {
                         .anyMatch(access -> access.getType().equals("write")))
             .count());
     Assertions.assertEquals(
-        0,
+        1,
         policies.get(0).getPolicyItems().stream()
             .filter(
                 item ->
@@ -338,6 +340,32 @@ public class RangerFilesetIT extends BaseIT {
     Assertions.assertTrue(
         catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, fileset.name())));
     Assertions.assertTrue(fileSystem.exists(new Path(storageLocation(filenameRole))));
+    FsPermission permission = new FsPermission("700");
+    fileSystem.setPermission(new Path(storageLocation(filenameRole)), permission);
+
+    String userName = "userTestReadWritePathE2E";
+    metalake.addUser(userName);
+
+    UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
+        .doAs(
+            (PrivilegedExceptionAction<Void>)
+                () -> {
+                  Configuration conf = new Configuration();
+                  conf.set("fs.defaultFS", defaultBaseLocation());
+                  FileSystem userFileSystem = FileSystem.get(conf);
+                  Assertions.assertThrows(
+                      Exception.class,
+                      () ->
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
+                  Assertions.assertThrows(
+                      Exception.class,
+                      () ->
+                          userFileSystem.mkdirs(
+                              new Path(
+                                  String.format("%s/%s", storageLocation(filenameRole), "test1"))));
+                  userFileSystem.close();
+                  return null;
+                });
 
     String filesetRole = currentFunName() + "_testReadWritePathE2E";
     SecurableObject securableObject =
@@ -346,14 +374,95 @@ public class RangerFilesetIT extends BaseIT {
             MetadataObject.Type.FILESET,
             Lists.newArrayList(Privileges.ReadFileset.allow()));
     metalake.createRole(filesetRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    String userName1 = System.getenv(HADOOP_USER_NAME);
-    metalake.addUser(userName1);
-    metalake.grantRolesToUser(Lists.newArrayList(filesetRole), userName1);
+    metalake.grantRolesToUser(Lists.newArrayList(filesetRole), userName);
     waitForUpdatingPolicies();
-    Assertions.assertDoesNotThrow(
-        () -> fileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
-    Assertions.assertThrows(
-        Exception.class, () -> fileSystem.mkdirs(new Path(storageLocation(filenameRole))));
+
+    UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
+        .doAs(
+            (PrivilegedExceptionAction<Void>)
+                () -> {
+                  FileSystem userFileSystem =
+                      FileSystem.get(
+                          new Configuration() {
+                            {
+                              set("fs.defaultFS", defaultBaseLocation());
+                            }
+                          });
+                  Assertions.assertDoesNotThrow(
+                      () ->
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
+                  Assertions.assertThrows(
+                      Exception.class,
+                      () ->
+                          userFileSystem.mkdirs(
+                              new Path(
+                                  String.format("%s/%s", storageLocation(filenameRole), "test2"))));
+                  userFileSystem.close();
+                  return null;
+                });
+
+    MetadataObject filesetObject =
+        MetadataObjects.of(
+            String.format("%s.%s", catalogName, schemaName),
+            fileset.name(),
+            MetadataObject.Type.FILESET);
+    metalake.grantPrivilegesToRole(
+        filesetRole, filesetObject, Lists.newArrayList(Privileges.WriteFileset.allow()));
+    waitForUpdatingPolicies();
+    UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
+        .doAs(
+            (PrivilegedExceptionAction<Void>)
+                () -> {
+                  FileSystem userFileSystem =
+                      FileSystem.get(
+                          new Configuration() {
+                            {
+                              set("fs.defaultFS", defaultBaseLocation());
+                            }
+                          });
+                  Assertions.assertDoesNotThrow(
+                      () ->
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
+                  Assertions.assertDoesNotThrow(
+                      () ->
+                          userFileSystem.mkdirs(
+                              new Path(
+                                  String.format("%s/%s", storageLocation(filenameRole), "test3"))));
+                  userFileSystem.close();
+                  return null;
+                });
+
+    metalake.revokePrivilegesFromRole(
+        filesetRole,
+        filesetObject,
+        Lists.newArrayList(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
+    waitForUpdatingPolicies();
+    UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
+        .doAs(
+            (PrivilegedExceptionAction<Void>)
+                () -> {
+                  FileSystem userFileSystem =
+                      FileSystem.get(
+                          new Configuration() {
+                            {
+                              set("fs.defaultFS", defaultBaseLocation());
+                            }
+                          });
+                  Assertions.assertThrows(
+                      Exception.class,
+                      () ->
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
+                  Assertions.assertThrows(
+                      Exception.class,
+                      () ->
+                          userFileSystem.mkdirs(
+                              new Path(
+                                  String.format("%s/%s", storageLocation(filenameRole), "test4"))));
+                  userFileSystem.close();
+                  return null;
+                });
+
+    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, fileset.name()));
   }
 
   private void createCatalogAndSchema() {

@@ -74,7 +74,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   public Map<Privilege.Name, Set<AuthorizationPrivilege>> privilegesMappingRule() {
     return ImmutableMap.of(
         Privilege.Name.READ_FILESET,
-        ImmutableSet.of(RangerPrivileges.RangerHdfsPrivilege.READ),
+        ImmutableSet.of(
+            RangerPrivileges.RangerHdfsPrivilege.READ,
+            RangerPrivileges.RangerHdfsPrivilege.EXECUTE),
         Privilege.Name.WRITE_FILESET,
         ImmutableSet.of(
             RangerPrivileges.RangerHdfsPrivilege.WRITE,
