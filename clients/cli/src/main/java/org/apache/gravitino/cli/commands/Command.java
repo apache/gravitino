@@ -24,7 +24,6 @@ import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 import java.io.File;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
-import org.apache.gravitino.cli.ListOptions;
 import org.apache.gravitino.cli.OAuthData;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
@@ -49,7 +48,7 @@ public abstract class Command {
 
   private final String url;
   private final boolean ignoreVersions;
-  private final ListOptions listOptions;
+  private final String outputFormat;
 
   /**
    * Command constructor.
@@ -60,7 +59,7 @@ public abstract class Command {
   public Command(String url, boolean ignoreVersions) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
-    this.listOptions = new ListOptions(OUTPUT_FORMAT_PLAIN);
+    this.outputFormat = OUTPUT_FORMAT_PLAIN;
   }
 
   /**
@@ -68,12 +67,12 @@ public abstract class Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param listOptions The list options.
+   * @param outputFormat output format used in some commands
    */
-  public Command(String url, boolean ignoreVersions, ListOptions listOptions) {
+  public Command(String url, boolean ignoreVersions, String outputFormat) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
-    this.listOptions = listOptions;
+    this.outputFormat = outputFormat;
   }
 
   /**
@@ -169,14 +168,14 @@ public abstract class Command {
    * @param <T> The type of entity.
    */
   protected <T> void output(T entity) {
-    if (listOptions.getOutputFormat() == null) {
+    if (outputFormat == null) {
       PlainFormat.output(entity);
       return;
     }
 
-    if (listOptions.getOutputFormat().equals(OUTPUT_FORMAT_TABLE)) {
+    if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
       TableFormat.output(entity);
-    } else if (listOptions.getOutputFormat().equals(OUTPUT_FORMAT_PLAIN)) {
+    } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
       PlainFormat.output(entity);
     } else {
       throw new IllegalArgumentException("Unsupported output format");

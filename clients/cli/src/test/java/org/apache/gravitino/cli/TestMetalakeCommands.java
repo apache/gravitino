@@ -27,7 +27,6 @@ import static org.mockito.Mockito.when;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
@@ -62,8 +61,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListMetalakes(
-            GravitinoCommandLine.DEFAULT_URL, false, new ListOptions(Command.OUTPUT_FORMAT_PLAIN));
+        .newListMetalakes(GravitinoCommandLine.DEFAULT_URL, false, null);
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -80,11 +78,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.DETAILS));
     doReturn(mockDetails)
         .when(commandLine)
-        .newMetalakeDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            new ListOptions(Command.OUTPUT_FORMAT_PLAIN),
-            "metalake_demo");
+        .newMetalakeDetails(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }

@@ -30,7 +30,6 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
-import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
@@ -63,11 +62,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListCatalogs(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            new ListOptions(Command.OUTPUT_FORMAT_PLAIN));
+        .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null);
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -87,11 +82,7 @@ class TestCatalogCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newCatalogDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            new ListOptions(Command.OUTPUT_FORMAT_PLAIN),
-            "metalake_demo",
-            "catalog");
+            GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo", "catalog");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
