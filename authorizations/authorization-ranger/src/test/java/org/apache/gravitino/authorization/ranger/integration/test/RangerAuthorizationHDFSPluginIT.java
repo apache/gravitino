@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization.ranger.integration.test;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
@@ -30,7 +29,6 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHDFSMetadataObject;
-import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
