@@ -25,8 +25,22 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:aws-core"))
-  implementation(libs.hadoop3.aws)
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-common"))
+  compileOnly(project(":catalogs:catalog-hadoop"))
+
+  compileOnly(libs.hadoop3.common)
+
+  implementation(libs.commons.lang3)
+  // runtime used
+  implementation(libs.commons.logging)
+
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
+  implementation(libs.google.auth.http)
+  implementation(libs.google.auth.credentials)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -34,7 +48,12 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
-  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
+  // Relocate dependencies to avoid conflicts
+  relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
+  relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
+  relocate("com.google", "org.apache.gravitino.gcp.shaded.com.google")
+  relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
 }
 
 tasks.jar {

@@ -25,29 +25,8 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.common)
-
-  implementation(libs.aliyun.credentials.sdk)
+  implementation(project(":bundles:aliyun-core"))
   implementation(libs.hadoop3.oss)
-
-  // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
-  // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
-  implementation(libs.sun.activation)
-
-  // oss needs StringUtils from commons-lang3 or the following error will occur in 3.3.0
-  // java.lang.NoClassDefFoundError: org/apache/commons/lang3/StringUtils
-  // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystemStore.initialize(AliyunOSSFileSystemStore.java:111)
-  // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
-  // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
-  implementation(libs.commons.lang3)
-
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
 }
 
 tasks.withType(ShadowJar::class.java) {
