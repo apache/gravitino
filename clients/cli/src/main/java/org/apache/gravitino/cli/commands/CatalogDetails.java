@@ -42,6 +42,7 @@ public class CatalogDetails extends Command {
   public CatalogDetails(
       String url, boolean ignoreVersions, String outputFormat, String metalake, String catalog) {
     super(url, ignoreVersions, outputFormat);
+
     this.metalake = metalake;
     this.catalog = catalog;
   }
