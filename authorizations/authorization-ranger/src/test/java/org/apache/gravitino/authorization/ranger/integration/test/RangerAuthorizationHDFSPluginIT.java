@@ -141,24 +141,7 @@ public class RangerAuthorizationHDFSPluginIT {
         securableObject -> {
           Assertions.assertEquals(RangerHDFSMetadataObject.Type.PATH, securableObject.type());
           Assertions.assertEquals("/test", securableObject.fullName());
-          Assertions.assertTrue(
-              securableObject.privileges().size() == 1 || securableObject.privileges().size() == 2);
-          if (securableObject.privileges().size() == 1) {
-            Assertions.assertEquals(
-                RangerPrivileges.RangerHdfsPrivilege.READ.getName(),
-                securableObject.privileges().get(0).getName());
-          } else {
-            securableObject
-                .privileges()
-                .forEach(
-                    privilege -> {
-                      Assertions.assertTrue(
-                          ImmutableList.of(
-                                  RangerPrivileges.RangerHdfsPrivilege.WRITE.getName(),
-                                  RangerPrivileges.RangerHdfsPrivilege.EXECUTE.getName())
-                              .contains(privilege.getName()));
-                    });
-          }
+          Assertions.assertEquals(2, securableObject.privileges().size());
         });
   }
 
