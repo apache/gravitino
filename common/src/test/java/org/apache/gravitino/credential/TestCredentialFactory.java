@@ -113,4 +113,29 @@ public class TestCredentialFactory {
     Assertions.assertEquals("token", ossTokenCredential1.securityToken());
     Assertions.assertEquals(expireTime, ossTokenCredential1.expireTimeInMs());
   }
+
+  @Test
+  void testOSSSecretKeyTokenCredential() {
+    Map<String, String> ossSecretKeyCredentialInfo =
+        ImmutableMap.of(
+            OSSSecretKeyCredential.GRAVITINO_OSS_STATIC_ACCESS_KEY_ID,
+            "accessKeyId",
+            OSSSecretKeyCredential.GRAVITINO_OSS_STATIC_SECRET_ACCESS_KEY,
+            "secretAccessKey");
+    long expireTime = 0;
+    Credential ossSecretKeyCredential =
+        CredentialFactory.create(
+            OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+            ossSecretKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+        ossSecretKeyCredential.credentialType());
+    Assertions.assertTrue(ossSecretKeyCredential instanceof OSSSecretKeyCredential);
+    OSSSecretKeyCredential ossSecretKeyCredential1 =
+        (OSSSecretKeyCredential) ossSecretKeyCredential;
+    Assertions.assertEquals("accessKeyId", ossSecretKeyCredential1.accessKeyId());
+    Assertions.assertEquals("secretAccessKey", ossSecretKeyCredential1.secretAccessKey());
+    Assertions.assertEquals(expireTime, ossSecretKeyCredential1.expireTimeInMs());
+  }
 }

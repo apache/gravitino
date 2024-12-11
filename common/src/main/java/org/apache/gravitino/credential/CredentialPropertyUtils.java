@@ -72,7 +72,7 @@ public class CredentialPropertyUtils {
     if (credential instanceof S3TokenCredential || credential instanceof S3SecretKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
-    if (credential instanceof OSSTokenCredential) {
+    if (credential instanceof OSSTokenCredential || credential instanceof OSSSecretKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
     return credential.toProperties();
