@@ -314,7 +314,6 @@
    JSR305
    LevelDB JNI
    Protobuf
-   RocksDB JNI
    Stax2 API
    XMLenc
 

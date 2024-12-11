@@ -18,10 +18,7 @@
  */
 package org.apache.gravitino;
 
-import static org.apache.gravitino.Configs.KV_STORE_KEY;
-
 import com.google.common.collect.ImmutableMap;
-import org.apache.gravitino.storage.kv.KvEntityStore;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,10 +35,7 @@ public class EntityStoreFactory {
   // doesn't need to specify the full qualified class name when creating an EntityStore.
   public static final ImmutableMap<String, String> ENTITY_STORES =
       ImmutableMap.of(
-          KV_STORE_KEY,
-          KvEntityStore.class.getCanonicalName(),
-          Configs.RELATIONAL_ENTITY_STORE,
-          RelationalEntityStore.class.getCanonicalName());
+          Configs.RELATIONAL_ENTITY_STORE, RelationalEntityStore.class.getCanonicalName());
 
   // Private constructor to prevent instantiation of this factory class.
   private EntityStoreFactory() {}
@@ -55,11 +49,6 @@ public class EntityStoreFactory {
   public static EntityStore createEntityStore(Config config) {
     String name = config.get(Configs.ENTITY_STORE);
     String className = ENTITY_STORES.getOrDefault(name, name);
-
-    if (KV_STORE_KEY.equals(name)) {
-      throw new UnsupportedOperationException(
-          "KvEntityStore is not supported since version 0.6.0. Please use RelationalEntityStore instead.");
-    }
 
     try {
       return (EntityStore) Class.forName(className).getDeclaredConstructor().newInstance();
