@@ -74,6 +74,7 @@ import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
+import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
@@ -481,6 +482,11 @@ public class TestableCommandLine {
   protected RemoveTagProperty newRemoveTagProperty(
       String url, boolean ignore, String metalake, String tag, String property) {
     return new RemoveTagProperty(url, ignore, metalake, tag, property);
+  }
+
+  protected RemoveAllTags newRemoveAllTags(
+      String url, boolean ignore, String metalake, FullName name, boolean force) {
+    return new RemoveAllTags(url, ignore, metalake, name, force);
   }
 
   protected ListTagProperties newListTagProperties(

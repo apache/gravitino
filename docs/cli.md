@@ -141,6 +141,15 @@ token=test
 scope=token/test
 ```
 
+Kerberos authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=kerberos
+principal=user/admin@foo.com
+keytabFile=file.keytab
+```
+
 ### Potentially unsafe operations
 
 For operations that delete data or rename a metalake the user with be prompted to make sure they wish to run this command. The `--force` option can be specified to override this behaviour.
@@ -585,6 +594,12 @@ gcli tag set --name catalog_postgres.hr --tag tagA tagB
 
 ```bash
 gcli tag remove --name catalog_postgres.hr --tag tagA tagB
+```
+
+#### Remove all tags from an entity
+
+```bash
+gcli tag remove --name catalog_postgres.hr
 ```
 
 #### List all tags on an entity
