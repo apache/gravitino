@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from typing import List
 
 from gravitino.api.expressions.distributions.strategy import Strategy
 from gravitino.api.expressions.distributions.distribution import Distribution
@@ -24,9 +25,9 @@ from gravitino.api.expressions.named_reference import NamedReference
 class DistributionImpl(Distribution):
     _strategy: Strategy
     _number: int
-    _expressions: list[Expression]
+    _expressions: List[Expression]
 
-    def __init__(self, strategy: Strategy, number: int, expressions: list[Expression]):
+    def __init__(self, strategy: Strategy, number: int, expressions: List[Expression]):
         self._strategy = strategy
         self._number = number
         self._expressions = expressions
@@ -37,7 +38,7 @@ class DistributionImpl(Distribution):
     def number(self) -> int:
         return self._number
 
-    def expressions(self) -> list[Expression]:
+    def expressions(self) -> List[Expression]:
         return self._expressions
 
     def __str__(self) -> str:
@@ -102,7 +103,7 @@ class Distributions:
 
     @staticmethod
     def fields(
-        strategy: Strategy, number: int, *field_names: list[str]
+        strategy: Strategy, number: int, *field_names: List[str]
     ) -> Distribution:
         """
         Create a distribution on columns. Like distribute by (a) or (a, b), for complex like

@@ -16,6 +16,8 @@
 # under the License.
 
 import unittest
+from typing import List
+
 from gravitino.api.expressions.distributions.distributions import (
     DistributionImpl,
     Distributions,
@@ -27,7 +29,7 @@ from gravitino.api.expressions.expression import Expression
 class MockExpression(Expression):
     """Mock class to simulate an Expression"""
 
-    def children(self) -> list[Expression]:
+    def children(self) -> List[Expression]:
         return Expression.EMPTY_EXPRESSION
 
 

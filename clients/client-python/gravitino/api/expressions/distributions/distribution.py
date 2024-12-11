@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 from abc import abstractmethod
+from typing import List
+
 from gravitino.api.expressions.distributions.strategy import Strategy
 from gravitino.api.expressions.expression import Expression
 
@@ -34,10 +36,10 @@ class Distribution(Expression):
         and the number is 10, then the data is distributed across 10 buckets."""
 
     @abstractmethod
-    def expressions(self) -> list[Expression]:
+    def expressions(self) -> List[Expression]:
         """Return The expressions passed to the distribution function."""
 
-    def children(self) -> list[Expression]:
+    def children(self) -> List[Expression]:
         """
         Returns the child expressions.
         """
