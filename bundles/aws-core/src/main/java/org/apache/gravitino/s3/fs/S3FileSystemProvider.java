@@ -19,12 +19,15 @@
 
 package org.apache.gravitino.s3.fs;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.storage.S3Properties;
@@ -77,20 +80,32 @@ public class S3FileSystemProvider implements FileSystemProvider {
     }
 
     Splitter splitter = Splitter.on(',').trimResults().omitEmptyStrings();
+    Joiner joiner = Joiner.on(",").skipNulls();
     // Split the list of providers
     List<String> providers = splitter.splitToList(provides);
+    List<String> validProviders = Lists.newArrayList();
 
     for (String provider : providers) {
       try {
-        Class.forName(provider);
+        Class<?> c = Class.forName(provider);
+        if (AWSCredentialsProvider.class.isAssignableFrom(c)) {
+          validProviders.add(provider);
+        } else {
+          LOGGER.warn(
+              "Credential provider {} is not a subclass of AWSCredentialsProvider, skipping",
+              provider);
+        }
       } catch (Exception e) {
         LOGGER.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
             provider);
-        // Set the S3_CREDENTIAL_KEY to the default provider
-        configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
-        return;
       }
+    }
+
+    if (validProviders.isEmpty()) {
+      configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+    } else {
+      configuration.set(S3_CREDENTIAL_KEY, joiner.join(validProviders));
     }
   }
 

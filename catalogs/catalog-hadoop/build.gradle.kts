@@ -82,8 +82,6 @@ dependencies {
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
 
-//  testImplementation(libs.guava)
-
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
 

@@ -22,9 +22,10 @@ Before running the Gravitino server, you need to put the following jars into the
 | S3           | AWS S3 storage.                                               | [gravitino-aws-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)       | 0.7.0-incubating |
 | GCS          | Google Cloud Storage.                                         | [gravitino-gcp-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)       | 0.7.0-incubating |
 | OSS          | Aliyun OSS storage.                                           | [gravitino-aliyun-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) | 0.7.0-incubating |
-| ABS          | Azure Blob Storage (aka. ABS, or Azure Data Lake Storage (v2) | [gravitino-azure-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)   | 0.7.0-incubating |
+| ABS          | Azure Blob Storage (aka. ABS, or Azure Data Lake Storage (v2) | [gravitino-azure-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)   | 0.8.0-incubating |
 
 After putting the jars into the fileset class path, you can start up the Gravitino server by running the following command:
+
 ```shell
 cd ${GRAVITINO_HOME}
 bin/gravitino.sh start
@@ -32,13 +33,25 @@ bin/gravitino.sh start
 
 ### Bundle jars
 
-`gravitino-{aws,gcp,aliyun,azure}-bundle` are the jars that contain the necessary classes to access the corresponding cloud storages, and it's compiled with Hadoop 3.3.1. Due to the compatibility issue, Those jars may not work 
-in the environment with Hadoop 2.x or below 3.3.1. In order to solve this issue, Gravitino also provide the `gravitino-{aws,gcp,aliyun,azure}-core` that do not contain the cloud storage classes, users can manually add the necessary jars to the classpath.
+`gravitino-{aws,gcp,aliyun,azure}-bundle` are the jars that contain the necessary classes to access the corresponding cloud storages, and it's compiled with Hadoop 3.3.1 and can work with hadoop 3.3.x. Due to the compatibility issue, Those jars may not work 
+in the environment with other hadoop versions. According to the tests conducted by Gravitino community. `hadoop-aws-3.3.1.jar` could not work with hadoop 3.4.x or above, nor could `hadoop-aws-3.4.x.jar` work with hadoop 3.3.0 or below. 
+
+In order to solve this issue, Gravitino also provide the `gravitino-{aws,gcp,aliyun,azure}-core` that do not contain the cloud storage classes, users can manually add the necessary jars to the classpath. The following table shows the corresponding jars for different hadoop versions:
 
 | Hadoop runtime version | S3                                                                                                                         | GCS                                                                                                | OSS                                                                                                                                 | ABS                                                                                                     |
 |------------------------|----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
 | 3.3.1+(including)      | gravitino-aws-bundle-{version}.jar                                                                                         | gravitino-gcp-bundle-{version}.jar                                                                 | gravitino-aliyun-bundle-{version}.jar                                                                                               | gravitino-azure-bundle-{version}.jar                                                                    |
 | 2.x, 3.3.1-            | gravitino-aws-core-{version}.jar, hadoop-aws-{hadoop-version}.jar, aws-sdk-java-{version} and other necessary dependencies | gravitino-gcp-core-{version}.jar, gcs-connector-{hadoop-version}.jar, other necessary dependencies | gravitino-aliyun-core-{version}.jar, hadoop-aliyun-{hadoop-version}.jar, aliyun-sdk-java-{version} and other necessary dependencies | gravitino-azure-core-{version}.jar, hadoop-azure-{hadoop-version}.jar, and other necessary dependencies |
+
+For `hadoop-aws`, `hadoop-azure` and `hadoop-aliyun` and related dependencies, you can get it from ${HADOOP_HOME}/share/hadoop/tools/lib/ directory.
+For `gcs-connector`, you can download it from the [GCS connector](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.22-shaded.jar) for hadoop2 or hadoop3. 
+
+If there still have some issues, please report it to the Gravitino community and create an issue. 
+
+:::note
+Gravitino server uses Hadoop 3.3.1, and you only need to put the corresponding bundle jars into the fileset class path. 
+:::
+
 
 ## Create filesets
 
@@ -526,8 +539,8 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
-If the Hadoop version is 3.3.1+, please copy the corresponding bundle jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory. For example, if you are using S3, you need to copy `gravitino-aws-bundle-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-If the version is below 3.3.1, for S3, GCS, OSS, please add all jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop class path or use the `hadoop fs` command with the `--jars` option to specify the necessary jars. For GCS, please download the corresponding the `gcs-connector-hadoop{2,3}-2.2.22-shaded.jar` from the [GCS connector](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.22-shaded.jar) and add it to the Hadoop class path. 
+If the Hadoop version is 3.3.x, please copy the corresponding bundle jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory. For example, if you are using S3, you need to copy `gravitino-aws-bundle-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+For other Hadoop versions, please add all jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop class path or use the `hadoop fs` command with the `--jars` option to specify the necessary jars if you are using S3, OSS, GCS, For GCS, please download the corresponding the `gcs-connector-hadoop{2,3}-2.2.22-shaded.jar` from the [GCS connector](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.22-shaded.jar) and add it to the Hadoop class path. 
 
 3. Run the following command to access the fileset:
 

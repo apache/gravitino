@@ -79,8 +79,10 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 | `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
 
 At the same time, you need to place the corresponding jar files in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`), things will be different according to the hadoop runtime version:
-- If your hadoop runtime version is 3.3.1 or later, we suggest you use the bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) which is built with hadoop 3.3.1 directly. The bundle jar contains `hadoop-aws`, `aws-java-sdk-bundle` and other dependencies except hadoop runtime that needed to run the S3 fileset. 
-- If your hadoop runtime is older than 3.3.1, you can put the mini jar [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-core/) and hadoop-aws jar and other necessary dependencies of the hadoop version in the classpath. In general, all the jars you need in `${HADOOP_HOME}/share/hadoop/tools/lib`, for s3, those files include `hadoop-aws`, `aws-java-sdk-bundle` and other possible dependencies.
+- If your hadoop runtime version is 3.3.1~3.3.6, we suggest you use the bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) which is built with hadoop 3.3.1 directly. The bundle jar contains `hadoop-aws`, `aws-java-sdk-bundle` and other dependencies except hadoop runtime that needed to run the S3 fileset. 
+- If your hadoop runtime is not in the range mentioned above, We suggest you put the mini jar [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-core/) and hadoop-aws jar and other necessary dependencies of the hadoop version in the classpath. In general, all the jars you need in `${HADOOP_HOME}/share/hadoop/tools/lib`, for s3, those files include `hadoop-aws`, `aws-java-sdk-bundle` and other possible dependencies.
+
+Things are similar for OSS, Azure Blob Storage, and GCS. for detail, please refer to [cloud storage fileset](./cloud-storage-fileset-example.md).
 
 #### GCS fileset
 
@@ -226,12 +228,12 @@ cp gravitino-filesystem-hadoop3-runtime-{version}.jar ${HADOOP_HOME}/share/hadoo
 kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
 
-# 4. Copy other depenedencies to the Hadoop environment if you want to access the S3 fileset via GVFS
-## For hadoop 3.3.1 or later, you can use the bundle jar. 
+# 4. Copy other dependencies to the Hadoop environment if you want to access the S3 fileset via GVFS
+## For hadoop 3.3.1 to 3.3.6, you can use the bundle jar. 
 cp bundles/aws-bundle/build/libs/gravitino-aws-bundle-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/
-## For hadoop version older than 3.3.1, you can use the mini jar.
+## For other hadoop version, you can use the mini jar.
 cp bundles/aws-core/build/libs/gravitino-aws-core-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/ 
-cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HADOOP_HOME}/share/hadoop/common/lib/
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HADOOP_HOME}/share/hadoop/common/lib/ 
 
 # 4. Try to list the fileset
 ./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/test_catalog/test_schema/test_fileset_1
@@ -251,8 +253,8 @@ has the `gravitino-filesystem-hadoop3-runtime-{version}.jar` dependency.
 </dependency>
 ```
 
-For S3, if the hadoop runtime version is 3.3.1 or later, you need to add [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) to the dependencies,
-and for the hadoop runtime version older than 3.3.1, you can use the mini jar [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-core/) and `hadoop-aws` jar and other necessary dependencies of the hadoop version.
+For S3, if the hadoop runtime version is 3.3.1 to 3.3.6, you need to add [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) to the dependencies,
+and for other hadoop runtime versions, you can use the mini jar [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-core/) and `hadoop-aws` jar and other necessary dependencies of the hadoop version.
 
 ```xml
 
@@ -311,8 +313,8 @@ fs.getFileStatus(filesetPath);
 
    If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
 
-   for S3, If the hadoop version in the Spark is 3.3.1 or higher, you need to add the bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) to the packages,
-    and for the hadoop version below 3.3.1, you can use the mini jar [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-core/) and `hadoop-aws` jar and other necessary dependencies of the hadoop version.
+   for S3, If the hadoop version in the Spark is 3.3.1 to 3.3.6, you need to add the bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) to the packages,
+    and for other hadoop versions, you can use the mini jar [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-core/) and `hadoop-aws` jar and other necessary dependencies of the hadoop version.
     
      ```shell
      ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:filesystem-hadoop3-runtime:${version},org.apache.gravitino:gravitino-aws-bundle:${version}
