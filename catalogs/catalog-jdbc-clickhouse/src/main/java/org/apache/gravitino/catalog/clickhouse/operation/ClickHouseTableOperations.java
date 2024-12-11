@@ -691,17 +691,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private StringBuilder appendColumnDefinition(
       JdbcColumn column, StringBuilder sqlBuilder, boolean isUpdateCol) {
-    // Add data type
-    sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
-    //     ck no support alter table with set nullable
+    // Add Nullable data type
+    String dataType=typeConverter.fromGravitino(column.dataType());
     if (!isUpdateCol) {
       if (column.nullable()) {
-        sqlBuilder.append("NULL ");
+        sqlBuilder.append(SPACE).append("Nullable(").append(dataType).append(")").append(SPACE);
       } else {
-        sqlBuilder.append("NOT NULL ");
+        sqlBuilder.append(SPACE).append(dataType).append(SPACE);
       }
     }
+    
+    //     ck no support alter table with set nullable
 
     // Add DEFAULT value if specified
     if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
