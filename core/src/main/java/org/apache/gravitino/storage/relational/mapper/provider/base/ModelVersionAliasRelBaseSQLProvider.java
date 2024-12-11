@@ -34,7 +34,11 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " (model_id, model_version, model_version_alias, deleted_at)"
         + " VALUES "
         + " <foreach collection='modelVersionAliasRel' item='item' separator=','>"
-        + " (#{item.modelId}, #{item.modelVersion}, #{item.modelVersionAlias},"
+        + " (#{item.modelId},"
+        + " (SELECT model_latest_version FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE model_id = #{item.modelId} AND deleted_at = 0),"
+        + " #{item.modelVersionAlias},"
         + " #{item.deletedAt})"
         + " </foreach>"
         + "</script>";

@@ -144,7 +144,7 @@ public class ModelVersionMetaService {
         ModelMetaService.getInstance()
             .getModelIdBySchemaIdAndModelName(schemaId, modelIdent.name());
 
-    ModelVersionPO.Builder builder = ModelVersionPO.builder();
+    ModelVersionPO.Builder builder = ModelVersionPO.builder().withModelId(modelId);
     ModelVersionPO modelVersionPO =
         POConverters.initializeModelVersionPO(modelVersionEntity, builder);
     List<ModelVersionAliasRelPO> aliasRelPOs =
@@ -155,7 +155,7 @@ public class ModelVersionMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
-                  mapper -> mapper.insertModelVersionMeta(modelId, modelVersionPO)),
+                  mapper -> mapper.insertModelVersionMeta(modelVersionPO)),
           () -> {
             if (aliasRelPOs.isEmpty()) {
               return;

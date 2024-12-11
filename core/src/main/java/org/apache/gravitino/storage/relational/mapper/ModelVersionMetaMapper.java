@@ -33,8 +33,7 @@ public interface ModelVersionMetaMapper {
   @InsertProvider(
       type = ModelVersionMetaSQLProviderFactory.class,
       method = "insertModelVersionMeta")
-  void insertModelVersionMeta(
-      @Param("modelId") Long modelId, @Param("modelVersionMeta") ModelVersionPO modelVersionPO);
+  void insertModelVersionMeta(@Param("modelVersionMeta") ModelVersionPO modelVersionPO);
 
   @SelectProvider(
       type = ModelVersionMetaSQLProviderFactory.class,
