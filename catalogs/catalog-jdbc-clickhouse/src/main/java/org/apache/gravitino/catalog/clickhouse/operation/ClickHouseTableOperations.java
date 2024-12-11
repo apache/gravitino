@@ -550,17 +550,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       columnDefinition.append(CLICKHOUSE_AUTO_INCREMENT).append(SPACE);
     }
 
-    // Append comment if available
-    if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
-    }
-
     // Append default value if available
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition
           .append("DEFAULT ")
           .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
           .append(SPACE);
+    }
+
+    //Append comment if available after default value
+    if (StringUtils.isNotEmpty(addColumn.getComment())) {
+      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
     // Append position if available
@@ -578,6 +578,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     } else {
       throw new IllegalArgumentException("Invalid column position.");
     }
+
     return columnDefinition.toString();
   }
 
