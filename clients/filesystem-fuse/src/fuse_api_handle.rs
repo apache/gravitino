@@ -153,10 +153,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         _umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
         let name = name.to_string_lossy();
-        let handle_id = self
-            .local_fs
-            .create_dir(parent, &name)
-            .await?;
+        let handle_id = self.local_fs.create_dir(parent, &name).await?;
         Ok(ReplyEntry {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
@@ -171,17 +168,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
     async fn unlink(&self, _req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
         let name = name.to_string_lossy();
-        self.local_fs
-            .remove_file(parent, &name)
-            .await?;
+        self.local_fs.remove_file(parent, &name).await?;
         Ok(())
     }
 
     async fn rmdir(&self, _req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
         let name = name.to_string_lossy();
-        self.local_fs
-            .remove_dir(parent, &name)
-            .await?;
+        self.local_fs.remove_dir(parent, &name).await?;
         Ok(())
     }
 
@@ -318,10 +311,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         flags: u32,
     ) -> fuse3::Result<ReplyCreated> {
         let name = name.to_string_lossy();
-        let file_handle = self
-            .local_fs
-            .create_file(parent, &name, flags)
-            .await?;
+        let file_handle = self.local_fs.create_file(parent, &name, flags).await?;
         Ok(ReplyCreated {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
