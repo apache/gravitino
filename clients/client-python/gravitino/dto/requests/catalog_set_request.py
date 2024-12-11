@@ -38,4 +38,4 @@ class CatalogSetRequest(RESTRequest):
             IllegalArgumentException if in_use is not set.
         """
         if self._in_use is None:
-            raise ValueError('"in_use" field is required and cannot be empty')
+            raise ValueError("The 'in_use' field is required to set the catalog status. Please specify whether the catalog is in use (True/False).")

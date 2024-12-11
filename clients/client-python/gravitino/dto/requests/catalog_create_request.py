@@ -63,7 +63,7 @@ class CatalogCreateRequest(RESTRequest):
             IllegalArgumentException if name or type are not set.
         """
         if not self._name:
-            raise ValueError('"name" field is required and cannot be empty')
+            raise ValueError('The catalog name is required. Please provide a valid name when creating the catalog.')
         if not self._type:
             raise ValueError('"catalog_type" field is required and cannot be empty')
         if not self._provider and not self._type.supports_managed_catalog:

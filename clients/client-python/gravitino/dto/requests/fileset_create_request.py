@@ -59,4 +59,4 @@ class FilesetCreateRequest(RESTRequest):
             IllegalArgumentException if the request is invalid.
         """
         if not self._name:
-            raise ValueError('"name" field is required and cannot be empty')
+            raise ValueError("The 'name' field is required. Please provide a valid name for the fileset.")

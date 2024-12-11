@@ -42,4 +42,4 @@ class SchemaCreateRequest(RESTRequest):
 
     def validate(self):
         if not self._name:
-            raise ValueError('"name" field is required and cannot be empty')
+            raise ValueError('"schema name" field is required and cannot be empty')

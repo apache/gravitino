@@ -38,4 +38,4 @@ class MetalakeSetRequest(RESTRequest):
             IllegalArgumentException if in_use is not set.
         """
         if self._in_use is None:
-            raise ValueError('"in_use" field is required and cannot be empty')
+            raise ValueError('"in_use" field is required (True/False) and cannot be empty')
