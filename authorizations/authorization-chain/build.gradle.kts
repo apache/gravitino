@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "authorization-ranger"
+description = "authorization-chain"
 
 plugins {
   `maven-publish`
@@ -28,8 +28,6 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark.get()
-val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
   implementation(project(":api")) {
@@ -38,9 +36,10 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
-  implementation(project(":catalogs:catalog-common")) {
+  implementation(project(":common")) {
     exclude(group = "*")
   }
+
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -50,8 +49,22 @@ dependencies {
   implementation(libs.javax.ws.rs.api)
   implementation(libs.jettison)
   compileOnly(libs.lombok)
-  implementation(libs.mail)
-  implementation(libs.ranger.intg) {
+  implementation(libs.rome)
+
+  testImplementation(project(":core", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":server"))
+  testImplementation(project(":catalogs:catalog-common"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":authorizations:authorization-ranger"))
+  testImplementation(project(":authorizations:authorization-ranger", "testArtifacts"))
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.testcontainers)
+  testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.ranger.intg) {
     exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
     exclude("org.apache.lucene")
@@ -67,20 +80,6 @@ dependencies {
     exclude("javax.ws.rs")
     exclude("org.eclipse.jetty")
   }
-  implementation(libs.rome)
-
-  testImplementation(project(":common"))
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":server"))
-
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.testcontainers)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-  testImplementation(libs.mysql.driver)
-  testImplementation(libs.postgresql.driver)
-  testImplementation(libs.postgresql.driver)
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
@@ -102,8 +101,6 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
 }
 
 tasks {
@@ -119,7 +116,7 @@ tasks {
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
     }
-    into("$rootDir/distribution/package/authorizations/ranger/libs")
+    into("$rootDir/distribution/package/authorizations/chain/libs")
   }
 
   register("copyLibAndConfig", Copy::class) {
@@ -132,10 +129,7 @@ tasks {
 }
 
 tasks.test {
-  doFirst {
-    environment("HADOOP_USER_NAME", "gravitino")
-  }
-  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars", ":catalogs:catalog-lakehouse-paimon:jar", ":catalogs:catalog-lakehouse-paimon:runtimeJars", ":authorizations:authorization-chain:jar", ":authorizations:authorization-chain:runtimeJars")
+  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":authorizations:authorization-ranger:jar", ":authorizations:authorization-ranger:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
@@ -144,17 +138,4 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
   }
-}
-
-val testJar by tasks.registering(Jar::class) {
-  archiveClassifier.set("tests")
-  from(sourceSets["test"].output)
-}
-
-configurations {
-  create("testArtifacts")
-}
-
-artifacts {
-  add("testArtifacts", testJar)
 }

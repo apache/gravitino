@@ -55,7 +55,7 @@ public class RangerITEnv {
   private static final Logger LOG = LoggerFactory.getLogger(RangerITEnv.class);
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
-  protected static final String RANGER_HIVE_REPO_NAME = "hiveDev";
+  public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";

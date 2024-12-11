@@ -24,8 +24,10 @@ import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
-import org.apache.gravitino.connector.authorization.mysql.TestMySQLAuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFS;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFSPlugin;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQL;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -35,7 +37,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestAuthorization {
   private static TestCatalog hiveCatalog;
-  private static TestCatalog mySQLCatalog;
+  private static TestCatalog filesetCatalog;
 
   @BeforeAll
   public static void setUp() throws Exception {
@@ -54,49 +56,53 @@ public class TestAuthorization {
 
     hiveCatalog =
         new TestCatalog()
-            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "ranger"))
+            .withCatalogConf(
+                ImmutableMap.of(
+                    Catalog.AUTHORIZATION_PROVIDER, TestRangerAuthorizationHadoopSQL.SHORT_NAME))
             .withCatalogEntity(hiveCatalogEntity);
     IsolatedClassLoader isolatedClassLoader =
         new IsolatedClassLoader(
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     hiveCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
 
-    CatalogEntity mySQLEntity =
+    CatalogEntity filesetEntity =
         CatalogEntity.builder()
             .withId(2L)
             .withName("catalog-test2")
             .withNamespace(Namespace.of("default"))
-            .withType(Catalog.Type.RELATIONAL)
+            .withType(Catalog.Type.FILESET)
             .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 
-    mySQLCatalog =
+    filesetCatalog =
         new TestCatalog()
-            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "mysql"))
-            .withCatalogEntity(mySQLEntity);
-    mySQLCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
+            .withCatalogConf(
+                ImmutableMap.of(
+                    Catalog.AUTHORIZATION_PROVIDER, TestRangerAuthorizationHDFS.SHORT_NAME))
+            .withCatalogEntity(filesetEntity);
+    filesetCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
   }
 
   @Test
-  public void testRangerAuthorization() {
-    AuthorizationPlugin rangerAuthPlugin = hiveCatalog.getAuthorizationPlugin();
-    Assertions.assertInstanceOf(TestRangerAuthorizationPlugin.class, rangerAuthPlugin);
-    TestRangerAuthorizationPlugin testRangerAuthPlugin =
-        (TestRangerAuthorizationPlugin) rangerAuthPlugin;
-    Assertions.assertFalse(testRangerAuthPlugin.callOnCreateRole1);
-    rangerAuthPlugin.onRoleCreated(null);
-    Assertions.assertTrue(testRangerAuthPlugin.callOnCreateRole1);
+  public void testRangerHadoopSQLAuthorization() {
+    AuthorizationPlugin rangerHiveAuthPlugin = hiveCatalog.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestRangerAuthorizationHadoopSQLPlugin.class, rangerHiveAuthPlugin);
+    TestRangerAuthorizationHadoopSQLPlugin testRangerAuthHadoopSQLPlugin =
+        (TestRangerAuthorizationHadoopSQLPlugin) rangerHiveAuthPlugin;
+    Assertions.assertFalse(testRangerAuthHadoopSQLPlugin.callOnCreateRole1);
+    rangerHiveAuthPlugin.onRoleCreated(null);
+    Assertions.assertTrue(testRangerAuthHadoopSQLPlugin.callOnCreateRole1);
   }
 
   @Test
-  public void testMySQLAuthorization() {
-    AuthorizationPlugin mySQLAuthPlugin = mySQLCatalog.getAuthorizationPlugin();
-    Assertions.assertInstanceOf(TestMySQLAuthorizationPlugin.class, mySQLAuthPlugin);
-    TestMySQLAuthorizationPlugin testMySQLAuthPlugin =
-        (TestMySQLAuthorizationPlugin) mySQLAuthPlugin;
-    Assertions.assertFalse(testMySQLAuthPlugin.callOnCreateRole2);
-    mySQLAuthPlugin.onRoleCreated(null);
-    Assertions.assertTrue(testMySQLAuthPlugin.callOnCreateRole2);
+  public void testRangerHDFSAuthorization() {
+    AuthorizationPlugin rangerHDFSAuthPlugin = filesetCatalog.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestRangerAuthorizationHDFSPlugin.class, rangerHDFSAuthPlugin);
+    TestRangerAuthorizationHDFSPlugin testRangerAuthHDFSPlugin =
+        (TestRangerAuthorizationHDFSPlugin) rangerHDFSAuthPlugin;
+    Assertions.assertFalse(testRangerAuthHDFSPlugin.callOnCreateRole2);
+    rangerHDFSAuthPlugin.onRoleCreated(null);
+    Assertions.assertTrue(testRangerAuthHDFSPlugin.callOnCreateRole2);
   }
 }

@@ -57,7 +57,7 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
-include("authorizations:authorization-ranger")
+include("authorizations:authorization-ranger", "authorizations:authorization-chain")
 include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")
 // kyuubi hive connector doesn't support 2.13 for Spark3.3
