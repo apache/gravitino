@@ -146,7 +146,7 @@ You can configure these properties in two ways:
     ```
    
 :::note
-If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle/mini jar in the Hadoop environment. 
+[If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle/core jar in the Hadoop environment. 
 For example, if you want to access the S3 fileset, you need to place the S3 bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) or
 [`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-mino/), and hadoop-aws jar and other necessary dependencies of the hadoop version in the classpath.
 it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`).
@@ -258,21 +258,20 @@ and for other hadoop runtime versions, you can use the mini jar [`gravitino-aws-
 
 ```xml
 
-<!-- Use the following one if the Hadoop version is 3.3.1 or newer -->
 <dependency>
   <groupId>org.apache.gravitino</groupId>
   <artifactId>filesystem-hadoop3-runtime</artifactId>
   <version>{gravitino-version}</version>
 </dependency>
 
-<!-- Use the following one if the Hadoop version below 3.3.1 -->
+<!-- Use the following one if the Hadoop version is 3.3.1 to 3.3.x -->
 <dependency>
   <groupId>org.apache.gravitino</groupId>
   <artifactId>gravitino-aws-bundle</artifactId>
   <version>{gravitino-version}</version>
 </dependency>
-
-  <!-- Use the following one if the Hadoop version below 3.3.1 -->
+  
+<!-- Use the following one if the Hadoop version is NOT 3.3.1 ~ 3.3.x -->
 <dependency>
   <groupId>org.apache.gravitino</groupId>
   <artifactId>gravitino-aws-core</artifactId>
