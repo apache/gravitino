@@ -27,6 +27,7 @@ import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
+import org.apache.gravitino.cli.commands.ColumnAudit;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.CreateGroup;
@@ -515,6 +516,17 @@ public class TestableCommandLine {
   protected UntagEntity newUntagEntity(
       String url, boolean ignore, String metalake, FullName name, String[] tags) {
     return new UntagEntity(url, ignore, metalake, name, tags);
+  }
+
+  protected ColumnAudit newColumnAudit(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column) {
+    return new ColumnAudit(url, ignore, metalake, catalog, schema, table, column);
   }
 
   protected ListColumns newListColumns(
