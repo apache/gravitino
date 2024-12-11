@@ -39,10 +39,12 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
         rest_client: HTTPClient,
     ):
         self._rest_client = rest_client
-        t = metadata_object.type().value
-        name = metadata_object.name()
+        metadata_object_type = metadata_object.type().value
+        metadata_object_name = metadata_object.name()
         self._request_path = (
-            f"api/metalakes/{metalake_name}/objects/{t}/{name}/credentials"
+            f"api/metalakes/{metalake_name}"
+            f"/objects/{metadata_object_type}/"
+            f"{metadata_object_name}/credentials"
         )
 
     def get_credentials(self) -> List[Credential]:
