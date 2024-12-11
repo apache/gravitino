@@ -26,8 +26,8 @@ import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 
-/** The helper class for {@link RangerSecurableObject}. */
-public class RangerSecurableObject extends RangerMetadataObject
+/** The helper class for {@link RangerHadoopSQLSecurableObject}. */
+public class RangerHadoopSQLSecurableObject extends RangerHadoopSQLMetadataObject
     implements AuthorizationSecurableObject {
   private final List<AuthorizationPrivilege> privileges;
 
@@ -38,7 +38,7 @@ public class RangerSecurableObject extends RangerMetadataObject
    * @param name The name of the metadata object
    * @param type The type of the metadata object
    */
-  public RangerSecurableObject(
+  public RangerHadoopSQLSecurableObject(
       String parent,
       String name,
       AuthorizationMetadataObject.Type type,
