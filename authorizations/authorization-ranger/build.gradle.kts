@@ -131,9 +131,10 @@ tasks {
 
 tasks.test {
   doFirst {
+    environment("GRAVITINO_TEST", "true")
     environment("HADOOP_USER_NAME", "gravitino")
   }
-  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars", ":catalogs:catalog-lakehouse-paimon:jar", ":catalogs:catalog-lakehouse-paimon:runtimeJars")
+  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars", ":catalogs:catalog-lakehouse-paimon:jar", ":catalogs:catalog-lakehouse-paimon:runtimeJars", ":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {

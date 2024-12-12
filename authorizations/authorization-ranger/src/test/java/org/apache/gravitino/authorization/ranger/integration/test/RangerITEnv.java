@@ -110,7 +110,7 @@ public class RangerITEnv {
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
 
     rangerAuthHDFSPlugin =
-        RangerAuthorizationHDFSPlugin.getInstanceForTest(
+        RangerAuthorizationHDFSPlugin.getInstance(
             "metalake",
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
