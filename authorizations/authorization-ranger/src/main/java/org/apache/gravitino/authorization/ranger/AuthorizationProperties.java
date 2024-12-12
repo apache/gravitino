@@ -16,26 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.ranger;
+package org.apache.gravitino.authorization.ranger;
 
 import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthorization> {
+public interface AuthorizationProperties {
+  /** The `Prefix.Wildcard` properties segment name */
+  void validateProperties(Map<String, String> properties);
 
-  public TestRangerAuthorization() {}
-
-  public static String SHORT_NAME = "ranger";
-
-  @Override
-  public String shortName() {
-    return SHORT_NAME;
-  }
-
-  @Override
-  protected AuthorizationPlugin newPlugin(
-      String metalake, String catalogProvider, Map<String, String> config) {
-    return new TestRangerAuthorizationPlugin();
+  static void validate(
+      Class<? extends AuthorizationProperties> authPropertiesClass,
+      Map<String, String> properties) {
+    try {
+      AuthorizationProperties authorizationProperties =
+          authPropertiesClass.getDeclaredConstructor().newInstance();
+      authorizationProperties.validateProperties(properties);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalArgumentException("Failed to instantiate AuthorizationProperties class", e);
+    }
   }
 }
