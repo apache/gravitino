@@ -61,6 +61,10 @@ class NoSuchFilesetException(NotFoundException):
     """Exception thrown when a file with specified name is not existed."""
 
 
+class NoSuchCredentialException(NotFoundException):
+    """Exception thrown when a credential with specified credential type is not existed."""
+
+
 class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
 
@@ -135,3 +139,7 @@ class UnauthorizedException(GravitinoRuntimeException):
 
 class BadRequestException(GravitinoRuntimeException):
     """An exception thrown when the request is invalid."""
+
+
+class IllegalStateException(GravitinoRuntimeException):
+    """An exception thrown when the state is invalid."""

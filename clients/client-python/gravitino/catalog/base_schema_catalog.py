@@ -19,9 +19,14 @@ import logging
 from typing import Dict, List
 
 from gravitino.api.catalog import Catalog
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.supports_schemas import SupportsSchemas
+from gravitino.client.metadata_object_credential_operations import (
+    MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_impl import MetadataObjectImpl
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.requests.schema_create_request import SchemaCreateRequest
@@ -52,6 +57,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     # The namespace of current catalog, which is the metalake name.
     _catalog_namespace: Namespace
 
+    # The metadata object credential operations
+    _object_credential_operations: MetadataObjectCredentialOperations
+
     def __init__(
         self,
         catalog_namespace: Namespace,
@@ -73,6 +81,11 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         )
         self.rest_client = rest_client
         self._catalog_namespace = catalog_namespace
+
+        metadata_object = MetadataObjectImpl([name], MetadataObject.Type.CATALOG)
+        self._object_credential_operations = MetadataObjectCredentialOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
 
         self.validate()
 
