@@ -179,6 +179,40 @@ public class TableFormatOutputIT extends BaseIT {
   }
 
   @Test
+  public void testCatalogDetailsCommand() {
+    // Create a byte array output stream to capture the output of the command
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    PrintStream originalOut = System.out;
+    System.setOut(new PrintStream(outputStream));
+
+    String[] args = {
+      "catalog",
+      "details",
+      commandArg(GravitinoOptions.METALAKE),
+      "my_metalake",
+      commandArg(GravitinoOptions.NAME),
+      "postgres",
+      commandArg(GravitinoOptions.OUTPUT),
+      "table",
+      commandArg(GravitinoOptions.URL),
+      gravitinoUrl
+    };
+    Main.main(args);
+
+    // Restore the original System.out
+    System.setOut(originalOut);
+    // Get the output and verify it
+    String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        "+----------+------------+-----------------+---------+\n"
+            + "| catalog  | type       | provider        | comment |\n"
+            + "+----------+------------+-----------------+---------+\n"
+            + "| postgres | RELATIONAL | jdbc-postgresql | null    |\n"
+            + "+----------+------------+-----------------+---------+",
+        output);
+  }
+
+  @Test
   public void testCatalogDetailsCommandFullCornerCharacter() {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintStream originalOut = System.out;
