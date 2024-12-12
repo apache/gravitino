@@ -132,7 +132,6 @@ tasks {
 tasks.test {
   doFirst {
     environment("HADOOP_USER_NAME", "gravitino")
-    environment("GRAVITINO_TEST", "true")
   }
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars", ":catalogs:catalog-lakehouse-paimon:jar", ":catalogs:catalog-lakehouse-paimon:runtimeJars")
 
