@@ -25,12 +25,12 @@ import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 
-public class RangerHDFSSecurableObject extends RangerHDFSMetadataObject
+public class RangerPathBaseSecurableObject extends RangerPathBaseMetadataObject
     implements AuthorizationSecurableObject {
 
   private final List<AuthorizationPrivilege> privileges;
 
-  public RangerHDFSSecurableObject(
+  public RangerPathBaseSecurableObject(
       String path, AuthorizationMetadataObject.Type type, Set<AuthorizationPrivilege> privileges) {
     super(path, type);
     this.privileges = ImmutableList.copyOf(privileges);

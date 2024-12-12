@@ -113,9 +113,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       AuthorizationMetadataObject.Type type,
       Set<AuthorizationPrivilege> privileges) {
     AuthorizationMetadataObject authMetadataObject =
-        new RangerHDFSMetadataObject(AuthorizationMetadataObject.getLastName(names), type);
+        new RangerPathBaseMetadataObject(AuthorizationMetadataObject.getLastName(names), type);
     authMetadataObject.validateAuthorizationMetadataObject();
-    return new RangerHDFSSecurableObject(
+    return new RangerPathBaseSecurableObject(
         authMetadataObject.name(), authMetadataObject.type(), privileges);
   }
 
@@ -170,7 +170,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               translateMetadataObject(securableObject).names(),
-                              RangerHDFSMetadataObject.Type.PATH,
+                              RangerPathBaseMetadataObject.Type.PATH,
                               rangerPrivileges));
                       break;
                     default:
@@ -202,7 +202,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 translateMetadataObject(gravitinoMetadataObject).names(),
-                RangerHDFSMetadataObject.Type.PATH,
+                RangerPathBaseMetadataObject.Type.PATH,
                 ownerMappingRule()));
         break;
       default:
@@ -227,13 +227,13 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
 
     if (metadataObject.type() == MetadataObject.Type.FILESET) {
-      RangerHDFSMetadataObject rangerHDFSMetadataObject =
-          new RangerHDFSMetadataObject(
-              getFileSetPath(metadataObject), RangerHDFSMetadataObject.Type.PATH);
+      RangerPathBaseMetadataObject rangerHDFSMetadataObject =
+          new RangerPathBaseMetadataObject(
+              getFileSetPath(metadataObject), RangerPathBaseMetadataObject.Type.PATH);
       rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
       return rangerHDFSMetadataObject;
     } else {
-      return new RangerHDFSMetadataObject("", RangerHDFSMetadataObject.Type.PATH);
+      return new RangerPathBaseMetadataObject("", RangerPathBaseMetadataObject.Type.PATH);
     }
   }
 
