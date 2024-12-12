@@ -56,19 +56,19 @@ public class RangerAuthorizationHDFSPluginIT {
     MetadataObject metalake =
         MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        RangerHDFSMetadataObject.Type.SCHEMA_PATH,
+        RangerHDFSMetadataObject.Type.PATH,
         rangerAuthPlugin.translateMetadataObject(metalake).type());
 
     MetadataObject catalog =
         MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
     Assertions.assertEquals(
-        RangerHDFSMetadataObject.Type.SCHEMA_PATH,
+        RangerHDFSMetadataObject.Type.PATH,
         rangerAuthPlugin.translateMetadataObject(catalog).type());
 
     MetadataObject schema =
         MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
-        RangerHDFSMetadataObject.Type.SCHEMA_PATH,
+        RangerHDFSMetadataObject.Type.PATH,
         rangerAuthPlugin.translateMetadataObject(schema).type());
 
     MetadataObject table =

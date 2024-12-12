@@ -233,14 +233,13 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
       return rangerHDFSMetadataObject;
     } else {
-      return new RangerHDFSMetadataObject("", RangerHDFSMetadataObject.Type.SCHEMA_PATH);
+      return new RangerHDFSMetadataObject("", RangerHDFSMetadataObject.Type.PATH);
     }
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
     FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
-    boolean testEnv =
-        System.getenv("GRAVITINO_TEST") != null || System.getenv("GRAVITINO_TEST_CLOUD_IT") == null;
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
     if (filesetDispatcher == null && testEnv) {
       return "/test";
     }

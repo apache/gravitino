@@ -50,6 +50,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.file.Fileset;
@@ -166,7 +167,12 @@ public class RangerFilesetIT extends BaseIT {
             .filter(item -> item.getRoles().contains(RangerHelper.GRAVITINO_OWNER_ROLE))
             .filter(
                 item ->
-                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+                    item.getAccesses().stream()
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.READ.getName())))
             .count());
     Assertions.assertEquals(
         1,
@@ -175,7 +181,11 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("write")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.WRITE.getName())))
             .count());
     Assertions.assertEquals(
         1,
@@ -184,7 +194,12 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("execute")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(
+                                        RangerPrivileges.RangerHdfsPrivilege.EXECUTE.getName())))
             .count());
 
     String filesetRole = currentFunName();
@@ -206,7 +221,12 @@ public class RangerFilesetIT extends BaseIT {
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
             .filter(
                 item ->
-                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+                    item.getAccesses().stream()
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.READ.getName())))
             .count());
     Assertions.assertEquals(
         0,
@@ -217,7 +237,11 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("write")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.WRITE.getName())))
             .count());
     Assertions.assertEquals(
         1,
@@ -228,7 +252,12 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("execute")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(
+                                        RangerPrivileges.RangerHdfsPrivilege.EXECUTE.getName())))
             .count());
 
     metalake.grantPrivilegesToRole(
@@ -250,7 +279,12 @@ public class RangerFilesetIT extends BaseIT {
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
             .filter(
                 item ->
-                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+                    item.getAccesses().stream()
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.READ.getName())))
             .count());
     Assertions.assertEquals(
         1,
@@ -261,7 +295,11 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("write")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.WRITE.getName())))
             .count());
     Assertions.assertEquals(
         1,
@@ -272,7 +310,12 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("execute")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(
+                                        RangerPrivileges.RangerHdfsPrivilege.EXECUTE.getName())))
             .count());
 
     metalake.revokePrivilegesFromRole(
@@ -293,7 +336,12 @@ public class RangerFilesetIT extends BaseIT {
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
             .filter(
                 item ->
-                    item.getAccesses().stream().anyMatch(access -> access.getType().equals("read")))
+                    item.getAccesses().stream()
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.READ.getName())))
             .count());
     Assertions.assertEquals(
         0,
@@ -304,7 +352,11 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("write")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(RangerPrivileges.RangerHdfsPrivilege.WRITE.getName())))
             .count());
     Assertions.assertEquals(
         0,
@@ -315,7 +367,12 @@ public class RangerFilesetIT extends BaseIT {
             .filter(
                 item ->
                     item.getAccesses().stream()
-                        .anyMatch(access -> access.getType().equals("execute")))
+                        .anyMatch(
+                            access ->
+                                access
+                                    .getType()
+                                    .equals(
+                                        RangerPrivileges.RangerHdfsPrivilege.EXECUTE.getName())))
             .count());
 
     catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, fileset.name()));
@@ -375,7 +432,7 @@ public class RangerFilesetIT extends BaseIT {
             Lists.newArrayList(Privileges.ReadFileset.allow()));
     metalake.createRole(filesetRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
     metalake.grantRolesToUser(Lists.newArrayList(filesetRole), userName);
-    waitForUpdatingPolicies();
+    RangerBaseE2EIT.waitForUpdatingPolicies();
 
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
         .doAs(
@@ -408,7 +465,7 @@ public class RangerFilesetIT extends BaseIT {
             MetadataObject.Type.FILESET);
     metalake.grantPrivilegesToRole(
         filesetRole, filesetObject, Lists.newArrayList(Privileges.WriteFileset.allow()));
-    waitForUpdatingPolicies();
+    RangerBaseE2EIT.waitForUpdatingPolicies();
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
         .doAs(
             (PrivilegedExceptionAction<Void>)
@@ -436,7 +493,7 @@ public class RangerFilesetIT extends BaseIT {
         filesetRole,
         filesetObject,
         Lists.newArrayList(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
-    waitForUpdatingPolicies();
+    RangerBaseE2EIT.waitForUpdatingPolicies();
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
         .doAs(
             (PrivilegedExceptionAction<Void>)
@@ -515,22 +572,7 @@ public class RangerFilesetIT extends BaseIT {
     return defaultBaseLocation;
   }
 
-  private Fileset createFileset(String filesetName, Fileset.Type type, String storageLocation) {
-    return catalog
-        .asFilesetCatalog()
-        .createFileset(
-            NameIdentifier.of(schemaName, filesetName), "comment", type, storageLocation, null);
-  }
-
   private String storageLocation(String filesetName) {
     return defaultBaseLocation() + "/" + filesetName;
-  }
-
-  private void waitForUpdatingPolicies() throws InterruptedException {
-    // After Ranger authorization, Must wait a period of time for the Ranger Spark plugin to update
-    // the policy Sleep time must be greater than the policy update interval
-    // (ranger.plugin.spark.policy.pollIntervalMs) in the
-    // `resources/ranger-spark-security.xml.template`
-    Thread.sleep(1000L);
   }
 }
