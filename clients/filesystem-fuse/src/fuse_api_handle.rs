@@ -52,18 +52,18 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         }
     }
 
-    pub async fn get_file_path(&self, inode: u64) -> String {
-        self.local_fs.get_file_path(inode).await
+    pub async fn get_file_path(&self, file_id: u64) -> String {
+        self.local_fs.get_file_path(file_id).await
     }
 
     async fn get_modified_file_stat(
         &self,
-        inode: u64,
+        file_id: u64,
         size: Option<u64>,
         atime: Option<Timestamp>,
         mtime: Option<Timestamp>,
     ) -> Result<FileStat, Errno> {
-        let mut file_stat = self.local_fs.stat(inode).await?;
+        let mut file_stat = self.local_fs.stat(file_id).await?;
 
         if let Some(size) = size {
             file_stat.size = size;
@@ -265,7 +265,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         let entries_stream =
             stream::iter(files.into_iter().enumerate().map(|(index, file_stat)| {
                 Ok(DirectoryEntry {
-                    inode: file_stat.inode,
+                    inode: file_stat.file_id,
                     name: file_stat.name.clone().into(),
                     kind: file_stat.kind,
                     offset: (index + 3) as i64,
@@ -274,13 +274,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
         let relative_paths = stream::iter([
             Ok(DirectoryEntry {
-                inode: current.inode,
+                inode: current.file_id,
                 name: ".".into(),
                 kind: Directory,
                 offset: 1,
             }),
             Ok(DirectoryEntry {
-                inode: current.parent_inode,
+                inode: current.parent_file_id,
                 name: "..".into(),
                 kind: Directory,
                 offset: 2,
@@ -346,7 +346,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         let entries_stream =
             stream::iter(files.into_iter().enumerate().map(|(index, file_stat)| {
                 Ok(DirectoryEntryPlus {
-                    inode: file_stat.inode,
+                    inode: file_stat.file_id,
                     name: file_stat.name.clone().into(),
                     kind: file_stat.kind,
                     offset: (index + 3) as i64,
@@ -359,7 +359,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
         let relative_paths = stream::iter([
             Ok(DirectoryEntryPlus {
-                inode: current.inode,
+                inode: current.file_id,
                 name: OsString::from("."),
                 kind: Directory,
                 offset: 1,
@@ -369,12 +369,12 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
                 attr_ttl: self.default_ttl,
             }),
             Ok(DirectoryEntryPlus {
-                inode: current.parent_inode,
+                inode: current.parent_file_id,
                 name: OsString::from(".."),
                 kind: Directory,
                 offset: 2,
                 attr: dummy_file_attr(
-                    current.parent_inode,
+                    current.parent_file_id,
                     Directory,
                     Timestamp::from(SystemTime::now()),
                     &self.fs_context,
@@ -394,7 +394,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
 const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
     FileAttr {
-        ino: file_st.inode,
+        ino: file_st.file_id,
         size: file_st.size,
         blocks: (file_st.size + context.block_size as u64 - 1) / context.block_size as u64,
         atime: file_st.atime,
@@ -415,7 +415,7 @@ const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> 
 }
 
 const fn dummy_file_attr(
-    inode: u64,
+    file_id: u64,
     kind: FileType,
     now: Timestamp,
     context: &FileSystemContext,
@@ -425,7 +425,7 @@ const fn dummy_file_attr(
         _ => context.default_file_perm,
     };
     FileAttr {
-        ino: inode,
+        ino: file_id,
         size: 0,
         blocks: 1,
         atime: now,

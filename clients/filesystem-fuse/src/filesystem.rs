@@ -26,8 +26,9 @@ pub(crate) type Result<T> = std::result::Result<T, Errno>;
 /// it ues the file id to operate the file system apis
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system,
 /// it is used to identify the file or directory
-/// the `fh` it is the file handle, it is used to identify the opened file,
+/// the `handle_id` it is the file handle, it is used to identify the opened file,
 /// it is used to read or write the file content
+/// the `file id` and `handle_id` need to mapping the `ino`/`inode` and `fh` in the fuse3
 #[async_trait]
 pub(crate) trait RawFileSystem: Send + Sync {
     /// Init the file system
@@ -152,24 +153,14 @@ impl FileSystemContext {
     }
 }
 
-// FileHandle is the file handle for the opened file.
-pub(crate) struct FileHandle {
-    pub(crate) file_id: u64,
-
-    pub(crate) handle_id: u64,
-}
-
-// OpenFileFlags is the open file flags for the file system.
-pub struct OpenFileFlags(u32);
-
 // FileStat is the file stat for the file system.
 #[derive(Clone, Debug)]
 pub struct FileStat {
-    // inode id for the file system, also call file id
-    pub(crate) inode: u64,
+    // file id for the file system.
+    pub(crate) file_id: u64,
 
-    // parent inode id
-    pub(crate) parent_inode: u64,
+    // parent file id
+    pub(crate) parent_file_id: u64,
 
     // file name
     pub(crate) name: String,
@@ -209,6 +200,16 @@ pub(crate) struct OpenedFile {
 
     pub writer: Option<Box<dyn FileWriter>>,
 }
+
+// FileHandle is the file handle for the opened file.
+pub(crate) struct FileHandle {
+    pub(crate) file_id: u64,
+
+    pub(crate) handle_id: u64,
+}
+
+// OpenFileFlags is the open file flags for the file system.
+pub struct OpenFileFlags(u32);
 
 /// File reader interface  for read file content
 #[async_trait]
