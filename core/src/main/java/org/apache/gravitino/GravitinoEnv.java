@@ -260,6 +260,11 @@ public class GravitinoEnv {
     return metalakeDispatcher;
   }
 
+  /**
+   * Get the {@link CredentialOperationDispatcher} associated with the Gravitino environment.
+   *
+   * @return The {@link CredentialOperationDispatcher} instance.
+   */
   public CredentialOperationDispatcher credentialOperationDispatcher() {
     return credentialOperationDispatcher;
   }

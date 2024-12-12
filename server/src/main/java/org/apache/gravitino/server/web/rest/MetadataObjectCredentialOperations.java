@@ -29,7 +29,6 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
@@ -37,11 +36,9 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.NoSuchCredentialException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -54,7 +51,6 @@ public class MetadataObjectCredentialOperations {
   private static final Logger LOG =
       LoggerFactory.getLogger(MetadataObjectCredentialOperations.class);
 
-  @SuppressWarnings("unused")
   private CredentialOperationDispatcher dispatcher;
 
   @SuppressWarnings("unused")
@@ -67,25 +63,15 @@ public class MetadataObjectCredentialOperations {
   }
 
   @GET
-  @Path("hello")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-credential." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-credential", absolute = true)
-  public Response getStaticCredential(
-      @PathParam("metalake") String metalake, @QueryParam("num") int num) {
-    return Utils.ok(getCredentialResponse(num));
-  }
-
-  @GET
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-credential." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-credential", absolute = true)
+  @Timed(name = "get-credentials." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-credentials", absolute = true)
   public Response getCredentials(
       @PathParam("metalake") String metalake,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName) {
     LOG.info(
-        "Received get credential request for object type: {}, full name: {} under metalake: {}",
+        "Received get credentials request for object type: {}, full name: {} under metalake: {}",
         type,
         fullName,
         metalake);
@@ -99,7 +85,7 @@ public class MetadataObjectCredentialOperations {
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-            List<Credential> credentials = getCredentials(identifier);
+            List<Credential> credentials = dispatcher.getCredentials(identifier);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
             }
@@ -110,23 +96,5 @@ public class MetadataObjectCredentialOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleCredentialException(OperationType.GET, "", fullName, e);
     }
-  }
-
-  private CredentialResponse getCredentialResponse(int num) {
-    if (num == 0) {
-      return new CredentialResponse(new CredentialDTO[0]);
-    } else if (num > 0) {
-      return new CredentialResponse(DTOConverters.toDTO(new Credential[] {getS3Credential()}));
-    } else {
-      throw new NoSuchCredentialException("no such credential");
-    }
-  }
-
-  private Credential getS3Credential() {
-    return new S3TokenCredential("access-id", "secret-key", "token", 1000);
-  }
-
-  private List<Credential> getCredentials(NameIdentifier identifier) {
-    return dispatcher.getCredentials(identifier);
   }
 }

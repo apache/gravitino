@@ -20,17 +20,16 @@
 package org.apache.gravitino.catalog;
 
 import java.util.List;
-import javax.ws.rs.NotSupportedException;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.SupportsCredentialOperations;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
+/** Get credentials with the specific catalog classloader. */
 public class CredentialOperationDispatcher extends OperationDispatcher {
 
   public CredentialOperationDispatcher(
@@ -46,13 +45,9 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   }
 
   private List<Credential> loadCredentials(BaseCatalog catalog, NameIdentifier identifier) {
-    CatalogOperations catalogOperations = catalog.ops();
-    if (!(catalogOperations instanceof SupportsCredentialOperations)) {
-      throw new NotSupportedException("Not support credential vending for the catalog");
-    }
-    SupportsCredentialOperations supportsCredentialOperation =
-        (SupportsCredentialOperations) catalogOperations;
-
-    return supportsCredentialOperation.getCredentials(identifier);
+    throw new NotImplementedException(
+        String.format(
+            "Load credentials is not implemented for catalog: %s, identifier: %s",
+            catalog.name(), identifier));
   }
 }
