@@ -328,9 +328,11 @@ public abstract class RangerAuthorizationPlugin
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
-        AuthorizationMetadataObject AuthorizationMetadataObject =
-            translateMetadataObject(metadataObject);
-        doRemoveMetadataObject(AuthorizationMetadataObject);
+        if (metadataObject.type() != MetadataObject.Type.FILESET) {
+          AuthorizationMetadataObject AuthorizationMetadataObject =
+              translateMetadataObject(metadataObject);
+          doRemoveMetadataObject(AuthorizationMetadataObject);
+        }
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
