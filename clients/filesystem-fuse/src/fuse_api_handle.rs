@@ -41,13 +41,13 @@ pub(crate) struct FuseApiHandle<T: RawFileSystem> {
 }
 
 impl<T: RawFileSystem> FuseApiHandle<T> {
-    const DEFAULT_TTL: Duration = Duration::from_secs(1);
-    const DEFAULT_MAX_WRITE: u32 = 16 * 1024;
+    const DEFAULT_ATTR_TTL: Duration = Duration::from_secs(1);
+    const DEFAULT_MAX_WRITE_SIZE: u32 = 16 * 1024;
 
     pub fn new(fs: T, context: FileSystemContext) -> Self {
         Self {
             local_fs: fs,
-            default_ttl: Self::DEFAULT_TTL,
+            default_ttl: Self::DEFAULT_ATTR_TTL,
             fs_context: context,
         }
     }
@@ -85,7 +85,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     async fn init(&self, _req: Request) -> fuse3::Result<ReplyInit> {
         self.local_fs.init().await;
         Ok(ReplyInit {
-            max_write: NonZeroU32::new(Self::DEFAULT_MAX_WRITE).unwrap(),
+            max_write: NonZeroU32::new(Self::DEFAULT_MAX_WRITE_SIZE).unwrap(),
         })
     }
 
@@ -115,7 +115,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         fh: Option<u64>,
         _flags: u32,
     ) -> fuse3::Result<ReplyAttr> {
-        // check the opened file inode is the same as the inode
+        // check the opened file file_id is the same as the inode
         if let Some(fh) = fh {
             self.local_fs.valid_file_id(inode, fh).await?;
         }
@@ -131,9 +131,14 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         &self,
         _req: Request,
         inode: Inode,
-        _fh: Option<u64>,
+        fh: Option<u64>,
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
+        // check the opened file file_id is the same as the inode
+        if let Some(fh) = fh {
+            self.local_fs.valid_file_id(inode, fh).await?;
+        }
+
         let new_file_stat = self
             .get_modified_file_stat(inode, set_attr.size, set_attr.atime, set_attr.mtime)
             .await?;
@@ -287,6 +292,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
             }),
         ]);
 
+        //TODO Need to improve the read dir operation
         let combined_stream = relative_paths.chain(entries_stream);
         Ok(ReplyDirectory {
             entries: combined_stream.skip(offset as usize).boxed(),
@@ -385,6 +391,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
             }),
         ]);
 
+        //TODO Need to improve the read dir operation
         let combined_stream = relative_paths.chain(entries_stream);
         Ok(ReplyDirectoryPlus {
             entries: combined_stream.skip(offset as usize).boxed(),
@@ -444,5 +451,57 @@ const fn dummy_file_attr(
         crtime: now,
         #[cfg(target_os = "macos")]
         flags: 0,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::filesystem::{FileStat, FileSystemContext};
+    use crate::fuse_api_handle::fstat_to_file_attr;
+    use fuse3::{FileType, Timestamp};
+
+    #[test]
+    fn test_fstat_to_file_attr() {
+        let file_stat = FileStat {
+            file_id: 1,
+            parent_file_id: 3,
+            name: "test".to_string(),
+            path: "".to_string(),
+            size: 10032,
+            kind: FileType::RegularFile,
+            perm: 0,
+            atime: Timestamp { sec: 10, nsec: 3 },
+            mtime: Timestamp { sec: 12, nsec: 5 },
+            ctime: Timestamp { sec: 15, nsec: 7 },
+            nlink: 0,
+        };
+
+        let context = FileSystemContext {
+            uid: 1,
+            gid: 2,
+            default_file_perm: 0o644,
+            default_dir_perm: 0o755,
+            block_size: 4 * 1024,
+        };
+
+        let file_attr = fstat_to_file_attr(&file_stat, &context);
+
+        assert_eq!(file_attr.ino, 1);
+        assert_eq!(file_attr.size, 10032);
+        assert_eq!(file_attr.blocks, 3);
+        assert_eq!(file_attr.atime, Timestamp { sec: 10, nsec: 3 });
+        assert_eq!(file_attr.mtime, Timestamp { sec: 12, nsec: 5 });
+        assert_eq!(file_attr.ctime, Timestamp { sec: 15, nsec: 7 });
+        assert_eq!(file_attr.kind, FileType::RegularFile);
+        assert_eq!(file_attr.perm, 0);
+        assert_eq!(file_attr.nlink, 0);
+        assert_eq!(file_attr.uid, 1);
+        assert_eq!(file_attr.gid, 2);
+        assert_eq!(file_attr.rdev, 0);
+        assert_eq!(file_attr.blksize, 4 * 1024);
+        #[cfg(target_os = "macos")]
+        assert_eq!(file_attr.crtime, Timestamp { sec: 15, nsec: 7 });
+        #[cfg(target_os = "macos")]
+        assert_eq!(file_attr.flags, 0);
     }
 }

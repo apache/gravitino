@@ -25,7 +25,7 @@ jobs:
               - .github/**
               - api/**
               - bin/**
-              - catalogs/**
+              - catalogs/hadoop/**
               - clients/filesystem-fuse/**
               - common/**
               - conf/**
