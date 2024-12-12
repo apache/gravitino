@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: trino-connector-integrate-test-reports-${{ matrix.java-version }}
+          name: Gvfs-fuse integrate-test-reports-${{ matrix.java-version }}
           path: |
             clients/filesystem-fuse/build/test/log/*.log
 
