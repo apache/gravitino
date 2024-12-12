@@ -47,12 +47,22 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
     return false;
   }
 
+  @Override
+  protected String getProvider() {
+    return "lakehouse-paimon";
+  }
+
+  @Override
+  protected boolean dropCascade() {
+    return true;
+  }
+
   protected Catalog currentCatalog() {
     return catalog;
   }
 
   @BeforeAll
-  static void setup() {
+  void setup() {
     initPaimonCatalog();
   }
 
@@ -62,13 +72,13 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
     metalake.dropCatalog(DEFAULT_PAIMON_CATALOG, true);
   }
 
-  private static void initPaimonCatalog() {
+  private void initPaimonCatalog() {
     Preconditions.checkNotNull(metalake);
     catalog =
         metalake.createCatalog(
             DEFAULT_PAIMON_CATALOG,
             org.apache.gravitino.Catalog.Type.RELATIONAL,
-            "lakehouse-paimon",
+            getProvider(),
             null,
             ImmutableMap.of(
                 PaimonConstants.CATALOG_BACKEND,
