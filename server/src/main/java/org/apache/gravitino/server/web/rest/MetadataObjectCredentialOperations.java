@@ -94,7 +94,7 @@ public class MetadataObjectCredentialOperations {
                     DTOConverters.toDTO(credentials.toArray(new Credential[credentials.size()]))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleCredentialException(OperationType.GET, "", fullName, e);
+      return ExceptionHandlers.handleCredentialException(OperationType.GET, fullName, e);
     }
   }
 }

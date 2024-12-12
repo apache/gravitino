@@ -122,8 +122,8 @@ public class ExceptionHandlers {
   }
 
   public static Response handleCredentialException(
-      OperationType op, String tag, String parent, Exception e) {
-    return CredentialExceptionHandler.INSTANCE.handle(op, tag, parent, e);
+      OperationType op, String metadataObjectName, Exception e) {
+    return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
   }
 
   public static Response handleTestConnectionException(Exception e) {
@@ -374,6 +374,7 @@ public class ExceptionHandlers {
   }
 
   private static class FilesetExceptionHandler extends BaseExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new FilesetExceptionHandler();
 
     private static String getFilesetErrorMsg(
@@ -525,6 +526,7 @@ public class ExceptionHandlers {
   }
 
   private static class TopicExceptionHandler extends BaseExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new TopicExceptionHandler();
 
     private static String getTopicErrorMsg(
@@ -563,6 +565,7 @@ public class ExceptionHandlers {
 
   private static class UserPermissionOperationExceptionHandler
       extends BasePermissionExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new UserPermissionOperationExceptionHandler();
 
     @Override
@@ -631,17 +634,14 @@ public class ExceptionHandlers {
 
     private static final ExceptionHandler INSTANCE = new CredentialExceptionHandler();
 
-    private static String getCredentialErrorMsg(
-        String tag, String operation, String parent, String reason) {
+    private static String getCredentialErrorMsg(String parent, String reason) {
       return String.format(
-          "Failed to operate credential(s)%s operation [%s] under object [%s], reason [%s]",
-          tag, operation, parent, reason);
+          "Failed to get credentials under object [%s], reason [%s]", parent, reason);
     }
 
     @Override
     public Response handle(OperationType op, String credential, String parent, Exception e) {
-      String formatted = StringUtil.isBlank(credential) ? "" : " [" + credential + "]";
-      String errorMsg = getCredentialErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      String errorMsg = getCredentialErrorMsg(parent, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -698,6 +698,7 @@ public class ExceptionHandlers {
   }
 
   private static class OwnerExceptionHandler extends BaseExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new OwnerExceptionHandler();
 
     private static String getOwnerErrorMsg(
