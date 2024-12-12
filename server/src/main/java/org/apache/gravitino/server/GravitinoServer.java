@@ -47,7 +47,7 @@ import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
-import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -116,6 +116,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagManager()).to(TagManager.class).ranked(1);
             bind(gravitinoEnv.credentialManager()).to(CredentialManager.class).ranked(1);
+            bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);

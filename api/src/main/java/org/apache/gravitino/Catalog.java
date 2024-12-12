@@ -27,7 +27,6 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.TableCatalog;
-import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * The interface of a catalog. The catalog is the second level entity in the Gravitino system,

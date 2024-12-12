@@ -23,10 +23,10 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
-import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a fileset under a schema {@link Namespace}. A fileset is a virtual

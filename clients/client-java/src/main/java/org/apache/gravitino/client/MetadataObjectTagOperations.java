@@ -25,13 +25,13 @@ import java.util.Collections;
 import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /**

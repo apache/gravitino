@@ -25,11 +25,11 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.messaging.Topic;
-import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic topic. */

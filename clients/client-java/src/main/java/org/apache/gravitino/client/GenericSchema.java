@@ -23,10 +23,10 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic schema. */

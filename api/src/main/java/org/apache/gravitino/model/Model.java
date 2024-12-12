@@ -22,9 +22,9 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
-import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing an ML model under a schema {@link Namespace}. A model is a metadata

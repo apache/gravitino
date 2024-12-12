@@ -18,5 +18,4 @@
  */
 package org.apache.gravitino.tag;
 
-public interface TagDispatcher extends SupportsTags{
-}
+public interface TagDispatcher extends SupportsTags {}
