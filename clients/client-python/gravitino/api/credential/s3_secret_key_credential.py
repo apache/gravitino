@@ -25,9 +25,9 @@ from gravitino.utils.precondition import Precondition
 class S3SecretKeyCredential(Credential, ABC):
     """Represents S3 secret key credential."""
 
-    S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key"
-    _GRAVITINO_S3_STATIC_ACCESS_KEY_ID = "s3-access-key-id"
-    _GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-secret-access-key"
+    S3_SECRET_KEY_CREDENTIAL_TYPE: str = "s3-secret-key"
+    _GRAVITINO_S3_STATIC_ACCESS_KEY_ID: str = "s3-access-key-id"
+    _GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: str = "s3-secret-access-key"
 
     def __init__(self, credential_info: Dict[str, str], expire_time: int):
         self._access_key_id = credential_info[self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID]

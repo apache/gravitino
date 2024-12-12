@@ -25,10 +25,10 @@ from gravitino.utils.precondition import Precondition
 class OSSTokenCredential(Credential, ABC):
     """Represents OSS token credential."""
 
-    OSS_TOKEN_CREDENTIAL_TYPE = "oss-token"
-    _GRAVITINO_OSS_SESSION_ACCESS_KEY_ID = "oss-access-key-id"
-    _GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY = "oss-secret-access-key"
-    _GRAVITINO_OSS_TOKEN = "oss-security-token"
+    OSS_TOKEN_CREDENTIAL_TYPE: str = "oss-token"
+    _GRAVITINO_OSS_SESSION_ACCESS_KEY_ID: str = "oss-access-key-id"
+    _GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY: str = "oss-secret-access-key"
+    _GRAVITINO_OSS_TOKEN: str = "oss-security-token"
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
         self._access_key_id = credential_info[self._GRAVITINO_OSS_SESSION_ACCESS_KEY_ID]

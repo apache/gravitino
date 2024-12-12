@@ -57,6 +57,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     # The namespace of current catalog, which is the metalake name.
     _catalog_namespace: Namespace
 
+    # The metadata object credential operations
+    _object_credential_operations: MetadataObjectCredentialOperations
+
     def __init__(
         self,
         catalog_namespace: Namespace,
@@ -80,7 +83,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         self._catalog_namespace = catalog_namespace
 
         metadata_object = MetadataObjectImpl([name], MetadataObject.Type.CATALOG)
-        self._credential_operations = MetadataObjectCredentialOperations(
+        self._object_credential_operations = MetadataObjectCredentialOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
 

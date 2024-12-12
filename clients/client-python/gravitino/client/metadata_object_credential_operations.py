@@ -26,12 +26,18 @@ from gravitino.exceptions.handlers.credential_error_handler import (
     CREDENTIAL_ERROR_HANDLER,
 )
 from gravitino.utils import HTTPClient
-from gravitino.utils.credential_utils import CredentialUtils
+from gravitino.utils.credential_factory import CredentialFactory
 
 logger = logging.getLogger(__name__)
 
 
 class MetadataObjectCredentialOperations(SupportsCredentials):
+    _rest_client: HTTPClient
+    """The REST client to communicate with the REST server"""
+
+    _request_path: str
+    """The REST API path to do credential operations"""
+
     def __init__(
         self,
         metalake_name: str,
@@ -61,7 +67,7 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
         return [self.to_credential(credential) for credential in credentials]
 
     def to_credential(self, credential_dto: CredentialDTO) -> Credential:
-        return CredentialUtils.to_credential(
+        return CredentialFactory.create(
             credential_dto.credential_type(),
             credential_dto.credential_info(),
             credential_dto.expire_time_in_ms(),

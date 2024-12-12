@@ -329,4 +329,4 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         return self
 
     def get_credentials(self) -> List[Credential]:
-        return self._credential_operations.get_credentials()
+        return self._object_credential_operations.get_credentials()

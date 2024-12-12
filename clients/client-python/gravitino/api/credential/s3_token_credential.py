@@ -25,15 +25,15 @@ from gravitino.utils.precondition import Precondition
 class S3TokenCredential(Credential, ABC):
     """Represents the S3 token credential."""
 
-    S3_TOKEN_CREDENTIAL_TYPE = "s3-token"
-    _GRAVITINO_S3_SESSION_ACCESS_KEY_ID = "s3-access-key-id"
-    _GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY = "s3-secret-access-key"
-    _GRAVITINO_S3_TOKEN = "s3-session-token"
+    S3_TOKEN_CREDENTIAL_TYPE: str = "s3-token"
+    _GRAVITINO_S3_SESSION_ACCESS_KEY_ID: str = "s3-access-key-id"
+    _GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY: str = "s3-secret-access-key"
+    _GRAVITINO_S3_TOKEN: str = "s3-session-token"
 
-    _expire_time_in_ms = 0
-    _access_key_id = None
-    _secret_access_key = None
-    _session_token = None
+    _expire_time_in_ms: int = 0
+    _access_key_id: str = None
+    _secret_access_key: str = None
+    _session_token: str = None
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
         self._access_key_id = credential_info[self._GRAVITINO_S3_SESSION_ACCESS_KEY_ID]

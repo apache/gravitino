@@ -25,10 +25,10 @@ from gravitino.utils.precondition import Precondition
 class GCSTokenCredential(Credential, ABC):
     """Represents the GCS token credential."""
 
-    GCS_TOKEN_CREDENTIAL_TYPE = "gcs-token"
-    _GCS_TOKEN_NAME = "token"
+    GCS_TOKEN_CREDENTIAL_TYPE: str = "gcs-token"
+    _GCS_TOKEN_NAME: str = "token"
 
-    _expire_time_in_ms = 0
+    _expire_time_in_ms: int = 0
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
         self._token = credential_info[self._GCS_TOKEN_NAME]

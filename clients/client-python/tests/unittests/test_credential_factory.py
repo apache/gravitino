@@ -23,10 +23,10 @@ from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
-from gravitino.utils.credential_utils import CredentialUtils
+from gravitino.utils.credential_factory import CredentialFactory
 
 
-class TestCredentialUtils(unittest.TestCase):
+class TestCredentialFactory(unittest.TestCase):
 
     def test_s3_token_credential(self):
         s3_credential_info = {
@@ -38,7 +38,7 @@ class TestCredentialUtils(unittest.TestCase):
         credential_info = s3_credential.credential_info()
         expire_time = s3_credential.expire_time_in_ms()
 
-        check_credential = CredentialUtils.to_credential(
+        check_credential = CredentialFactory.create(
             s3_credential.S3_TOKEN_CREDENTIAL_TYPE, credential_info, expire_time
         )
         self.assertEqual("access_key", check_credential.access_key_id())
@@ -55,7 +55,7 @@ class TestCredentialUtils(unittest.TestCase):
         credential_info = s3_credential.credential_info()
         expire_time = s3_credential.expire_time_in_ms()
 
-        check_credential = CredentialUtils.to_credential(
+        check_credential = CredentialFactory.create(
             s3_credential.S3_SECRET_KEY_CREDENTIAL_TYPE, credential_info, expire_time
         )
         self.assertEqual("access_key", check_credential.access_key_id())
@@ -68,7 +68,7 @@ class TestCredentialUtils(unittest.TestCase):
         credential_info = credential.credential_info()
         expire_time = credential.expire_time_in_ms()
 
-        check_credential = CredentialUtils.to_credential(
+        check_credential = CredentialFactory.create(
             credential.credential_type(), credential_info, expire_time
         )
         self.assertEqual(
@@ -88,7 +88,7 @@ class TestCredentialUtils(unittest.TestCase):
         credential_info = credential.credential_info()
         expire_time = credential.expire_time_in_ms()
 
-        check_credential = CredentialUtils.to_credential(
+        check_credential = CredentialFactory.create(
             credential.credential_type(), credential_info, expire_time
         )
         self.assertEqual(

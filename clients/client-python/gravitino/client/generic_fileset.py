@@ -32,6 +32,12 @@ from gravitino.utils import HTTPClient
 
 class GenericFileset(Fileset, SupportsCredentials):
 
+    _fileset: FilesetDTO
+    """The fileset data transfer object"""
+
+    _object_credential_operations: MetadataObjectCredentialOperations
+    """The metadata object credential operations"""
+
     def __init__(
         self, fileset: FilesetDTO, rest_client: HTTPClient, full_namespace: Namespace
     ):
@@ -40,7 +46,7 @@ class GenericFileset(Fileset, SupportsCredentials):
             [full_namespace.level(1), full_namespace.level(2), fileset.name()],
             MetadataObject.Type.FILESET,
         )
-        self._credential_operations = MetadataObjectCredentialOperations(
+        self._object_credential_operations = MetadataObjectCredentialOperations(
             full_namespace.level(0), metadata_object, rest_client
         )
 
@@ -66,4 +72,4 @@ class GenericFileset(Fileset, SupportsCredentials):
         return self
 
     def get_credentials(self) -> List[Credential]:
-        return self._credential_operations.get_credentials()
+        return self._object_credential_operations.get_credentials()
