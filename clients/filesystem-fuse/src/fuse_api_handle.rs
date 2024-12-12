@@ -63,22 +63,21 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         atime: Option<Timestamp>,
         mtime: Option<Timestamp>,
     ) -> Result<FileStat, Errno> {
-        let file_stat = self.local_fs.stat(inode).await?;
-        let mut nf = FileStat::clone(&file_stat);
+        let mut file_stat = self.local_fs.stat(inode).await?;
 
         if let Some(size) = size {
-            nf.size = size;
+            file_stat.size = size;
         };
 
         if let Some(atime) = atime {
-            nf.atime = atime;
+            file_stat.atime = atime;
         };
 
         if let Some(mtime) = mtime {
-            nf.mtime = mtime;
+            file_stat.mtime = mtime;
         };
 
-        Ok(nf)
+        Ok(file_stat)
     }
 }
 
@@ -90,7 +89,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         })
     }
 
-    async fn destroy(&self, _req: Request) {}
+    async fn destroy(&self, _req: Request) {
+        //TODO need to call the destroy method of the local_fs
+    }
 
     async fn lookup(
         &self,

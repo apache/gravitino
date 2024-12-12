@@ -22,60 +22,86 @@ use fuse3::{Errno, FileType, Timestamp};
 
 pub(crate) type Result<T> = std::result::Result<T, Errno>;
 
-/// RawFileSystem interface for the file system implementation. it use by FuseApiHandle
-/// the `file_id` and `parent_file_id` it is the unique identifier for the file system, it is used to identify the file or directory
-/// the `fh` it is the file handle, it is used to identify the opened file, it is used to read or write the file content
+/// RawFileSystem interface for the file system implementation. it use by FuseApiHandle,
+/// it ues the file id to operate the file system apis
+/// the `file_id` and `parent_file_id` it is the unique identifier for the file system,
+/// it is used to identify the file or directory
+/// the `fh` it is the file handle, it is used to identify the opened file,
+/// it is used to read or write the file content
 #[async_trait]
 pub(crate) trait RawFileSystem: Send + Sync {
+    /// Init the file system
     async fn init(&self);
 
+    /// Get the file path by file id
     async fn get_file_path(&self, file_id: u64) -> String;
 
+    /// Validate the file id and file handle, if the file id or file handle is invalid, return error
     async fn valid_file_id(&self, file_id: u64, fh: u64) -> Result<()>;
 
+    /// Get the file stat by file id
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
 
+    /// Get the file stat by parent file id and file name
     async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat>;
 
+    /// Read the directory by file id
     async fn read_dir(&self, dir_file_id: u64) -> Result<Vec<FileStat>>;
 
+    /// Open the file by file id and flags
     async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
 
+    /// Open the directory by file id and flags
     async fn open_dir(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
 
+    /// Create the file by parent file id and file name and flags
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle>;
 
+    /// Create the directory by parent file id and file name
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<FileHandle>;
 
+    /// Set the file attribute by file id and file stat
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
+    /// Remove the file by parent file id and file name
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
+    /// Remove the directory by parent file id and file name
     async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()>;
 
+    /// Close the file by file id and file handle
     async fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
 
+    /// Read the file content by file id, file handle, offset and size
     async fn read(&self, file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes>;
 
+    /// Write the file content by file id, file handle, offset and data
     async fn write(&self, file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32>;
 }
 
 /// PathFileSystem is the interface for the file system implementation, it use to interact with other file system
-/// it is used file name or path to operate the file system
+/// it is used file path to operate the file system
 #[async_trait]
 pub(crate) trait PathFileSystem: Send + Sync {
+    /// Init the file system
     async fn init(&self);
 
+    /// Get the file stat by file path
     async fn stat(&self, name: &str) -> Result<FileStat>;
 
+    /// Get the file stat by parent file path and file name
     async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat>;
 
+    /// Read the directory by file path
     async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>>;
 
+    /// Open the file by file path and flags
     async fn open_file(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
+    /// Open the directory by file path and flags
     async fn open_dir(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
+    /// Create the file by parent file path and file name and flags
     async fn create_file(
         &self,
         parent: &str,
@@ -83,12 +109,16 @@ pub(crate) trait PathFileSystem: Send + Sync {
         flags: OpenFileFlags,
     ) -> Result<OpenedFile>;
 
+    /// Create the directory by parent file path and file name
     async fn create_dir(&self, parent: &str, name: &str) -> Result<OpenedFile>;
 
+    /// Set the file attribute by file path and file stat
     async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
 
+    /// Remove the file by parent file path and file name
     async fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
 
+    /// Remove the directory by parent file path and file name
     async fn remove_dir(&self, parent: &str, name: &str) -> Result<()>;
 }
 
