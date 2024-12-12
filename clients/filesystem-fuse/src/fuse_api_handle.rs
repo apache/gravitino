@@ -393,6 +393,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 }
 
 const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
+    debug_assert!(file_st.file_id != 0 && file_st.parent_file_id != 0);
     FileAttr {
         ino: file_st.file_id,
         size: file_st.size,
@@ -420,6 +421,7 @@ const fn dummy_file_attr(
     now: Timestamp,
     context: &FileSystemContext,
 ) -> FileAttr {
+    debug_assert!(file_id != 0);
     let mode = match kind {
         Directory => context.default_dir_perm,
         _ => context.default_file_perm,
