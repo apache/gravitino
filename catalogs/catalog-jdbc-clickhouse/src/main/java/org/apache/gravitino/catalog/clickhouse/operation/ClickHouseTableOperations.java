@@ -182,7 +182,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           .append(column.name())
           .append(BACK_QUOTE);
 
-      appendColumnDefinition(column, sqlBuilder, false);
+      appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
         sqlBuilder.append(",\n");
@@ -443,7 +443,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         + BACK_QUOTE
         + col
         + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder(), true);
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   @VisibleForTesting
@@ -476,7 +476,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         + BACK_QUOTE
         + col
         + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder(), true);
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String generateAlterTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -513,7 +513,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         + BACK_QUOTE
         + col
         + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder(), true);
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -554,17 +554,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       columnDefinition.append(CLICKHOUSE_AUTO_INCREMENT).append(SPACE);
     }
 
-    // Append comment if available
-    if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
-    }
-
     // Append default value if available
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition
           .append("DEFAULT ")
           .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
           .append(SPACE);
+    }
+
+    //Append comment if available after default value
+    if (StringUtils.isNotEmpty(addColumn.getComment())) {
+      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
     // Append position if available
@@ -582,6 +582,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     } else {
       throw new IllegalArgumentException("Invalid column position.");
     }
+
     return columnDefinition.toString();
   }
 
@@ -616,7 +617,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append(MODIFY_COLUMN).append(quote(col));
-    appendColumnDefinition(column, columnDefinition, true);
+    appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
@@ -669,7 +670,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
             .build();
-    return appendColumnDefinition(newColumn, sqlBuilder, true).toString();
+    return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
   private String updateColumnTypeFieldDefinition(
@@ -689,22 +690,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return appendColumnDefinition(newColumn, sqlBuilder, true).toString();
+    return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
-  private StringBuilder appendColumnDefinition(
-      JdbcColumn column, StringBuilder sqlBuilder, boolean isUpdateCol) {
-    // Add data type
-    sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
-
-    //     ck no support alter table with set nullable
-    if (!isUpdateCol) {
-      if (column.nullable()) {
-        sqlBuilder.append("NULL ");
-      } else {
-        sqlBuilder.append("NOT NULL ");
-      }
+  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+    // Add Nullable data type
+    String dataType=typeConverter.fromGravitino(column.dataType());
+    if (column.nullable()) {
+      sqlBuilder.append(SPACE).append("Nullable(").append(dataType).append(")").append(SPACE);
+    } else {
+      sqlBuilder.append(SPACE).append(dataType).append(SPACE);
     }
+    
+    // ck no support alter table with set nullable
 
     // Add DEFAULT value if specified
     if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
@@ -715,9 +713,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // Add column auto_increment if specified
-    if (column.autoIncrement()) {
-      sqlBuilder.append(CLICKHOUSE_AUTO_INCREMENT).append(" ");
-    }
+//    if (column.autoIncrement()) {
+//      sqlBuilder.append(CLICKHOUSE_AUTO_INCREMENT).append(" ");
+//    }
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
