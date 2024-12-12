@@ -238,10 +238,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private String getFileSetPath(MetadataObject metadataObject) {
-    if (System.getenv("GRAVITINO_TEST") != null) {
+    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
+    if (System.getenv("GRAVITINO_TEST") != null && filesetDispatcher == null) {
       return "/test";
     }
-    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
     Fileset fileset = filesetDispatcher.loadFileset(identifier);
