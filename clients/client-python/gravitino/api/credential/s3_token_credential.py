@@ -52,8 +52,8 @@ class S3TokenCredential(Credential, ABC):
             self._session_token, "The S3 session token should not be empty"
         )
         Precondition.check_argument(
-            self.expire_time_in_ms,
-            "The expiration time of S3 token credential should greater than 0",
+            self._expire_time_in_ms > 0,
+            "The expiration time of S3 token credential should be greater than 0",
         )
 
     def credential_type(self) -> str:
@@ -94,7 +94,7 @@ class S3TokenCredential(Credential, ABC):
         return self._access_key_id
 
     def secret_access_key(self) -> str:
-        """The s3 secret access key.
+        """The S3 secret access key.
 
         Returns:
             The S3 secret access key.
@@ -102,7 +102,7 @@ class S3TokenCredential(Credential, ABC):
         return self._secret_access_key
 
     def session_token(self) -> str:
-        """The s3 session token.
+        """The S3 session token.
 
         Returns:
             The S3 session token.

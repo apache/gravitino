@@ -48,7 +48,7 @@ class SupportsCredentials(ABC):
 
         Args:
             credential_type: The type of the credential like s3-token,
-            s3-secret-key which defined in the specific credentials.
+            s3-secret-key which are defined in the specific credentials.
         Returns:
             An Credential object with the specified credential type.
         Raises:
