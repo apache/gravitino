@@ -24,6 +24,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import java.time.Instant;
 import java.util.Map;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -350,6 +351,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .build();
     try {
       store.put(schemaEntity, true);
+    } catch (EntityAlreadyExistsException e) {
+      LOG.error("Failed to import schema {} with id {} to the store.", identifier, uid, e);
+      throw new UnsupportedOperationException(
+          "The schema is already managed by another catalog and cannot be loaded by the current catalog.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import schema entity to the store.", e);

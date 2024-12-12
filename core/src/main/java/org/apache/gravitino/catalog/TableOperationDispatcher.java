@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -394,6 +395,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .build();
     try {
       store.put(tableEntity, true);
+    } catch (EntityAlreadyExistsException e) {
+      LOG.error("Failed to import table {} with id {} to the store.", identifier, uid, e);
+      throw new UnsupportedOperationException(
+          "The table is already managed by another catalog and cannot be loaded by the current catalog.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import the table entity to the store.", e);
