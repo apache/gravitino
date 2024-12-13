@@ -27,10 +27,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.cli.commands.Command;
 
 /* Gravitino Command line */
@@ -316,6 +321,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
+      List<String> missArguments =
+          Stream.of(
+                  catalog == null ? MetadataObject.Type.CATALOG.name() : null,
+                  schema == null ? MetadataObject.Type.SCHEMA.name() : null)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toList());
+      if (!missArguments.isEmpty()) {
+        System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missArguments));
+        return;
+      }
+
       newListTables(url, ignore, metalake, catalog, schema).handle();
       return;
     }
