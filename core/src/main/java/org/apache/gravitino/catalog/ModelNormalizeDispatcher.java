@@ -74,18 +74,6 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   @Override
-  public Model registerModel(
-      NameIdentifier ident,
-      String uri,
-      String[] aliases,
-      String comment,
-      Map<String, String> properties)
-      throws ModelAlreadyExistsException, ModelVersionAliasesAlreadyExistException {
-    return dispatcher.registerModel(
-        normalizeNameIdentifier(ident), uri, aliases, comment, properties);
-  }
-
-  @Override
   public boolean deleteModel(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
@@ -120,15 +108,14 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   @Override
-  public ModelVersion linkModelVersion(
+  public void linkModelVersion(
       NameIdentifier ident,
       String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    return dispatcher.linkModelVersion(
-        normalizeCaseSensitive(ident), uri, aliases, comment, properties);
+    dispatcher.linkModelVersion(normalizeCaseSensitive(ident), uri, aliases, comment, properties);
   }
 
   @Override

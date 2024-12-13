@@ -16,32 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hadoop;
+package org.apache.gravitino.catalog.model;
 
-import org.apache.gravitino.connector.BaseSchema;
+import org.apache.gravitino.connector.BaseModel;
 
-public class HadoopSchema extends BaseSchema {
+public class ModelImpl extends BaseModel {
 
-  public static class Builder extends BaseSchemaBuilder<Builder, HadoopSchema> {
-    /** Creates a new instance of {@link Builder}. */
+  public static class Builder extends BaseModelBuilder<Builder, ModelImpl> {
+
     private Builder() {}
 
     @Override
-    protected HadoopSchema internalBuild() {
-      HadoopSchema schema = new HadoopSchema();
-      schema.name = name;
-      schema.comment = comment;
-      schema.properties = properties;
-      schema.auditInfo = auditInfo;
-      return schema;
+    protected ModelImpl internalBuild() {
+      ModelImpl model = new ModelImpl();
+      model.name = name;
+      model.comment = comment;
+      model.properties = properties;
+      model.latestVersion = latestVersion;
+      model.auditInfo = auditInfo;
+      return model;
     }
   }
 
-  /**
-   * Creates a new instance of {@link Builder}.
-   *
-   * @return The new instance.
-   */
   public static Builder builder() {
     return new Builder();
   }
