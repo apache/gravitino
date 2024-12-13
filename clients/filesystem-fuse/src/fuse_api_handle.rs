@@ -163,7 +163,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         Ok(ReplyEntry {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
-                handle_id.file_id,
+                handle_id,
                 Directory,
                 Timestamp::from(SystemTime::now()),
                 &self.fs_context,

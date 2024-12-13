@@ -59,7 +59,7 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle>;
 
     /// Create the directory by parent file id and file name
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<FileHandle>;
+    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64>;
 
     /// Set the file attribute by file id and file stat
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
@@ -111,7 +111,7 @@ pub(crate) trait PathFileSystem: Send + Sync {
     ) -> Result<OpenedFile>;
 
     /// Create the directory by parent file path and file name
-    async fn create_dir(&self, parent: &str, name: &str) -> Result<OpenedFile>;
+    async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat>;
 
     /// Set the file attribute by file path and file stat
     async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
