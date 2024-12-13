@@ -50,21 +50,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       LOG.info("Finished dropping database {}", databaseName);
     } catch (NoSuchSchemaException e) {
       return false;
-    } catch (Exception e) {
-      if (e.getMessage() != null
-          && (e.getMessage().contains("Database " + databaseName + " does not exist.")
-              || e.getMessage().contains("Database `" + databaseName + "` does not exist."))) {
-        return false;
-      }
-
-      if (e.getMessage() != null
-          && e.getMessage()
-              .contains(
-                  "Database "
-                      + databaseName
-                      + " is not empty, the value of cascade should be true.")) {
-        throw e;
-      }
     }
     return true;
   }

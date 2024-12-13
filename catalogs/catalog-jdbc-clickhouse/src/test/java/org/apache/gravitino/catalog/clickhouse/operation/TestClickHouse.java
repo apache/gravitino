@@ -24,10 +24,10 @@ import java.util.Collections;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -48,7 +48,7 @@ public class TestClickHouse extends TestJdbc {
 
     DATABASE_OPERATIONS = new ClickHouseDatabaseOperations();
     TABLE_OPERATIONS = new ClickHouseTableOperations();
-    JDBC_EXCEPTION_CONVERTER = new JdbcExceptionConverter();
+    JDBC_EXCEPTION_CONVERTER = new ClickHouseExceptionConverter();
     DATABASE_OPERATIONS.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
     TABLE_OPERATIONS.initialize(
         dataSource,
