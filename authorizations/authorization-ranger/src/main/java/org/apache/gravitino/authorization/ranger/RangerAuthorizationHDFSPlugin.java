@@ -54,8 +54,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   private static volatile RangerAuthorizationHDFSPlugin instance = null;
 
-  private boolean isTestEnv = false;
-
   private RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
   }
@@ -69,13 +67,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         }
       }
     }
-    return instance;
-  }
-
-  public static synchronized RangerAuthorizationHDFSPlugin getInstanceForTest(
-      String metalake, Map<String, String> config) {
-    getInstance(metalake, config);
-    instance.isTestEnv = true;
     return instance;
   }
 
@@ -248,9 +239,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   private String getFileSetPath(MetadataObject metadataObject) {
     FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
-    if (isTestEnv && filesetDispatcher == null) {
-      return "/test";
-    }
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
     Fileset fileset = filesetDispatcher.loadFileset(identifier);
