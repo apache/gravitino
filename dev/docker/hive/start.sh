@@ -39,6 +39,12 @@ cp -f ${HADOOP_TMP_CONF_DIR}/* ${HADOOP_CONF_DIR}
 cp -f ${HIVE_TMP_CONF_DIR}/* ${HIVE_CONF_DIR}
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
+
+if [[ -n "${ENABLE_JDBC_AUTHORIZATION}" ]]; then
+  cp -f ${HIVE_CONF_DIR}/hive-site-for-jdbc.xml ${HIVE_CONF_DIR}/hive-site.xml
+  cp -f ${HIVE_CONF_DIR}/hiveserver2-site-for-jdbc.xml ${HIVE_CONF_DIR}/hiveserver2-site.xml
+fi
+
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
 
 # whether S3 is set
