@@ -50,7 +50,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws ModelAlreadyExistsException {
+      throws NoSuchModelException, ModelAlreadyExistsException {
     throw new UnsupportedOperationException("Not implemented");
   }
 

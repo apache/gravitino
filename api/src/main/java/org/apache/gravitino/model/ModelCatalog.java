@@ -79,10 +79,11 @@ public interface ModelCatalog {
    * @param properties The properties of the model. The properties are optional and can be null or
    *     empty.
    * @return The registered model object.
+   * @throws NoSuchSchemaException If the schema does not exist.
    * @throws ModelAlreadyExistsException If the model already registered.
    */
   Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws ModelAlreadyExistsException;
+      throws NoSuchSchemaException, ModelAlreadyExistsException;
 
   /**
    * Register a model in the catalog if the model is not existed, otherwise the {@link
@@ -97,6 +98,7 @@ public interface ModelCatalog {
    * @param properties The properties of the model. The properties are optional and can be null or
    *     empty.
    * @return The registered model object.
+   * @throws NoSuchSchemaException If the schema does not exist when register a model.
    * @throws ModelAlreadyExistsException If the model already registered.
    * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
@@ -106,7 +108,8 @@ public interface ModelCatalog {
       String[] aliases,
       String comment,
       Map<String, String> properties)
-      throws ModelAlreadyExistsException, ModelVersionAliasesAlreadyExistException {
+      throws NoSuchSchemaException, ModelAlreadyExistsException,
+          ModelVersionAliasesAlreadyExistException {
     Model model = registerModel(ident, comment, properties);
     linkModelVersion(ident, uri, aliases, comment, properties);
     return model;

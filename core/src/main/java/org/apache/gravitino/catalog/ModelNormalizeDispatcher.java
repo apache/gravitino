@@ -69,7 +69,7 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
 
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws ModelAlreadyExistsException {
+      throws NoSuchSchemaException, ModelAlreadyExistsException {
     return dispatcher.registerModel(normalizeNameIdentifier(ident), comment, properties);
   }
 

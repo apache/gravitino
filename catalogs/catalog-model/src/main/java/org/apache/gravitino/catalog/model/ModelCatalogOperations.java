@@ -142,10 +142,12 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
 
     try {
       store.put(model, false /* overwrite */);
-    } catch (NoSuchEntityException | IOException e) {
+    } catch (IOException e) {
       throw new RuntimeException("Failed to register model " + ident, e);
     } catch (EntityAlreadyExistsException e) {
       throw new ModelAlreadyExistsException(e, "Model %s already exists", ident);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
     }
 
     return toModelImpl(model);
