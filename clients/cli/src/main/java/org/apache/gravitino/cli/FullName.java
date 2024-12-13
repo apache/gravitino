@@ -153,7 +153,7 @@ public class FullName {
       return names[position];
     }
 
-    //    System.err.println(ErrorMessages.MISSING_NAME);
+    System.err.println(ErrorMessages.MISSING_NAME);
     return null;
   }
 

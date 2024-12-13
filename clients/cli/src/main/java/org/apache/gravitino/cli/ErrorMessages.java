@@ -28,9 +28,6 @@ public class ErrorMessages {
   public static final String UNKNOWN_CATALOG = "Unknown catalog name.";
   public static final String UNKNOWN_SCHEMA = "Unknown schema name.";
   public static final String UNKNOWN_TABLE = "Unknown table name.";
-  public static final String UNSPECIFIED_METALAKE = "Metalake not specified.";
-  public static final String UNSPECIFIED_CATALOG = "Catalog not specified.";
-  public static final String UNSPECIFIED_SCHEMA = "Schema not specified.";
   public static final String MALFORMED_NAME = "Malformed entity name.";
   public static final String MISSING_NAME = "Missing name.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
