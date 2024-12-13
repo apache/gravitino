@@ -70,7 +70,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: getTagFailureEvent
       throw e;
     }
-    return null;
+    return dispatcher.getTag(metalake, name);
   }
 
   @Override
@@ -83,7 +83,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: createTagFailureEvent
       throw e;
     }
-    return null;
+    return dispatcher.createTag(metalake, name, comment, properties);
   }
 
   @Override
@@ -95,7 +95,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: alterTagFailureEvent
       throw e;
     }
-    return null;
+    return dispatcher.alterTag(metalake, name, changes);
   }
 
   @Override
@@ -107,7 +107,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: deleteTagFailureEvent
       throw e;
     }
-    return false;
+    return true;
   }
 
   @Override
@@ -168,6 +168,6 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: getTagForMetadataObjectFailureEvent
       throw e;
     }
-    return null;
+    return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
   }
 }
