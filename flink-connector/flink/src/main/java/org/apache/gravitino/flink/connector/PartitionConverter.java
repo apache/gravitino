@@ -34,7 +34,7 @@ public interface PartitionConverter {
    * @param partitions The partition keys in Gravitino.
    * @return The partition keys in Flink.
    */
-  public abstract List<String> toFlinkPartitionKeys(Transform[] partitions);
+  List<String> toFlinkPartitionKeys(Transform[] partitions);
 
   /**
    * Convert the partition keys to Gravitino partition keys.
@@ -42,5 +42,5 @@ public interface PartitionConverter {
    * @param partitionsKey The partition keys in Flink.
    * @return The partition keys in Gravitino.
    */
-  public abstract Transform[] toGravitinoPartitions(List<String> partitionsKey);
+  Transform[] toGravitinoPartitions(List<String> partitionsKey);
 }
