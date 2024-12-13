@@ -237,7 +237,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     }
   }
 
-  private String getFileSetPath(MetadataObject metadataObject) {
+  public String getFileSetPath(MetadataObject metadataObject) {
     FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
