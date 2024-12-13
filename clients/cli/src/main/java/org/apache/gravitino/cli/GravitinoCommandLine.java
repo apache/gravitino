@@ -323,6 +323,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     if (CommandActions.LIST.equals(command)) {
       List<String> missArguments =
           Stream.of(
+                  metalake == null ? MetadataObject.Type.METALAKE.name() : null,
                   catalog == null ? MetadataObject.Type.CATALOG.name() : null,
                   schema == null ? MetadataObject.Type.SCHEMA.name() : null)
               .filter(Objects::nonNull)
