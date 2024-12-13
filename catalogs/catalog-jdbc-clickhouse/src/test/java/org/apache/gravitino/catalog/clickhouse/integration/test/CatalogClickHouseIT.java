@@ -337,7 +337,7 @@ public class CatalogClickHouseIT extends BaseIT {
     // drop schema failed check.
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
-    Assertions.assertThrows(RuntimeException.class, () -> tableCatalog.dropTable(table));
+    Assertions.assertFalse(() -> tableCatalog.dropTable(table));
     clickhouseNamespaces = clickhouseService.listSchemas(Namespace.empty());
     schemaNames =
         Arrays.stream(clickhouseNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());

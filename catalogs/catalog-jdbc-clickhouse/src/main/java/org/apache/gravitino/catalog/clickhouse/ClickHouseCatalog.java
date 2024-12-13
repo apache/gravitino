@@ -20,12 +20,14 @@ package org.apache.gravitino.catalog.clickhouse;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.clickhouse.operation.ClickHouseDatabaseOperations;
 import org.apache.gravitino.catalog.clickhouse.operation.ClickHouseTableOperations;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -58,6 +60,11 @@ public class ClickHouseCatalog extends JdbcCatalog {
   @Override
   public Capability newCapability() {
     return new ClickHouseCatalogCapability();
+  }
+
+  @Override
+  protected JdbcExceptionConverter createExceptionConverter() {
+    return new ClickHouseExceptionConverter();
   }
 
   @Override
