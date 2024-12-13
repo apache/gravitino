@@ -115,7 +115,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         fh: Option<u64>,
         _flags: u32,
     ) -> fuse3::Result<ReplyAttr> {
-        // check the opened file file_id is the same as the inode
+        // check the fh is associated with the file_id
         if let Some(fh) = fh {
             self.fs.valid_file_id(inode, fh).await?;
         }
@@ -134,7 +134,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         fh: Option<u64>,
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
-        // check the opened file file_id is the same as the inode
+        // check the fh is associated with the file_id
         if let Some(fh) = fh {
             self.fs.valid_file_id(inode, fh).await?;
         }
