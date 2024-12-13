@@ -46,7 +46,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagFailureEvent
       throw e;
     }
-    return new String[0];
+    return dispatcher.listTags(metalake);
   }
 
   @Override
@@ -58,7 +58,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsInfoFailureEvent
       throw e;
     }
-    return new Tag[0];
+    return dispatcher.listTagsInfo(metalake);
   }
 
   @Override
@@ -107,7 +107,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: deleteTagFailureEvent
       throw e;
     }
-    return true;
+    return dispatcher.deleteTag(metalake, name);
   }
 
   @Override
@@ -119,7 +119,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listMetadataObjectsForTagFailureEvent
       throw e;
     }
-    return new MetadataObject[0];
+    return dispatcher.listMetadataObjectsForTag(metalake, name);
   }
 
   @Override
@@ -131,7 +131,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsForMetadataObjectFailureEvent
       throw e;
     }
-    return new String[0];
+    return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
   }
 
   @Override
@@ -143,7 +143,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsInfoForMetadataObjectFailureEvent
       throw e;
     }
-    return new Tag[0];
+    return dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
   }
 
   @Override
@@ -156,7 +156,7 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: associateTagsForMetadataObjectFailureEvent
       throw e;
     }
-    return new String[0];
+    return dispatcher.associateTagsForMetadataObject(metalake, metadataObject, tagsToAdd, tagsToRemove);
   }
 
   @Override
