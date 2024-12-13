@@ -27,10 +27,10 @@ dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly(libs.hadoop3.common)
 
-  implementation(project(":catalogs:hadoop-common")) {
+  implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
-  implementation(project(":catalogs:catalog-common")) {
+  implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
 
@@ -48,12 +48,14 @@ dependencies {
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:azure-bundle"))
+  testImplementation(project(":bundles:gcp-bundle"))
+
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
-  testImplementation(libs.testcontainers)
   testImplementation(libs.guava)
+
   testImplementation(libs.hadoop3.client)
   testImplementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
@@ -77,6 +79,8 @@ dependencies {
   }
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -101,6 +105,7 @@ tasks.test {
   dependsOn(":bundles:aws-bundle:jar")
   dependsOn(":bundles:aliyun-bundle:jar")
   dependsOn(":bundles:gcp-bundle:jar")
+  dependsOn(":bundles:azure-bundle:jar")
 }
 
 tasks.javadoc {
