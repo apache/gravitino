@@ -117,18 +117,18 @@ public class RangerITEnv {
             RangerAuthorizationHDFSPlugin.getInstance(
                 "metalake",
                 ImmutableMap.of(
-                    AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                    RangerAuthorizationProperties.RANGER_ADMIN_URL,
                     String.format(
                         "http://%s:%d",
                         containerSuite.getRangerContainer().getContainerIpAddress(),
                         RangerContainer.RANGER_SERVER_PORT),
-                    AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                    RangerAuthorizationProperties.RANGER_AUTH_TYPE,
                     RangerContainer.authType,
-                    AuthorizationPropertiesMeta.RANGER_USERNAME,
+                    RangerAuthorizationProperties.RANGER_USERNAME,
                     RangerContainer.rangerUserName,
-                    AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                    RangerAuthorizationProperties.RANGER_PASSWORD,
                     RangerContainer.rangerPassword,
-                    AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                    RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
     doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFileSetPath(Mockito.any());
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
