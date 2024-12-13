@@ -16,17 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::cloud_storage_filesystem::CloudStorageFileSystem;
 use crate::filesystem::{FileSystemContext, SimpleFileSystem};
 use crate::fuse_api_handle::FuseApiHandle;
+use crate::log_fuse_api_handle::LogFuseApiHandle;
 use crate::memory_filesystem::MemoryFileSystem;
 use fuse3::raw::{MountHandle, Session};
 use fuse3::{MountOptions, Result};
 use log::{error, info};
+use opendal::layers::LoggingLayer;
+use opendal::{services, Operator};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
+use serde::__private::ser::constrain;
 use tokio::sync::{Mutex, Notify};
 use tokio::time::timeout;
+use crate::config::{Config, FilesystemConfig, FuseConfig, GravitinoConfig};
+use crate::gravitino_filesystem::GravitinoFileSystem;
 
 /// Represents a FUSE server capable of starting and stopping the FUSE filesystem.
 pub struct FuseServer {
@@ -51,12 +58,17 @@ impl FuseServer {
     }
 
     /// Starts the FUSE filesystem and blocks until it is stopped.
-    pub async fn start(&self) -> Result<()> {
-        let fs = SimpleFileSystem::new(MemoryFileSystem::new());
+    pub async fn start(&self,config: &Config) -> Result<()> {
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
         let fs_context = FileSystemContext { uid: uid, gid: gid };
-        let fuse_fs = FuseApiHandle::new(fs, fs_context);
+
+        let gvfs = GravitinoFileSystem::new(&config, &fs_context).await;
+        let fs = SimpleFileSystem::new(gvfs);
+
+        //let fs = SimpleFileSystem::new(MemoryFileSystem::new());
+        let fuse_fs = LogFuseApiHandle::new(FuseApiHandle::new(fs, fs_context));
+        //let fuse_fs = FuseApiHandle::new(fs, fs_context);
 
         //check if the mount point exists
         if !std::path::Path::new(&self.mount_point).exists() {

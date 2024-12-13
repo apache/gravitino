@@ -16,18 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-mod cloud_storage_filesystem;
-mod filesystem;
-mod filesystem_metadata;
-mod fuse_api_handle;
-pub mod fuse_server;
-mod gravitino_client;
-mod log_fuse_api_handle;
-mod memory_filesystem;
-mod opened_file_manager;
-mod utils;
-mod gravitino_compose_filesystem;
-mod gravitino_filesystem;
-mod storage_filesystem;
-mod config;
-mod error;
+
+
+#[derive(Debug)]
+pub enum ErrorCode {
+    UnSupportedFilesystem,
+    GravitinoClientError,
+}
+
+impl ErrorCode {
+    pub fn to_string(&self) -> String {
+        match self {
+            ErrorCode::UnSupportedFilesystem=> "The filesystem is not supported".to_string(),
+            _ => "".to_string(),
+        }
+    }
+    pub fn to_error(self, message: impl Into<String>) -> GravitinoError {
+        GravitinoError::Error(self, message.into())
+    }
+}
+
+#[derive(Debug)]
+pub enum GravitinoError {
+    RestError(String, reqwest::Error),
+    Error(ErrorCode, String),
+}
+impl From<reqwest::Error> for GravitinoError {
+    fn from(err: reqwest::Error) -> Self {
+        GravitinoError::RestError("Http request failed:".to_owned() + &err.to_string(), err)
+    }
+}

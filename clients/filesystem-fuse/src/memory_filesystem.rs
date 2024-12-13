@@ -17,7 +17,8 @@
  * under the License.
  */
 use crate::filesystem::{
-    FileReader, FileStat, FileWriter, OpenFileFlags, OpenedFile, PathFileSystem, Result,
+    FileReader, FileStat, FileSystemCapacity, FileWriter, OpenFileFlags, OpenedFile,
+    PathFileSystem, Result,
 };
 use crate::filesystem_metadata::DefaultFileSystemMetadata;
 use crate::utils::join_file_path;
@@ -49,8 +50,6 @@ impl MemoryFileSystem {
             file_map: RwLock::new(Default::default()),
         }
     }
-
-    pub fn init(&self) {}
 
     fn create_file_stat(&self, path: &str, file: &MemoryFile) -> FileStat {
         match file.kind {
@@ -204,6 +203,10 @@ impl PathFileSystem for MemoryFileSystem {
 
         file_map.remove(&join_file_path(parent, name));
         Ok(())
+    }
+
+    fn get_capacity(&self) -> Result<FileSystemCapacity> {
+        Ok(FileSystemCapacity {})
     }
 }
 

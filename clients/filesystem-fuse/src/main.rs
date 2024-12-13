@@ -16,26 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+mod cloud_storage_filesystem;
 mod filesystem;
 mod filesystem_metadata;
 mod fuse_api_handle;
 mod fuse_server;
+mod gravitino_client;
+mod log_fuse_api_handle;
 mod memory_filesystem;
 mod opened_file_manager;
 mod utils;
-
+mod config;
+mod error;
+mod gravitino_compose_filesystem;
+mod gravitino_filesystem;
+mod storage_filesystem;
 use crate::fuse_server::FuseServer;
 use fuse3::Result;
-use log::info;
+use log::{debug, info};
 use std::sync::Arc;
+use crate::config::{Config};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_env_filter("debug").init();
+    tracing_subscriber::fmt()
+        .with_env_filter("info,gvfs_fuse=debug,fuse3=warn")
+        .init();
 
+    debug!("Starting gvfs-fuse server...");
     let server = Arc::new(FuseServer::new("gvfs"));
     let clone_server = server.clone();
-    let v = tokio::spawn(async move { clone_server.start().await });
+
+    let config = Config::new();
+    let v = tokio::spawn(async move { clone_server.start(&config).await });
 
     tokio::signal::ctrl_c().await?;
     info!("Received Ctrl+C, stopping server...");
