@@ -32,10 +32,6 @@ import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-/**
- * For spark-connector in Paimon, it explicitly uses SparkTable to identify whether it is an Apache
- * Paimon table, so the SparkPaimonTable must extend SparkTable.
- */
 public class SparkPaimonTable extends SparkTable {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
