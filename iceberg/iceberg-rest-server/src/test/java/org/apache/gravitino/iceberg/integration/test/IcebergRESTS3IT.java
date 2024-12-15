@@ -51,7 +51,8 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
   @Override
   void initEnv() {
     this.s3Warehouse =
-        String.format("s3://%s/test1", System.getenv().getOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
+        String.format(
+            "s3://%s/test1", System.getenv().getOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
     this.accessKey = System.getenv().getOrDefault("GRAVITINO_S3_ACCESS_KEY", "{ACCESS_KEY}");
     this.secretKey = System.getenv().getOrDefault("GRAVITINO_S3_SECRET_KEY", "{SECRET_KEY}");
     this.region = System.getenv().getOrDefault("GRAVITINO_S3_REGION", "ap-southeast-2");

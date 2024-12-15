@@ -48,10 +48,11 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     this.warehouse =
         String.format(
             "oss://%s/gravitino-test",
-                System.getenv().getOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
+            System.getenv().getOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
     this.accessKey = System.getenv().getOrDefault("GRAVITINO_OSS_ACCESS_KEY", "{ACCESS_KEY}");
     this.secretKey = System.getenv().getOrDefault("GRAVITINO_OSS_SECRET_KEY", "{SECRET_KEY}");
-    this.endpoint = System.getenv().getOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
+    this.endpoint =
+        System.getenv().getOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
     this.region = System.getenv().getOrDefault("GRAVITINO_OSS_REGION", "oss-cn-hangzhou");
     this.roleArn = System.getenv().getOrDefault("GRAVITINO_OSS_ROLE_ARN", "{ROLE_ARN}");
     this.externalId = System.getenv().getOrDefault("GRAVITINO_OSS_EXTERNAL_ID", "");

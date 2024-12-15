@@ -22,7 +22,6 @@ package org.apache.gravitino.iceberg.integration.test;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
@@ -46,10 +45,11 @@ public class IcebergRESTOSSSecretIT extends IcebergRESTJdbcCatalogIT {
     this.warehouse =
         String.format(
             "oss://%s/gravitino-test",
-                System.getenv().getOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
+            System.getenv().getOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
     this.accessKey = System.getenv().getOrDefault("GRAVITINO_OSS_ACCESS_KEY", "{ACCESS_KEY}");
     this.secretKey = System.getenv().getOrDefault("GRAVITINO_OSS_SECRET_KEY", "{SECRET_KEY}");
-    this.endpoint = System.getenv().getOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
+    this.endpoint =
+        System.getenv().getOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
 
     if (ITUtils.isEmbedded()) {
       return;

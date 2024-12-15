@@ -40,9 +40,10 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
   @Override
   void initEnv() {
     this.gcsWarehouse =
-        String.format("gs://%s/test", System.getenv().getOrDefault("GRAVITINO_GCS_BUCKET", "bucketName"));
+        String.format(
+            "gs://%s/test", System.getenv().getOrDefault("GRAVITINO_GCS_BUCKET", "bucketName"));
     this.gcsCredentialPath =
-            System.getenv().getOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credential.json");
+        System.getenv().getOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credential.json");
     if (ITUtils.isEmbedded()) {
       return;
     }

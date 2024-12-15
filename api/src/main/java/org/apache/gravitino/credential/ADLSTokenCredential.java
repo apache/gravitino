@@ -82,11 +82,11 @@ public class ADLSTokenCredential implements Credential {
 
   private void validate(String accountName, String sasToken, long expireTimeInMS) {
     Preconditions.checkArgument(
-            StringUtils.isNotBlank(accountName), "ADLS account name should not be empty.");
+        StringUtils.isNotBlank(accountName), "ADLS account name should not be empty.");
     Preconditions.checkArgument(
-            StringUtils.isNotBlank(sasToken), "ADLS SAS token should not be empty.");
+        StringUtils.isNotBlank(sasToken), "ADLS SAS token should not be empty.");
     Preconditions.checkArgument(
-            expireTimeInMS > 0, "The expire time of S3TokenCredential should great than 0");
+        expireTimeInMS > 0, "The expire time of S3TokenCredential should great than 0");
   }
 
   /**

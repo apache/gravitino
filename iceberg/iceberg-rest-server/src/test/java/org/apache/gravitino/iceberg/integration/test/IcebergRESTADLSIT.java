@@ -45,16 +45,18 @@ public class IcebergRESTADLSIT extends IcebergRESTJdbcCatalogIT {
   @Override
   void initEnv() {
     this.storageAccountName =
-            System.getenv().getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
+        System.getenv()
+            .getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
     this.storageAccountKey =
-            System.getenv().getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
+        System.getenv().getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
     this.tenantId = System.getenv().getOrDefault("GRAVITINO_ADLS_TENANT_ID", "{TENANT_ID}");
     this.clientId = System.getenv().getOrDefault("GRAVITINO_ADLS_CLIENT_ID", "{CLIENT_ID}");
-    this.clientSecret = System.getenv().getOrDefault("GRAVITINO_ADLS_CLIENT_SECRET", "{CLIENT_SECRET}");
+    this.clientSecret =
+        System.getenv().getOrDefault("GRAVITINO_ADLS_CLIENT_SECRET", "{CLIENT_SECRET}");
     this.warehousePath =
         String.format(
             "abfss://%s@%s.dfs.core.windows.net/data/test",
-                System.getenv().getOrDefault("GRAVITINO_ADLS_CONTAINER", "{ADLS_CONTAINER}"),
+            System.getenv().getOrDefault("GRAVITINO_ADLS_CONTAINER", "{ADLS_CONTAINER}"),
             storageAccountName);
 
     if (ITUtils.isEmbedded()) {

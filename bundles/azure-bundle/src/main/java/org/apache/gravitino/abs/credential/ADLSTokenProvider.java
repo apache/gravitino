@@ -108,7 +108,8 @@ public class ADLSTokenProvider implements CredentialProvider {
     OffsetDateTime expiry = start.plusSeconds(tokenExpireSecs);
     UserDelegationKey userDelegationKey = dataLakeServiceClient.getUserDelegationKey(start, expiry);
 
-    PathSasPermission pathSasPermission = new PathSasPermission()
+    PathSasPermission pathSasPermission =
+        new PathSasPermission()
             .setReadPermission(true)
             .setWritePermission(true)
             .setDeletePermission(true)
@@ -121,7 +122,11 @@ public class ADLSTokenProvider implements CredentialProvider {
 
     ADLSLocationUtils.ADLSLocationParts locationParts = ADLSLocationUtils.parseLocation(uniquePath);
     String sasToken =
-        new DataLakeSasImplUtil(signatureValues, locationParts.getContainer(), locationParts.getPath().replaceAll("^/+|/*$", ""), true)
+        new DataLakeSasImplUtil(
+                signatureValues,
+                locationParts.getContainer(),
+                locationParts.getPath().replaceAll("^/+|/*$", ""),
+                true)
             .generateUserDelegationSas(
                 userDelegationKey, locationParts.getAccountName(), Context.NONE);
 
