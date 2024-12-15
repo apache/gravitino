@@ -1,0 +1,27 @@
+gcli role [details|list|create|delete|grant|revoke]
+
+Example Commands
+
+Display role details
+gcli role details --role admin
+
+List all roles
+gcli role list
+
+Create a role
+gcli role create --role admin
+
+Delete a role
+gcli role delete --role admin
+
+Add a role to a user
+gcli user grant --user new_user --role admin
+
+Remove a role from a user
+gcli user revoke --user new_user --role admin
+
+Add a role to a group
+gcli group grant --group groupA --role admin
+
+Remove a role from a group
+gcli group revoke --group groupA --role admin

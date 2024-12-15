@@ -1,0 +1,15 @@
+gcli user [details|list|create|delete]
+
+Example Commands
+
+Create a user
+gcli user create --user new_user
+
+Show a user's details
+gcli user details --user new_user
+
+List all users
+gcli user list
+
+Delete a user
+gcli user delete --user new_user
