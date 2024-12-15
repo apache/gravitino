@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Locale;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -72,7 +73,7 @@ public class Main {
     if (args.length == 2) {
       String action = args[1];
       if (CommandActions.isValidCommand(action)) {
-        return action;
+        return action.toLowerCase(Locale.ROOT);
       }
     } else if (args.length == 1) {
       /* Default to 'details' command. */
@@ -98,7 +99,7 @@ public class Main {
     if (args.length >= 1) {
       String entity = args[0];
       if (CommandEntities.isValidEntity(entity)) {
-        return entity;
+        return entity.toLowerCase(Locale.ROOT);
       } else {
         System.err.println(ErrorMessages.UNKNOWN_ENTITY);
         return null;
