@@ -47,6 +47,7 @@ public class Main {
       }
       String command = resolveCommand(line);
       if (Objects.isNull(command)) {
+        /* Default to 'details' command. */
         command =
             (Objects.nonNull(entity) && line.hasOption(GravitinoOptions.HELP))
                 ? CommandActions.HELP
@@ -83,7 +84,7 @@ public class Main {
         return action;
       }
     } else if (args.length == 1) {
-      return null; /* Default to 'details' command. */
+      return null;
     } else if (args.length == 0) {
       return null;
     }
