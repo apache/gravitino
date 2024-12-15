@@ -28,51 +28,52 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.ADLSProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.junit.platform.commons.util.StringUtils;
 
+@SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
-public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
+public class IcebergRESTADLSIT extends IcebergRESTJdbcCatalogIT {
 
-  private String warehouse;
-  private String accessKey;
-  private String secretKey;
-  private String endpoint;
-  private String roleArn;
-  private String externalId;
-  private String region;
+  private String storageAccountName;
+  private String storageAccountKey;
+  private String tenantId;
+  private String clientId;
+  private String clientSecret;
+  private String warehousePath;
 
   @Override
   void initEnv() {
-    this.warehouse =
+    this.storageAccountName =
+            System.getenv().getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
+    this.storageAccountKey =
+            System.getenv().getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
+    this.tenantId = System.getenv().getOrDefault("GRAVITINO_ADLS_TENANT_ID", "{TENANT_ID}");
+    this.clientId = System.getenv().getOrDefault("GRAVITINO_ADLS_CLIENT_ID", "{CLIENT_ID}");
+    this.clientSecret = System.getenv().getOrDefault("GRAVITINO_ADLS_CLIENT_SECRET", "{CLIENT_SECRET}");
+    this.warehousePath =
         String.format(
-            "oss://%s/gravitino-test",
-                System.getenv().getOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
-    this.accessKey = System.getenv().getOrDefault("GRAVITINO_OSS_ACCESS_KEY", "{ACCESS_KEY}");
-    this.secretKey = System.getenv().getOrDefault("GRAVITINO_OSS_SECRET_KEY", "{SECRET_KEY}");
-    this.endpoint = System.getenv().getOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
-    this.region = System.getenv().getOrDefault("GRAVITINO_OSS_REGION", "oss-cn-hangzhou");
-    this.roleArn = System.getenv().getOrDefault("GRAVITINO_OSS_ROLE_ARN", "{ROLE_ARN}");
-    this.externalId = System.getenv().getOrDefault("GRAVITINO_OSS_EXTERNAL_ID", "");
+            "abfss://%s@%s.dfs.core.windows.net/data/test",
+                System.getenv().getOrDefault("GRAVITINO_ADLS_CONTAINER", "{ADLS_CONTAINER}"),
+            storageAccountName);
 
     if (ITUtils.isEmbedded()) {
       return;
     }
     try {
-      downloadIcebergForAliyunJar();
+      downloadIcebergAzureBundleJar();
     } catch (IOException e) {
-      LOG.warn("Download Iceberg Aliyun bundle jar failed,", e);
+      LOG.warn("Download Iceberg Azure bundle jar failed,", e);
       throw new RuntimeException(e);
     }
-    copyAliyunOSSJar();
+    copyAzureBundleJar();
   }
 
   @Override
   public Map<String, String> getCatalogConfig() {
     HashMap m = new HashMap<String, String>();
     m.putAll(getCatalogJdbcConfig());
-    m.putAll(getOSSConfig());
+    m.putAll(getADLSConfig());
     return m;
   }
 
@@ -80,50 +81,48 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     return true;
   }
 
-  private Map<String, String> getOSSConfig() {
+  private Map<String, String> getADLSConfig() {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.OSS_TOKEN_CREDENTIAL_PROVIDER);
-    configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_REGION, region);
+        CredentialConstants.ADLS_TOKEN_CREDENTIAL_PROVIDER_TYPE);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME,
+        storageAccountName);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, accessKey);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY,
+        storageAccountKey);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
-        secretKey);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_TENANT_ID, tenantId);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ROLE_ARN, roleArn);
-    if (StringUtils.isNotBlank(externalId)) {
-      configMap.put(
-          IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_EXTERNAL_ID,
-          externalId);
-    }
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_CLIENT_ID, clientId);
+    configMap.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_CLIENT_SECRET,
+        clientSecret);
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.IO_IMPL,
-        "org.apache.iceberg.aliyun.oss.OSSFileIO");
-    configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.WAREHOUSE, warehouse);
+        "org.apache.iceberg.azure.adlsv2.ADLSFileIO");
+    configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.WAREHOUSE, warehousePath);
 
     return configMap;
   }
 
-  private void downloadIcebergForAliyunJar() throws IOException {
-    String icebergBundleJarName = "iceberg-aliyun-1.5.2.jar";
+  private void downloadIcebergAzureBundleJar() throws IOException {
+    String icebergBundleJarName = "iceberg-azure-bundle-1.5.2.jar";
     String icebergBundleJarUri =
         "https://repo1.maven.org/maven2/org/apache/iceberg/"
-            + "iceberg-aliyun/1.5.2/"
+            + "iceberg-azure-bundle/1.5.2/"
             + icebergBundleJarName;
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
   }
 
-  private void copyAliyunOSSJar() {
+  private void copyAzureBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("azure-bundle", targetDir);
   }
 }
