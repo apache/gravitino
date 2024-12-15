@@ -107,7 +107,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   @Test
   void testPaimonPartitionManagement() {
     testPaimonListAndDropPartition();
-    // TODO: replace, add and load partition operations are unsupported in Paimon now.
+    // TODO: replace, add and load partition operations are unsupported in Paimon 0.9.
   }
 
   private void testPaimonListAndDropPartition() {
