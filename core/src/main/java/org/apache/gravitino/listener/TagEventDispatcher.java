@@ -156,7 +156,8 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: associateTagsForMetadataObjectFailureEvent
       throw e;
     }
-    return dispatcher.associateTagsForMetadataObject(metalake, metadataObject, tagsToAdd, tagsToRemove);
+    return dispatcher.associateTagsForMetadataObject(
+        metalake, metadataObject, tagsToAdd, tagsToRemove);
   }
 
   @Override
