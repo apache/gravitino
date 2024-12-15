@@ -43,6 +43,7 @@ public class ADLSTokenCredential implements Credential {
   /**
    * Constructs an instance of {@link ADLSTokenCredential} with SAS token.
    *
+   * @param accountName The ADLS account name.
    * @param sasToken The ADLS SAS token.
    * @param expireTimeInMS The SAS token expire time in ms.
    */
