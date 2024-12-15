@@ -81,7 +81,7 @@ public class TableOpsUtils {
     if (tableChange instanceof ColumnChange) {
       if (tableChange instanceof AddColumn) {
         AddColumn addColumn = (AddColumn) tableChange;
-        String fieldName = getfieldName(addColumn);
+        String fieldName = getFieldName(addColumn);
         checkColumnCapability(fieldName, addColumn.getDefaultValue(), addColumn.isAutoIncrement());
         return addColumn(
             fieldName,
@@ -89,29 +89,29 @@ public class TableOpsUtils {
             addColumn.getComment(),
             move(fieldName, addColumn.getPosition()));
       } else if (tableChange instanceof DeleteColumn) {
-        return dropColumn(getfieldName((DeleteColumn) tableChange));
+        return dropColumn(getFieldName((DeleteColumn) tableChange));
       } else if (tableChange instanceof RenameColumn) {
         RenameColumn renameColumn = ((RenameColumn) tableChange);
-        return renameColumn(getfieldName(renameColumn), renameColumn.getNewName());
+        return renameColumn(getFieldName(renameColumn), renameColumn.getNewName());
       } else if (tableChange instanceof UpdateColumnComment) {
         UpdateColumnComment updateColumnComment = (UpdateColumnComment) tableChange;
         return updateColumnComment(
-            getfieldName(updateColumnComment), updateColumnComment.getNewComment());
+            getFieldName(updateColumnComment), updateColumnComment.getNewComment());
       } else if (tableChange instanceof UpdateColumnNullability) {
         UpdateColumnNullability updateColumnNullability = (UpdateColumnNullability) tableChange;
         return updateColumnNullability(
-            getfieldName(updateColumnNullability), updateColumnNullability.nullable());
+            getFieldName(updateColumnNullability), updateColumnNullability.nullable());
       } else if (tableChange instanceof UpdateColumnPosition) {
         UpdateColumnPosition updateColumnPosition = (UpdateColumnPosition) tableChange;
         Preconditions.checkArgument(
             !(updateColumnPosition.getPosition() instanceof Default),
             "Default position is not supported for Paimon update column position.");
         return updateColumnPosition(
-            move(getfieldName(updateColumnPosition), updateColumnPosition.getPosition()));
+            move(getFieldName(updateColumnPosition), updateColumnPosition.getPosition()));
       } else if (tableChange instanceof UpdateColumnType) {
         UpdateColumnType updateColumnType = (UpdateColumnType) tableChange;
         return updateColumnType(
-            getfieldName(updateColumnType), toPaimonType(updateColumnType.getNewDataType()));
+            getFieldName(updateColumnType), toPaimonType(updateColumnType.getNewDataType()));
       }
     } else if (tableChange instanceof UpdateComment) {
       return updateComment(((UpdateComment) tableChange).getNewComment());
@@ -147,19 +147,19 @@ public class TableOpsUtils {
         fieldNames.length == 1,
         String.format(
             "Paimon does not support update nested column. Illegal column: %s.",
-            getfieldName(fieldNames)));
+            getFieldName(fieldNames)));
   }
 
-  public static String[] getfieldName(String fieldName) {
+  public static String[] getFieldName(String fieldName) {
     return new String[] {fieldName};
   }
 
-  public static String getfieldName(String[] fieldName) {
+  public static String getFieldName(String[] fieldName) {
     return DOT.join(fieldName);
   }
 
-  private static String getfieldName(ColumnChange columnChange) {
-    return getfieldName(columnChange.fieldName());
+  private static String getFieldName(ColumnChange columnChange) {
+    return getFieldName(columnChange.fieldName());
   }
 
   private static Move move(String fieldName, ColumnPosition columnPosition)

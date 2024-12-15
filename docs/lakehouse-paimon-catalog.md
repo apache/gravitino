@@ -29,26 +29,27 @@ Builds with Apache Paimon `0.8.0`.
 
 ### Catalog properties
 
-| Property name                                      | Description                                                                                                                                                                                                 | Default value | Required                                                                                                                                                             | Since Version     |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc` and `hive`.                                                                                                                      | (none)        | Yes                                                                                                                                                                  | 0.6.0-incubating  |
-| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)        | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      | 0.6.0-incubating  |
-| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)        | Yes                                                                                                                                                                  | 0.6.0-incubating  |
-| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating  |
-| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                    | `false`       | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating  |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating  |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating  |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60            | No                                                                                                                                                                   | 0.6.0-incubating  |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60            | No                                                                                                                                                                   | 0.6.0-incubating  |
-| `oss-endpoint`                                     | The endpoint of the Aliyun OSS.                                                                                                                                                                             | (none)        | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating  |
-| `oss-access-key-id`                                | The access key of the Aliyun OSS.                                                                                                                                                                           | (none)        | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating  |
-| `oss-accesss-key-secret`                           | The secret key the Aliyun OSS.                                                                                                                                                                              | (none)        | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating  |
-| `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)        | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating  |
-| `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)        | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating  |
-| `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)        | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating  |
+| Property name                                      | Description                                                                                                                                                                                                 | Default value                                                                  | Required                                                                                                                                                             | Since Version    |
+|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc` and `hive`.                                                                                                                      | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
+| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                                                                         | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      | 0.6.0-incubating |
+| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
+| `catalog-backend-name`                             | The catalog name passed to underlying Paimon catalog backend.                                                                                                                                               | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                                                                                                                                                   | 0.8.0-incubating |
+| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`                                                                       | No                                                                                                                                                                   | 0.6.0-incubating |
+| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                    | `false`                                                                        | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                                                                             | No                                                                                                                                                                   | 0.6.0-incubating |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                                                                             | No                                                                                                                                                                   | 0.6.0-incubating |
+| `oss-endpoint`                                     | The endpoint of the Aliyun OSS.                                                                                                                                                                             | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
+| `oss-access-key-id`                                | The access key of the Aliyun OSS.                                                                                                                                                                           | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
+| `oss-accesss-key-secret`                           | The secret key the Aliyun OSS.                                                                                                                                                                              | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
+| `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
+| `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
+| `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 
 :::note
-If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/). 
+If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/).
 :::
 
 :::note
@@ -75,7 +76,7 @@ You must download the corresponding JDBC driver and place it to the `catalogs/la
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
-## Schema 
+## Schema
 
 ### Schema capabilities
 
@@ -94,7 +95,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
-## Table 
+## Table
 
 ### Table capabilities
 
@@ -154,28 +155,28 @@ Paimon Table primary key constraint should not be same with partition fields, th
 
 ### Table column types
 
-| Gravitino Type              | Apache Paimon Type             |
-|-----------------------------|--------------------------------|
-| `Struct`                    | `Row`                          |
-| `Map`                       | `Map`                          |
-| `List`                      | `Array`                        |
-| `Boolean`                   | `Boolean`                      |
-| `Byte`                      | `TinyInt`                      |
-| `Short`                     | `SmallInt`                     |
-| `Integer`                   | `Int`                          |
-| `Long`                      | `BigInt`                       |
-| `Float`                     | `Float`                        |
-| `Double`                    | `Double`                       |
-| `Decimal`                   | `Decimal`                      |
-| `String`                    | `VarChar(Integer.MAX_VALUE)`   |
-| `VarChar`                   | `VarChar`                      |
-| `FixedChar`                 | `Char`                         |
-| `Date`                      | `Date`                         |
-| `Time`                      | `Time`                         |
-| `TimestampType withZone`    | `LocalZonedTimestamp`          |
-| `TimestampType withoutZone` | `Timestamp`                    |
-| `Binary`                    | `Binary`                       |
-| `Fixed`                     | `VarBinary`                    |
+| Gravitino Type              | Apache Paimon Type           |
+|-----------------------------|------------------------------|
+| `Struct`                    | `Row`                        |
+| `Map`                       | `Map`                        |
+| `List`                      | `Array`                      |
+| `Boolean`                   | `Boolean`                    |
+| `Byte`                      | `TinyInt`                    |
+| `Short`                     | `SmallInt`                   |
+| `Integer`                   | `Int`                        |
+| `Long`                      | `BigInt`                     |
+| `Float`                     | `Float`                      |
+| `Double`                    | `Double`                     |
+| `Decimal`                   | `Decimal`                    |
+| `String`                    | `VarChar(Integer.MAX_VALUE)` |
+| `VarChar`                   | `VarChar`                    |
+| `FixedChar`                 | `Char`                       |
+| `Date`                      | `Date`                       |
+| `Time`                      | `Time`                       |
+| `TimestampType withZone`    | `LocalZonedTimestamp`        |
+| `TimestampType withoutZone` | `Timestamp`                  |
+| `Fixed`                     | `Binary`                     |
+| `Binary`                    | `VarBinary`                  |
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.
@@ -185,23 +186,22 @@ Gravitino doesn't support Paimon `MultisetType` type.
 
 You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
 
-The Gravitino server doesn't allow passing the following reserved fields.
+:::note
+**Reserved**: Fields that cannot be passed to the Gravitino server.
 
-| Configuration item                 | Description                                                  |
-|------------------------------------|--------------------------------------------------------------|
-| `comment`                          | The table comment.                                           |
-| `owner`                            | The table owner.                                             |
-| `bucket-key`                       | The table bucket-key.                                        |
-| `primary-key`                      | The table primary-key.                                       |
-| `partition`                        | The table partition.                                         |
+**Immutable**: Fields that cannot be modified once set.
+:::
 
-The Gravitino server doesn't allow the following immutable fields to be modified, but allows them to be specified when creating a new table.
-
-| Configuration item                 | Description                                                  |
-|------------------------------------|--------------------------------------------------------------|
-| `merge-engine`                     | The table merge-engine.                                      |
-| `sequence.field`                   | The table sequence.field.                                    |
-| `rowkind.field`                    | The table rowkind.field.                                     |
+| Configuration item                 | Description                                                  | Default Value | Required  | Reserved | Immutable | Since version     |
+|------------------------------------|--------------------------------------------------------------|---------------|-----------|----------|-----------|-------------------|
+| `merge-engine`                     | The table merge-engine.                                      | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `sequence.field`                   | The table sequence.field.                                    | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `rowkind.field`                    | The table rowkind.field.                                     | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `comment`                          | The table comment.                                           | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `owner`                            | The table owner.                                             | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `bucket-key`                       | The table bucket-key.                                        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `primary-key`                      | The table primary-key.                                       | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `partition`                        | The table partition.                                         | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 
 ### Table operations
 

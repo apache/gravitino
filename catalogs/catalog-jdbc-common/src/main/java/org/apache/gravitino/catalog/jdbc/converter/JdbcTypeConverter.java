@@ -35,10 +35,10 @@ public abstract class JdbcTypeConverter
     private String typeName;
 
     /** Column size. For example: 20 in varchar (20) and 10 in decimal (10,2). */
-    private String columnSize;
+    private Integer columnSize;
 
     /** Scale. For example: 2 in decimal (10,2). */
-    private String scale;
+    private Integer scale;
 
     public JdbcTypeBean(String typeName) {
       this.typeName = typeName;
@@ -52,19 +52,19 @@ public abstract class JdbcTypeConverter
       this.typeName = typeName;
     }
 
-    public String getColumnSize() {
+    public Integer getColumnSize() {
       return columnSize;
     }
 
-    public void setColumnSize(String columnSize) {
+    public void setColumnSize(Integer columnSize) {
       this.columnSize = columnSize;
     }
 
-    public String getScale() {
+    public Integer getScale() {
       return scale;
     }
 
-    public void setScale(String scale) {
+    public void setScale(Integer scale) {
       this.scale = scale;
     }
 

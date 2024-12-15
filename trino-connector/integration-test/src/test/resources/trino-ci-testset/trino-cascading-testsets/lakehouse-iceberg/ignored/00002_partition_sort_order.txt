@@ -1,0 +1,51 @@
+
+"CREATE TABLE %.gt_db2.lineitem (
+   orderkey bigint,
+   partkey bigint,
+   suppkey bigint,
+   linenumber integer,
+   quantity decimal(12, 2),
+   extendedprice decimal(12, 2),
+   discount decimal(12, 2),
+   tax decimal(12, 2),
+   returnflag varchar,
+   linestatus varchar,
+   shipdate date,
+   commitdate date,
+   receiptdate date,
+   shipinstruct varchar,
+   shipmode varchar,
+   comment varchar
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/lineitem',
+   partitioning = ARRAY['year(commitdate)'],
+   sorted_by = ARRAY['partkey','extendedprice DESC']
+)"
+
+
+"CREATE TABLE %.gt_db2.tb01 (
+   orderkey bigint,
+   partkey bigint,
+   suppkey bigint,
+   linenumber integer,
+   quantity decimal(12, 2),
+   extendedprice decimal(12, 2),
+   discount decimal(12, 2),
+   tax decimal(12, 2),
+   returnflag varchar,
+   linestatus varchar,
+   shipdate date,
+   commitdate date,
+   receiptdate date,
+   shipinstruct varchar,
+   shipmode varchar,
+   comment varchar
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01',
+   partitioning = ARRAY['day(commitdate)','month(shipdate)','bucket(partkey, 2)','truncate(shipinstruct, 2)'],
+   sorted_by = ARRAY['partkey ASC NULLS LAST','extendedprice DESC NULLS FIRST']
+)"

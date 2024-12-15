@@ -29,24 +29,34 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
   usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
   Options
- [options]
+ usage: gcli
  -a,--audit              display audit information
+    --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
+    --columnfile <arg>   CSV file describing columns
  -d,--distribution       display distribution information
+    --datatype <arg>     column data type
+    --default <arg>      default column value
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
+    --login <arg>        user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+    --null <arg>         column value can be null (true/false)
  -o,--owner              display entity owner
+    --output <arg>       output format (plain/table)
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
     --partition          display partition information
+    --position <arg>     position of column
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
+    --simple             simple authentication
+    --sortorder          display sortorder information
  -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
@@ -89,6 +99,14 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
+### Setting the Gravitino Authentication Type
+
+The authentication type can also be set in several ways.
+
+1. Passed in on the command line via the `--simple` flag.
+2. Set via the 'GRAVITINO_AUTH' environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
 ### Gravitino CLI configuration file
 
 The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
@@ -107,6 +125,29 @@ URL=http://localhost:8090
 # Ignore client/server version mismatch
 ignore=true
 
+# Authentication
+auth=simple
+
+```
+
+OAuth authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=oauth
+serverURI=http://127.0.0.1:1082
+credential=xx:xx
+token=test
+scope=token/test
+```
+
+Kerberos authentication can also be configured via the configuration file.
+
+```text
+# Authentication
+auth=kerberos
+principal=user/admin@foo.com
+keytabFile=file.keytab
 ```
 
 ### Potentially unsafe operations
@@ -289,6 +330,30 @@ gcli catalog create  -name postgres --provider postgres --properties jdbc-url=jd
 gcli catalog create --name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
 ```
 
+##### Create a Doris catalog
+
+```bash
+gcli catalog create --name doris --provider doris --properties jdbc-url=jdbc:mysql://localhost:9030,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
+```
+
+##### Create a Paimon catalog
+
+```bash
+gcli catalog create --name paimon --provider paimon --properties catalog-backend=jdbc,uri=jdbc:mysql://127.0.0.1:3306/metastore_db,authentication.type=simple
+```
+
+#### Create a Hudi catalog
+
+```bash
+gcli catalog create --name hudi --provider hudi --properties catalog-backend=hms,uri=thrift://127.0.0.1:9083
+```
+
+#### Create an Oceanbase catalog
+
+```bash
+gcli catalog create --name oceanbase --provider oceanbase --properties jdbc-url=jdbc:mysql://localhost:2881,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
+```
+
 #### Delete a catalog
 
 ```bash
@@ -361,6 +426,16 @@ Setting and removing schema properties is not currently supported by the Java AP
 
 ### Table commands
 
+When creating a table the columns are specified in CSV file specifying the name of the column, the datatype, a comment, true or false if the column is nullable, true or false if the column is auto incremented, a default value and a default type. Not all of the columns need to be specifed just the name and datatype columns. If not specified comment default to null, nullability to true and auto increment to false. If only the default value is specified it defaults to the same data type as the column.
+
+Example CSV file
+```text
+Name,Datatype,Comment,Nullable,AutoIncrement,DefaultValue,DefaultType
+name,String,person's name
+ID,Integer,unique id,false,true
+location,String,city they work in,false,false,Sydney,String
+```
+
 #### Show all tables
 
 ```bash
@@ -387,6 +462,11 @@ gcli table details --name catalog_postgres.hr.departments --distribution
 #### Show tables partition information
 ```bash
 gcli table details --name catalog_postgres.hr.departments --partition
+```
+
+#### Show tables sort order information
+```bash
+gcli table details --name catalog_postgres.hr.departments --sortorder
 ```
 
 ### Show table indexes
@@ -420,6 +500,11 @@ gcli table set --name catalog_postgres.hr.salaries --property test --value value
 gcli table remove --name catalog_postgres.hr.salaries --property test
 ```
 
+#### Create a table
+
+```bash
+gcli table create --name catalog_postgres.hr.salaries --comment "comment" --columnfile ~/table.csv
+```
 
 ### User commands
 
@@ -509,6 +594,12 @@ gcli tag set --name catalog_postgres.hr --tag tagA tagB
 
 ```bash
 gcli tag remove --name catalog_postgres.hr --tag tagA tagB
+```
+
+#### Remove all tags from an entity
+
+```bash
+gcli tag remove --name catalog_postgres.hr
 ```
 
 #### List all tags on an entity
@@ -720,4 +811,51 @@ gcli fileset set  --name hadoop.schema.fileset --property test --value value
 
 ```bash
 gcli fileset remove --name hadoop.schema.fileset --property test
+```
+
+### Column commands
+
+Note that some commands are not supported depending on what the database supports.
+
+When setting the datatype of a column the following basic types are currently supported:
+null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
+
+In addition decimal(precision,scale) and varchar(length).
+
+#### Add a column
+
+```bash
+gcli column create --name catalog_postgres.hr.departments.value --datatype long
+gcli column create --name catalog_postgres.hr.departments.money --datatype "decimal(10,2)"
+gcli column create --name catalog_postgres.hr.departments.name --datatype "varchar(100)"
+gcli column create --name catalog_postgres.hr.departments.fullname --datatype "varchar(250)" --default "Fred Smith" --null=false
+```
+
+#### Delete a column
+
+```bash
+gcli  column delete --name catalog_postgres.hr.departments.money
+```
+
+#### Update a column
+
+```bash
+gcli column update --name catalog_postgres.hr.departments.value --rename values
+gcli column update --name catalog_postgres.hr.departments.values --datatype "varchar(500)"
+gcli column update --name catalog_postgres.hr.departments.values --position name
+gcli column update --name catalog_postgres.hr.departments.name --null true
+```
+
+#### Simple authentication
+
+```bash
+gcli <normal command> --simple
+```
+
+### Authentication
+
+#### Simple authentication with user name
+
+```bash
+gcli <normal command> --simple --login userName
 ```
