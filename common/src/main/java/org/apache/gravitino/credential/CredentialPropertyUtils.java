@@ -33,6 +33,7 @@ public class CredentialPropertyUtils {
   @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
   @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
   @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
+  @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
 
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
@@ -53,7 +54,9 @@ public class CredentialPropertyUtils {
           OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID,
           ICEBERG_OSS_ACCESS_KEY_ID,
           OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
-          ICEBERG_OSS_ACCESS_KEY_SECRET);
+          ICEBERG_OSS_ACCESS_KEY_SECRET,
+          ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN,
+          ICEBERG_ADLS_TOKEN);
 
   /**
    * Transforms a specific credential into a map of Iceberg properties.
@@ -74,6 +77,17 @@ public class CredentialPropertyUtils {
     }
     if (credential instanceof OSSTokenCredential || credential instanceof OSSSecretKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+    }
+    if (credential instanceof ADLSTokenCredential) {
+      ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
+      String sasTokenkey =
+          String.format(
+              "%s.%s.%s",
+              ICEBERG_ADLS_TOKEN, adlsCredential.accountName(), ADLSTokenCredential.ADLS_DOMAIN);
+
+      Map<String, String> icebergADLSCredentialProperties = new HashMap<>();
+      icebergADLSCredentialProperties.put(sasTokenkey, adlsCredential.sasToken());
+      return icebergADLSCredentialProperties;
     }
     return credential.toProperties();
   }
