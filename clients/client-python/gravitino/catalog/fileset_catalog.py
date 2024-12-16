@@ -19,10 +19,13 @@ import logging
 from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
+from gravitino.api.credential.supports_credentials import SupportsCredentials
+from gravitino.api.credential.credential import Credential
 from gravitino.api.fileset import Fileset
 from gravitino.api.fileset_change import FilesetChange
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.catalog.base_schema_catalog import BaseSchemaCatalog
+from gravitino.client.generic_fileset import GenericFileset
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 from gravitino.dto.requests.fileset_update_request import FilesetUpdateRequest
@@ -40,7 +43,7 @@ from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HA
 logger = logging.getLogger(__name__)
 
 
-class FilesetCatalog(BaseSchemaCatalog):
+class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
     """
     Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
     example, schemas and filesets list, creation, update and deletion. A Fileset catalog is under the metalake.
@@ -124,7 +127,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return fileset_resp.fileset()
+        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def create_fileset(
         self,
@@ -321,3 +324,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         if isinstance(change, FilesetChange.RemoveComment):
             return FilesetUpdateRequest.UpdateFilesetCommentRequest(None)
         raise ValueError(f"Unknown change type: {type(change).__name__}")
+
+    def support_credentials(self) -> SupportsCredentials:
+        return self
+
+    def get_credentials(self) -> List[Credential]:
+        return self._object_credential_operations.get_credentials()

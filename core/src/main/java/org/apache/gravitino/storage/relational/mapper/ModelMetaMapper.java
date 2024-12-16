@@ -81,4 +81,7 @@ public interface ModelMetaMapper {
       method = "deleteModelMetasByLegacyTimeline")
   Integer deleteModelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelLatestVersion")
+  Integer updateModelLatestVersion(@Param("modelId") Long modelId);
 }
