@@ -63,6 +63,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.jdom", "org.apache.gravitino.shaded.org.jdom")
   relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
+  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
 }
 
 tasks.jar {

@@ -45,10 +45,15 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
-  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aws-core"))
+  testImplementation(project(":bundles:gcp-core"))
+  testImplementation(project(":bundles:aliyun-core"))
+  testImplementation(project(":bundles:azure-core"))
+
+  testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.gcs)
+  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.oss)
 
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
