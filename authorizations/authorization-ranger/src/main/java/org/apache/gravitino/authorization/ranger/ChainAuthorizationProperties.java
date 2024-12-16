@@ -69,8 +69,11 @@ public class ChainAuthorizationProperties {
     Preconditions.checkArgument(
         pluginNames.length > 0,
         String.format("%s must have at least one plugin name", CHAIN_PLUGINS_PROPERTIES_KEY));
+    Preconditions.checkArgument(
+        Arrays.asList(pluginNames).contains(pluginName),
+        String.format("pluginName %s must be one of %s", pluginName, Arrays.toString(pluginNames)));
 
-    String regex = "^authorization\\.chain\\.(" + String.join("|", pluginNames) + ")\\..*";
+    String regex = "^authorization\\.chain\\.(" + pluginName + ")\\..*";
     Pattern pattern = Pattern.compile(regex);
 
     Map<String, String> filteredProperties = new HashMap<>();
@@ -81,7 +84,7 @@ public class ChainAuthorizationProperties {
       }
     }
 
-    String removeRegex = "^authorization\\.chain\\.(" + String.join("|", pluginNames) + ")\\.";
+    String removeRegex = "^authorization\\.chain\\.(" + pluginName + ")\\.";
     Pattern removePattern = Pattern.compile(removeRegex);
 
     Map<String, String> resultProperties = new HashMap<>();
@@ -92,7 +95,6 @@ public class ChainAuthorizationProperties {
       }
     }
 
-    resultProperties.forEach((key, value) -> System.out.println(key + " = " + value));
     return resultProperties;
   }
 
