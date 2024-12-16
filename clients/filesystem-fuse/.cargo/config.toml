@@ -16,5 +16,5 @@
 # under the License.
 
 [build]
-target-dir = "build"
+#target-dir = "build"
 
