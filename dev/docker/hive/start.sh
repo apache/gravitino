@@ -41,8 +41,12 @@ sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 
 if [[ -n "${ENABLE_JDBC_AUTHORIZATION}" ]]; then
-  cp -f ${HIVE_CONF_DIR}/hive-site-for-jdbc.xml ${HIVE_CONF_DIR}/hive-site.xml
-  cp -f ${HIVE_CONF_DIR}/hiveserver2-site-for-jdbc.xml ${HIVE_CONF_DIR}/hiveserver2-site.xml
+  if [[ -n "${RANGER_HIVE_REPOSITORY_NAME}" && -n "${RANGER_SERVER_URL}" ]]; then
+    echo "You can't set ENABLE_JDBC_AUTHORIZATION and RANGER_HIVE_REPOSITORY_NAME at the same time."
+    exit -1
+  fi
+  cp -f ${HIVE_CONF_DIR}/hive-site-for-sql-base-auth.xml ${HIVE_CONF_DIR}/hive-site.xml
+  cp -f ${HIVE_CONF_DIR}/hiveserver2-site-for-sql-base-auth.xml ${HIVE_CONF_DIR}/hiveserver2-site.xml
 fi
 
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
