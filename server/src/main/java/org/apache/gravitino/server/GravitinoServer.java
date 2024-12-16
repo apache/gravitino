@@ -27,6 +27,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -118,6 +119,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.credentialOperationDispatcher())
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
