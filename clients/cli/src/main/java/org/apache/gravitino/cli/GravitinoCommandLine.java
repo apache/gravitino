@@ -32,7 +32,6 @@ import java.util.Objects;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.cli.commands.Command;
 
 /* Gravitino Command line */
@@ -177,7 +176,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       if (Objects.isNull(metalake)) {
-        System.err.println("! " + MetadataObject.Type.METALAKE.name() + " is not defined");
+        System.err.println("! " + CommandEntities.METALAKE + " is not defined");
         return;
       }
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
