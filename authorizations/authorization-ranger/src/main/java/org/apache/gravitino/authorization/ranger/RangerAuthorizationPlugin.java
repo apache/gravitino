@@ -87,7 +87,7 @@ public abstract class RangerAuthorizationPlugin
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
-    AuthorizationProperties.validate(RangerAuthorizationProperties.class, config);
+    RangerAuthorizationProperties.validate(config);
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);

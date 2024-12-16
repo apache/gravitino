@@ -21,7 +21,8 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 
-public class RangerAuthorizationProperties implements AuthorizationProperties {
+/** The properties for Ranger authorization plugin. */
+public class RangerAuthorizationProperties {
   /** Ranger admin web URIs */
   public static final String RANGER_ADMIN_URL = "authorization.ranger.admin.url";
 
@@ -42,8 +43,7 @@ public class RangerAuthorizationProperties implements AuthorizationProperties {
    */
   public static final String RANGER_PASSWORD = "authorization.ranger.password";
 
-  @Override
-  public void validateProperties(Map<String, String> properties) {
+  public static void validate(Map<String, String> properties) {
     Preconditions.checkArgument(
         properties.containsKey(RANGER_ADMIN_URL),
         String.format("%s is required", RANGER_ADMIN_URL));

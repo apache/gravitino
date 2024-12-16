@@ -29,8 +29,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * ChainAuthorizationProperties is a class that implements {@link AuthorizationProperties}
- * interface. <br>
+ * The properties for Chain authorization plugin. <br>
  * <br>
  * Configuration Example: <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
@@ -49,7 +48,7 @@ import java.util.stream.Collectors;
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
  * "authorization.chain.hdfs1.ranger.service.name" = "hdfsDev"; <br>
  */
-public class ChainAuthorizationProperties implements AuthorizationProperties {
+public class ChainAuthorizationProperties {
   public static final String PLUGINS_SPLITTER = ",";
   /** Chain authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
@@ -97,8 +96,7 @@ public class ChainAuthorizationProperties implements AuthorizationProperties {
     return resultProperties;
   }
 
-  @Override
-  public void validateProperties(Map<String, String> properties) {
+  public static void validate(Map<String, String> properties) {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY),
         String.format("%s is required", CHAIN_PLUGINS_PROPERTIES_KEY));

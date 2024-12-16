@@ -32,8 +32,7 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.username", "admin");
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.name", "hiveDev");
-    Assertions.assertDoesNotThrow(
-        () -> AuthorizationProperties.validate(RangerAuthorizationProperties.class, properties));
+    Assertions.assertDoesNotThrow(() -> RangerAuthorizationProperties.validate(properties));
   }
 
   @Test
@@ -44,8 +43,7 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> AuthorizationProperties.validate(RangerAuthorizationProperties.class, properties));
+        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
   }
 
   @Test
@@ -56,8 +54,7 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> AuthorizationProperties.validate(RangerAuthorizationProperties.class, properties));
+        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
   }
 
   @Test
@@ -68,8 +65,7 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> AuthorizationProperties.validate(RangerAuthorizationProperties.class, properties));
+        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
   }
 
   @Test
@@ -80,8 +76,7 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.username", "admin");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> AuthorizationProperties.validate(RangerAuthorizationProperties.class, properties));
+        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
   }
 
   @Test
@@ -92,7 +87,6 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.username", "admin");
     properties.put("authorization.ranger.password", "admin");
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> AuthorizationProperties.validate(RangerAuthorizationProperties.class, properties));
+        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
   }
 }
