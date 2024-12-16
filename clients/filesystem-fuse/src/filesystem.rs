@@ -37,7 +37,7 @@ pub(crate) trait RawFileSystem: Send + Sync {
     /// Get the file path by file id, if the file id is valid, return the file path
     async fn get_file_path(&self, file_id: u64) -> String;
 
-    /// Validate the file id and file handle, if the file id and file handle is valid, return success
+    /// Validate the file id and file handle, if file id and file handle is valid and it associated, return Ok
     async fn valid_file_id(&self, file_id: u64, fh: u64) -> Result<()>;
 
     /// Get the file stat by file id. if the file id is valid, return the file stat

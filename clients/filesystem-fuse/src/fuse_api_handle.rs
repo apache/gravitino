@@ -83,7 +83,7 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
 
 impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     async fn init(&self, _req: Request) -> fuse3::Result<ReplyInit> {
-        self.fs.init().await;
+        self.fs.init().await?;
         Ok(ReplyInit {
             max_write: NonZeroU32::new(Self::DEFAULT_MAX_WRITE_SIZE).unwrap(),
         })
