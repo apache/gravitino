@@ -127,7 +127,7 @@ public class ADLSTokenProvider implements CredentialProvider {
         new DataLakeSasImplUtil(
                 signatureValues,
                 locationParts.getContainer(),
-                locationParts.getPath().replaceAll("^/+|/*$", ""),
+                ADLSLocationUtils.trimSlashes(locationParts.getPath()),
                 true)
             .generateUserDelegationSas(
                 userDelegationKey, locationParts.getAccountName(), Context.NONE);

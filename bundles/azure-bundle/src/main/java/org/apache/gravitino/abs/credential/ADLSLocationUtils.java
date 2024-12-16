@@ -22,6 +22,7 @@ package org.apache.gravitino.abs.credential;
 import java.net.URI;
 
 public class ADLSLocationUtils {
+  /** Encapsulates parts of an ADLS URI: container, account name, and path. */
   public static class ADLSLocationParts {
     private final String container;
     private final String accountName;
@@ -46,6 +47,16 @@ public class ADLSLocationUtils {
     }
   }
 
+  /**
+   * Parses an ADLS URI and extracts its components. Example: Input:
+   * "abfss://container@accountName.dfs.core.windows.net/path/data". Output: ADLSLocationParts {
+   * container = "container", accountName = "accountName", path = "/path/data" }
+   *
+   * @param location The ADLS URI (e.g.,
+   *     "abfss://container@accountName.dfs.core.windows.net/path/data").
+   * @return An ADLSLocationParts object containing the container, account name, and path.
+   * @throws IllegalArgumentException If the URI format is invalid.
+   */
   public static ADLSLocationParts parseLocation(String location) {
     URI locationUri = URI.create(location);
 
@@ -57,5 +68,18 @@ public class ADLSLocationUtils {
 
     return new ADLSLocationParts(
         authorityParts[0], authorityParts[1].split("\\.")[0], locationUri.getPath());
+  }
+
+  /**
+   * Trims leading and trailing slashes from a given string.
+   *
+   * @param input The string to process.
+   * @return A string without leading or trailing slashes, or null if the input is null.
+   */
+  public static String trimSlashes(String input) {
+    if (input == null) {
+      return null;
+    }
+    return input.replaceAll("^/+|/*$", "");
   }
 }
