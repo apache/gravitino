@@ -15,29 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-[package]
-name = "filesystem-fuse"
-version = "0.8.0-incubating-SNAPSHOT"
-rust-version = "1.75"
-edition = "2021"
-
-homepage = "https://gravitino.apache.org"
-license = "Apache-2.0"
-repository = "https://github.com/apache/gravitino"
-
-[[bin]]
-name = "gvfs-fuse"
-path = "src/main.rs"
-
-[lib]
-name="gvfs_fuse"
-
-[dependencies]
-async-trait = "0.1"
-bytes = "1.6.0"
-futures-util = "0.3.30"
-fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }
-log = "0.4.22"
-tokio = { version = "1.38.0", features = ["full"] }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-
+[toolchain]
+channel = "1.82.0"
+components = ["rustfmt", "clippy", "rust-src"]
+profile = "default"
