@@ -35,6 +35,10 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(project(":catalogs:hadoop-common")) {
+    exclude("*")
+  }
+
   implementation(libs.guava)
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)

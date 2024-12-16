@@ -96,6 +96,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":catalogs:hadoop-common"))
 
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
