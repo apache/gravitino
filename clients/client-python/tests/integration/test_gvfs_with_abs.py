@@ -123,8 +123,8 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
             comment="",
             properties={
                 "filesystem-providers": "abs",
-                "azure-account-name": cls.azure_abs_account_name,
-                "azure-account-key": cls.azure_abs_account_key,
+                "azure-storage-account-name": cls.azure_abs_account_name,
+                "azure-storage-account-key": cls.azure_abs_account_key,
             },
         )
         catalog.as_schemas().create_schema(
