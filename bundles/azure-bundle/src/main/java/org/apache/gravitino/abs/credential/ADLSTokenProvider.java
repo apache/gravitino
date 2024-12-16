@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
@@ -65,7 +66,7 @@ public class ADLSTokenProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE;
+    return CredentialConstants.ADLS_TOKEN_CREDENTIAL_PROVIDER_TYPE;
   }
 
   @Override
