@@ -171,7 +171,7 @@ Changelog
 
 - apache/gravitino-ci:hive-0.1.17
   - Add support for JDBC SQL standard authorization
-    - Add JDBC SQL standard authorization related configuration in the `hive-site-for-jdbc.xml` and `hiveserver2-siste-for-jdbc.xml`
+    - Add JDBC SQL standard authorization related configuration in the `hive-site-for-sql-base-auth.xml` and `hiveserver2-site-for-sql-base-auth.xml`
 - 
 - apache/gravitino-ci:hive-0.1.16
   - Add GCS related configuration in the `hive-site.xml` file.
