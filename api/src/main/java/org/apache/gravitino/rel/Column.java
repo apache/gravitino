@@ -23,11 +23,11 @@ import com.google.common.base.Strings;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a column of a {@link Table}. It defines basic properties of a column,

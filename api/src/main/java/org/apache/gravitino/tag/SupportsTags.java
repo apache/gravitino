@@ -17,12 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino;
+package org.apache.gravitino.tag;
 
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
-import org.apache.gravitino.tag.Tag;
 
 /**
  * Interface for supporting getting or associate tags to objects. This interface will be mixed with

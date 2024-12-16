@@ -23,6 +23,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a schema in the {@link Catalog}. A Schema is a basic container of

@@ -23,7 +23,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsTags;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -33,6 +32,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a table in a {@link Namespace}. It defines the basic properties of a
