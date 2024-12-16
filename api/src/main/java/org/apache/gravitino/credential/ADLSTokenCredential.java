@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 public class ADLSTokenCredential implements Credential {
 
   /** ADLS SAS token credential type. */
-  private static final String ADLS_SAS_TOKEN_CREDENTIAL_TYPE = "adls-sas-token";
+  public static final String ADLS_SAS_TOKEN_CREDENTIAL_TYPE = "adls-sas-token";
   /** ADLS base domain */
   public static final String ADLS_DOMAIN = "dfs.core.windows.net";
   /** ADLS storage account name */

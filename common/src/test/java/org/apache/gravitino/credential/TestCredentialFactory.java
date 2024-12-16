@@ -153,8 +153,11 @@ public class TestCredentialFactory {
     long expireTime = 100;
     Credential credential =
         CredentialFactory.create(
-            ADLSTokenCredential.CREDENTIAL_TYPE, adlsTokenCredentialInfo, expireTime);
-    Assertions.assertEquals(ADLSTokenCredential.CREDENTIAL_TYPE, credential.credentialType());
+            ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE,
+            adlsTokenCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE, credential.credentialType());
     Assertions.assertInstanceOf(ADLSTokenCredential.class, credential);
 
     ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
