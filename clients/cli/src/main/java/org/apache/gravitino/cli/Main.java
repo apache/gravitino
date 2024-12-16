@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli;
 
-import java.util.Objects;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -46,14 +45,6 @@ public class Main {
         return;
       }
       String command = resolveCommand(line);
-      if (Objects.isNull(command)) {
-        /* Default to 'details' command. */
-        command =
-            (Objects.nonNull(entity) && line.hasOption(GravitinoOptions.HELP))
-                ? CommandActions.HELP
-                : CommandActions.DETAILS;
-      }
-
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
 
       if (entity != null && command != null) {
@@ -84,7 +75,8 @@ public class Main {
         return action;
       }
     } else if (args.length == 1) {
-      return null;
+      /* Default to 'details' command. */
+      return line.hasOption(GravitinoOptions.HELP) ? CommandActions.HELP : CommandActions.DETAILS;
     } else if (args.length == 0) {
       return null;
     }
