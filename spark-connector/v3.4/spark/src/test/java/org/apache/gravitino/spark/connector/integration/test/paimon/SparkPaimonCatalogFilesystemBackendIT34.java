@@ -16,24 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.spark.connector.version;
+package org.apache.gravitino.spark.connector.integration.test.paimon;
 
-import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34;
-import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark34;
 import org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark34;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestCatalogNameAdaptor {
+public class SparkPaimonCatalogFilesystemBackendIT34 extends SparkPaimonCatalogFilesystemBackendIT {
+
   @Test
-  void testSpark34() {
-    String hiveCatalogName = CatalogNameAdaptor.getCatalogName("hive");
-    Assertions.assertEquals(GravitinoHiveCatalogSpark34.class.getName(), hiveCatalogName);
-
-    String icebergCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-iceberg");
-    Assertions.assertEquals(GravitinoIcebergCatalogSpark34.class.getName(), icebergCatalogName);
-
-    String paimonCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-paimon");
-    Assertions.assertEquals(GravitinoPaimonCatalogSpark34.class.getName(), paimonCatalogName);
+  void testCatalogClassName() {
+    String catalogClass =
+        getSparkSession()
+            .sessionState()
+            .conf()
+            .getConfString("spark.sql.catalog." + getCatalogName());
+    Assertions.assertEquals(GravitinoPaimonCatalogSpark34.class.getName(), catalogClass);
   }
 }

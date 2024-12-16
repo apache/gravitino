@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.hive.SparkHiveTable;
 import org.apache.gravitino.spark.connector.iceberg.SparkIcebergTable;
+import org.apache.gravitino.spark.connector.paimon.SparkPaimonTable;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -69,6 +70,10 @@ public class SparkTableInfo {
 
   public String getTableLocation() {
     return tableProperties.get(TableCatalog.PROP_LOCATION);
+  }
+
+  public Map<String, String> getTableProperties() {
+    return tableProperties;
   }
 
   // Include database name and table name
@@ -186,6 +191,8 @@ public class SparkTableInfo {
       return ((SparkHiveTable) baseTable).schema();
     } else if (baseTable instanceof SparkIcebergTable) {
       return ((SparkIcebergTable) baseTable).schema();
+    } else if (baseTable instanceof SparkPaimonTable) {
+      return ((SparkPaimonTable) baseTable).schema();
     } else {
       throw new IllegalArgumentException(
           "Doesn't support Spark table: " + baseTable.getClass().getName());
