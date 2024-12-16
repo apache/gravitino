@@ -354,7 +354,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     } catch (EntityAlreadyExistsException e) {
       LOG.error("Failed to import schema {} with id {} to the store.", identifier, uid, e);
       throw new UnsupportedOperationException(
-          "The schema is already managed by another catalog and cannot be loaded by the current catalog.");
+          "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+              + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import schema entity to the store.", e);

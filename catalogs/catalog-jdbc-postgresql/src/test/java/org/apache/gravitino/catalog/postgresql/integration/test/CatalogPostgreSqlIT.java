@@ -681,9 +681,15 @@ public class CatalogPostgreSqlIT extends BaseIT {
     newCatalog.asSchemas().loadSchema(testSchemaName2);
     Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName2, false));
     createSchema(testSchemaName2);
+    SupportsSchemas schemaOps = newCatalog.asSchemas();
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> newCatalog.asSchemas().loadSchema(testSchemaName2));
+        UnsupportedOperationException.class, () -> schemaOps.loadSchema(testSchemaName2));
+    // recovered by re-build the catalog
+    Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
+    newCatalog = createCatalog(newCatalogName);
+    Schema loadedSchema = newCatalog.asSchemas().loadSchema(testSchemaName2);
+    Assertions.assertEquals(testSchemaName2, loadedSchema.name());
+
     Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
   }
 
