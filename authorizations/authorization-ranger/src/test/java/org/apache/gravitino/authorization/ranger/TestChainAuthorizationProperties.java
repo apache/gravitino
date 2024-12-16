@@ -203,11 +203,11 @@ public class TestChainAuthorizationProperties {
     Map<String, String> rangerHiveProperties =
         ChainAuthorizationProperties.fetchAuthPluginProperties("hive1", properties);
     Assertions.assertDoesNotThrow(
-        () -> ChainAuthorizationProperties.validate(rangerHiveProperties));
+        () -> RangerAuthorizationProperties.validate(rangerHiveProperties));
 
     Map<String, String> rangerHDFSProperties =
         ChainAuthorizationProperties.fetchAuthPluginProperties("hdfs1", properties);
     Assertions.assertDoesNotThrow(
-        () -> ChainAuthorizationProperties.validate(rangerHDFSProperties));
+        () -> RangerAuthorizationProperties.validate(rangerHDFSProperties));
   }
 }
