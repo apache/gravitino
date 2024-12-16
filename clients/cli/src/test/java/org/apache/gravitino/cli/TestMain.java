@@ -143,4 +143,36 @@ public class TestMain {
     String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.CATALOG, entity);
   }
+
+  @Test
+  public void metalakeWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"metalake", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.METALAKE);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @Test
+  public void catalogWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"catalog", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.CATALOG);
+  }
+
+  @Test
+  public void schemaWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"schema", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.SCHEMA);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
 }
