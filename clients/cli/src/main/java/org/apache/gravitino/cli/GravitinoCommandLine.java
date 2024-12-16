@@ -546,13 +546,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String table = name.getTableName();
-    String column = name.getColumnName();
 
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
-    } else if (CommandActions.CREATE.equals(command)) {
+      return;
+    }
+
+    String column = name.getColumnName();
+
+    if (CommandActions.CREATE.equals(command)) {
       String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       String position = line.getOptionValue(GravitinoOptions.POSITION);
