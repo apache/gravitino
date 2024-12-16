@@ -49,13 +49,13 @@ public class AzureFileSystemProvider implements FileSystemProvider {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, ImmutableMap.of());
 
-    if (config.containsKey(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)
-        && config.containsKey(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY)) {
+    if (config.containsKey(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME)
+        && config.containsKey(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY)) {
       hadoopConfMap.put(
           String.format(
               "fs.azure.account.key.%s.dfs.core.windows.net",
-              config.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)),
-          config.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY));
+              config.get(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME)),
+          config.get(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY));
     }
 
     if (!config.containsKey(ABFS_IMPL_KEY)) {

@@ -77,8 +77,8 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
     Map<String, String> properties = Maps.newHashMap();
 
-    properties.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
-    properties.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    properties.put(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    properties.put(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     properties.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog catalog =
@@ -96,8 +96,8 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
-    conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    conf.set(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    conf.set(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     conf.set("fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem");
   }
 
@@ -133,13 +133,13 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
     Map<String, String> hadoopConfMap = FileSystemUtils.toHadoopConfigMap(map, ImmutableMap.of());
 
-    if (gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME) != null
-        && gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY) != null) {
+    if (gvfsConf.get(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME) != null
+        && gvfsConf.get(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY) != null) {
       hadoopConfMap.put(
           String.format(
               "fs.azure.account.key.%s.dfs.core.windows.net",
-              gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)),
-          gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY));
+              gvfsConf.get(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME)),
+          gvfsConf.get(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY));
     }
 
     hadoopConfMap.forEach(absConf::set);

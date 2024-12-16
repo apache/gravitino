@@ -54,9 +54,7 @@ public class CredentialPropertyUtils {
           OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID,
           ICEBERG_OSS_ACCESS_KEY_ID,
           OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
-          ICEBERG_OSS_ACCESS_KEY_SECRET,
-          ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN,
-          ICEBERG_ADLS_TOKEN);
+          ICEBERG_OSS_ACCESS_KEY_SECRET);
 
   /**
    * Transforms a specific credential into a map of Iceberg properties.
@@ -80,13 +78,13 @@ public class CredentialPropertyUtils {
     }
     if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
-      String sasTokenkey =
+      String sasTokenKey =
           String.format(
               "%s.%s.%s",
               ICEBERG_ADLS_TOKEN, adlsCredential.accountName(), ADLSTokenCredential.ADLS_DOMAIN);
 
       Map<String, String> icebergADLSCredentialProperties = new HashMap<>();
-      icebergADLSCredentialProperties.put(sasTokenkey, adlsCredential.sasToken());
+      icebergADLSCredentialProperties.put(sasTokenKey, adlsCredential.sasToken());
       return icebergADLSCredentialProperties;
     }
     return credential.toProperties();

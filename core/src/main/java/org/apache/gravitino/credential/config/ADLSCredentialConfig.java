@@ -26,40 +26,40 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.storage.ADLSProperties;
+import org.apache.gravitino.storage.AzureProperties;
 
 public class ADLSCredentialConfig extends Config {
 
-  public static final ConfigEntry<String> ADLS_STORAGE_ACCOUNT_NAME =
-      new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME)
+  public static final ConfigEntry<String> AZURE_STORAGE_ACCOUNT_NAME =
+      new ConfigBuilder(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)
           .doc("The name of the Azure Data Lake Storage account.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
-  public static final ConfigEntry<String> ADLS_STORAGE_ACCOUNT_KEY =
-      new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY)
+  public static final ConfigEntry<String> AZURE_STORAGE_ACCOUNT_KEY =
+      new ConfigBuilder(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY)
           .doc("The key of the Azure Data Lake Storage account.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
-  public static final ConfigEntry<String> ADLS_TENANT_ID =
-      new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_TENANT_ID)
+  public static final ConfigEntry<String> AZURE_TENANT_ID =
+      new ConfigBuilder(AzureProperties.GRAVITINO_AZURE_TENANT_ID)
           .doc("The Azure Active Directory (AAD) tenant ID used for authentication.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
-  public static final ConfigEntry<String> ADLS_CLIENT_ID =
-      new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_CLIENT_ID)
+  public static final ConfigEntry<String> AZURE_CLIENT_ID =
+      new ConfigBuilder(AzureProperties.GRAVITINO_AZURE_CLIENT_ID)
           .doc("The client ID used for authenticating with Azure Active Directory (AAD).")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
-  public static final ConfigEntry<String> ADLS_CLIENT_SECRET =
-      new ConfigBuilder(ADLSProperties.GRAVITINO_ADLS_CLIENT_SECRET)
+  public static final ConfigEntry<String> AZURE_CLIENT_SECRET =
+      new ConfigBuilder(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET)
           .doc("The client secret used for authenticating with Azure Active Directory (AAD).")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
@@ -80,27 +80,27 @@ public class ADLSCredentialConfig extends Config {
 
   @NotNull
   public String storageAccountName() {
-    return this.get(ADLS_STORAGE_ACCOUNT_NAME);
+    return this.get(AZURE_STORAGE_ACCOUNT_NAME);
   }
 
   @NotNull
   public String storageAccountKey() {
-    return this.get(ADLS_STORAGE_ACCOUNT_KEY);
+    return this.get(AZURE_STORAGE_ACCOUNT_KEY);
   }
 
   @NotNull
   public String tenantId() {
-    return this.get(ADLS_TENANT_ID);
+    return this.get(AZURE_TENANT_ID);
   }
 
   @NotNull
   public String clientId() {
-    return this.get(ADLS_CLIENT_ID);
+    return this.get(AZURE_CLIENT_ID);
   }
 
   @NotNull
   public String clientSecret() {
-    return this.get(ADLS_CLIENT_SECRET);
+    return this.get(AZURE_CLIENT_SECRET);
   }
 
   @NotNull

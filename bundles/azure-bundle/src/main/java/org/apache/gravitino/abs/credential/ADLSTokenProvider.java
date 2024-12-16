@@ -105,17 +105,19 @@ public class ADLSTokenProvider implements CredentialProvider {
             .buildClient();
 
     OffsetDateTime start = OffsetDateTime.now();
-    OffsetDateTime expiry = start.plusSeconds(tokenExpireSecs);
+    OffsetDateTime expiry = OffsetDateTime.now().plusSeconds(tokenExpireSecs);
     UserDelegationKey userDelegationKey = dataLakeServiceClient.getUserDelegationKey(start, expiry);
 
     PathSasPermission pathSasPermission =
-        new PathSasPermission()
-            .setReadPermission(true)
-            .setWritePermission(true)
-            .setDeletePermission(true)
-            .setListPermission(true)
-            .setCreatePermission(true)
-            .setAddPermission(true);
+        new PathSasPermission().setReadPermission(true).setListPermission(true);
+
+    if (!writePaths.isEmpty()) {
+      pathSasPermission
+          .setWritePermission(true)
+          .setDeletePermission(true)
+          .setCreatePermission(true)
+          .setAddPermission(true);
+    }
 
     DataLakeServiceSasSignatureValues signatureValues =
         new DataLakeServiceSasSignatureValues(expiry, pathSasPermission);
@@ -131,6 +133,6 @@ public class ADLSTokenProvider implements CredentialProvider {
                 userDelegationKey, locationParts.getAccountName(), Context.NONE);
 
     return new ADLSTokenCredential(
-        locationParts.getAccountName(), sasToken, tokenExpireSecs * 1000);
+        locationParts.getAccountName(), sasToken, expiry.toInstant().toEpochMilli());
   }
 }

@@ -18,22 +18,22 @@
  */
 package org.apache.gravitino.storage;
 
-// Defines unified properties for Azure Data Lake Storage (ADLS) configurations.
-public class ADLSProperties {
+// Defines unified properties for Azure configurations.
+public class AzureProperties {
 
-  // Configuration key for specifying the name of the ADLS storage account.
-  public static final String GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME = "adls-storage-account-name";
-  // Configuration key for specifying the key of the ADLS storage account.
-  public static final String GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY = "adls-storage-account-key";
+  // Configuration key for specifying the name of the storage account.
+  public static final String GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME = "azure-storage-account-name";
+  // Configuration key for specifying the key of the storage account.
+  public static final String GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY = "azure-storage-account-key";
 
   // Configuration key for specifying the Azure Active Directory (AAD) tenant ID.
-  public static final String GRAVITINO_ADLS_TENANT_ID = "adls-tenant-id";
+  public static final String GRAVITINO_AZURE_TENANT_ID = "azure-tenant-id";
   // Configuration key for specifying the Azure Active Directory (AAD) client ID used for
   // authentication.
-  public static final String GRAVITINO_ADLS_CLIENT_ID = "adls-client-id";
+  public static final String GRAVITINO_AZURE_CLIENT_ID = "azure-client-id";
   // Configuration key for specifying the Azure Active Directory (AAD) client secret used for
   // authentication.
-  public static final String GRAVITINO_ADLS_CLIENT_SECRET = "adls-client-secret";
+  public static final String GRAVITINO_AZURE_CLIENT_SECRET = "azure-client-secret";
 
-  private ADLSProperties() {}
+  private AzureProperties() {}
 }

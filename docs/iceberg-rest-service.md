@@ -175,15 +175,15 @@ Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_na
 
 Gravitino Iceberg REST service supports generating SAS token to access ADLS data.
 
-| Configuration item                                   | Description                                                                                               | Default value | Required | Since Version    |
-|------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl`                     | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS. | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.credential-provider-type`    | Supports `adls-token`, generates a temporary token according to the query data path.                      | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.adls-storage-account-name`   | The static storage account name used to access ADLS data.                                                 | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.adls-storage-account-key`    | The static storage account key used to access ADLS data.                                                  | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.adls-tenant-id`              | Azure Active Directory (AAD) tenant ID.                                                                   | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.adls-client-id`              | Azure Active Directory (AAD) client ID used for authentication.                                           | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.adls-client-secret`          | Azure Active Directory (AAD) client secret used for authentication.                                       | (none)        | Yes      | 0.8.0-incubating |
+| Configuration item                                  | Description                                                                                               | Default value | Required | Since Version    |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl`                    | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS. | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.credential-provider-type`   | Supports `adls-token`, generates a temporary token according to the query data path.                      | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data.                                                 | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                  | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-tenant-id`            | Azure Active Directory (AAD) tenant ID.                                                                   | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-client-id`            | Azure Active Directory (AAD) client ID used for authentication.                                           | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-client-secret`        | Azure Active Directory (AAD) client secret used for authentication.                                       | (none)        | Yes      | 0.8.0-incubating |
 
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
@@ -440,24 +440,24 @@ docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 
 Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
 
-| Environment variables                   | Configuration items                                | Since version     |
-|-----------------------------------------|----------------------------------------------------|-------------------|
-| `GRAVITINO_IO_IMPL`                     | `gravitino.iceberg-rest.io-impl`                   | 0.7.0-incubating  |
-| `GRAVITINO_URI`                         | `gravitino.iceberg-rest.uri`                       | 0.7.0-incubating  |
-| `GRAVITINO_WAREHOUSE`                   | `gravitino.iceberg-rest.warehouse`                 | 0.7.0-incubating  |
-| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE`    | `gravitino.iceberg-rest.credential-provider-type`  | 0.7.0-incubating  |
-| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH`    | `gravitino.iceberg-rest.gcs-credential-file-path`  | 0.7.0-incubating  |
-| `GRAVITINO_S3_ACCESS_KEY`               | `gravitino.iceberg-rest.s3-access-key-id`          | 0.7.0-incubating  |
-| `GRAVITINO_S3_SECRET_KEY`               | `gravitino.iceberg-rest.s3-secret-access-key`      | 0.7.0-incubating  |
-| `GRAVITINO_S3_REGION`                   | `gravitino.iceberg-rest.s3-region`                 | 0.7.0-incubating  |
-| `GRAVITINO_S3_ROLE_ARN`                 | `gravitino.iceberg-rest.s3-role-arn`               | 0.7.0-incubating  |
-| `GRAVITINO_S3_EXTERNAL_ID`              | `gravitino.iceberg-rest.s3-external-id`            | 0.7.0-incubating  |
-| `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT`   | `gravitino.iceberg-rest.s3-token-service-endpoint` | 0.8.0-incubating  |
-| `GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME`   | `gravitino.iceberg-rest.adls-storage-account-name` | 0.8.0-incubating  |
-| `GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY`    | `gravitino.iceberg-rest.adls-storage-account-key`  | 0.8.0-incubating  |
-| `GRAVITINO_ADLS_TENANT_ID`              | `gravitino.iceberg-rest.adls-tenant-id`            | 0.8.0-incubating  |
-| `GRAVITINO_ADLS_CLIENT_ID`              | `gravitino.iceberg-rest.adls-client-id`            | 0.8.0-incubating  |
-| `GRAVITINO_ADLS_CLIENT_SECRET`          | `gravitino.iceberg-rest.adls-client-secret`        | 0.8.0-incubating  |
+| Environment variables                   | Configuration items                                 | Since version     |
+|-----------------------------------------|-----------------------------------------------------|-------------------|
+| `GRAVITINO_IO_IMPL`                     | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating  |
+| `GRAVITINO_URI`                         | `gravitino.iceberg-rest.uri`                        | 0.7.0-incubating  |
+| `GRAVITINO_WAREHOUSE`                   | `gravitino.iceberg-rest.warehouse`                  | 0.7.0-incubating  |
+| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE`    | `gravitino.iceberg-rest.credential-provider-type`   | 0.7.0-incubating  |
+| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH`    | `gravitino.iceberg-rest.gcs-credential-file-path`   | 0.7.0-incubating  |
+| `GRAVITINO_S3_ACCESS_KEY`               | `gravitino.iceberg-rest.s3-access-key-id`           | 0.7.0-incubating  |
+| `GRAVITINO_S3_SECRET_KEY`               | `gravitino.iceberg-rest.s3-secret-access-key`       | 0.7.0-incubating  |
+| `GRAVITINO_S3_REGION`                   | `gravitino.iceberg-rest.s3-region`                  | 0.7.0-incubating  |
+| `GRAVITINO_S3_ROLE_ARN`                 | `gravitino.iceberg-rest.s3-role-arn`                | 0.7.0-incubating  |
+| `GRAVITINO_S3_EXTERNAL_ID`              | `gravitino.iceberg-rest.s3-external-id`             | 0.7.0-incubating  |
+| `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT`   | `gravitino.iceberg-rest.s3-token-service-endpoint`  | 0.8.0-incubating  |
+| `GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME`  | `gravitino.iceberg-rest.azure-storage-account-name` | 0.8.0-incubating  |
+| `GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY`   | `gravitino.iceberg-rest.azure-storage-account-key`  | 0.8.0-incubating  |
+| `GRAVITINO_AZURE_TENANT_ID`             | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating  |
+| `GRAVITINO_AZURE_CLIENT_ID`             | `gravitino.iceberg-rest.azure-client-id`            | 0.8.0-incubating  |
+| `GRAVITINO_AZURE_CLIENT_SECRET`         | `gravitino.iceberg-rest.azure-client-secret`        | 0.8.0-incubating  |
 
 Or build it manually to add custom configuration or logics:
 

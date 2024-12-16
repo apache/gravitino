@@ -32,7 +32,7 @@ public class ADLSTokenCredential implements Credential {
   /** ADLS base domain */
   public static final String ADLS_DOMAIN = "dfs.core.windows.net";
   /** ADLS storage account name */
-  public static final String GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME = "adls-storage-account-name";
+  public static final String GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME = "azure-storage-account-name";
   /** ADLS SAS token used to access ADLS data. */
   public static final String GRAVITINO_ADLS_SAS_TOKEN = "adls-sas-token";
 
@@ -54,6 +54,12 @@ public class ADLSTokenCredential implements Credential {
     this.expireTimeInMS = expireTimeInMS;
   }
 
+  /**
+   * This is the constructor that is used by credential factory to create an instance of credential
+   * according to the credential information.
+   */
+  public ADLSTokenCredential() {}
+
   @Override
   public String credentialType() {
     return ADLS_SAS_TOKEN_CREDENTIAL_TYPE;
@@ -73,21 +79,12 @@ public class ADLSTokenCredential implements Credential {
 
   @Override
   public void initialize(Map<String, String> credentialInfo, long expireTimeInMS) {
-    String accountName = credentialInfo.get(GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME);
+    String accountName = credentialInfo.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
     String sasToken = credentialInfo.get(GRAVITINO_ADLS_SAS_TOKEN);
     validate(accountName, sasToken, expireTimeInMS);
     this.accountName = accountName;
     this.sasToken = sasToken;
     this.expireTimeInMS = expireTimeInMS;
-  }
-
-  private void validate(String accountName, String sasToken, long expireTimeInMS) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(accountName), "ADLS account name should not be empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(sasToken), "ADLS SAS token should not be empty.");
-    Preconditions.checkArgument(
-        expireTimeInMS > 0, "The expire time of S3TokenCredential should great than 0");
   }
 
   /**
@@ -106,5 +103,14 @@ public class ADLSTokenCredential implements Credential {
    */
   public String sasToken() {
     return sasToken;
+  }
+
+  private void validate(String accountName, String sasToken, long expireTimeInMS) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accountName), "ADLS account name should not be empty.");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(sasToken), "ADLS SAS token should not be empty.");
+    Preconditions.checkArgument(
+        expireTimeInMS > 0, "The expire time of ADLSTokenCredential should great than 0");
   }
 }

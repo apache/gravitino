@@ -28,7 +28,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.storage.ADLSProperties;
+import org.apache.gravitino.storage.AzureProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 @SuppressWarnings("FormatStringAnnotation")
@@ -90,17 +90,17 @@ public class IcebergRESTADLSIT extends IcebergRESTJdbcCatalogIT {
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
         CredentialConstants.ADLS_TOKEN_CREDENTIAL_PROVIDER_TYPE);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME,
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
         storageAccountName);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY,
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
         storageAccountKey);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_TENANT_ID, tenantId);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID, tenantId);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_CLIENT_ID, clientId);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID, clientId);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + ADLSProperties.GRAVITINO_ADLS_CLIENT_SECRET,
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
         clientSecret);
 
     configMap.put(

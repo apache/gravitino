@@ -113,8 +113,8 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
-    map.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    map.put(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    map.put(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     map.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
@@ -138,8 +138,8 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
             GravitinoITUtils.genRandomName("CatalogCatalogIT"));
     Map<String, String> catalogProps = Maps.newHashMap();
     catalogProps.put("location", ossLocation);
-    catalogProps.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
-    catalogProps.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    catalogProps.put(ABSProperties.GRAVITINO_AZURE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    catalogProps.put(ABSProperties.GRAVITINO_AZURE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     catalogProps.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog localCatalog =
