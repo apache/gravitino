@@ -62,9 +62,9 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
-  testImplementation(project(":bundles:aliyun-bundle"))
-  testImplementation(project(":bundles:aws-bundle"))
-  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun-core"))
+  testImplementation(project(":bundles:aws-core"))
+  testImplementation(project(":bundles:gcp-core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
