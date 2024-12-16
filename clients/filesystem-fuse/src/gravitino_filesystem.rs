@@ -17,17 +17,19 @@
  * under the License.
  */
 use crate::config::Config;
-use crate::filesystem::{FileStat, FileSystemCapacity, FileSystemContext, OpenFileFlags, OpenedFile, PathFileSystem, Result};
+use crate::filesystem::{
+    FileStat, FileSystemCapacity, FileSystemContext, OpenFileFlags, OpenedFile, PathFileSystem,
+    Result,
+};
 use crate::gravitino_client::GravitinoClient;
 use crate::storage_filesystem::StorageFileSystem;
 use crate::utils::{extract_fileset, extract_storage_filesystem};
 use async_trait::async_trait;
 
-pub(crate) struct GravitinoFileSystemConfig {
-}
+pub(crate) struct GravitinoFileSystemConfig {}
 
 pub(crate) struct GravitinoFileSystem {
-    fs : StorageFileSystem,
+    fs: StorageFileSystem,
     client: GravitinoClient,
     fileset_location: String,
 }
@@ -36,11 +38,16 @@ impl GravitinoFileSystem {
     pub async fn new(config: &Config, context: &FileSystemContext) -> Self {
         let client = GravitinoClient::new(&config.gravitino);
         let fileset_location = config.fuse.mount_from.clone();
-        let (catalog, schema, fileset)  = extract_fileset(&fileset_location).unwrap();
-        let fileset = client.get_fileset(&catalog, &schema, &fileset).await.unwrap();
+        let (catalog, schema, fileset) = extract_fileset(&fileset_location).unwrap();
+        let fileset = client
+            .get_fileset(&catalog, &schema, &fileset)
+            .await
+            .unwrap();
 
         let (schema, location) = extract_storage_filesystem(&fileset.storage_location).unwrap();
-        let fs = StorageFileSystem::new(&schema, &config, &context).await.unwrap();
+        let fs = StorageFileSystem::new(&schema, &config, &context)
+            .await
+            .unwrap();
 
         Self {
             fs: fs,
@@ -66,10 +73,9 @@ impl PathFileSystem for GravitinoFileSystem {
     }
 
     async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat> {
-        let parent =  self.map_fileset_location(parent);
+        let parent = self.map_fileset_location(parent);
         self.fs.lookup(&parent, name).await
     }
-
 
     async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>> {
         let name = self.map_fileset_location(name);
@@ -86,7 +92,12 @@ impl PathFileSystem for GravitinoFileSystem {
         self.fs.open_dir(&name, flags).await
     }
 
-    async fn create_file(&self, parent: &str, name: &str, flags: OpenFileFlags) -> Result<OpenedFile> {
+    async fn create_file(
+        &self,
+        parent: &str,
+        name: &str,
+        flags: OpenFileFlags,
+    ) -> Result<OpenedFile> {
         let parent = self.map_fileset_location(parent);
         self.fs.create_file(&parent, name, flags).await
     }

@@ -17,17 +17,17 @@
  * under the License.
  */
 mod cloud_storage_filesystem;
+mod config;
+mod error;
 mod filesystem;
 mod filesystem_metadata;
 mod fuse_api_handle;
 pub mod fuse_server;
 mod gravitino_client;
+mod gravitino_compose_filesystem;
+mod gravitino_filesystem;
 mod log_fuse_api_handle;
 mod memory_filesystem;
 mod opened_file_manager;
-mod utils;
-mod gravitino_compose_filesystem;
-mod gravitino_filesystem;
 mod storage_filesystem;
-mod config;
-mod error;
+mod utils;

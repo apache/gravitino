@@ -17,25 +17,25 @@
  * under the License.
  */
 mod cloud_storage_filesystem;
+mod config;
+mod error;
 mod filesystem;
 mod filesystem_metadata;
 mod fuse_api_handle;
 mod fuse_server;
 mod gravitino_client;
+mod gravitino_compose_filesystem;
+mod gravitino_filesystem;
 mod log_fuse_api_handle;
 mod memory_filesystem;
 mod opened_file_manager;
-mod utils;
-mod config;
-mod error;
-mod gravitino_compose_filesystem;
-mod gravitino_filesystem;
 mod storage_filesystem;
+mod utils;
+use crate::config::Config;
 use crate::fuse_server::FuseServer;
 use fuse3::Result;
 use log::{debug, info};
 use std::sync::Arc;
-use crate::config::{Config};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     let server = Arc::new(FuseServer::new("gvfs"));
     let clone_server = server.clone();
 
-    let config = Config::new();
+    let config = Config::default();
     let v = tokio::spawn(async move { clone_server.start(&config).await });
 
     tokio::signal::ctrl_c().await?;

@@ -29,7 +29,7 @@ use dashmap::DashMap;
 pub(crate) struct GravitinoComposeFileSystem {
     // meta is the metadata of the filesystem
     client: GravitinoClient,
-    inner_fs: DashMap<String, StorageFileSystem>
+    inner_fs: DashMap<String, StorageFileSystem>,
 }
 
 impl GravitinoComposeFileSystem {
@@ -67,7 +67,12 @@ impl PathFileSystem for GravitinoComposeFileSystem {
         todo!()
     }
 
-    async fn create_file(&self, parent: &str, name: &str, flags: OpenFileFlags) -> Result<OpenedFile> {
+    async fn create_file(
+        &self,
+        parent: &str,
+        name: &str,
+        flags: OpenFileFlags,
+    ) -> Result<OpenedFile> {
         todo!()
     }
 

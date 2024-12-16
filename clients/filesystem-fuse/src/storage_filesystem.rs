@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use async_trait::async_trait;
-use opendal::{services, Builder, Operator};
-use opendal::layers::LoggingLayer;
 use crate::cloud_storage_filesystem::CloudStorageFileSystem;
 use crate::config::Config;
 use crate::error::{ErrorCode, GravitinoError};
+use crate::filesystem::{FileStat, FileSystemCapacity, OpenFileFlags, OpenedFile, Result};
 use crate::filesystem::{FileSystemContext, PathFileSystem};
 use crate::memory_filesystem::MemoryFileSystem;
-use crate::filesystem::{FileStat, FileSystemCapacity, OpenFileFlags, OpenedFile, Result};
 use crate::utils::{GravitinoResult, StorageFileSystemType};
+use async_trait::async_trait;
+use opendal::layers::LoggingLayer;
+use opendal::{services, Builder, Operator};
 
 pub(crate) enum StorageFileSystem {
     MemoryStorge(MemoryFileSystem),
@@ -33,9 +33,13 @@ pub(crate) enum StorageFileSystem {
 }
 
 impl StorageFileSystem {
-    pub(crate) async fn new(fs_type: &StorageFileSystemType, config: &Config, context: &FileSystemContext) -> GravitinoResult<Self> {
+    pub(crate) async fn new(
+        fs_type: &StorageFileSystemType,
+        config: &Config,
+        context: &FileSystemContext,
+    ) -> GravitinoResult<Self> {
         match fs_type {
-            StorageFileSystemType::S3=> {
+            StorageFileSystemType::S3 => {
                 let builder = services::S3::from_map(config.extent_config.clone());
                 let op = Operator::new(builder)
                     .expect("opendal create failed")
@@ -45,9 +49,8 @@ impl StorageFileSystem {
                 let fs = CloudStorageFileSystem::new(op);
                 Ok(StorageFileSystem::CloudStorage(fs))
             }
-            _=> {
-                Err(ErrorCode::UnSupportedFilesystem.to_error(format!("Unsupported filesystem type: {}", fs_type)))
-            }
+            _ => Err(ErrorCode::UnSupportedFilesystem
+                .to_error(format!("Unsupported filesystem type: {}", fs_type))),
         }
     }
 }
@@ -96,7 +99,12 @@ impl PathFileSystem for StorageFileSystem {
         async_call_fun!(self, open_dir, name, flags)
     }
 
-    async fn create_file(&self, parent: &str, name: &str, flags: OpenFileFlags) -> Result<OpenedFile> {
+    async fn create_file(
+        &self,
+        parent: &str,
+        name: &str,
+        flags: OpenFileFlags,
+    ) -> Result<OpenedFile> {
         async_call_fun!(self, create_file, parent, name, flags)
     }
 

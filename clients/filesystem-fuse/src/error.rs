@@ -17,7 +17,6 @@
  * under the License.
  */
 
-
 #[derive(Debug)]
 pub enum ErrorCode {
     UnSupportedFilesystem,
@@ -27,7 +26,7 @@ pub enum ErrorCode {
 impl ErrorCode {
     pub fn to_string(&self) -> String {
         match self {
-            ErrorCode::UnSupportedFilesystem=> "The filesystem is not supported".to_string(),
+            ErrorCode::UnSupportedFilesystem => "The filesystem is not supported".to_string(),
             _ => "".to_string(),
         }
     }

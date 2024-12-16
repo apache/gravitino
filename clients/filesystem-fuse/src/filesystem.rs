@@ -309,6 +309,8 @@ impl OpenedFile {
     }
 
     fn file_handle(&self) -> FileHandle {
+        debug_assert!(self.handle_id != 0);
+        debug_assert!(self.file_stat.inode != 0);
         FileHandle {
             file_id: self.file_stat.inode,
             handle_id: self.handle_id,
@@ -316,6 +318,7 @@ impl OpenedFile {
     }
 
     pub(crate) fn set_inode(&mut self, parent_file_id: u64, file_id: u64) {
+        debug_assert!(file_id != 0 && parent_file_id != 0);
         self.file_stat.set_inode(parent_file_id, file_id)
     }
 }

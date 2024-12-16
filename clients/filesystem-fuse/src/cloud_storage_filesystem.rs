@@ -39,9 +39,7 @@ pub(crate) struct CloudStorageFileSystem {
 
 impl CloudStorageFileSystem {
     pub fn new(op: Operator) -> Self {
-        Self {
-            op: op,
-        }
+        Self { op: op }
     }
 }
 

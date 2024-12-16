@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use std::fmt;
-use fuse3::Timestamp;
-use std::time::SystemTime;
 use crate::error::GravitinoError;
+use fuse3::Timestamp;
+use std::fmt;
+use std::time::SystemTime;
 
 pub type GravitinoResult<T> = Result<T, GravitinoError>;
 
@@ -48,7 +48,6 @@ pub fn timestamp_diff_from_now(timestamp: Timestamp) -> i64 {
     timestamp.sec - now.sec
 }
 
-
 pub fn extract_fileset(path: &str) -> Option<(String, String, String)> {
     let prefix = "gvfs://fileset/";
     if !path.starts_with(prefix) {
@@ -75,13 +74,10 @@ pub fn extract_storage_filesystem(path: &str) -> Option<(StorageFileSystemType, 
         let protocol = &path[..pos];
         let location = &path[pos + 3..];
         match protocol {
-            "s3" => {
-                Some((StorageFileSystemType::S3, location.to_string()))
-            },
+            "s3" => Some((StorageFileSystemType::S3, location.to_string())),
             _ => None,
         }
     } else {
         None
     }
 }
-

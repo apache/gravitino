@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::GravitinoConfig;
+use crate::error::{ErrorCode, GravitinoError};
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use urlencoding::encode;
-use crate::config::GravitinoConfig;
-use crate::error::{ErrorCode, GravitinoError};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Fileset {
@@ -56,8 +56,7 @@ pub(crate) struct GravitinoClient {
 }
 
 impl GravitinoClient {
-
-    pub fn new(config :&GravitinoConfig) -> Self {
+    pub fn new(config: &GravitinoConfig) -> Self {
         Self {
             gravitino_uri: config.gravitino_url.clone(),
             metalake: config.metalake.clone(),
@@ -90,7 +89,8 @@ impl GravitinoClient {
     fn get_fileset_url(&self, catalog_name: &str, schema_name: &str, fileset_name: &str) -> String {
         format!(
             "{}/api/metalakes/{}/catalogs/{}/schemas/{}/filesets/{}",
-            self.gravitino_uri, self.metalake, catalog_name, schema_name, fileset_name)
+            self.gravitino_uri, self.metalake, catalog_name, schema_name, fileset_name
+        )
     }
 
     async fn send_and_parse<T>(&self, url: &str) -> Result<T, GravitinoError>
@@ -126,11 +126,18 @@ impl GravitinoClient {
         Ok(res.fileset)
     }
 
-    pub fn get_file_location_url(&self, catalog_name: &str, schema_name: &str, fileset_name: &str, path: &str) -> String {
+    pub fn get_file_location_url(
+        &self,
+        catalog_name: &str,
+        schema_name: &str,
+        fileset_name: &str,
+        path: &str,
+    ) -> String {
         let encoded_path = encode(path);
         format!(
             "{}/api/metalakes/{}/catalogs/{}/schemas/{}/filesets/{}/location?sub_path={}",
-            self.gravitino_uri, self.metalake, catalog_name, schema_name, fileset_name, path)
+            self.gravitino_uri, self.metalake, catalog_name, schema_name, fileset_name, path
+        )
     }
 
     pub async fn get_file_location(
@@ -235,7 +242,9 @@ mod tests {
         };
         let client = GravitinoClient::new(&config);
 
-        let result = client.get_file_location("catalog1", "schema1", "fileset1", "/example/path").await;
+        let result = client
+            .get_file_location("catalog1", "schema1", "fileset1", "/example/path")
+            .await;
 
         match result {
             Ok(location) => {
