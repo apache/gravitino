@@ -179,6 +179,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.LIST.equals(command)) {
       newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
+      if (Objects.isNull(metalake)) {
+        System.err.println("! " + CommandEntities.METALAKE + " is not defined");
+        return;
+      }
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
