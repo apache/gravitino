@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
 /** Database operations for ClickHouse. */
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
@@ -43,18 +42,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public boolean delete(String databaseName, boolean cascade) {
-    LOG.info("Beginning to drop database {}", databaseName);
-    try {
-      dropDatabase(databaseName, cascade);
-      LOG.info("Finished dropping database {}", databaseName);
-    } catch (NoSuchSchemaException e) {
-      return false;
-    }
-    return true;
-  }
-
-  @Override
   public List<String> listDatabases() {
     List<String> databaseNames = new ArrayList<>();
     try (final Connection connection = getConnection()) {
@@ -62,13 +49,12 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       // causing the following statement to error,
       // so here we manually set a system catalog
       connection.setCatalog(createSysDatabaseNameSet().iterator().next());
-      try (Statement statement = connection.createStatement()) {
-        try (ResultSet resultSet = statement.executeQuery("SHOW DATABASES")) {
-          while (resultSet.next()) {
-            String databaseName = resultSet.getString(1);
-            if (!isSystemDatabase(databaseName)) {
-              databaseNames.add(databaseName);
-            }
+      try (Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery("SHOW DATABASES")) {
+        while (resultSet.next()) {
+          String databaseName = resultSet.getString(1);
+          if (!isSystemDatabase(databaseName)) {
+            databaseNames.add(databaseName);
           }
         }
       }

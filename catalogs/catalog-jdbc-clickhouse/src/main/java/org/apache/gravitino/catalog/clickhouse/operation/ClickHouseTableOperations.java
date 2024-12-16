@@ -562,7 +562,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           .append(SPACE);
     }
 
-    //Append comment if available after default value
+    // Append comment if available after default value
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
@@ -695,13 +695,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add Nullable data type
-    String dataType=typeConverter.fromGravitino(column.dataType());
+    String dataType = typeConverter.fromGravitino(column.dataType());
     if (column.nullable()) {
       sqlBuilder.append(SPACE).append("Nullable(").append(dataType).append(")").append(SPACE);
     } else {
       sqlBuilder.append(SPACE).append(dataType).append(SPACE);
     }
-    
+
     // ck no support alter table with set nullable
 
     // Add DEFAULT value if specified
@@ -713,9 +713,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // Add column auto_increment if specified
-//    if (column.autoIncrement()) {
-//      sqlBuilder.append(CLICKHOUSE_AUTO_INCREMENT).append(" ");
-//    }
+    //    if (column.autoIncrement()) {
+    //      sqlBuilder.append(CLICKHOUSE_AUTO_INCREMENT).append(" ");
+    //    }
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
