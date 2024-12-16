@@ -163,6 +163,7 @@ public class TestMain {
     CommandLine line = parser.parse(options, args);
 
     assertEquals(Main.resolveEntity(line), CommandEntities.CATALOG);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
   }
 
   @Test
