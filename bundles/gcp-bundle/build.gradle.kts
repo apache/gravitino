@@ -27,6 +27,7 @@ plugins {
 dependencies {
   implementation(project(":bundles:gcp-core"))
   implementation(libs.hadoop3.gcs)
+  implementation(libs.hadoop3.common)
 }
 
 tasks.withType(ShadowJar::class.java) {

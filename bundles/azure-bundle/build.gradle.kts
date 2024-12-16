@@ -27,6 +27,7 @@ plugins {
 dependencies {
   implementation(project(":bundles:azure-core"))
   implementation(libs.hadoop3.abs)
+  implementation(libs.hadoop3.common)
 }
 
 tasks.withType(ShadowJar::class.java) {

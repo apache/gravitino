@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:aliyun-core"))
+  implementation(libs.hadoop3.common)
   implementation(libs.hadoop3.oss)
 }
 
