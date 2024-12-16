@@ -145,6 +145,7 @@ public class TestMain {
   }
 
   @Test
+  @SuppressWarnings("DefaultCharset")
   public void CreateTagWithNoTag() {
     String[] args = {"tag", "create", "--metalake", "metalake_test_no_tag"};
 
@@ -154,6 +155,7 @@ public class TestMain {
   }
 
   @Test
+  @SuppressWarnings("DefaultCharset")
   public void DeleteTagWithNoTag() {
     String[] args = {"tag", "delete", "--metalake", "metalake_test_no_tag", "-f"};
 

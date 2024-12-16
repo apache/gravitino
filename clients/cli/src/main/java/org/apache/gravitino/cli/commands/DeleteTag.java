@@ -58,17 +58,15 @@ public class DeleteTag extends Command {
       return;
     }
 
-    int tagCount = (tags != null ? tags.length : 0);
-    switch (tagCount) {
-      case 0:
-        System.err.println(ErrorMessages.TAG_EMPTY);
-        break;
-      case 1:
+    if (tags == null || tags.length == 0) {
+      System.err.println(ErrorMessages.TAG_EMPTY);
+    } else {
+      boolean hasOnlyOneTag = tags.length == 1;
+      if (hasOnlyOneTag) {
         handleOnlyOneTag();
-        break;
-      default:
+      } else {
         handleMultipleTags();
-        break;
+      }
     }
   }
 
