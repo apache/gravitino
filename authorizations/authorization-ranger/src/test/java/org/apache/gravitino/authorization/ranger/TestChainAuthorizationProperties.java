@@ -34,11 +34,11 @@ public class TestChainAuthorizationProperties {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive1");
     properties.put("authorization.chain.hive1.provider", "ranger");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
     Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
   }
@@ -51,19 +51,19 @@ public class TestChainAuthorizationProperties {
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
     properties.put("authorization.chain.plugins", "hive1,hdfs1");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
   }
@@ -73,18 +73,18 @@ public class TestChainAuthorizationProperties {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive1, hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
   }
@@ -94,18 +94,18 @@ public class TestChainAuthorizationProperties {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive1");
     properties.put("authorization.chain.hive1.provider", "ranger");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
@@ -116,18 +116,18 @@ public class TestChainAuthorizationProperties {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive.1,hdfs1");
     properties.put("authorization.chain.hive.1.provider", "ranger");
-    properties.put("authorization.chain.hive.1.catalog-provider", "hive");
     properties.put("authorization.chain.hive.1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive.1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive.1.ranger.username", "admin");
     properties.put("authorization.chain.hive.1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive.1.ranger.service.name", "hiveDev");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
@@ -138,18 +138,18 @@ public class TestChainAuthorizationProperties {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive1,hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.plug3.ranger.service.name", "hdfsDev");
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
@@ -160,18 +160,18 @@ public class TestChainAuthorizationProperties {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive1,hive1,hdfs1");
     properties.put("authorization.chain.hive1.provider", "ranger");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
@@ -185,19 +185,19 @@ public class TestChainAuthorizationProperties {
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
     properties.put("authorization.chain.plugins", "hive1,hdfs1");
-    properties.put("authorization.chain.hive1.catalog-provider", "hive");
     properties.put("authorization.chain.hive1.provider", "ranger");
     properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hive1.ranger.username", "admin");
     properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
-    properties.put("authorization.chain.hdfs1.catalog-provider", "hadoop");
     properties.put("authorization.chain.hdfs1.provider", "ranger");
     properties.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
     properties.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
     properties.put("authorization.chain.hdfs1.ranger.username", "admin");
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
+    properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
 
     Map<String, String> rangerHiveProperties =

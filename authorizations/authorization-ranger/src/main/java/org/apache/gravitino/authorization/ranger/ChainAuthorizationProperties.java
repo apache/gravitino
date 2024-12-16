@@ -34,27 +34,24 @@ import java.util.stream.Collectors;
  * Configuration Example: <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
  * "authorization.chain.hive1.provider" = "ranger"; <br>
- * "authorization.chain.hive1.catalog-provider" = "hive"; <br>
+ * "authorization.chain.hive1.ranger.service.type" = "hive"; <br>
+ * "authorization.chain.hive1.ranger.service.name" = "hiveDev"; <br>
  * "authorization.chain.hive1.ranger.auth.type" = "simple"; <br>
  * "authorization.chain.hive1.ranger.admin.url" = "http://localhost:6080"; <br>
  * "authorization.chain.hive1.ranger.username" = "admin"; <br>
  * "authorization.chain.hive1.ranger.password" = "admin"; <br>
- * "authorization.chain.hive1.ranger.service.name" = "hiveDev"; <br>
  * "authorization.chain.hdfs1.provider" = "ranger"; <br>
- * "authorization.chain.hdfs1.catalog-provider" = "hadoop"; <br>
+ * "authorization.chain.hdfs1.ranger.service.type" = "hadoop"; <br>
+ * "authorization.chain.hdfs1.ranger.service.name" = "hdfsDev"; <br>
  * "authorization.chain.hdfs1.ranger.auth.type" = "simple"; <br>
  * "authorization.chain.hdfs1.ranger.admin.url" = "http://localhost:6080"; <br>
  * "authorization.chain.hdfs1.ranger.username" = "admin"; <br>
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
- * "authorization.chain.hdfs1.ranger.service.name" = "hdfsDev"; <br>
  */
 public class ChainAuthorizationProperties {
   public static final String PLUGINS_SPLITTER = ",";
   /** Chain authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
-
-  /** Chain authorization plugin provider */
-  public static final String CHAIN_CATALOG_PROVIDER = "authorization.chain.*.catalog-provider";
 
   /** Chain authorization plugin provider */
   public static final String CHAIN_PROVIDER = "authorization.chain.*.provider";
@@ -143,7 +140,7 @@ public class ChainAuthorizationProperties {
     }
 
     // Generate regex patterns from wildcardProperties
-    List<String> wildcardProperties = ImmutableList.of(CHAIN_CATALOG_PROVIDER, CHAIN_PROVIDER);
+    List<String> wildcardProperties = ImmutableList.of(CHAIN_PROVIDER);
     for (String pluginName : pluginNames) {
       List<Pattern> patterns =
           wildcardProperties.stream()

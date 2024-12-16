@@ -26,6 +26,9 @@ public class RangerAuthorizationProperties {
   /** Ranger admin web URIs */
   public static final String RANGER_ADMIN_URL = "authorization.ranger.admin.url";
 
+  /** Ranger service type */
+  public static final String RANGER_SERVICE_TYPE = "authorization.ranger.service.type";
+
   /** Ranger service name */
   public static final String RANGER_SERVICE_NAME = "authorization.ranger.service.name";
 
@@ -47,6 +50,9 @@ public class RangerAuthorizationProperties {
     Preconditions.checkArgument(
         properties.containsKey(RANGER_ADMIN_URL),
         String.format("%s is required", RANGER_ADMIN_URL));
+    Preconditions.checkArgument(
+        properties.containsKey(RANGER_SERVICE_TYPE),
+        String.format("%s is required", RANGER_SERVICE_TYPE));
     Preconditions.checkArgument(
         properties.containsKey(RANGER_SERVICE_NAME),
         String.format("%s is required", RANGER_SERVICE_NAME));
