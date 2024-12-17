@@ -20,6 +20,8 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 
 /** Displays the details of a table's columns. */
@@ -58,6 +60,9 @@ public class ListColumns extends TableCommand {
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       columns = tableCatalog().loadTable(name).columns();
+    } catch (NoSuchTableException noSuchTableException) {
+      System.err.println(ErrorMessages.UNKNOWN_TABLE + table);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
