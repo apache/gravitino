@@ -16,24 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.connector.authorization.ranger;
 
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
+public class TestRangerAuthorizationHDFS extends BaseAuthorization<TestRangerAuthorizationHDFS> {
+  public static final String SHORT_NAME = "test_ranger_hdfs";
 
-  public TestMySQLAuthorization() {}
+  public TestRangerAuthorizationHDFS() {}
 
   @Override
   public String shortName() {
-    return "mysql";
+    return SHORT_NAME;
   }
 
   @Override
   protected AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
+    return new TestRangerAuthorizationHDFSPlugin();
   }
 }
