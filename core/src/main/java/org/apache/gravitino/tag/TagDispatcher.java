@@ -22,6 +22,11 @@ import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 
+/**
+ * {@code TagDispatcher} interface provides functionalities for managing tags within a metalake. It
+ * includes a comprehensive set of operations such as listing, creating, retrieving, updating, and
+ * deleting tags, as well as associating tags with other objects.
+ */
 public interface TagDispatcher {
   /**
    * List all the tag names for the specific object.
@@ -69,6 +74,8 @@ public interface TagDispatcher {
   Tag alterTag(String metalake, String name, TagChange... changes);
 
   /**
+   * delete an existing tag in the specified metalake
+   *
    * @param metalake The name of the metalake.
    * @param name The name of the tag.
    * @return True if the tag was successfully deleted, false otherwise
@@ -76,6 +83,8 @@ public interface TagDispatcher {
   boolean deleteTag(String metalake, String name);
 
   /**
+   * List all metadata objects associated with the specified tag.
+   *
    * @param metalake The name of the metalake.
    * @param name The name of the tag.
    * @return The array of metadata objects associated with the specified tag.
@@ -83,6 +92,8 @@ public interface TagDispatcher {
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
 
   /**
+   * List all tag names associated with the specified metadata object.
+   *
    * @param metalake The name of the metalake
    * @param metadataObject The metadata object for which associated tags
    * @return The list of tag names associated with the given metadata object.
@@ -90,27 +101,33 @@ public interface TagDispatcher {
   String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject);
 
   /**
-   * @param metalake
-   * @param metadataObject
-   * @return
+   * List detailed information for all tags associated with the specified metadata object.
+   *
+   * @param metalake The name of the metalake
+   * @param metadataObject The metadata object to query tag details for.
+   * @return An array of tags with detailed information.
    */
   Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject);
 
   /**
-   * @param metalake
-   * @param metadataObject
-   * @param tagsToAdd
-   * @param tagsToRemove
-   * @return
+   * Associate or disassociate tags with the specified metadata object.
+   *
+   * @param metalake The name of the metalake.
+   * @param metadataObject The metadata object to update tags for.
+   * @param tagsToAdd Tags to associate with the object.
+   * @param tagsToRemove Tags to disassociate from the object.
+   * @return An array of updated tag names.
    */
   String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove);
 
   /**
-   * @param metalake
-   * @param metadataObject
-   * @param name
-   * @return
+   * Retrieve a specific tag associated with the specified metadata object.
+   *
+   * @param metalake The name of the metalake.
+   * @param metadataObject The metadata object to query the tag for.
+   * @param name The name of the tag to retrieve.
+   * @return The tag associated with the metadata object.
    */
   Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name);
 }

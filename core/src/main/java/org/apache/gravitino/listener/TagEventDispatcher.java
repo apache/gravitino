@@ -25,6 +25,12 @@ import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
 
+/**
+ * {@code TagEventDispatcher} is a decorator for {@link TagDispatcher} that not only delegates tag
+ * operations to the underlying tag dispatcher but also dispatches corresponding events to an {@link
+ * EventBus} after each operation is completed. This allows for event-driven workflows or monitoring
+ * of tag operations.
+ */
 public class TagEventDispatcher implements TagDispatcher {
   @SuppressWarnings("unused")
   private final EventBus eventBus;
