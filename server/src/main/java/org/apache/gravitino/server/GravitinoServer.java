@@ -26,6 +26,7 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -114,6 +115,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagManager()).to(TagManager.class).ranked(1);
+            bind(gravitinoEnv.credentialManager()).to(CredentialManager.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
