@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -61,7 +62,8 @@ public class ListColumns extends TableCommand {
       NameIdentifier name = NameIdentifier.of(schema, table);
       columns = tableCatalog().loadTable(name).columns();
     } catch (NoSuchTableException noSuchTableException) {
-      System.err.println(ErrorMessages.UNKNOWN_TABLE + table);
+      System.err.println(
+          ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
