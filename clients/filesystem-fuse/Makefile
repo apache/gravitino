@@ -31,8 +31,7 @@ check-fmt:
 	cargo  fmt --all -- --check
 
 check-clippy:
-	#cargo  clippy --all-targets --all-features --workspace -- -D warnings
-	cargo  clippy --all-targets --all-features --workspace --
+	cargo  clippy --all-targets --all-features --workspace -- -D warnings
 
 install-cargo-sort:
 	cargo install cargo-sort@1.0.9

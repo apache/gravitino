@@ -63,3 +63,65 @@ impl OpenedFileManager {
         self.file_handle_map.remove(&handle_id).map(|x| x.1)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filesystem::FileStat;
+
+    #[tokio::test]
+    async fn test_opened_file_manager() {
+        let manager = OpenedFileManager::new();
+
+        let file1_stat = FileStat::new_file("", "a.txt", 13);
+        let file2_stat = FileStat::new_file("", "b.txt", 18);
+
+        let file1 = OpenedFile::new(file1_stat.clone());
+        let file2 = OpenedFile::new(file2_stat.clone());
+
+        let handle_id1 = manager.put_file(file1).lock().await.handle_id;
+        let handle_id2 = manager.put_file(file2).lock().await.handle_id;
+
+        // Test the file handle id is assigned.
+        assert!(handle_id1 > 0 && handle_id2 > 0);
+        assert_ne!(handle_id1, handle_id2);
+
+        // test get file by handle id
+        assert_eq!(
+            manager
+                .get_file(handle_id1)
+                .unwrap()
+                .lock()
+                .await
+                .file_stat
+                .name,
+            file1_stat.name
+        );
+
+        assert_eq!(
+            manager
+                .get_file(handle_id2)
+                .unwrap()
+                .lock()
+                .await
+                .file_stat
+                .name,
+            file2_stat.name
+        );
+
+        // test remove file by handle id
+        assert_eq!(
+            manager
+                .remove_file(handle_id1)
+                .unwrap()
+                .lock()
+                .await
+                .handle_id,
+            handle_id1
+        );
+
+        // test get file by handle id after remove
+        assert!(manager.get_file(handle_id1).is_none());
+        assert!(manager.get_file(handle_id2).is_some());
+    }
+}

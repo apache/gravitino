@@ -663,3 +663,85 @@ impl FileEntryManager {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_file_stat() {
+        //test new file
+        let file_stat = FileStat::new_file("a", "b", 10);
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 10);
+        assert_eq!(file_stat.kind, FileType::RegularFile);
+
+        //test new dir
+        let file_stat = FileStat::new_dir("a", "b");
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 0);
+        assert_eq!(file_stat.kind, FileType::Directory);
+
+        //test new file with path
+        let file_stat = FileStat::new_file_with_path("a/b", 10);
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 10);
+        assert_eq!(file_stat.kind, FileType::RegularFile);
+
+        //teset new dir with path
+        let file_stat = FileStat::new_dir_with_path("a/b");
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 0);
+        assert_eq!(file_stat.kind, FileType::Directory);
+    }
+
+    #[test]
+    fn test_file_stat_set_file_id() {
+        let mut file_stat = FileStat::new_file("a", "b", 10);
+        file_stat.set_file_id(1, 2);
+        assert_eq!(file_stat.file_id, 2);
+        assert_eq!(file_stat.parent_file_id, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed: file_id != 0 && parent_file_id != 0")]
+    fn test_file_stat_set_file_id_panic() {
+        let mut file_stat = FileStat::new_file("a", "b", 10);
+        file_stat.set_file_id(1, 0);
+    }
+
+    #[test]
+    fn test_open_file() {
+        let mut open_file = OpenedFile::new(FileStat::new_file("a", "b", 10));
+        assert_eq!(open_file.file_stat.name, "b");
+        assert_eq!(open_file.file_stat.size, 10);
+
+        open_file.set_file_id(1, 2);
+
+        assert_eq!(open_file.file_stat.file_id, 2);
+        assert_eq!(open_file.file_stat.parent_file_id, 1);
+    }
+
+    #[test]
+    fn test_file_entry_manager() {
+        let mut manager = FileEntryManager::new();
+        manager.insert(1, 2, "a/b");
+        let file = manager.get_file_by_id(2).unwrap();
+        assert_eq!(file.file_id, 2);
+        assert_eq!(file.parent_file_id, 1);
+        assert_eq!(file.file_name, "a/b");
+
+        let file = manager.get_file_by_name("a/b").unwrap();
+        assert_eq!(file.file_id, 2);
+        assert_eq!(file.parent_file_id, 1);
+        assert_eq!(file.file_name, "a/b");
+
+        manager.remove("a/b");
+        assert!(manager.get_file_by_id(2).is_none());
+        assert!(manager.get_file_by_name("a/b").is_none());
+    }
+}

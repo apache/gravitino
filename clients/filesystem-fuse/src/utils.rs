@@ -33,3 +33,26 @@ pub fn split_file_path(path: &str) -> (&str, &str) {
         None => ("", path),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_join_file_path() {
+        assert_eq!(join_file_path("", "a"), "a");
+        assert_eq!(join_file_path("", "a.txt"), "a.txt");
+        assert_eq!(join_file_path("a", "b"), "a/b");
+        assert_eq!(join_file_path("a/b", "c"), "a/b/c");
+        assert_eq!(join_file_path("a/b", "c.txt"), "a/b/c.txt");
+    }
+
+    #[test]
+    fn test_split_file_path() {
+        assert_eq!(split_file_path("a"), ("", "a"));
+        assert_eq!(split_file_path("a.txt"), ("", "a.txt"));
+        assert_eq!(split_file_path("a/b"), ("a", "b"));
+        assert_eq!(split_file_path("a/b/c"), ("a/b", "c"));
+        assert_eq!(split_file_path("a/b/c.txt"), ("a/b", "c.txt"));
+    }
+}
