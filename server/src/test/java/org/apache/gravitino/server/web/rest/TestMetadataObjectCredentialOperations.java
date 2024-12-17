@@ -59,7 +59,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     }
   }
 
-  private CredentialManager dispatcher = mock(CredentialManager.class);
+  private CredentialManager credentialManager = mock(CredentialManager.class);
 
   private String metalake = "test_metalake";
 
@@ -78,7 +78,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(CredentialManager.class).ranked(2);
+            bind(credentialManager).to(CredentialManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -101,7 +101,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
     S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
     // Test return one credential
-    when(dispatcher.getCredentials(any())).thenReturn(Arrays.asList(credential));
+    when(credentialManager.getCredentials(any())).thenReturn(Arrays.asList(credential));
     Response response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
@@ -123,7 +123,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     Assertions.assertEquals(0, credentialToTest.expireTimeInMs());
 
     // Test doesn't return credential
-    when(dispatcher.getCredentials(any())).thenReturn(null);
+    when(credentialManager.getCredentials(any())).thenReturn(null);
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
@@ -139,7 +139,9 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     Assertions.assertEquals(0, credentialResponse.getCredentials().length);
 
     // Test throws NoSuchCredentialException
-    doThrow(new NoSuchCredentialException("mock error")).when(dispatcher).getCredentials(any());
+    doThrow(new NoSuchCredentialException("mock error"))
+        .when(credentialManager)
+        .getCredentials(any());
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())

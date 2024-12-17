@@ -429,8 +429,7 @@ public class GravitinoEnv {
         new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
-    this.credentialManager =
-        new CredentialManager(catalogManager, entityStore, idGenerator);
+    this.credentialManager = new CredentialManager(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
