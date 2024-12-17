@@ -257,20 +257,28 @@ impl OpenedFile {
     }
 
     async fn read(&mut self, offset: u64, size: u32) -> Result<Bytes> {
+        let reader = self.reader.as_mut().ok_or(Errno::from(libc::EBADF))?;
+        let result = reader.read(offset, size).await?;
+
+        // update the access time
         self.file_stat.atime = Timestamp::from(SystemTime::now());
-        self.reader.as_mut().unwrap().read(offset, size).await
+
+        Ok(result)
     }
 
     async fn write(&mut self, offset: u64, data: &[u8]) -> Result<u32> {
-        let end = offset + data.len() as u64;
+        let writer = self.writer.as_mut().ok_or(Errno::from(libc::EBADF))?;
+        let written = writer.write(offset, data).await?;
 
+        // update the file size
+        let end = offset + data.len() as u64;
         if end > self.file_stat.size {
             self.file_stat.size = end;
         }
         self.file_stat.atime = Timestamp::from(SystemTime::now());
         self.file_stat.mtime = self.file_stat.atime;
 
-        self.writer.as_mut().unwrap().write(offset, data).await
+        Ok(written)
     }
 
     async fn close(&mut self) -> Result<()> {
@@ -355,14 +363,14 @@ pub struct SimpleFileSystem<T: PathFileSystem> {
     /// opened files
     opened_file_manager: OpenedFileManager,
     /// inode id generator
-    inode_id_generator: AtomicU64,
+    file_id_generator: AtomicU64,
 
     /// real system
     fs: T,
 }
 
 impl<T: PathFileSystem> SimpleFileSystem<T> {
-    const INITIAL_INODE_ID: u64 = 10000;
+    const INITIAL_FILE_ID: u64 = 10000;
     const ROOT_DIR_PARENT_FILE_ID: u64 = 0;
     const ROOT_DIR_FILE_ID: u64 = 1;
     const ROOT_DIR_NAME: &'static str = "";
@@ -371,17 +379,17 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
             opened_file_manager: OpenedFileManager::new(),
-            inode_id_generator: AtomicU64::new(Self::INITIAL_INODE_ID),
+            file_id_generator: AtomicU64::new(Self::INITIAL_FILE_ID),
             fs,
         }
     }
 
-    fn next_inode_id(&self) -> u64 {
-        self.inode_id_generator
+    fn next_file_id(&self) -> u64 {
+        self.file_id_generator
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    async fn get_file_node(&self, file_id: u64) -> Result<FileEntry> {
+    async fn get_file_entry(&self, file_id: u64) -> Result<FileEntry> {
         self.file_entry_manager
             .read()
             .await
@@ -389,7 +397,7 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
             .ok_or(Errno::from(libc::ENOENT))
     }
 
-    async fn get_file_node_by_path(&self, path: &str) -> Option<FileEntry> {
+    async fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
         self.file_entry_manager.read().await.get_file_by_name(path)
     }
 
@@ -398,7 +406,8 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
         let file = file_manager.get_file_by_name(&file_stat.path);
         match file {
             None => {
-                file_stat.set_file_id(parent_file_id, self.next_inode_id());
+                // allocate new file id
+                file_stat.set_file_id(parent_file_id, self.next_file_id());
                 file_manager.insert(file_stat.parent_file_id, file_stat.file_id, &file_stat.path);
             }
             Some(file) => {
@@ -413,24 +422,24 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
         flags: u32,
         kind: FileType,
     ) -> Result<FileHandle> {
-        let file_node = self.get_file_node(file_id).await?;
+        let file_entry = self.get_file_entry(file_id).await?;
 
         let mut file = {
             match kind {
                 FileType::Directory => {
                     self.fs
-                        .open_dir(&file_node.file_name, OpenFileFlags(flags))
+                        .open_dir(&file_entry.file_name, OpenFileFlags(flags))
                         .await?
                 }
                 FileType::RegularFile => {
                     self.fs
-                        .open_file(&file_node.file_name, OpenFileFlags(flags))
+                        .open_file(&file_entry.file_name, OpenFileFlags(flags))
                         .await?
                 }
                 _ => return Err(Errno::from(libc::EINVAL)),
             }
         };
-        file.set_file_id(file_node.parent_file_id, file_id);
+        file.set_file_id(file_entry.parent_file_id, file_id);
         let file = self.opened_file_manager.put_file(file);
         let file = file.lock().await;
         Ok(file.file_handle())
@@ -449,7 +458,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn get_file_path(&self, file_id: u64) -> String {
-        let file = self.get_file_node(file_id).await;
+        let file = self.get_file_entry(file_id).await;
         file.map(|x| x.file_name).unwrap_or_else(|_| "".to_string())
     }
 
@@ -469,24 +478,24 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn stat(&self, file_id: u64) -> Result<FileStat> {
-        let file_node = self.get_file_node(file_id).await?;
-        let mut stat = self.fs.stat(&file_node.file_name).await?;
-        stat.set_file_id(file_node.parent_file_id, file_node.file_id);
+        let file = self.get_file_entry(file_id).await?;
+        let mut stat = self.fs.stat(&file.file_name).await?;
+        stat.set_file_id(file.parent_file_id, file.file_id);
         Ok(stat)
     }
 
     async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
-        let parent_file_node = self.get_file_node(parent_file_id).await?;
-        let mut stat = self.fs.lookup(&parent_file_node.file_name, name).await?;
+        let parent_file = self.get_file_entry(parent_file_id).await?;
+        let mut stat = self.fs.lookup(&parent_file.file_name, name).await?;
         self.fill_file_id(&mut stat, parent_file_id).await;
         Ok(stat)
     }
 
     async fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
-        let file_node = self.get_file_node(file_id).await?;
-        let mut files = self.fs.read_dir(&file_node.file_name).await?;
+        let file = self.get_file_entry(file_id).await?;
+        let mut files = self.fs.read_dir(&file.file_name).await?;
         for file in files.iter_mut() {
-            self.fill_file_id(file, file_node.file_id).await;
+            self.fill_file_id(file, file.file_id).await;
         }
         Ok(files)
     }
@@ -502,16 +511,16 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
-        let parent_node = self.get_file_node(parent_file_id).await?;
+        let parent = self.get_file_entry(parent_file_id).await?;
         let mut file = self
             .fs
-            .create_file(&parent_node.file_name, name, OpenFileFlags(flags))
+            .create_file(&parent.file_name, name, OpenFileFlags(flags))
             .await?;
 
-        file.set_file_id(parent_file_id, self.next_inode_id());
+        file.set_file_id(parent_file_id, self.next_file_id());
         {
-            let mut file_node_manager = self.file_entry_manager.write().await;
-            file_node_manager.insert(
+            let mut file_manager = self.file_entry_manager.write().await;
+            file_manager.insert(
                 file.file_stat.parent_file_id,
                 file.file_stat.file_id,
                 &file.file_stat.path,
@@ -523,46 +532,40 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64> {
-        let parent_node = self.get_file_node(parent_file_id).await?;
-        let mut file = self.fs.create_dir(&parent_node.file_name, name).await?;
+        let parent = self.get_file_entry(parent_file_id).await?;
+        let mut file = self.fs.create_dir(&parent.file_name, name).await?;
 
-        file.set_file_id(parent_file_id, self.next_inode_id());
+        file.set_file_id(parent_file_id, self.next_file_id());
         {
-            let mut file_node_manager = self.file_entry_manager.write().await;
-            file_node_manager.insert(file.parent_file_id, file.file_id, &file.path);
+            let mut file_manager = self.file_entry_manager.write().await;
+            file_manager.insert(file.parent_file_id, file.file_id, &file.path);
         }
         Ok(file.file_id)
     }
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
-        let file_node = self.get_file_node(file_id).await?;
-        self.fs
-            .set_attr(&file_node.file_name, file_stat, true)
-            .await
+        let file = self.get_file_entry(file_id).await?;
+        self.fs.set_attr(&file.file_name, file_stat, true).await
     }
 
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
-        let parent_file_node = self.get_file_node(parent_file_id).await?;
-        self.fs
-            .remove_file(&parent_file_node.file_name, name)
-            .await?;
+        let parent_file = self.get_file_entry(parent_file_id).await?;
+        self.fs.remove_file(&parent_file.file_name, name).await?;
 
         {
             let mut file_id_manager = self.file_entry_manager.write().await;
-            file_id_manager.remove(&join_file_path(&parent_file_node.file_name, name));
+            file_id_manager.remove(&join_file_path(&parent_file.file_name, name));
         }
         Ok(())
     }
 
     async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
-        let parent_file_node = self.get_file_node(parent_file_id).await?;
-        self.fs
-            .remove_dir(&parent_file_node.file_name, name)
-            .await?;
+        let parent_file = self.get_file_entry(parent_file_id).await?;
+        self.fs.remove_dir(&parent_file.file_name, name).await?;
 
         {
             let mut file_id_manager = self.file_entry_manager.write().await;
-            file_id_manager.remove(&join_file_path(&parent_file_node.file_name, name));
+            file_id_manager.remove(&join_file_path(&parent_file.file_name, name));
         }
         Ok(())
     }
@@ -645,18 +648,18 @@ impl FileEntryManager {
     }
 
     fn insert(&mut self, parent_file_id: u64, file_id: u64, file_name: &str) {
-        let file_node = FileEntry {
+        let file = FileEntry {
             file_id,
             parent_file_id,
             file_name: file_name.to_string(),
         };
-        self.file_id_map.insert(file_id, file_node.clone());
-        self.file_name_map.insert(file_name.to_string(), file_node);
+        self.file_id_map.insert(file_id, file.clone());
+        self.file_name_map.insert(file_name.to_string(), file);
     }
 
     fn remove(&mut self, file_name: &str) {
-        if let Some(node) = self.file_name_map.remove(file_name) {
-            self.file_id_map.remove(&node.file_id);
+        if let Some(file) = self.file_name_map.remove(file_name) {
+            self.file_id_map.remove(&file.file_id);
         }
     }
 }
