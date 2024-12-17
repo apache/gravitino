@@ -36,7 +36,9 @@ class SortDirection(Enum):
         self._direction = direction
         self._default_null_ordering = default_null_ordering
 
-    @property
+    def direction(self) -> str:
+        return self._direction
+
     def default_null_ordering(self) -> NullOrdering:
         """
         Returns the default null ordering to use if no null ordering is specified explicitly.
@@ -48,9 +50,9 @@ class SortDirection(Enum):
 
     def __str__(self) -> str:
         if self == SortDirection.ASCENDING:
-            return SortDirection.ASCENDING._direction
+            return SortDirection.ASCENDING.direction()
         if self == SortDirection.DESCENDING:
-            return SortDirection.DESCENDING._direction
+            return SortDirection.DESCENDING.direction()
 
         raise ValueError(f"Unexpected sort direction: {self}")
 
@@ -66,9 +68,9 @@ class SortDirection(Enum):
             SortDirection: The corresponding SortDirection.
         """
         direction = direction.lower()
-        if direction == SortDirection.ASCENDING._direction:
+        if direction == SortDirection.ASCENDING.direction():
             return SortDirection.ASCENDING
-        if direction == SortDirection.DESCENDING._direction:
+        if direction == SortDirection.DESCENDING.direction():
             return SortDirection.DESCENDING
 
         raise ValueError(f"Unexpected sort direction: {direction}")
