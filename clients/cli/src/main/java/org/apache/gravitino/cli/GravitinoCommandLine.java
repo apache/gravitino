@@ -397,7 +397,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
-      newUserDetails(url, ignore, metalake, user).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        newUserAudit(url, ignore, metalake, user).handle();
+      } else {
+        newUserDetails(url, ignore, metalake, user).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       newListUsers(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
@@ -434,7 +438,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
-      newGroupDetails(url, ignore, metalake, group).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        newGroupAudit(url, ignore, metalake, group).handle();
+      } else {
+        newGroupDetails(url, ignore, metalake, group).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       newListGroups(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
@@ -539,7 +547,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
-      newRoleDetails(url, ignore, metalake, role).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        newRoleAudit(url, ignore, metalake, role).handle();
+      } else {
+        newRoleDetails(url, ignore, metalake, role).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       newListRoles(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
