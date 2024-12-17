@@ -21,25 +21,17 @@ from gravitino.api.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.expressions.sorts.sort_order import SortOrder
 
-# Here is a compare of the other version for SortImpl class with @dataclass decorator
-# @dataclass(frozen=True)
-# class SortImpl(SortOrder):
-#     """Implementation of the SortOrder."""
-#     expression: Expression
-#     direction: SortDirection
-#     null_ordering: NullOrdering
-
-#     def __str__(self) -> str:
-#         return (f"SortImplexpression={self.expression}, "
-#                 f"direction={self.direction}, null_ordering={self.null_ordering})")
-
 
 class SortImpl(SortOrder):
+    _expression: Expression
+    _direction: SortDirection
+    _null_ordering: NullOrdering
+
     def __init__(
-        self,
-        expression: Expression,
-        direction: SortDirection,
-        null_ordering: NullOrdering,
+            self,
+            expression: Expression,
+            direction: SortDirection,
+            null_ordering: NullOrdering,
     ):
         """Initialize the SortImpl object."""
         self._expression = expression
@@ -60,9 +52,9 @@ class SortImpl(SortOrder):
         if not isinstance(other, SortImpl):
             return False
         return (
-            self.expression() == other.expression()
-            and self.direction() == other.direction()
-            and self.null_ordering() == other.null_ordering()
+                self.expression() == other.expression()
+                and self.direction() == other.direction()
+                and self.null_ordering() == other.null_ordering()
         )
 
     def __hash__(self) -> int:
@@ -95,9 +87,9 @@ class SortOrders:
 
     @staticmethod
     def of(
-        expression: Expression,
-        direction: SortDirection,
-        null_ordering: NullOrdering = None,
+            expression: Expression,
+            direction: SortDirection,
+            null_ordering: NullOrdering = None,
     ) -> SortImpl:
         """Creates a sort order with the given direction and optionally specified null ordering."""
         if null_ordering is None:

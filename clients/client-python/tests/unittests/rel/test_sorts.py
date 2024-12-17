@@ -17,6 +17,8 @@
 import unittest
 from unittest.mock import MagicMock
 
+from gravitino.api.expressions.function_expression import FunctionExpression
+from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.expressions.sorts.sort_orders import SortImpl, SortOrders
@@ -90,3 +92,21 @@ class TestSortOrder(unittest.TestCase):
             f"direction=asc, null_ordering=nulls_first)"
         )
         self.assertEqual(str(sort_impl), expected_str)
+
+    def test_sort_order(self):
+        field_reference = NamedReference.field(["field1"])
+        sort_order = SortOrders.of(field_reference, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
+
+        self.assertEqual(NullOrdering.NULLS_FIRST, sort_order.null_ordering())
+        self.assertEqual(SortDirection.ASCENDING, sort_order.direction())
+        self.assertIsInstance(sort_order.expression(), NamedReference)
+        self.assertEqual(["field1"], sort_order.expression().field_name())
+
+        date = FunctionExpression.of("date", NamedReference.field(["b"]))
+        sort_order = SortOrders.of(date, SortDirection.DESCENDING, NullOrdering.NULLS_LAST)
+        self.assertEqual(NullOrdering.NULLS_LAST, sort_order.null_ordering())
+        self.assertEqual(SortDirection.DESCENDING, sort_order.direction())
+
+        self.assertIsInstance(sort_order.expression(), FunctionExpression)
+        self.assertEqual("date", sort_order.expression().function_name())
+        self.assertEqual(["b"], sort_order.expression().arguments()[0].references()[0].field_name())

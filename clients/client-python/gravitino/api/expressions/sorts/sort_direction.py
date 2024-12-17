@@ -20,7 +20,6 @@ from gravitino.api.expressions.sorts.null_ordering import NullOrdering
 
 class SortDirection(Enum):
     """A sort direction used in sorting expressions.
-
     Each direction has a default null ordering that is implied if no null ordering is specified explicitly.
     """
 
@@ -29,6 +28,9 @@ class SortDirection(Enum):
 
     DESCENDING = ("desc", NullOrdering.NULLS_LAST)
     """Descending sort direction. Nulls appear last. For ascending order, this means nulls appear at the end."""
+
+    _direction: str
+    _default_null_ordering: NullOrdering
 
     def __init__(self, direction: str, default_null_ordering: NullOrdering):
         self._direction = direction
@@ -46,9 +48,9 @@ class SortDirection(Enum):
 
     def __str__(self) -> str:
         if self == SortDirection.ASCENDING:
-            return "asc"
+            return SortDirection.ASCENDING._direction
         if self == SortDirection.DESCENDING:
-            return "desc"
+            return SortDirection.DESCENDING._direction
 
         raise ValueError(f"Unexpected sort direction: {self}")
 
@@ -58,16 +60,15 @@ class SortDirection(Enum):
         Returns the SortDirection from the string representation.
 
         Args:
-            str: The string representation of the sort direction.
+            direction: The string representation of the sort direction.
 
         Returns:
             SortDirection: The corresponding SortDirection.
         """
-
         direction = direction.lower()
-        if direction == "asc":
+        if direction == SortDirection.ASCENDING._direction:
             return SortDirection.ASCENDING
-        if direction == "desc":
+        if direction == SortDirection.DESCENDING._direction:
             return SortDirection.DESCENDING
 
         raise ValueError(f"Unexpected sort direction: {direction}")
