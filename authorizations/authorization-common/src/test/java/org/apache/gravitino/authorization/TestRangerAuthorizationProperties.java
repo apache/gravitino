@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

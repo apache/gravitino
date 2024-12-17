@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
-public class RangerPathBaseMetadataObject implements AuthorizationMetadataObject {
+public class RangerHDFSMetadataObject implements AuthorizationMetadataObject {
   /**
    * The type of object in the Ranger system. Every type will map one kind of the entity of the
    * Gravitino type system.
@@ -59,7 +59,7 @@ public class RangerPathBaseMetadataObject implements AuthorizationMetadataObject
 
   private final AuthorizationMetadataObject.Type type;
 
-  public RangerPathBaseMetadataObject(String path, AuthorizationMetadataObject.Type type) {
+  public RangerHDFSMetadataObject(String path, AuthorizationMetadataObject.Type type) {
     this.path = path;
     this.type = type;
   }
@@ -97,7 +97,7 @@ public class RangerPathBaseMetadataObject implements AuthorizationMetadataObject
         type != null, "Cannot create a Ranger metadata object with no type");
 
     Preconditions.checkArgument(
-        type == RangerPathBaseMetadataObject.Type.PATH, "it must be the PATH type");
+        type == RangerHDFSMetadataObject.Type.PATH, "it must be the PATH type");
 
     for (String name : names) {
       Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");

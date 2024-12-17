@@ -22,17 +22,21 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.google.common.collect.Lists;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFS;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFSPlugin;
-import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQL;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,12 +44,10 @@ import org.junit.jupiter.api.Test;
 
 public class TestChainAuthorization {
   private static TestCatalog hiveCatalog;
-
+  static AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
   @BeforeAll
   public static void setUp() {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-
     CatalogEntity hiveCatalogEntity =
         CatalogEntity.builder()
             .withId(1L)
@@ -59,17 +61,22 @@ public class TestChainAuthorization {
     Map<String, String> catalogConf = new HashMap<>();
     catalogConf.put(Catalog.AUTHORIZATION_PROVIDER, "chain");
     catalogConf.put(
-        AuthorizationPropertiesMeta.getInstance().wildcardNodePropertyKey(), "hive1,hdfs1");
-    catalogConf.put("authorization.chain.hive1.catalog-provider", "hive");
+        ChainAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
     catalogConf.put(
-        "authorization.chain.hive1.provider", TestRangerAuthorizationHadoopSQL.SHORT_NAME);
-    catalogConf.put("authorization.chain.hive1.ranger.auth.types", "simple");
+        "authorization.chain.hive1.provider", "test-ranger");
+    catalogConf.put("authorization.chain.hive1.ranger.auth.type", "simple");
     catalogConf.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     catalogConf.put("authorization.chain.hive1.ranger.username", "admin");
     catalogConf.put("authorization.chain.hive1.ranger.password", "admin");
+    catalogConf.put("authorization.chain.hive1.ranger.service.type", "HadoopSQL");
     catalogConf.put("authorization.chain.hive1.ranger.service.name", "hiveDev1");
-    catalogConf.put("authorization.chain.hdfs1.catalog-provider", "hdfs");
-    catalogConf.put("authorization.chain.hdfs1.provider", TestRangerAuthorizationHDFS.SHORT_NAME);
+    catalogConf.put("authorization.chain.hdfs1.provider", "test-ranger");
+    catalogConf.put("authorization.chain.hdfs1.ranger.auth.type", "simple");
+    catalogConf.put("authorization.chain.hdfs1.ranger.admin.url", "http://localhost:6080");
+    catalogConf.put("authorization.chain.hdfs1.ranger.username", "admin");
+    catalogConf.put("authorization.chain.hdfs1.ranger.password", "admin");
+    catalogConf.put("authorization.chain.hdfs1.ranger.service.type", "HDFS");
+    catalogConf.put("authorization.chain.hdfs1.ranger.service.name", "hiveDev1");
 
     hiveCatalog =
         new TestCatalog().withCatalogConf(catalogConf).withCatalogEntity(hiveCatalogEntity);
@@ -77,6 +84,34 @@ public class TestChainAuthorization {
         new IsolatedClassLoader(
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     hiveCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
+  }
+
+  public RoleEntity mock3TableRole(String roleName) {
+    SecurableObject securableObject1 =
+            SecurableObjects.parse(
+                    String.format("catalog.%s", roleName), // use unique db name to avoid conflict
+                    MetadataObject.Type.SCHEMA,
+                    Lists.newArrayList(Privileges.CreateTable.allow()));
+
+    SecurableObject securableObject2 =
+            SecurableObjects.parse(
+                    String.format("catalog.%s.tab2", roleName),
+                    SecurableObject.Type.TABLE,
+                    Lists.newArrayList(Privileges.SelectTable.allow()));
+
+    SecurableObject securableObject3 =
+            SecurableObjects.parse(
+                    String.format("catalog.%s.tab3", roleName),
+                    SecurableObject.Type.TABLE,
+                    Lists.newArrayList(Privileges.ModifyTable.allow()));
+
+    return RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(
+                    Lists.newArrayList(securableObject1, securableObject2, securableObject3))
+            .build();
   }
 
   @Test
@@ -99,7 +134,8 @@ public class TestChainAuthorization {
               }
             });
 
-    chainAuthPlugin.onRoleCreated(null);
+    RoleEntity roleEntity = mock3TableRole("role1");
+    chainAuthPlugin.onRoleCreated(roleEntity);
 
     chainAuthPlugin
         .getPlugins()

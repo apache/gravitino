@@ -35,7 +35,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
@@ -61,10 +61,10 @@ public class RangerITEnv {
   private static final String RANGER_TRINO_TYPE = "trino";
   public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
-  protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   protected static RangerClient rangerClient;
-  protected static final String HADOOP_USER_NAME = "gravitino";
+  public static final String HADOOP_USER_NAME = "gravitino";
   private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -175,7 +175,7 @@ public class RangerITEnv {
     }
   }
 
-  static void startHiveRangerContainer() {
+  public static void startHiveRangerContainer() {
     containerSuite.startHiveRangerContainer(
         new HashMap<>(
             ImmutableMap.of(

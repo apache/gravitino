@@ -24,9 +24,7 @@ import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
-import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFS;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFSPlugin;
-import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQL;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -58,7 +56,8 @@ public class TestAuthorization {
         new TestCatalog()
             .withCatalogConf(
                 ImmutableMap.of(
-                    Catalog.AUTHORIZATION_PROVIDER, TestRangerAuthorizationHadoopSQL.SHORT_NAME))
+                    Catalog.AUTHORIZATION_PROVIDER, "test-ranger",
+                    "authorization.ranger.service.type", "HadoopSQL"))
             .withCatalogEntity(hiveCatalogEntity);
     IsolatedClassLoader isolatedClassLoader =
         new IsolatedClassLoader(
@@ -79,7 +78,8 @@ public class TestAuthorization {
         new TestCatalog()
             .withCatalogConf(
                 ImmutableMap.of(
-                    Catalog.AUTHORIZATION_PROVIDER, TestRangerAuthorizationHDFS.SHORT_NAME))
+                        Catalog.AUTHORIZATION_PROVIDER, "test-ranger",
+                        "authorization.ranger.service.type", "HDFS"))
             .withCatalogEntity(filesetEntity);
     filesetCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
   }

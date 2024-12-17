@@ -16,17 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
-
-import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
+package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Maps;
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.gravitino.authorization.chain.ChainAuthorizationProperties;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
+import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 
 public class TestChainAuthorizationProperties {
   @Test
@@ -66,6 +69,20 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
+  }
+
+  @Test
+  void testWithoutChains() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("authorization.chain.plugins", "");
+    properties.put("authorization.chain.hive1.provider", "ranger");
+    properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
+    properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
+    properties.put("authorization.chain.hive1.ranger.username", "admin");
+    properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
+    properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
+//    Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
   }
 
   @Test

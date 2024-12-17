@@ -39,7 +39,9 @@ dependencies {
   implementation(project(":common")) {
     exclude(group = "*")
   }
-
+  implementation(project(":authorizations:authorization-common")) {
+    exclude(group = "*")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -129,6 +131,9 @@ tasks {
 }
 
 tasks.test {
+  doFirst {
+    environment("HADOOP_USER_NAME", "gravitino")
+  }
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":authorizations:authorization-ranger:jar", ":authorizations:authorization-ranger:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")

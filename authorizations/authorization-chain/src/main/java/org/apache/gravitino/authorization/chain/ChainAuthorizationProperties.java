@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.chain;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -49,12 +50,22 @@ import java.util.stream.Collectors;
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
  */
 public class ChainAuthorizationProperties {
-  public static final String PLUGINS_SPLITTER = ",";
+  private static final String PLUGINS_SPLITTER = ",";
   /** Chain authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
 
   /** Chain authorization plugin provider */
   public static final String CHAIN_PROVIDER = "authorization.chain.*.provider";
+
+  public static final String PREFIX = "authorization.chain";
+
+  static String getPluginProvider(String pluginName, Map<String, String> properties) {
+    return properties.get(PREFIX + "." + pluginName + ".provider");
+  }
+
+  static List<String> plugins(Map<String, String> properties) {
+    return Arrays.asList(properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER));
+  }
 
   static Map<String, String> fetchAuthPluginProperties(
       String pluginName, Map<String, String> properties) {

@@ -16,27 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.ranger;
+package org.apache.gravitino.authorization.ranger;
 
-import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Set;
+import org.apache.gravitino.authorization.AuthorizationMetadataObject;
+import org.apache.gravitino.authorization.AuthorizationPrivilege;
+import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 
-public class TestRangerAuthorizationHadoopSQL
-    extends BaseAuthorization<TestRangerAuthorizationHadoopSQL> {
+public class RangerHDFSSecurableObject extends RangerHDFSMetadataObject
+    implements AuthorizationSecurableObject {
 
-  public static final String SHORT_NAME = "test_ranger_hadoop_sql";
+  private final List<AuthorizationPrivilege> privileges;
 
-  public TestRangerAuthorizationHadoopSQL() {}
-
-  @Override
-  public String shortName() {
-    return SHORT_NAME;
+  public RangerHDFSSecurableObject(
+      String path, AuthorizationMetadataObject.Type type, Set<AuthorizationPrivilege> privileges) {
+    super(path, type);
+    this.privileges = ImmutableList.copyOf(privileges);
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(
-      String metalake, String catalogProvider, Map<String, String> config) {
-    return new TestRangerAuthorizationHadoopSQLPlugin();
+  public List<AuthorizationPrivilege> privileges() {
+    return privileges;
   }
 }

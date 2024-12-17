@@ -29,8 +29,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -102,7 +103,11 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     createCatalog();
 
     RangerITEnv.cleanup();
-    metalake.addUser(System.getenv(HADOOP_USER_NAME));
+    try {
+      metalake.addUser(System.getenv(HADOOP_USER_NAME));
+    } catch (UserAlreadyExistsException e) {
+      LOG.error("Failed to add user: {}", System.getenv(HADOOP_USER_NAME), e);
+    }
   }
 
   @AfterAll
