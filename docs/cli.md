@@ -840,12 +840,6 @@ null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float
 
 In addition decimal(precision,scale) and varchar(length).
 
-#### Show a column's audit information
-
-```bash
-gcli column details --name catalog_postgres.hr.departments.name --audit
-```
-
 #### Add a column
 
 ```bash
