@@ -21,16 +21,12 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_SERVICE_NAME;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_USERNAME;
 import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
@@ -39,8 +35,8 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -168,31 +164,24 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
   }
 
   private static void createCatalog() {
-    Map<String, String> properties =
-        ImmutableMap.of(
-            IcebergConstants.URI,
-            HIVE_METASTORE_URIS,
-            IcebergConstants.CATALOG_BACKEND,
-            "hive",
-            IcebergConstants.WAREHOUSE,
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse",
-                containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT),
-            IMPERSONATION_ENABLE,
-            "true",
-            AUTHORIZATION_PROVIDER,
-            "ranger",
-            RANGER_SERVICE_NAME,
-            RangerITEnv.RANGER_HIVE_REPO_NAME,
-            AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
-            RANGER_ADMIN_URL,
-            RANGER_AUTH_TYPE,
-            RangerContainer.authType,
-            RANGER_USERNAME,
-            RangerContainer.rangerUserName,
-            RANGER_PASSWORD,
-            RangerContainer.rangerPassword);
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.URI, HIVE_METASTORE_URIS);
+    properties.put(IcebergConstants.CATALOG_BACKEND, "hive");
+    properties.put(
+        IcebergConstants.WAREHOUSE,
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse",
+            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT));
+    properties.put(IMPERSONATION_ENABLE, "true");
+    properties.put(AUTHORIZATION_PROVIDER, "ranger");
+    properties.put(RangerAuthorizationProperties.RANGER_SERVICE_TYPE, "HadoopSQL");
+    properties.put(
+        RangerAuthorizationProperties.RANGER_SERVICE_NAME, RangerITEnv.RANGER_HIVE_REPO_NAME);
+    properties.put(RangerAuthorizationProperties.RANGER_ADMIN_URL, RANGER_ADMIN_URL);
+    properties.put(RangerAuthorizationProperties.RANGER_AUTH_TYPE, RangerContainer.authType);
+    properties.put(RangerAuthorizationProperties.RANGER_USERNAME, RangerContainer.rangerUserName);
+    properties.put(RangerAuthorizationProperties.RANGER_PASSWORD, RangerContainer.rangerPassword);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);

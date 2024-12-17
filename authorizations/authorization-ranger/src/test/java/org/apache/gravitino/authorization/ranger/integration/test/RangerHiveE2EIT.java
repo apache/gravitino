@@ -20,10 +20,6 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_SERVICE_NAME;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_USERNAME;
 import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
 
 import com.google.common.collect.ImmutableMap;
@@ -33,8 +29,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -179,15 +175,17 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             "true",
             AUTHORIZATION_PROVIDER,
             "ranger",
-            RANGER_SERVICE_NAME,
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
             RangerITEnv.RANGER_HIVE_REPO_NAME,
-            AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
             RANGER_ADMIN_URL,
-            RANGER_AUTH_TYPE,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
             RangerContainer.authType,
-            RANGER_USERNAME,
+            RangerAuthorizationProperties.RANGER_USERNAME,
             RangerContainer.rangerUserName,
-            RANGER_PASSWORD,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
             RangerContainer.rangerPassword);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
