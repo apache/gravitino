@@ -25,7 +25,8 @@ plugins {
 
 dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
-  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
@@ -35,6 +36,8 @@ dependencies {
   }
 
   implementation(libs.caffeine)
+  implementation(libs.guava)
+  implementation(libs.commons.lang3)
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
@@ -45,27 +48,19 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
-  testImplementation(project(":bundles:aws-core"))
-  testImplementation(project(":bundles:gcp-core"))
-  testImplementation(project(":bundles:aliyun-core"))
-  testImplementation(project(":bundles:azure-core"))
-
-  testImplementation(libs.hadoop3.abs)
-  testImplementation(libs.hadoop3.gcs)
-  testImplementation(libs.hadoop3.aws)
-  testImplementation(libs.hadoop3.oss)
+  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
 
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
-  testImplementation(libs.guava)
 
-  testImplementation(libs.hadoop3.client)
-  testImplementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-  }
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
+
   testImplementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")

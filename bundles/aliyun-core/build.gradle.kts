@@ -29,7 +29,8 @@ dependencies {
   compileOnly(project(":core"))
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.oss)
 
   implementation(libs.aliyun.credentials.sdk)
@@ -44,6 +45,14 @@ dependencies {
   // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
   // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
   implementation(libs.commons.lang3)
+  implementation(libs.httpclient)
+  implementation(libs.commons.collections3)
+
+  implementation(libs.guava)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
@@ -64,6 +73,8 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
   relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
+  relocate("org.apache.http", "org.apache.gravitino.shaded.org.apache.http")
+  relocate("org.apache.commons.collections", "org.apache.gravitino.shaded.org.apache.commons.collections")
 }
 
 tasks.jar {

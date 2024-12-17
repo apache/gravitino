@@ -28,7 +28,8 @@ dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":core"))
   compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.abs)
 
   implementation(libs.guava)

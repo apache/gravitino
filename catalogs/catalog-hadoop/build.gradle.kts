@@ -45,25 +45,10 @@ dependencies {
     exclude(group = "*")
   }
 
-  implementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-    exclude("org.eclipse.jetty", "*")
-    exclude("org.apache.hadoop", "hadoop-auth")
-    exclude("org.apache.curator", "curator-client")
-    exclude("org.apache.curator", "curator-framework")
-    exclude("org.apache.curator", "curator-recipes")
-    exclude("org.apache.avro", "avro")
-    exclude("com.sun.jersey", "jersey-servlet")
-  }
-
-  implementation(libs.hadoop3.client) {
-    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
-    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
-    exclude("org.apache.hadoop", "hadoop-yarn-api")
-    exclude("org.apache.hadoop", "hadoop-yarn-client")
-    exclude("com.squareup.okhttp", "okhttp")
-  }
+  implementation(libs.commons.lang3)
+  implementation(libs.commons.io)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")

@@ -30,7 +30,8 @@ dependencies {
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
 
-  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
 
   implementation(libs.commons.lang3)
   // runtime used
@@ -54,7 +55,7 @@ tasks.withType(ShadowJar::class.java) {
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
-  relocate("com.google", "org.apache.gravitino.gcp.shaded.com.google")
+  relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
 }

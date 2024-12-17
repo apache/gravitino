@@ -27,7 +27,8 @@ plugins {
 dependencies {
   implementation(project(":bundles:gcp-core"))
   implementation(libs.hadoop3.gcs)
-  implementation(libs.hadoop3.common)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -38,7 +39,7 @@ tasks.withType(ShadowJar::class.java) {
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
-  relocate("com.google", "org.apache.gravitino.gcp.shaded.com.google")
+  relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
   relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
 }
