@@ -28,7 +28,7 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
-import org.apache.gravitino.catalog.CredentialOperationDispatcher;
+import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
@@ -106,7 +106,7 @@ public class GravitinoEnv {
 
   private MetalakeDispatcher metalakeDispatcher;
 
-  private CredentialOperationDispatcher credentialOperationDispatcher;
+  private CredentialManager credentialManager;
 
   private AccessControlDispatcher accessControlDispatcher;
 
@@ -261,12 +261,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the {@link CredentialOperationDispatcher} associated with the Gravitino environment.
+   * Get the {@link CredentialManager} associated with the Gravitino environment.
    *
-   * @return The {@link CredentialOperationDispatcher} instance.
+   * @return The {@link CredentialManager} instance.
    */
-  public CredentialOperationDispatcher credentialOperationDispatcher() {
-    return credentialOperationDispatcher;
+  public CredentialManager credentialManager() {
+    return credentialManager;
   }
 
   /**
@@ -429,8 +429,8 @@ public class GravitinoEnv {
         new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
-    this.credentialOperationDispatcher =
-        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.credentialManager =
+        new CredentialManager(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);

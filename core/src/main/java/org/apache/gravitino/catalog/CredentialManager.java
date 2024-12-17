@@ -30,9 +30,9 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Get credentials with the specific catalog classloader. */
-public class CredentialOperationDispatcher extends OperationDispatcher {
+public class CredentialManager extends OperationDispatcher {
 
-  public CredentialOperationDispatcher(
+  public CredentialManager(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     super(catalogManager, store, idGenerator);
   }
@@ -40,11 +40,11 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   public List<Credential> getCredentials(NameIdentifier identifier) {
     return doWithCatalog(
         NameIdentifierUtil.getCatalogIdentifier(identifier),
-        c -> loadCredentials(c.catalog(), identifier),
+        c -> getCredentials(c.catalog(), identifier),
         NoSuchCatalogException.class);
   }
 
-  private List<Credential> loadCredentials(BaseCatalog catalog, NameIdentifier identifier) {
+  private List<Credential> getCredentials(BaseCatalog catalog, NameIdentifier identifier) {
     throw new NotImplementedException(
         String.format(
             "Load credentials is not implemented for catalog: %s, identifier: %s",

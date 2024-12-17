@@ -34,7 +34,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.CredentialOperationDispatcher;
+import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
@@ -51,15 +51,15 @@ public class MetadataObjectCredentialOperations {
   private static final Logger LOG =
       LoggerFactory.getLogger(MetadataObjectCredentialOperations.class);
 
-  private CredentialOperationDispatcher dispatcher;
+  private CredentialManager credentialManager;
 
   @SuppressWarnings("unused")
   @Context
   private HttpServletRequest httpRequest;
 
   @Inject
-  public MetadataObjectCredentialOperations(CredentialOperationDispatcher dispatcher) {
-    this.dispatcher = dispatcher;
+  public MetadataObjectCredentialOperations(CredentialManager dispatcher) {
+    this.credentialManager = dispatcher;
   }
 
   @GET
@@ -85,7 +85,7 @@ public class MetadataObjectCredentialOperations {
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-            List<Credential> credentials = dispatcher.getCredentials(identifier);
+            List<Credential> credentials = credentialManager.getCredentials(identifier);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
             }

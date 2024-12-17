@@ -31,7 +31,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.catalog.CredentialOperationDispatcher;
+import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
@@ -59,7 +59,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     }
   }
 
-  private CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
+  private CredentialManager dispatcher = mock(CredentialManager.class);
 
   private String metalake = "test_metalake";
 
@@ -78,7 +78,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(CredentialOperationDispatcher.class).ranked(2);
+            bind(dispatcher).to(CredentialManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
