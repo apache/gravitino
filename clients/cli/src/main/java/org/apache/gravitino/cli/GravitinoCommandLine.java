@@ -28,6 +28,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -174,6 +175,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.LIST.equals(command)) {
       newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
+      if (Objects.isNull(metalake)) {
+        System.err.println("! " + CommandEntities.METALAKE + " is not defined");
+        return;
+      }
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
@@ -215,7 +220,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, metalake).handle();
+      newListCatalogs(url, ignore, outputFormat, metalake).handle();
       return;
     }
 
