@@ -104,6 +104,13 @@ public class S3TokenProvider implements CredentialProvider {
     if (StringUtils.isNotBlank(region)) {
       builder.region(Region.of(region));
     }
+    String stsEndpoint = s3CredentialConfig.stsEndpoint();
+    // If the user does not set a value or provides an blank string, we treat as unspecified.
+    // The goal is to pass a custom endpoint to the `builder` only when the user specifies a
+    // non-blank value.
+    if (StringUtils.isNotBlank(stsEndpoint)) {
+      builder.endpointOverride(URI.create(stsEndpoint));
+    }
     return builder.build();
   }
 

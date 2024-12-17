@@ -94,6 +94,10 @@ def mock_data(cls):
         return_value=mock_load_fileset_catalog(),
     )
     @patch(
+        "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_load_fileset("fileset", ""),
+    )
+    @patch(
         "gravitino.client.gravitino_client_base.GravitinoClientBase.check_version",
         return_value=True,
     )

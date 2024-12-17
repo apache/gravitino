@@ -29,7 +29,7 @@ public class ErrorMessages {
   public static final String UNKNOWN_SCHEMA = "Unknown schema name.";
   public static final String UNKNOWN_TABLE = "Unknown table name.";
   public static final String MALFORMED_NAME = "Malformed entity name.";
-  public static final String MISSING_NAME = "Missing name.";
+  public static final String MISSING_NAME = "Missing --name option.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String SCHEMA_EXISTS = "Schema already exists.";

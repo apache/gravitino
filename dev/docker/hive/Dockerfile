@@ -171,6 +171,8 @@ RUN ln -s /opt/apache-hive-${HIVE3_VERSION}-bin ${HIVE3_HOME}
 
 # Add hive configuration to temporary directory
 ADD hive-site.xml ${HIVE_TMP_CONF_DIR}/hive-site.xml
+ADD hive-site-for-sql-base-auth.xml ${HIVE_TMP_CONF_DIR}/hive-site-for-sql-base-auth.xml
+ADD hiveserver2-site-for-sql-base-auth.xml ${HIVE_TMP_CONF_DIR}/hiveserver2-site-for-sql-base-auth.xml
 
 ################################################################################
 # add mysql jdbc driver

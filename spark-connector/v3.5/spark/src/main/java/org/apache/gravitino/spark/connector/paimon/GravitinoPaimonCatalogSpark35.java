@@ -16,14 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.spark.connector.paimon;
 
-package org.apache.gravitino.storage;
-
-public class ABSProperties {
-
-  // The account name of the Azure Blob Storage.
-  public static final String GRAVITINO_ABS_ACCOUNT_NAME = "abs-account-name";
-
-  // The account key of the Azure Blob Storage.
-  public static final String GRAVITINO_ABS_ACCOUNT_KEY = "abs-account-key";
-}
+public class GravitinoPaimonCatalogSpark35 extends GravitinoPaimonCatalogSpark34 {}

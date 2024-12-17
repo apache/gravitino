@@ -48,10 +48,10 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
+import org.apache.gravitino.authorization.ranger.RangerHadoopSQLSecurableObject;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
-import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
-import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -80,7 +80,7 @@ public class RangerHiveIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init();
+    RangerITEnv.init(true);
 
     rangerAuthHivePlugin = RangerITEnv.rangerAuthHivePlugin;
     rangerHelper = RangerITEnv.rangerHelper;
@@ -343,7 +343,7 @@ public class RangerHiveIT {
     AuthorizationSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateAuthorizationSecurableObject(
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
-            RangerMetadataObject.Type.TABLE,
+            RangerHadoopSQLMetadataObject.Type.TABLE,
             ImmutableSet.of(
                 new RangerPrivileges.RangerHivePrivilegeImpl(
                     RangerPrivileges.RangerHadoopSQLPrivilege.ALL, Privilege.Condition.ALLOW)));
@@ -460,7 +460,7 @@ public class RangerHiveIT {
         Collections.singletonList(policyItem));
   }
 
-  static boolean deleteHivePolicy(RangerSecurableObject rangerSecurableObject) {
+  static boolean deleteHivePolicy(RangerHadoopSQLSecurableObject rangerSecurableObject) {
     RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
     if (policy != null) {
       try {

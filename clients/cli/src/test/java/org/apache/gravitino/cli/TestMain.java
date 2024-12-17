@@ -143,4 +143,55 @@ public class TestMain {
     String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.CATALOG, entity);
   }
+
+  public void metalakeWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"metalake", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.METALAKE);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @Test
+  public void catalogWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"catalog", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.CATALOG);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @Test
+  public void schemaWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"schema", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.SCHEMA);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @SuppressWarnings("DefaultCharset")
+  public void CreateTagWithNoTag() {
+    String[] args = {"tag", "create", "--metalake", "metalake_test_no_tag"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void DeleteTagWithNoTag() {
+    String[] args = {"tag", "delete", "--metalake", "metalake_test_no_tag", "-f"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+  }
 }
