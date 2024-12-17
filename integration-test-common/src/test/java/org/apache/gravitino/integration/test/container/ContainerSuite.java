@@ -538,7 +538,7 @@ public class ContainerSuite implements Closeable {
     return kerberosHiveContainer;
   }
 
-  public HiveContainer getJdbcHiveContainer() {
+  public HiveContainer getSQLBaseAuthHiveContainer() {
     return sqlBaseHiveContainer;
   }
 
