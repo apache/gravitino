@@ -703,15 +703,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String table = name.getTableName();
-    String column = name.getColumnName();
 
     Command.setAuthenticationMode(auth, userName);
 
-    switch (command) {
-      case CommandActions.LIST:
-        newListColumns(url, ignore, metalake, catalog, schema, table).handle();
-        break;
+    if (CommandActions.LIST.equals(command)) {
+      newListColumns(url, ignore, metalake, catalog, schema, table).handle();
+      return;
+    }
 
+    String column = name.getColumnName();
+
+    switch (command) {
       case CommandActions.CREATE:
         {
           String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
