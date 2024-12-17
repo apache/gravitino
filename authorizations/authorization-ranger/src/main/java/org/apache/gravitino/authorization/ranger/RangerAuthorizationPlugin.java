@@ -52,7 +52,6 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -88,17 +87,13 @@ public abstract class RangerAuthorizationPlugin
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
-    String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
-    String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
-    rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
+    RangerAuthorizationProperties.validate(config);
+    String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
+    String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
+    rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
-    String password = config.get(AuthorizationPropertiesMeta.RANGER_PASSWORD);
-    rangerServiceName = config.get(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME);
-    Preconditions.checkArgument(rangerUrl != null, "Ranger admin URL is required");
-    Preconditions.checkArgument(authType != null, "Ranger auth type is required");
-    Preconditions.checkArgument(rangerAdminName != null, "Ranger username is required");
-    Preconditions.checkArgument(password != null, "Ranger password is required");
-    Preconditions.checkArgument(rangerServiceName != null, "Ranger service name is required");
+    String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
+    rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
     rangerHelper =

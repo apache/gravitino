@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
 import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -200,7 +200,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (String)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMeta.KEY_TAB_URI);
+                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.KEY_TAB_URI);
         Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
@@ -210,7 +210,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (int)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
+                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC);
 
         FetchFileUtils.fetchFileFromUri(
             keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
@@ -244,7 +244,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (int)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
+                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.CHECK_INTERVAL_SEC);
 
         checkTgtExecutor.scheduleAtFixedRate(
             () -> {

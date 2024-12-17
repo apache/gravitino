@@ -478,7 +478,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newUserDetails(url, ignore, metalake, user).handle();
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newUserAudit(url, ignore, metalake, user).handle();
+        } else {
+          newUserDetails(url, ignore, metalake, user).handle();
+        }
         break;
 
       case CommandActions.LIST:
@@ -529,7 +533,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newGroupDetails(url, ignore, metalake, group).handle();
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newGroupAudit(url, ignore, metalake, group).handle();
+        } else {
+          newGroupDetails(url, ignore, metalake, group).handle();
+        }
         break;
 
       case CommandActions.LIST:
@@ -669,7 +677,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newRoleDetails(url, ignore, metalake, role).handle();
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newRoleAudit(url, ignore, metalake, role).handle();
+        } else {
+          newRoleDetails(url, ignore, metalake, role).handle();
+        }
         break;
 
       case CommandActions.LIST:
@@ -714,6 +726,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String column = name.getColumnName();
 
     switch (command) {
+      case CommandActions.DETAILS:
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newColumnAudit(url, ignore, metalake, catalog, schema, table, column).handle();
+        }
+        break;
+
       case CommandActions.CREATE:
         {
           String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
