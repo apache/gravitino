@@ -40,7 +40,7 @@ val checkRustProject by tasks.registering(Exec::class) {
   description = "Check the Rust project"
   workingDir = file("$projectDir")
 
-  commandLine( "bash", "-c", "make check")
+  commandLine("bash", "-c", "make check")
 }
 
 val testRustProject by tasks.registering(Exec::class) {
