@@ -28,7 +28,7 @@ use opendal::layers::LoggingLayer;
 use opendal::{services, Builder, Operator};
 
 pub(crate) enum StorageFileSystem {
-    MemoryStorge(MemoryFileSystem),
+    MemoryStorage(MemoryFileSystem),
     CloudStorage(CloudStorageFileSystem),
 }
 
@@ -58,7 +58,7 @@ impl StorageFileSystem {
 macro_rules! async_call_fun {
     ($self:expr, $fun:ident $(, $args:expr)* ) => {
         match $self {
-            StorageFileSystem::MemoryStorge(fs) => fs.$fun($($args),*).await,
+            StorageFileSystem::MemoryStorage(fs) => fs.$fun($($args),*).await,
             StorageFileSystem::CloudStorage(fs) => fs.$fun($($args),*).await,
         }
     };
@@ -67,7 +67,7 @@ macro_rules! async_call_fun {
 macro_rules! call_fun {
     ($self:expr, $fun:ident $(, $args:expr)* ) => {
         match $self {
-            StorageFileSystem::MemoryStorge(fs) => fs.$fun($($args),*),
+            StorageFileSystem::MemoryStorage(fs) => fs.$fun($($args),*),
             StorageFileSystem::CloudStorage(fs) => fs.$fun($($args),*),
         }
     };

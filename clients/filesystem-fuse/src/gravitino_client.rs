@@ -253,4 +253,23 @@ mod tests {
             Err(e) => panic!("Expected Ok, but got Err: {:?}", e),
         }
     }
+
+    #[tokio::test]
+    async fn test1() {
+        tracing_subscriber::fmt::init();
+        let config = GravitinoConfig {
+            gravitino_url: "http://localhost:8090".to_string(),
+            metalake: "test".to_string(),
+        };
+        let client = GravitinoClient::new(&config);
+        client.init();
+        let result= client.get_fileset("c1", "s1", "fileset1").await;
+        if let Err(e) = &result {
+            println!("{:?}", e);
+        }
+
+        let fileset= result.unwrap();
+        println!("{:?}", fileset);
+        assert!(fileset.name == "fileset1");
+    }
 }

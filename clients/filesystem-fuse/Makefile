@@ -19,11 +19,16 @@
 
 .PHONY: build
 build:
-	#cargo build --all-targets --all-features --workspace
 	cargo build --all-features --workspace
 
 fmt:
-	cargo  fmt --all
+	cargo fmt --all
+
+cargo-sort: install-cargo-sort
+	cargo sort -w
+
+fix-toml: install-taplo-cli
+	taplo fmt
 
 check-fmt:
 	cargo  fmt --all -- --check
@@ -35,8 +40,8 @@ check-clippy:
 install-cargo-sort:
 	cargo install cargo-sort@1.0.9
 
-cargo-sort: install-cargo-sort
-	cargo sort -c -w
+check-cargo-sort: install-cargo-sort
+	cargo sort -c
 
 install-cargo-machete:
 	cargo install cargo-machete
@@ -47,13 +52,10 @@ cargo-machete: install-cargo-machete
 install-taplo-cli:
 	cargo install taplo-cli@0.9.0
 
-fix-toml: install-taplo-cli
-	taplo fmt
-
 check-toml: install-taplo-cli
 	taplo check
 
-check: check-fmt check-clippy cargo-sort check-toml cargo-machete
+check: check-fmt check-clippy check-cargo-sort check-toml cargo-machete
 
 doc-test:
 	cargo test --no-fail-fast --doc --all-features --workspace
