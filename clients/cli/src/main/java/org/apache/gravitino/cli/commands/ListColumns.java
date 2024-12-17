@@ -74,6 +74,7 @@ public class ListColumns extends TableCommand {
       if (i == 0) {
         all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
       }
+      // TODO default values
       all.append(
           name
               + ","
