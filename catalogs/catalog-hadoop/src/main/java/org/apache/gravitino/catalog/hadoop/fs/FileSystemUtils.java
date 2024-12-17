@@ -63,8 +63,8 @@ public class FileSystemUtils {
               if (resultMap.containsKey(fileSystemProvider.scheme())) {
                 throw new UnsupportedOperationException(
                     String.format(
-                        "File system provider: '%s' with scheme '%s' already exists in the use provider list "
-                            + "Please make sure the file system provider scheme is unique.",
+                        "File system provider: '%s' with scheme '%s' already exists in the provider list,"
+                            + "please make sure the file system provider scheme is unique.",
                         fileSystemProvider.getClass().getName(), fileSystemProvider.scheme()));
               }
               resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);

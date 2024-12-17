@@ -144,7 +144,6 @@ public class TestMain {
     assertEquals(CommandEntities.CATALOG, entity);
   }
 
-  @Test
   public void metalakeWithHelpOption() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
@@ -175,5 +174,24 @@ public class TestMain {
 
     assertEquals(Main.resolveEntity(line), CommandEntities.SCHEMA);
     assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @SuppressWarnings("DefaultCharset")
+  public void CreateTagWithNoTag() {
+    String[] args = {"tag", "create", "--metalake", "metalake_test_no_tag"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void DeleteTagWithNoTag() {
+    String[] args = {"tag", "delete", "--metalake", "metalake_test_no_tag", "-f"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
   }
 }

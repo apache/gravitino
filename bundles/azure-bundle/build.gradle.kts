@@ -28,6 +28,9 @@ dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":core"))
   compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":catalogs:hadoop-common")) {
+    exclude("*")
+  }
 
   compileOnly(libs.hadoop3.common)
 
