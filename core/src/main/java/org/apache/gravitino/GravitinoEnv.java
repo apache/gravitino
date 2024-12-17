@@ -126,7 +126,6 @@ public class GravitinoEnv {
 
   private AuditLogManager auditLogManager;
 
-  private TagManager tagManager;
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
@@ -501,9 +500,7 @@ public class GravitinoEnv {
     // Tree lock
     this.lockManager = new LockManager(config);
 
-    // Tag manager
-    this.tagManager = new TagManager(idGenerator, entityStore);
-    // TagDispatcher
-    this.tagDispatcher = new TagEventDispatcher(eventBus, tagManager);
+    // Create and initialize Tag related modules
+    this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
   }
 }
