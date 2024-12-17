@@ -65,7 +65,7 @@ dependencies {
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:azure-bundle"))
+  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
