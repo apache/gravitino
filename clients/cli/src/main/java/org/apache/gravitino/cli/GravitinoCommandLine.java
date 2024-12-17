@@ -565,7 +565,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
-    if (CommandActions.LIST.equals(command)) {
+    if (line.hasOption(GravitinoOptions.AUDIT)) {
+      newColumnAudit(url, ignore, metalake, catalog, schema, table, column).handle();
+    } else if (CommandActions.LIST.equals(command)) {
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
       return;
     }
