@@ -71,6 +71,10 @@ public class SetOwner extends Command {
       this.entityType = MetadataObject.Type.TABLE;
     } else if (entityType.equals(CommandEntities.COLUMN)) {
       this.entityType = MetadataObject.Type.COLUMN;
+    } else if (entityType.equals(CommandEntities.TOPIC)) {
+      this.entityType = MetadataObject.Type.TOPIC;
+    } else if (entityType.equals(CommandEntities.FILESET)) {
+      this.entityType = MetadataObject.Type.FILESET;
     } else {
       this.entityType = null;
     }

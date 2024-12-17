@@ -33,17 +33,19 @@ bin/gravitino.sh start
 
 ### Bundle jars
 
-`gravitino-{aws,gcp,aliyun,azure}-bundle` are the jars that contain the necessary classes to access the corresponding cloud storages, and it's compiled with Hadoop 3.3.1 and can work with hadoop 3.3.x. Due to the compatibility issue, Those jars may not work 
-in the environment with other hadoop versions. According to the tests conducted by Gravitino community. `hadoop-aws-3.3.1.jar` could not work with hadoop 3.4.x or above, nor could `hadoop-aws-3.4.x.jar` work with hadoop 3.3.0 or below. 
+`gravitino-{aws,gcp,aliyun,azure}-bundle` are the jars that contain all the necessary classes to access the corresponding cloud storages, for instance, gravitino-aws-bundle contains the all necessary classes like `hadoop-common`(hadoop-3.3.1) and `hadoop-aws` to access the S3 storage.
+**They are used in the scenario where there is no hadoop environment in the runtime.**
 
-In order to solve this issue, Gravitino also provide the `gravitino-{aws,gcp,aliyun,azure}-core` that do not contain the cloud storage classes, users can manually add the necessary jars to the classpath. The following table shows the corresponding jars for different hadoop versions:
+**If there is already hadoop environment in the runtime, you can use the `gravitino-{aws,gcp,aliyun,azure}-core.jar` that does not contain the cloud storage classes (like hadoop-aws) and hadoop environment, you can manually add the necessary jars to the classpath.**
 
-| Hadoop runtime version | S3                                                                                                                         | GCS                                                                                                | OSS                                                                                                                                 | ABS                                                                                                     |
-|------------------------|----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| 3.3.1+(including)      | gravitino-aws-bundle-{version}.jar                                                                                         | gravitino-gcp-bundle-{version}.jar                                                                 | gravitino-aliyun-bundle-{version}.jar                                                                                               | gravitino-azure-bundle-{version}.jar                                                                    |
-| 2.x, 3.3.1-            | gravitino-aws-core-{version}.jar, hadoop-aws-{hadoop-version}.jar, aws-sdk-java-{version} and other necessary dependencies | gravitino-gcp-core-{version}.jar, gcs-connector-{hadoop-version}.jar, other necessary dependencies | gravitino-aliyun-core-{version}.jar, hadoop-aliyun-{hadoop-version}.jar, aliyun-sdk-java-{version} and other necessary dependencies | gravitino-azure-core-{version}.jar, hadoop-azure-{hadoop-version}.jar, and other necessary dependencies |
+The following picture demonstrates what jars are necessary for different cloud storage filesets:
 
-For `hadoop-aws`, `hadoop-azure` and `hadoop-aliyun` and related dependencies, you can get it from ${HADOOP_HOME}/share/hadoop/tools/lib/ directory.
+| Hadoop runtime version | S3                                                                                                                                   | GCS                                                                                                          | OSS                                                                                                                                           | ABS                                                                                                               |
+|------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| No Hadoop environment  | gravitino-aws-bundle-{gravitino-version}.jar                                                                                         | gravitino-gcp-bundle-{gravitino-version}.jar                                                                 | gravitino-aliyun-bundle-{gravitino-version}.jar                                                                                               | gravitino-azure-bundle-{gravitino-version}.jar                                                                    |
+| 2.x, 3.x               | gravitino-aws-core-{gravitino-version}.jar, hadoop-aws-{hadoop-version}.jar, aws-sdk-java-{version} and other necessary dependencies | gravitino-gcp-core-{gravitino-version}.jar, gcs-connector-{hadoop-version}.jar, other necessary dependencies | gravitino-aliyun-core-{gravitino-version}.jar, hadoop-aliyun-{hadoop-version}.jar, aliyun-sdk-java-{version} and other necessary dependencies | gravitino-azure-core-{gravitino-version}.jar, hadoop-azure-{hadoop-version}.jar, and other necessary dependencies |
+
+For `hadoop-aws-{version}.jar`, `hadoop-azure-{version}.jar` and `hadoop-aliyun-{version}.jar` and related dependencies, you can get it from ${HADOOP_HOME}/share/hadoop/tools/lib/ directory.
 For `gcs-connector`, you can download it from the [GCS connector](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.22-shaded.jar) for hadoop2 or hadoop3. 
 
 If there still have some issues, please report it to the Gravitino community and create an issue. 
@@ -53,12 +55,12 @@ Gravitino server uses Hadoop 3.3.1, and you only need to put the corresponding b
 :::
 
 
-## Create filesets
+## Create fileset catalogs
 
 Once the Gravitino server is started, you can create the corresponding fileset by the following sentence:
 
 
-### Create a S3 fileset
+### Create a S3 fileset catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -133,7 +135,7 @@ s3_catalog = gravitino_client.create_catalog(name="catalog",
 The value of location should always start with `s3a` NOT `s3`, for instance, `s3a://bucket/root`. Value like `s3://bucket/root` is not supported.
 :::
 
-### Create a GCS fileset
+### Create a GCS fileset catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -199,7 +201,7 @@ s3_catalog = gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
-### Create an OSS fileset
+### Create an OSS fileset catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -267,7 +269,7 @@ oss_catalog = gravitino_client.create_catalog(name="catalog",
 
 ```
 
-### Create an ABS (Azure Blob Storage or ADLS) fileset
+### Create an ABS (Azure Blob Storage or ADLS) fileset catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -336,10 +338,132 @@ abs_catalog = gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
+note:::
+- The prefix of an ABS (Azure Blob Storage or ADLS (v2)) location should always start with `abfss` NOT `abfs`, for instance, `abfss://container/root`. Value like `abfs://container/root` is not supported.
+- The prefix of an AWS S3 location should always start with `s3a` NOT `s3`, for instance, `s3a://bucket/root`. Value like `s3://bucket/root` is not supported.
+- The prefix of an Aliyun OSS location should always start with `oss` for instance, `oss://bucket/root`.
+- The prefix of a GCS location should always start with `gs` for instance, `gs://bucket/root`.
+:::
+
+
+## Create fileset schema
+
+This part is the same for all cloud storage filesets, you can create the schema by the following sentence:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "schema",
+  "comment": "comment",
+  "properties": {
+    "location": "file:///tmp/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("metalake")
+    .build();
+
+// Assuming you have just created a Hadoop catalog named `catalog`
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
+
+SupportsSchemas supportsSchemas = catalog.asSchemas();
+
+Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
+    // Property "location" is optional, if specified all the managed fileset without
+    // specifying storage location will be stored under this location.
+    .put("location", "file:///tmp/root/schema")
+    .build();
+Schema schema = supportsSchemas.createSchema("schema",
+    "This is a schema",
+    schemaProperties
+);
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+You can change the value of property `location` according to which catalog you are using, moreover, if we have set the `location` property in the catalog, we can omit the `location` property in the schema.
+
+## Create filesets
+
+The following sentences can be used to create a fileset in the schema:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "file:///tmp/root/schema/example_fileset",
+  "properties": {
+    "k1": "v1"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/filesets
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("metalake")
+    .build();
+
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
+FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+
+Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
+        .put("k1", "v1")
+        .build();
+
+filesetCatalog.createFileset(
+  NameIdentifier.of("schema", "example_fileset"),
+  "This is an example fileset",
+  Fileset.Type.MANAGED,
+  "file:///tmp/root/schema/example_fileset",
+  propertiesMap,
+);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog: Catalog = gravitino_client.load_catalog(name="catalog")
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "example_fileset"),
+                                            type=Fileset.Type.MANAGED,
+                                            comment="This is an example fileset",
+                                            storage_location="/tmp/root/schema/example_fileset",
+                                            properties={"k1": "v1"})
+```
+
+</TabItem>
+</Tabs>
+
+Similar to schema, the `storageLocation` is optional if you have set the `location` property in the schema or catalog. Please change the value of 
+`location` as the actual location you want to store the fileset. 
+
 
 ## Using Spark to access the fileset
 
-The following code snippet shows how to use Spark to access the fileset
+The following code snippet shows how to use **Spark 3.1.3 with hadoop environment** to access the fileset
 
 ```python
 import logging
@@ -355,7 +479,7 @@ schema_name = "schema"
 fileset_name = "example"
 
 ## this is for S3
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aws-bundle/build/libs/gravitino-aws-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aws-core/build/libs/gravitino-aws-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/hadoop-aws-3.2.0.jar,/Users/yuqi/Downloads/aws-java-sdk-bundle-1.11.375.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
   .appName("s3_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -371,7 +495,7 @@ spark = SparkSession.builder
   .getOrCreate()
 
 ### this is for GCS
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/gcp-bundle/build/libs/gravitino-gcp-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar, --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/gcp-core/build/libs/gravitino-gcp-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
   .appName("s3_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -385,7 +509,7 @@ spark = SparkSession.builder
   .getOrCreate()
 
 ### this is for OSS
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar, --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aliyun-core/build/libs/gravitino-aliyun-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/aliyun-sdk-oss-2.8.3.jar,/Users/yuqi/Downloads/hadoop-jars/hadoop-aliyun-3.2.0.jar,/Users/yuqi/Downloads/hadoop-jars/jdom-1.1.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
   .appName("s3_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -402,7 +526,7 @@ spark = SparkSession.builder
 spark.sparkContext.setLogLevel("DEBUG")
 
 ### this is for ABS
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/azure-bundle/build/libs/gravitino-azure-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/azure-core/build/libs/gravitino-azure-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/hadoop-azure-3.2.0.jar,/Users/yuqi/Downloads/hadoop-jars/azure-storage-7.0.0.jar,/Users/yuqi/Downloads/hadoop-jars/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
   .appName("s3_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -429,24 +553,24 @@ spark_df.coalesce(1).write
 
 ```
 
-The above examples are only applicable for Spark 3.2.x+, if you are using Spark 3.1.x or below, you need to make the following changes according to [bundle jars](#bundle-jars) to adapt to different hadoop runtime versions:
-Take Spark 3.1.3 for example, as the hadoop runtime of spark 3.1.3 is 3.2.0, we need to do the following changes:
+If your spark has no hadoop environment, you can use the following code snippet to access the fileset:
 
 ```python
-
-## replace the env variable with the following content:
-
+## replace the env PYSPARK_SUBMIT_ARGS variable in the code above with the following content:
 ### S3
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aws-core/build/libs/gravitino-aws-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/hadoop-aws-3.2.0.jar,/Users/yuqi/Downloads/aws-java-sdk-bundle-1.11.375.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aws-bundle/build/libs/gravitino-aws-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar --master local[1] pyspark-shell"
 ### GCS
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/gcp-core/build/libs/gravitino-gcp-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/gcp-bundle/build/libs/gravitino-gcp-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar, --master local[1] pyspark-shell"
 ### OSS
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aliyun-core/build/libs/gravitino-aliyun-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/aliyun-sdk-oss-2.8.3.jar,/Users/yuqi/Downloads/hadoop-jars/hadoop-aliyun-3.2.0.jar,/Users/yuqi/Downloads/hadoop-jars/jdom-1.1.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar, --master local[1] pyspark-shell"
 
 #### Azure Blob Storage
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/azure-core/build/libs/gravitino-azure-core-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/Downloads/hadoop-jars/hadoop-azure-3.2.0.jar,/Users/yuqi/Downloads/hadoop-jars/azure-storage-7.0.0.jar,/Users/yuqi/Downloads/hadoop-jars/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"  
-
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /Users/yuqi/project/gravitino/bundles/azure-bundle/build/libs/gravitino-azure-bundle-0.8.0-incubating-SNAPSHOT.jar,/Users/yuqi/project/gravitino/clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-0.8.0-incubating-SNAPSHOT.jar --master local[1] pyspark-shell"
 ```
+
+:::note
+**In some spark version, hadoop environment is needed by the driver, adding the bundles jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.**
+:::
 
 ## Using fileset with hadoop fs command
 
@@ -539,8 +663,11 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
-If the Hadoop version is 3.3.x, please copy the corresponding bundle jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory. For example, if you are using S3, you need to copy `gravitino-aws-bundle-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-For other Hadoop versions, please add all jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop class path or use the `hadoop fs` command with the `--jars` option to specify the necessary jars if you are using S3, OSS, GCS, For GCS, please download the corresponding the `gcs-connector-hadoop{2,3}-2.2.22-shaded.jar` from the [GCS connector](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.22-shaded.jar) and add it to the Hadoop class path. 
+Copy the corresponding core jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory. For example, if you are using S3, you need to copy `gravitino-aws-core-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+then copy hadoop-aws-{version}.jar and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, for simple you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+
+For GCS, please download the corresponding the `gcs-connector-hadoop{2,3}-2.2.22-shaded.jar` from the [GCS connector](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.22-shaded.jar) and add it to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. 
+
 
 3. Run the following command to access the fileset:
 

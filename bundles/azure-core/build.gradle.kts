@@ -32,6 +32,9 @@ dependencies {
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.abs)
 
+  implementation(libs.azure.identity)
+  implementation(libs.azure.storage.file.datalake)
+
   implementation(libs.guava)
   implementation(libs.commons.lang3)
   // runtime used

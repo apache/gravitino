@@ -228,7 +228,7 @@ gcli metalake list
 gcli metalake details
 ```
 
-#### Show a metalake audit information
+#### Show a metalake's audit information
 
 ```bash
 gcli metalake details --audit
@@ -290,7 +290,7 @@ gcli catalog list
 gcli catalog details --name catalog_postgres
 ```
 
-#### Show a catalog audit information
+#### Show a catalog's audit information
 
 ```bash
 gcli catalog details --name catalog_postgres --audit
@@ -404,7 +404,7 @@ gcli schema list --name catalog_postgres
 gcli schema details --name catalog_postgres.hr
 ```
 
-#### Show schema audit information
+#### Show schema's audit information
 
 ```bash
 gcli schema details --name catalog_postgres.hr --audit
@@ -526,6 +526,12 @@ gcli user details --user new_user
 gcli user list
 ```
 
+#### Show a roles's audit information
+
+```bash
+gcli user details --user new_user --audit
+```
+
 #### Delete a user
 
 ```bash
@@ -550,6 +556,12 @@ gcli group details --group new_group
 
 ```bash
 gcli group list
+```
+
+#### Show a groups's audit information
+
+```bash
+gcli group details --group new_group --audit
 ```
 
 #### Delete a group
@@ -670,6 +682,12 @@ gcli role details --role admin
 
 ```bash
 gcli role list
+```
+
+#### Show a roles's audit information
+
+```bash
+gcli role details --role admin --audit
 ```
 
 #### Create a role
@@ -821,6 +839,12 @@ When setting the datatype of a column the following basic types are currently su
 null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
 
 In addition decimal(precision,scale) and varchar(length).
+
+#### Show a column's audit information
+
+```bash
+gcli column details --name catalog_postgres.hr.departments.name --audit
+```
 
 #### Add a column
 

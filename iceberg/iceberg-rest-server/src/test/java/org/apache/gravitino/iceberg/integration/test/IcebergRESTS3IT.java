@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -52,12 +51,13 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
   @Override
   void initEnv() {
     this.s3Warehouse =
-        String.format("s3://%s/test1", getFromEnvOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
-    this.accessKey = getFromEnvOrDefault("GRAVITINO_S3_ACCESS_KEY", "{ACCESS_KEY}");
-    this.secretKey = getFromEnvOrDefault("GRAVITINO_S3_SECRET_KEY", "{SECRET_KEY}");
-    this.region = getFromEnvOrDefault("GRAVITINO_S3_REGION", "ap-southeast-2");
-    this.roleArn = getFromEnvOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
-    this.externalId = getFromEnvOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
+        String.format(
+            "s3://%s/test1", System.getenv().getOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
+    this.accessKey = System.getenv().getOrDefault("GRAVITINO_S3_ACCESS_KEY", "{ACCESS_KEY}");
+    this.secretKey = System.getenv().getOrDefault("GRAVITINO_S3_SECRET_KEY", "{SECRET_KEY}");
+    this.region = System.getenv().getOrDefault("GRAVITINO_S3_REGION", "ap-southeast-2");
+    this.roleArn = System.getenv().getOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
+    this.externalId = System.getenv().getOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
     if (ITUtils.isEmbedded()) {
       return;
     }
@@ -124,11 +124,6 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     BaseIT.copyBundleJarsToDirectory("aws-bundle", targetDir);
-  }
-
-  private String getFromEnvOrDefault(String envVar, String defaultValue) {
-    String envValue = System.getenv(envVar);
-    return Optional.ofNullable(envValue).orElse(defaultValue);
   }
 
   /**
