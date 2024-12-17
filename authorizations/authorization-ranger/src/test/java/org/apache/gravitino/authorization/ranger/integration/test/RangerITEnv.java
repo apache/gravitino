@@ -134,7 +134,7 @@ public class RangerITEnv {
                     "HDFS",
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
-    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFileSetPath(Mockito.any());
+    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFilesetPath(Mockito.any());
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =

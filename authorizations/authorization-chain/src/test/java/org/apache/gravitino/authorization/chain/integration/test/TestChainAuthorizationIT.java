@@ -201,7 +201,6 @@ public class TestChainAuthorizationIT extends RangerBaseE2EIT {
                     metalakeName, Lists.newArrayList(Privileges.CreateSchema.allow()));
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
     metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
-
   }
 
   @Override

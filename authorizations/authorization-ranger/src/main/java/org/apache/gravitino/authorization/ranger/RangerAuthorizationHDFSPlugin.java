@@ -23,16 +23,21 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
@@ -40,9 +45,11 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,19 +149,40 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         .filter(Objects::nonNull)
         .forEach(
             gravitinoPrivilege -> {
-              Set<AuthorizationPrivilege> rangerPrivileges = new HashSet<>();
-              // Ignore unsupported privileges
-              if (!privilegesMappingRule().containsKey(gravitinoPrivilege.name())) {
-                return;
-              }
-              privilegesMappingRule().get(gravitinoPrivilege.name()).stream()
-                  .forEach(
-                      rangerPrivilege ->
-                          rangerPrivileges.add(
-                              new RangerPrivileges.RangerHivePrivilegeImpl(
-                                  rangerPrivilege, gravitinoPrivilege.condition())));
-
               switch (gravitinoPrivilege.name()) {
+                case CREATE_SCHEMA:
+                  switch (securableObject.type()) {
+                    case METALAKE:
+                      CatalogDispatcher catalogDispatcher = GravitinoEnv.getInstance().catalogDispatcher();
+                      Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(Namespace.of(securableObject.name()));
+                      for (Catalog catalog : catalogs) {
+                        if (catalog.provider().equals("hive")) {
+                          try {
+                            CatalogEntity catalogEntity = GravitinoEnv.getInstance().entityStore().get(NameIdentifier.of(securableObject.name(), catalog.name()), Entity.EntityType.CATALOG, CatalogEntity.class);
+
+                          } catch (IOException e) {
+                            throw new RuntimeException(e);
+                          }
+                        }
+                      }
+
+
+                    rangerSecurableObjects.add(
+                              generateAuthorizationSecurableObject(
+                                      translateMetadataObject(securableObject).names(),
+                                      RangerHDFSMetadataObject.Type.PATH,
+                                      rangerPrivileges));
+                    case CATALOG:
+                    case SCHEMA:
+                      break;
+                    case FILESET:
+                      break;
+                    default:
+                      throw new AuthorizationPluginException(
+                              "The privilege %s is not supported for the securable object: %s",
+                              gravitinoPrivilege.name(), securableObject.type());
+                  }
+                  break;
                 case CREATE_FILESET:
                   // Ignore the Gravitino privilege `CREATE_FILESET` in the
                   // RangerAuthorizationHDFSPlugin
@@ -229,7 +257,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     if (metadataObject.type() == MetadataObject.Type.FILESET) {
       RangerHDFSMetadataObject rangerHDFSMetadataObject =
           new RangerHDFSMetadataObject(
-              getFileSetPath(metadataObject), RangerHDFSMetadataObject.Type.PATH);
+              getFilesetPath(metadataObject), RangerHDFSMetadataObject.Type.PATH);
       rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
       return rangerHDFSMetadataObject;
     } else {
@@ -237,7 +265,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     }
   }
 
-  public String getFileSetPath(MetadataObject metadataObject) {
+  public String getFilesetPath(MetadataObject metadataObject) {
     FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
     NameIdentifier identifier =
         NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
