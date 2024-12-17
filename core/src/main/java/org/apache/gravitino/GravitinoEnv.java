@@ -73,6 +73,7 @@ import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,6 +126,7 @@ public class GravitinoEnv {
 
   private AuditLogManager auditLogManager;
 
+  private TagManager tagManager;
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
@@ -499,7 +501,9 @@ public class GravitinoEnv {
     // Tree lock
     this.lockManager = new LockManager(config);
 
+    // Tag manager
+    this.tagManager = new TagManager(idGenerator, entityStore);
     // TagDispatcher
-    this.tagDispatcher = new TagEventDispatcher(eventBus, tagDispatcher);
+    this.tagDispatcher = new TagEventDispatcher(eventBus, tagManager);
   }
 }

@@ -48,11 +48,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: listTagsPreEvent
     try {
       // TODO: listTagsEvent
+      return dispatcher.listTags(metalake);
     } catch (Exception e) {
       // TODO: listTagFailureEvent
       throw e;
     }
-    return dispatcher.listTags(metalake);
   }
 
   @Override
@@ -60,11 +60,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: listTagsInfoPreEvent
     try {
       // TODO: listTagsInfoEvent
+      return dispatcher.listTagsInfo(metalake);
     } catch (Exception e) {
       // TODO: listTagsInfoFailureEvent
       throw e;
     }
-    return dispatcher.listTagsInfo(metalake);
   }
 
   @Override
@@ -72,11 +72,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: getTagPreEvent
     try {
       // TODO: getTagEvent
+      return dispatcher.getTag(metalake, name);
     } catch (NoSuchTagException e) {
       // TODO: getTagFailureEvent
       throw e;
     }
-    return dispatcher.getTag(metalake, name);
   }
 
   @Override
@@ -85,11 +85,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: createTagPreEvent
     try {
       // TODO: createTagEvent
+      return dispatcher.createTag(metalake, name, comment, properties);
     } catch (Exception e) {
       // TODO: createTagFailureEvent
       throw e;
     }
-    return dispatcher.createTag(metalake, name, comment, properties);
   }
 
   @Override
@@ -97,11 +97,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: alterTagPreEvent
     try {
       // TODO: alterTagEvent
+      return dispatcher.alterTag(metalake, name, changes);
     } catch (Exception e) {
       // TODO: alterTagFailureEvent
       throw e;
     }
-    return dispatcher.alterTag(metalake, name, changes);
   }
 
   @Override
@@ -109,11 +109,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: deleteTagPreEvent
     try {
       // TODO: deleteTagEvent
+      return dispatcher.deleteTag(metalake, name);
     } catch (Exception e) {
       // TODO: deleteTagFailureEvent
       throw e;
     }
-    return dispatcher.deleteTag(metalake, name);
   }
 
   @Override
@@ -121,11 +121,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: listMetadataObjectsForTagPreEvent
     try {
       // TODO: listMetadataObjectsForTagEvent
+      return dispatcher.listMetadataObjectsForTag(metalake, name);
     } catch (Exception e) {
       // TODO: listMetadataObjectsForTagFailureEvent
       throw e;
     }
-    return dispatcher.listMetadataObjectsForTag(metalake, name);
   }
 
   @Override
@@ -133,11 +133,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: listTagsForMetadataObjectPreEvent
     try {
       // TODO: listTagsForMetadataObjectEvent
+      return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
     } catch (Exception e) {
       // TODO: listTagsForMetadataObjectFailureEvent
       throw e;
     }
-    return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
   }
 
   @Override
@@ -145,11 +145,11 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: listTagsInfoForMetadataObjectPreEvent
     try {
       // TODO: listTagsInfoForMetadataObjectEvent
+      return dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
     } catch (Exception e) {
       // TODO: listTagsInfoForMetadataObjectFailureEvent
       throw e;
     }
-    return dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
   }
 
   @Override
@@ -158,12 +158,12 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: associateTagsForMetadataObjectPreEvent
     try {
       // TODO: associateTagsForMetadataObjectEvent
+      return dispatcher.associateTagsForMetadataObject(
+              metalake, metadataObject, tagsToAdd, tagsToRemove);
     } catch (Exception e) {
       // TODO: associateTagsForMetadataObjectFailureEvent
       throw e;
     }
-    return dispatcher.associateTagsForMetadataObject(
-        metalake, metadataObject, tagsToAdd, tagsToRemove);
   }
 
   @Override
@@ -171,10 +171,10 @@ public class TagEventDispatcher implements TagDispatcher {
     // TODO: getTagForMetadataObjectPreEvent
     try {
       // TODO: getTagForMetadataObjectEvent
+      return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
     } catch (Exception e) {
       // TODO: getTagForMetadataObjectFailureEvent
       throw e;
     }
-    return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
   }
 }
