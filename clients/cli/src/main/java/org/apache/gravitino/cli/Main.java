@@ -31,6 +31,10 @@ public class Main {
   public static void main(String[] args) {
     CommandLineParser parser = new DefaultParser();
     Options options = new GravitinoOptions().options();
+    if (args.length == 0) {
+      GravitinoCommandLine.displayHelp(options);
+      return;
+    }
 
     try {
       CommandLine line = parser.parse(options, args);

@@ -21,6 +21,8 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 
 /** Displays the details of a table's columns. */
 public class ListColumns extends TableCommand {
@@ -70,11 +72,18 @@ public class ListColumns extends TableCommand {
       String comment = columns[i].comment();
       String nullable = columns[i].nullable() ? "true" : "false";
       String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
+      String defaultValue = null;
+
+      if (columns[i].defaultValue().equals(Literals.NULL)) {
+        defaultValue = "null";
+      } else if (columns[i].defaultValue() instanceof Literal) {
+        defaultValue = ((Literal) columns[i].defaultValue()).dataType().toString();
+      }
 
       if (i == 0) {
-        all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
+        all.append(
+            "name,datatype,comment,nullable,auto_increment,default_value" + System.lineSeparator());
       }
-      // TODO default values
       all.append(
           name
               + ","
@@ -85,6 +94,8 @@ public class ListColumns extends TableCommand {
               + nullable
               + ","
               + autoIncrement
+              + ","
+              + defaultValue
               + System.lineSeparator());
     }
 

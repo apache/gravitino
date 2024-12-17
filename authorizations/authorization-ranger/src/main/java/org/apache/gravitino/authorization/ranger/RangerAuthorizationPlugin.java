@@ -123,6 +123,57 @@ public abstract class RangerAuthorizationPlugin
   public abstract List<String> policyResourceDefinesRule();
 
   /**
+   * Create a new policy for metadata object
+   *
+   * @return The RangerPolicy for metadata object.
+   */
+  protected abstract RangerPolicy createPolicyAddResources(
+      AuthorizationMetadataObject metadataObject);
+
+  protected RangerPolicy addOwnerToNewPolicy(
+      AuthorizationMetadataObject metadataObject, Owner newOwner) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+    ownerMappingRule()
+        .forEach(
+            ownerPrivilege -> {
+              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              if (newOwner != null) {
+                if (newOwner.type() == Owner.Type.USER) {
+                  policyItem.getUsers().add(newOwner.name());
+                } else {
+                  policyItem.getGroups().add(newOwner.name());
+                }
+                // mark the policy item is created by Gravitino
+                policyItem.getRoles().add(RangerHelper.GRAVITINO_OWNER_ROLE);
+              }
+              policy.getPolicyItems().add(policyItem);
+            });
+    return policy;
+  }
+
+  protected RangerPolicy addOwnerRoleToNewPolicy(
+      AuthorizationMetadataObject metadataObject, String ownerRoleName) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+
+    ownerMappingRule()
+        .forEach(
+            ownerPrivilege -> {
+              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.getRoles().add(rangerHelper.generateGravitinoRoleName(ownerRoleName));
+              policy.getPolicyItems().add(policyItem);
+            });
+    return policy;
+  }
+
+  /**
    * Create a new role in the Ranger. <br>
    * 1. Create a policy for metadata object. <br>
    * 2. Save role name in the Policy items. <br>
@@ -277,9 +328,11 @@ public abstract class RangerAuthorizationPlugin
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
-        AuthorizationMetadataObject AuthorizationMetadataObject =
-            translateMetadataObject(metadataObject);
-        doRemoveMetadataObject(AuthorizationMetadataObject);
+        if (metadataObject.type() != MetadataObject.Type.FILESET) {
+          AuthorizationMetadataObject AuthorizationMetadataObject =
+              translateMetadataObject(metadataObject);
+          doRemoveMetadataObject(AuthorizationMetadataObject);
+        }
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
@@ -385,9 +438,7 @@ public abstract class RangerAuthorizationPlugin
                       rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
                   try {
                     if (policy == null) {
-                      policy =
-                          rangerHelper.addOwnerRoleToNewPolicy(
-                              AuthorizationSecurableObject, ownerRoleName);
+                      policy = addOwnerRoleToNewPolicy(AuthorizationSecurableObject, ownerRoleName);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
@@ -401,6 +452,7 @@ public abstract class RangerAuthorizationPlugin
         break;
       case SCHEMA:
       case TABLE:
+      case FILESET:
         // The schema and table use user/group to manage the owner
         AuthorizationSecurableObjects.stream()
             .forEach(
@@ -409,8 +461,7 @@ public abstract class RangerAuthorizationPlugin
                       rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
                   try {
                     if (policy == null) {
-                      policy =
-                          rangerHelper.addOwnerToNewPolicy(AuthorizationSecurableObject, newOwner);
+                      policy = addOwnerToNewPolicy(AuthorizationSecurableObject, newOwner);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwner(policy, preOwner, newOwner);
@@ -684,7 +735,7 @@ public abstract class RangerAuthorizationPlugin
         return true;
       }
     } else {
-      policy = rangerHelper.createPolicyAddResources(securableObject);
+      policy = createPolicyAddResources(securableObject);
     }
 
     rangerHelper.addPolicyItem(policy, roleName, securableObject);
@@ -807,6 +858,9 @@ public abstract class RangerAuthorizationPlugin
       case COLUMN:
         removePolicyByMetadataObject(authMetadataObject.names());
         break;
+      case FILESET:
+        // can not get fileset path in this case, do nothing
+        break;
       default:
         throw new IllegalArgumentException(
             "Unsupported metadata object type: " + authMetadataObject.type());
@@ -819,7 +873,7 @@ public abstract class RangerAuthorizationPlugin
    */
   private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authMetadataObject) {
     Preconditions.checkArgument(
-        authMetadataObject.type() == RangerMetadataObject.Type.SCHEMA,
+        authMetadataObject.type() == RangerHadoopSQLMetadataObject.Type.SCHEMA,
         "The metadata object type must be SCHEMA");
     Preconditions.checkArgument(
         authMetadataObject.names().size() == 1, "The metadata object names must be 1");
@@ -893,6 +947,9 @@ public abstract class RangerAuthorizationPlugin
         break;
       case COLUMN:
         doRenameColumnMetadataObject(AuthorizationMetadataObject, newAuthMetadataObject);
+        break;
+      case FILESET:
+        // do nothing when fileset is renamed
         break;
       default:
         throw new IllegalArgumentException(
@@ -1083,22 +1140,10 @@ public abstract class RangerAuthorizationPlugin
   public void close() throws IOException {}
 
   /** Generate authorization securable object */
-  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
+  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
       List<String> names,
       AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges) {
-    AuthorizationMetadataObject authMetadataObject =
-        new RangerMetadataObject(
-            AuthorizationMetadataObject.getParentFullName(names),
-            AuthorizationMetadataObject.getLastName(names),
-            type);
-    authMetadataObject.validateAuthorizationMetadataObject();
-    return new RangerSecurableObject(
-        authMetadataObject.parent(),
-        authMetadataObject.name(),
-        authMetadataObject.type(),
-        privileges);
-  }
+      Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()

@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -46,6 +47,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -66,6 +68,8 @@ import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -1323,5 +1327,69 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  public static ModelVersionEntity fromModelVersionPO(
+      NameIdentifier modelIdent,
+      ModelVersionPO modelVersionPO,
+      List<ModelVersionAliasRelPO> aliasRelPOs) {
+    List<String> aliases =
+        aliasRelPOs.stream()
+            .map(ModelVersionAliasRelPO::getModelVersionAlias)
+            .collect(Collectors.toList());
+
+    try {
+      return ModelVersionEntity.builder()
+          .withModelIdentifier(modelIdent)
+          .withVersion(modelVersionPO.getModelVersion())
+          .withAliases(aliases)
+          .withComment(modelVersionPO.getModelVersionComment())
+          .withUri(modelVersionPO.getModelVersionUri())
+          .withProperties(
+              JsonUtils.anyFieldMapper()
+                  .readValue(modelVersionPO.getModelVersionProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(modelVersionPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static ModelVersionPO initializeModelVersionPO(
+      ModelVersionEntity modelVersionEntity, ModelVersionPO.Builder builder) {
+    try {
+      return builder
+          // Note that version set here will not be used when inserting into database, it will
+          // directly use the version from the query to avoid concurrent version conflict.
+          .withModelVersion(modelVersionEntity.version())
+          .withModelVersionComment(modelVersionEntity.comment())
+          .withModelVersionUri(modelVersionEntity.uri())
+          .withModelVersionProperties(
+              JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.properties()))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static List<ModelVersionAliasRelPO> initializeModelVersionAliasRelPO(
+      ModelVersionEntity modelVersionEntity, Long modelId) {
+    return modelVersionEntity.aliases().stream()
+        .map(
+            a ->
+                ModelVersionAliasRelPO.builder()
+                    // Note that version set here will not be used when inserting into database, it
+                    // will directly use the version from the query to avoid concurrent version
+                    // conflict.
+                    .withModelVersion(modelVersionEntity.version())
+                    .withModelVersionAlias(a)
+                    .withModelId(modelId)
+                    .withDeletedAt(DEFAULT_DELETED_AT)
+                    .build())
+        .collect(Collectors.toList());
   }
 }

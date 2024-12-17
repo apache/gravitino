@@ -117,6 +117,7 @@ Gravitino Iceberg REST service supports using static S3 secret key or generating
 | `gravitino.iceberg-rest.s3-role-arn`              | The ARN of the role to access the S3 data.                                                                                                                                                                          | (none)        | Yes, when `credential-provider-type` is `s3-token` | 0.7.0-incubating |
 | `gravitino.iceberg-rest.s3-external-id`           | The S3 external id to generate token, only used when `credential-provider-type` is `s3-token`.                                                                                                                      | (none)        | No                                                 | 0.7.0-incubating |
 | `gravitino.iceberg-rest.s3-token-expire-in-secs`  | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role, only used when `credential-provider-type` is `s3-token`.                                                     | 3600          | No                                                 | 0.7.0-incubating |
+| `gravitino.iceberg-rest.s3-token-service-endpoint`          | An alternative endpoint of the S3 token service, This could be used with s3-compatible object storage service like MINIO that has a different STS endpoint. | (none)        | No                                                 | 0.8.0-incubating |
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
@@ -130,16 +131,17 @@ To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse
 
 Gravitino Iceberg REST service supports using static access-key-id and secret-access-key or generating temporary token to access OSS data.
 
-| Configuration item                                | Description                                                                                                      | Default value   | Required | Since Version    |
-|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS.            | (none)          | No       | 0.6.0-incubating |
-| `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                                | (none)          | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                            | (none)          | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.oss-endpoint`             | The endpoint of Aliyun OSS service.                                                                              | (none)          | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-provider-type` is `oss-token`. | (none)          | No       | 0.8.0-incubating |
-| `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data, only used when `credential-provider-type` is `oss-token`.            | (none)          | No       | 0.8.0-incubating |
-| `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token, only used when `credential-provider-type` is `oss-token`.                 | (none)          | No       | 0.8.0-incubating |
-| `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs,  only used when `credential-provider-type` is `oss-token`.           | 3600            | No       | 0.8.0-incubating |
+| Configuration item                                | Description                                                                                                                                                                                           | Default value   | Required                                             | Since Version    |
+|---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|------------------------------------------------------|------------------|
+| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS.                                                                                                 | (none)          | No                                                   | 0.6.0-incubating |
+| `gravitino.iceberg-rest.credential-provider-type` | Supports `oss-token` and `oss-secret-key` for OSS. `oss-token` generates a temporary token according to the query data path while `oss-secret-key` using the oss secret access key to access S3 data. | (none)          | No                                                   | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                                                                                                                     | (none)          | No                                                   | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                                                                                                                 | (none)          | No                                                   | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-endpoint`             | The endpoint of Aliyun OSS service.                                                                                                                                                                   | (none)          | No                                                   | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-provider-type` is `oss-token`.                                                                                      | (none)          | No                                                   | 0.8.0-incubating |
+| `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data, only used when `credential-provider-type` is `oss-token`.                                                                                                 | (none)          | Yes, when `credential-provider-type` is `oss-token`. | 0.8.0-incubating |
+| `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token, only used when `credential-provider-type` is `oss-token`.                                                                                                      | (none)          | No                                                   | 0.8.0-incubating |
+| `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs,  only used when `credential-provider-type` is `oss-token`.                                                                                                | 3600            | No                                                   | 0.8.0-incubating |
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.iceberg-rest.client.security-token`.
 
@@ -416,18 +418,19 @@ docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 
 Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
 
-| Environment variables                | Configuration items                               | Since version     |
-|--------------------------------------|---------------------------------------------------|-------------------|
-| `GRAVITINO_IO_IMPL`                  | `gravitino.iceberg-rest.io-impl`                  | 0.7.0-incubating  |
-| `GRAVITINO_URI`                      | `gravitino.iceberg-rest.uri`                      | 0.7.0-incubating  |
-| `GRAVITINO_WAREHOUSE`                | `gravitino.iceberg-rest.warehouse`                | 0.7.0-incubating  |
-| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` | `gravitino.iceberg-rest.credential-provider-type` | 0.7.0-incubating  |
-| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` | `gravitino.iceberg-rest.gcs-credential-file-path` | 0.7.0-incubating  |
-| `GRAVITINO_S3_ACCESS_KEY`            | `gravitino.iceberg-rest.s3-access-key-id`         | 0.7.0-incubating  |
-| `GRAVITINO_S3_SECRET_KEY`            | `gravitino.iceberg-rest.s3-secret-access-key`     | 0.7.0-incubating  |
-| `GRAVITINO_S3_REGION`                | `gravitino.iceberg-rest.s3-region`                | 0.7.0-incubating  |
-| `GRAVITINO_S3_ROLE_ARN`              | `gravitino.iceberg-rest.s3-role-arn`              | 0.7.0-incubating  |
-| `GRAVITINO_S3_EXTERNAL_ID`           | `gravitino.iceberg-rest.s3-external-id`           | 0.7.0-incubating  |
+| Environment variables                          | Configuration items                               | Since version     |
+|------------------------------------------------|---------------------------------------------------|-------------------|
+| `GRAVITINO_IO_IMPL`                            | `gravitino.iceberg-rest.io-impl`                  | 0.7.0-incubating  |
+| `GRAVITINO_URI`                                | `gravitino.iceberg-rest.uri`                      | 0.7.0-incubating  |
+| `GRAVITINO_WAREHOUSE`                          | `gravitino.iceberg-rest.warehouse`                | 0.7.0-incubating  |
+| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE`           | `gravitino.iceberg-rest.credential-provider-type` | 0.7.0-incubating  |
+| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH`           | `gravitino.iceberg-rest.gcs-credential-file-path` | 0.7.0-incubating  |
+| `GRAVITINO_S3_ACCESS_KEY`                      | `gravitino.iceberg-rest.s3-access-key-id`         | 0.7.0-incubating  |
+| `GRAVITINO_S3_SECRET_KEY`                      | `gravitino.iceberg-rest.s3-secret-access-key`     | 0.7.0-incubating  |
+| `GRAVITINO_S3_REGION`                          | `gravitino.iceberg-rest.s3-region`                | 0.7.0-incubating  |
+| `GRAVITINO_S3_ROLE_ARN`                        | `gravitino.iceberg-rest.s3-role-arn`              | 0.7.0-incubating  |
+| `GRAVITINO_S3_EXTERNAL_ID`                     | `gravitino.iceberg-rest.s3-external-id`           | 0.7.0-incubating  |
+| `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT`          | `gravitino.iceberg-rest.s3-token-service-endpoint`| 0.8.0-incubating  |
 
 Or build it manually to add custom configuration or logics:
 

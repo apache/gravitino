@@ -32,6 +32,7 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
+
   implementation(project(":common")) {
     exclude(group = "*")
   }
@@ -40,7 +41,9 @@ dependencies {
     exclude(group = "*")
   }
 
-  compileOnly(libs.guava)
+  implementation(project(":catalogs:hadoop-common")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
@@ -54,6 +57,14 @@ dependencies {
     exclude("com.sun.jersey", "jersey-servlet")
   }
 
+  implementation(libs.hadoop3.client) {
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
+    exclude("org.apache.hadoop", "hadoop-yarn-api")
+    exclude("org.apache.hadoop", "hadoop-yarn-client")
+    exclude("com.squareup.okhttp", "okhttp")
+  }
+
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
@@ -63,38 +74,32 @@ dependencies {
     exclude("io.netty")
     exclude("org.fusesource.leveldbjni")
   }
-  implementation(libs.hadoop3.client) {
-    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
-    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
-    exclude("org.apache.hadoop", "hadoop-yarn-api")
-    exclude("org.apache.hadoop", "hadoop-yarn-client")
-    exclude("com.squareup.okhttp", "okhttp")
-  }
 
   implementation(libs.slf4j.api)
 
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
+  compileOnly(libs.guava)
+
   testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:gcp-bundle"))
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:azure-bundle"))
-
-  testImplementation(libs.minikdc)
-  testImplementation(libs.hadoop3.minicluster)
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
 
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.hadoop3.gcs)
+  testImplementation(libs.hadoop3.minicluster)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.hadoop3.gcs)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
