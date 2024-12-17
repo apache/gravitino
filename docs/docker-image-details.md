@@ -169,9 +169,6 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
-- apache/gravitino-ci:hive-0.1.18
-  - Change environment variable from `ENABLE_JDBC_AUTHORIZATION` to `ENABLE_SQL_BASE_AUTHORIZATION`
-
 - apache/gravitino-ci:hive-0.1.17
   - Add support for JDBC SQL standard authorization
     - Add JDBC SQL standard authorization related configuration in the `hive-site-for-sql-base-auth.xml` and `hiveserver2-site-for-sql-base-auth.xml`
