@@ -35,7 +35,6 @@ import java.util.stream.Stream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.cli.commands.Command;
 
 /* Gravitino Command line */
@@ -325,15 +324,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
-      List<String> missArguments =
+      List<String> missingEntities =
           Stream.of(
-                  metalake == null ? MetadataObject.Type.METALAKE.name() : null,
-                  catalog == null ? MetadataObject.Type.CATALOG.name() : null,
-                  schema == null ? MetadataObject.Type.SCHEMA.name() : null)
+                  metalake == null ? CommandEntities.METALAKE : null,
+                  catalog == null ? CommandEntities.CATALOG : null,
+                  schema == null ? CommandEntities.SCHEMA : null)
               .filter(Objects::nonNull)
               .collect(Collectors.toList());
-      if (!missArguments.isEmpty()) {
-        System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missArguments));
+      if (!missingEntities.isEmpty()) {
+        System.err.println(
+            "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
         return;
       }
 
