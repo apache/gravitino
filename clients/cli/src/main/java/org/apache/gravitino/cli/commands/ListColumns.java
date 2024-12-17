@@ -72,8 +72,7 @@ public class ListColumns extends TableCommand {
       String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
 
       if (i == 0) {
-        all.append(
-            "name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
+        all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
       }
       all.append(
           name
