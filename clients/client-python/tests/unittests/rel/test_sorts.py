@@ -95,7 +95,9 @@ class TestSortOrder(unittest.TestCase):
 
     def test_sort_order(self):
         field_reference = NamedReference.field(["field1"])
-        sort_order = SortOrders.of(field_reference, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
+        sort_order = SortOrders.of(
+            field_reference, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST
+        )
 
         self.assertEqual(NullOrdering.NULLS_FIRST, sort_order.null_ordering())
         self.assertEqual(SortDirection.ASCENDING, sort_order.direction())
@@ -103,10 +105,14 @@ class TestSortOrder(unittest.TestCase):
         self.assertEqual(["field1"], sort_order.expression().field_name())
 
         date = FunctionExpression.of("date", NamedReference.field(["b"]))
-        sort_order = SortOrders.of(date, SortDirection.DESCENDING, NullOrdering.NULLS_LAST)
+        sort_order = SortOrders.of(
+            date, SortDirection.DESCENDING, NullOrdering.NULLS_LAST
+        )
         self.assertEqual(NullOrdering.NULLS_LAST, sort_order.null_ordering())
         self.assertEqual(SortDirection.DESCENDING, sort_order.direction())
 
         self.assertIsInstance(sort_order.expression(), FunctionExpression)
         self.assertEqual("date", sort_order.expression().function_name())
-        self.assertEqual(["b"], sort_order.expression().arguments()[0].references()[0].field_name())
+        self.assertEqual(
+            ["b"], sort_order.expression().arguments()[0].references()[0].field_name()
+        )

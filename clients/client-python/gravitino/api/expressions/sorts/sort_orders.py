@@ -28,10 +28,10 @@ class SortImpl(SortOrder):
     _null_ordering: NullOrdering
 
     def __init__(
-            self,
-            expression: Expression,
-            direction: SortDirection,
-            null_ordering: NullOrdering,
+        self,
+        expression: Expression,
+        direction: SortDirection,
+        null_ordering: NullOrdering,
     ):
         """Initialize the SortImpl object."""
         self._expression = expression
@@ -52,9 +52,9 @@ class SortImpl(SortOrder):
         if not isinstance(other, SortImpl):
             return False
         return (
-                self.expression() == other.expression()
-                and self.direction() == other.direction()
-                and self.null_ordering() == other.null_ordering()
+            self.expression() == other.expression()
+            and self.direction() == other.direction()
+            and self.null_ordering() == other.null_ordering()
         )
 
     def __hash__(self) -> int:
@@ -87,11 +87,11 @@ class SortOrders:
 
     @staticmethod
     def of(
-            expression: Expression,
-            direction: SortDirection,
-            null_ordering: NullOrdering = None,
+        expression: Expression,
+        direction: SortDirection,
+        null_ordering: NullOrdering = None,
     ) -> SortImpl:
         """Creates a sort order with the given direction and optionally specified null ordering."""
         if null_ordering is None:
-            null_ordering = direction.default_null_ordering
+            null_ordering = direction.default_null_ordering()
         return SortImpl(expression, direction, null_ordering)
