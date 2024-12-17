@@ -16,19 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-mod filesystem;
-mod fuse_api_handle;
-mod opened_file_manager;
-mod utils;
 
-use log::debug;
-use log::info;
-use std::process::exit;
+// join the parent and name to a path
+pub fn join_file_path(parent: &str, name: &str) -> String {
+    if parent.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", parent, name)
+    }
+}
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt().init();
-    info!("Starting filesystem...");
-    debug!("Shutdown filesystem...");
-    exit(0);
+// split the path to parent and name
+pub fn split_file_path(path: &str) -> (&str, &str) {
+    match path.rfind('/') {
+        Some(pos) => (&path[..pos], &path[pos + 1..]),
+        None => ("", path),
+    }
 }

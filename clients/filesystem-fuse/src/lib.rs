@@ -18,3 +18,5 @@
  */
 mod filesystem;
 mod fuse_api_handle;
+mod opened_file_manager;
+mod utils;

@@ -401,6 +401,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
 const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
     debug_assert!(file_st.file_id != 0 && file_st.parent_file_id != 0);
+    let perm = match file_st.kind {
+        Directory => context.default_dir_perm,
+        _ => context.default_file_perm,
+    };
     FileAttr {
         ino: file_st.file_id,
         size: file_st.size,
@@ -409,7 +413,7 @@ const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> 
         mtime: file_st.mtime,
         ctime: file_st.ctime,
         kind: file_st.kind,
-        perm: file_st.perm,
+        perm: perm,
         nlink: file_st.nlink,
         uid: context.uid,
         gid: context.gid,
@@ -469,7 +473,6 @@ mod test {
             path: "".to_string(),
             size: 10032,
             kind: FileType::RegularFile,
-            perm: 0,
             atime: Timestamp { sec: 10, nsec: 3 },
             mtime: Timestamp { sec: 12, nsec: 5 },
             ctime: Timestamp { sec: 15, nsec: 7 },
