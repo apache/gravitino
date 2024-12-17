@@ -24,6 +24,7 @@ from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from gravitino.utils.credential_factory import CredentialFactory
+from gravitino.api.credential.oss_secret_key_credential import OSSSecretKeyCredential
 
 
 class TestCredentialFactory(unittest.TestCase):
@@ -99,3 +100,19 @@ class TestCredentialFactory(unittest.TestCase):
         self.assertEqual("access_id", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
         self.assertEqual(1000, check_credential.expire_time_in_ms())
+
+    def test_oss_secret_key_credential(self):
+        oss_credential_info = {
+            OSSSecretKeyCredential._GRAVITINO_OSS_STATIC_ACCESS_KEY_ID: "access_key",
+            OSSSecretKeyCredential._GRAVITINO_OSS_STATIC_SECRET_ACCESS_KEY: "secret_key",
+        }
+        oss_credential = OSSSecretKeyCredential(oss_credential_info, 0)
+        credential_info = oss_credential.credential_info()
+        expire_time = oss_credential.expire_time_in_ms()
+
+        check_credential = CredentialFactory.create(
+            oss_credential.OSS_SECRET_KEY_CREDENTIAL_TYPE, credential_info, expire_time
+        )
+        self.assertEqual("access_key", check_credential.access_key_id())
+        self.assertEqual("secret_key", check_credential.secret_access_key())
+        self.assertEqual(0, check_credential.expire_time_in_ms())
