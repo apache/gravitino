@@ -51,13 +51,7 @@ public class OSSTokenCredential implements Credential {
    */
   public OSSTokenCredential(
       String accessKeyId, String secretAccessKey, String securityToken, long expireTimeInMS) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(accessKeyId), "OSS access key Id should not be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(secretAccessKey), "OSS access key secret should not be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(securityToken), "OSS security token should not be empty");
-
+    validate(accessKeyId, secretAccessKey, securityToken, expireTimeInMS);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.securityToken = securityToken;
@@ -133,12 +127,12 @@ public class OSSTokenCredential implements Credential {
   private void validate(
       String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(accessKeyId), "S3 access key Id should not be empty");
+        StringUtils.isNotBlank(accessKeyId), "OSS access key Id should not be empty");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(secretAccessKey), "S3 secret access key should not be empty");
+        StringUtils.isNotBlank(secretAccessKey), "OSS secret access key should not be empty");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(sessionToken), "S3 session token should not be empty");
+        StringUtils.isNotBlank(sessionToken), "OSS session token should not be empty");
     Preconditions.checkArgument(
-        expireTimeInMs > 0, "The expire time of S3TokenCredential should great than 0");
+        expireTimeInMs > 0, "The expire time of OSSTokenCredential should great than 0");
   }
 }

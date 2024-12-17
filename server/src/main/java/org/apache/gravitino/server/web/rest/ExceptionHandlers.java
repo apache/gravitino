@@ -121,6 +121,11 @@ public class ExceptionHandlers {
     return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
   }
 
+  public static Response handleCredentialException(
+      OperationType op, String metadataObjectName, Exception e) {
+    return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
+  }
+
   public static Response handleTestConnectionException(Exception e) {
     ErrorResponse response;
     if (e instanceof IllegalArgumentException) {
@@ -369,6 +374,7 @@ public class ExceptionHandlers {
   }
 
   private static class FilesetExceptionHandler extends BaseExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new FilesetExceptionHandler();
 
     private static String getFilesetErrorMsg(
@@ -520,6 +526,7 @@ public class ExceptionHandlers {
   }
 
   private static class TopicExceptionHandler extends BaseExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new TopicExceptionHandler();
 
     private static String getTopicErrorMsg(
@@ -558,6 +565,7 @@ public class ExceptionHandlers {
 
   private static class UserPermissionOperationExceptionHandler
       extends BasePermissionExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new UserPermissionOperationExceptionHandler();
 
     @Override
@@ -622,6 +630,35 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class CredentialExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new CredentialExceptionHandler();
+
+    private static String getCredentialErrorMsg(String parent, String reason) {
+      return String.format(
+          "Failed to get credentials under object [%s], reason [%s]", parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String credential, String parent, Exception e) {
+      String errorMsg = getCredentialErrorMsg(parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, credential, parent, e);
+      }
+    }
+  }
+
   private static class TagExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new TagExceptionHandler();
@@ -661,6 +698,7 @@ public class ExceptionHandlers {
   }
 
   private static class OwnerExceptionHandler extends BaseExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new OwnerExceptionHandler();
 
     private static String getOwnerErrorMsg(

@@ -21,12 +21,11 @@ package org.apache.gravitino.catalog.hive;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
-public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
+public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
   public static final String CLIENT_POOL_SIZE = HiveConstants.CLIENT_POOL_SIZE;
   public static final String METASTORE_URIS = HiveConstants.METASTORE_URIS;
@@ -110,7 +109,6 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   DEFAULT_LIST_ALL_TABLES,
                   false /* hidden */,
                   false /* reserved */))
-          .putAll(AuthorizationPropertiesMeta.RANGER_AUTHORIZATION_PROPERTY_ENTRIES)
           .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 

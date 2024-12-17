@@ -76,6 +76,13 @@ public class S3CredentialConfig extends Config {
           .intConf()
           .createWithDefault(3600);
 
+  public static final ConfigEntry<String> S3_STS_ENDPOINT =
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_STS_ENDPOINT)
+          .doc("S3 STS endpoint")
+          .version(ConfigConstants.VERSION_0_8_0)
+          .stringConf()
+          .create();
+
   public S3CredentialConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
@@ -106,5 +113,9 @@ public class S3CredentialConfig extends Config {
 
   public Integer tokenExpireInSecs() {
     return this.get(S3_TOKEN_EXPIRE_IN_SECS);
+  }
+
+  public String stsEndpoint() {
+    return this.get(S3_STS_ENDPOINT);
   }
 }

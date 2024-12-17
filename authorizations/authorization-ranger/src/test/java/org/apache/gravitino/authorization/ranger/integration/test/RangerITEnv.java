@@ -35,10 +35,10 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -98,18 +98,20 @@ public class RangerITEnv {
         RangerAuthorizationHadoopSQLPlugin.getInstance(
             "metalake",
             ImmutableMap.of(
-                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                RangerAuthorizationProperties.RANGER_ADMIN_URL,
                 String.format(
                     "http://%s:%d",
                     containerSuite.getRangerContainer().getContainerIpAddress(),
                     RangerContainer.RANGER_SERVER_PORT),
-                AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                RangerAuthorizationProperties.RANGER_AUTH_TYPE,
                 RangerContainer.authType,
-                AuthorizationPropertiesMeta.RANGER_USERNAME,
+                RangerAuthorizationProperties.RANGER_USERNAME,
                 RangerContainer.rangerUserName,
-                AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                RangerAuthorizationProperties.RANGER_PASSWORD,
                 RangerContainer.rangerPassword,
-                AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+                "HadoopSQL",
+                RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
 
     RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
@@ -117,18 +119,20 @@ public class RangerITEnv {
             RangerAuthorizationHDFSPlugin.getInstance(
                 "metalake",
                 ImmutableMap.of(
-                    AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                    RangerAuthorizationProperties.RANGER_ADMIN_URL,
                     String.format(
                         "http://%s:%d",
                         containerSuite.getRangerContainer().getContainerIpAddress(),
                         RangerContainer.RANGER_SERVER_PORT),
-                    AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                    RangerAuthorizationProperties.RANGER_AUTH_TYPE,
                     RangerContainer.authType,
-                    AuthorizationPropertiesMeta.RANGER_USERNAME,
+                    RangerAuthorizationProperties.RANGER_USERNAME,
                     RangerContainer.rangerUserName,
-                    AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                    RangerAuthorizationProperties.RANGER_PASSWORD,
                     RangerContainer.rangerPassword,
-                    AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                    RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+                    "HDFS",
+                    RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
     doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFileSetPath(Mockito.any());
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
