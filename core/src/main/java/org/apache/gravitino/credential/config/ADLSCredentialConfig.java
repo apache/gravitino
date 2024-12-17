@@ -21,6 +21,7 @@ package org.apache.gravitino.credential.config;
 
 import java.util.Map;
 import javax.validation.constraints.NotNull;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -35,6 +36,7 @@ public class ADLSCredentialConfig extends Config {
           .doc("The name of the Azure Data Lake Storage account.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> AZURE_STORAGE_ACCOUNT_KEY =
@@ -42,6 +44,7 @@ public class ADLSCredentialConfig extends Config {
           .doc("The key of the Azure Data Lake Storage account.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> AZURE_TENANT_ID =
@@ -49,6 +52,7 @@ public class ADLSCredentialConfig extends Config {
           .doc("The Azure Active Directory (AAD) tenant ID used for authentication.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> AZURE_CLIENT_ID =
@@ -56,6 +60,7 @@ public class ADLSCredentialConfig extends Config {
           .doc("The client ID used for authenticating with Azure Active Directory (AAD).")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> AZURE_CLIENT_SECRET =
@@ -63,6 +68,7 @@ public class ADLSCredentialConfig extends Config {
           .doc("The client secret used for authenticating with Azure Active Directory (AAD).")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<Integer> ADLS_TOKEN_EXPIRE_IN_SECS =
