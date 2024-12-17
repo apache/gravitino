@@ -143,4 +143,24 @@ public class TestMain {
     String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.CATALOG, entity);
   }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void CreateTagWithNoTag() {
+    String[] args = {"tag", "create", "--metalake", "metalake_test_no_tag"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void DeleteTagWithNoTag() {
+    String[] args = {"tag", "delete", "--metalake", "metalake_test_no_tag", "-f"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+  }
 }
