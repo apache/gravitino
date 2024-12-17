@@ -59,13 +59,11 @@ public class ChainAuthorizationProperties {
   static Map<String, String> fetchAuthPluginProperties(
       String pluginName, Map<String, String> properties) {
     Preconditions.checkArgument(
-        properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY),
+        properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY)
+            && properties.get(CHAIN_PLUGINS_PROPERTIES_KEY) != null,
         String.format("%s is required", CHAIN_PLUGINS_PROPERTIES_KEY));
 
     String[] pluginNames = properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER);
-    Preconditions.checkArgument(
-        pluginNames.length > 0,
-        String.format("%s must have at least one plugin name", CHAIN_PLUGINS_PROPERTIES_KEY));
     Preconditions.checkArgument(
         Arrays.asList(pluginNames).contains(pluginName),
         String.format("pluginName %s must be one of %s", pluginName, Arrays.toString(pluginNames)));
