@@ -65,7 +65,7 @@ public class ContainerSuite implements Closeable {
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
   private static volatile HiveContainer kerberosHiveContainer;
-  private static volatile HiveContainer jdbcHiveContainer;
+  private static volatile HiveContainer sqlBaseHiveContainer;
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
@@ -232,19 +232,19 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public void startJdbcHiveContainer(Map<String, String> envVars) {
+  public void startSQLBaseAuthHiveContainer(Map<String, String> envVars) {
     // If you want to enable SQL based authorization, you need both set the
-    // `ENABLE_JDBC_AUTHORIZATION` environment.
+    // `ENABLE_SQL_BASE_AUTHORIZATION` environment.
     if (envVars == null
         || (!Objects.equals(envVars.get(HiveContainer.HIVE_RUNTIME_VERSION), HiveContainer.HIVE3))
-        || (!envVars.containsKey(HiveContainer.ENABLE_AUTHORIZATION))) {
+        || (!envVars.containsKey(HiveContainer.ENABLE_SQL_BASE_AUTHORIZATION))) {
       throw new IllegalArgumentException(
           "Error environment variables for Hive SQL base authorization container");
     }
 
-    if (jdbcHiveContainer == null) {
+    if (sqlBaseHiveContainer == null) {
       synchronized (ContainerSuite.class) {
-        if (jdbcHiveContainer == null) {
+        if (sqlBaseHiveContainer == null) {
           initIfNecessary();
           // Start Hive container
           HiveContainer.Builder hiveBuilder =
@@ -254,7 +254,7 @@ public class ContainerSuite implements Closeable {
                   .withEnvVars(envVars);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
-          jdbcHiveContainer = container;
+          sqlBaseHiveContainer = container;
         }
       }
     }
@@ -539,7 +539,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public HiveContainer getJdbcHiveContainer() {
-    return jdbcHiveContainer;
+    return sqlBaseHiveContainer;
   }
 
   public DorisContainer getDorisContainer() {
@@ -706,7 +706,7 @@ public class ContainerSuite implements Closeable {
       kafkaContainer = null;
       dorisContainer = null;
       kerberosHiveContainer = null;
-      jdbcHiveContainer = null;
+      sqlBaseHiveContainer = null;
       pgContainerMap.clear();
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);

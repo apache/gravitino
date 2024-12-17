@@ -49,7 +49,7 @@ public class HiveContainer extends BaseContainer {
   public static final String HIVE_RUNTIME_VERSION = "HIVE_RUNTIME_VERSION";
   public static final String HIVE2 = "hive2"; // The Hive container default version
   public static final String HIVE3 = "hive3";
-  public static final String ENABLE_AUTHORIZATION = "ENABLE_JDBC_AUTHORIZATION";
+  public static final String ENABLE_SQL_BASE_AUTHORIZATION = "ENABLE_SQL_BASE_AUTHORIZATION";
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
