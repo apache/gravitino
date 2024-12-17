@@ -691,7 +691,7 @@ mod tests {
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
-        //teset new dir with path
+        //test new dir with path
         let file_stat = FileStat::new_dir_with_path("a/b");
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, "a/b");

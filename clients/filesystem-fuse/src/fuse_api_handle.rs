@@ -496,7 +496,7 @@ mod test {
         assert_eq!(file_attr.mtime, Timestamp { sec: 12, nsec: 5 });
         assert_eq!(file_attr.ctime, Timestamp { sec: 15, nsec: 7 });
         assert_eq!(file_attr.kind, FileType::RegularFile);
-        assert_eq!(file_attr.perm, 0);
+        assert_eq!(file_attr.perm, context.default_file_perm);
         assert_eq!(file_attr.nlink, 0);
         assert_eq!(file_attr.uid, 1);
         assert_eq!(file_attr.gid, 2);

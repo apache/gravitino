@@ -27,6 +27,9 @@ fmt:
 cargo-sort: install-cargo-sort
 	cargo sort -w
 
+fix-toml: install-taplo-cli
+	taplo fmt
+
 check-fmt:
 	cargo  fmt --all -- --check
 
@@ -47,9 +50,6 @@ cargo-machete: install-cargo-machete
 
 install-taplo-cli:
 	cargo install taplo-cli@0.9.0
-
-fix-toml: install-taplo-cli
-	taplo fmt
 
 check-toml: install-taplo-cli
 	taplo check
