@@ -175,6 +175,8 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             "true",
             AUTHORIZATION_PROVIDER,
             "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
             RangerAuthorizationProperties.RANGER_SERVICE_NAME,
             RangerITEnv.RANGER_HIVE_REPO_NAME,
             RangerAuthorizationProperties.RANGER_ADMIN_URL,

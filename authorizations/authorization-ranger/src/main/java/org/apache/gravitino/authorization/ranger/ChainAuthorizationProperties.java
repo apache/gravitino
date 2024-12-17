@@ -34,14 +34,14 @@ import java.util.stream.Collectors;
  * Configuration Example: <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
  * "authorization.chain.hive1.provider" = "ranger"; <br>
- * "authorization.chain.hive1.ranger.service.type" = "hive"; <br>
+ * "authorization.chain.hive1.ranger.service.type" = "HadoopSQL"; <br>
  * "authorization.chain.hive1.ranger.service.name" = "hiveDev"; <br>
  * "authorization.chain.hive1.ranger.auth.type" = "simple"; <br>
  * "authorization.chain.hive1.ranger.admin.url" = "http://localhost:6080"; <br>
  * "authorization.chain.hive1.ranger.username" = "admin"; <br>
  * "authorization.chain.hive1.ranger.password" = "admin"; <br>
  * "authorization.chain.hdfs1.provider" = "ranger"; <br>
- * "authorization.chain.hdfs1.ranger.service.type" = "hadoop"; <br>
+ * "authorization.chain.hdfs1.ranger.service.type" = "HDFS"; <br>
  * "authorization.chain.hdfs1.ranger.service.name" = "hdfsDev"; <br>
  * "authorization.chain.hdfs1.ranger.auth.type" = "simple"; <br>
  * "authorization.chain.hdfs1.ranger.admin.url" = "http://localhost:6080"; <br>

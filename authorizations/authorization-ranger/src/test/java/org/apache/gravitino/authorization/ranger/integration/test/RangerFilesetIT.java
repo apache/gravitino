@@ -536,6 +536,8 @@ public class RangerFilesetIT extends BaseIT {
             "true",
             AUTHORIZATION_PROVIDER,
             "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HDFS",
             RangerAuthorizationProperties.RANGER_SERVICE_NAME,
             RangerITEnv.RANGER_HDFS_REPO_NAME,
             RangerAuthorizationProperties.RANGER_ADMIN_URL,

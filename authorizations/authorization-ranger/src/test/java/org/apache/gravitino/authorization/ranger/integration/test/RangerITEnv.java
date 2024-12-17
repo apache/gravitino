@@ -110,7 +110,7 @@ public class RangerITEnv {
                 RangerAuthorizationProperties.RANGER_PASSWORD,
                 RangerContainer.rangerPassword,
                 RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
-                RangerITEnv.RANGER_HIVE_TYPE,
+                "HadoopSQL",
                 RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
 
@@ -131,7 +131,7 @@ public class RangerITEnv {
                     RangerAuthorizationProperties.RANGER_PASSWORD,
                     RangerContainer.rangerPassword,
                     RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
-                    RangerITEnv.RANGER_HDFS_TYPE,
+                    "HDFS",
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
     doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFileSetPath(Mockito.any());

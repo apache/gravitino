@@ -23,10 +23,10 @@ import static org.apache.gravitino.authorization.ranger.integration.test.RangerI
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
@@ -164,31 +164,24 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
   }
 
   private static void createCatalog() {
-    Map<String, String> properties =
-        ImmutableMap.of(
-            IcebergConstants.URI,
-            HIVE_METASTORE_URIS,
-            IcebergConstants.CATALOG_BACKEND,
-            "hive",
-            IcebergConstants.WAREHOUSE,
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse",
-                containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT),
-            IMPERSONATION_ENABLE,
-            "true",
-            AUTHORIZATION_PROVIDER,
-            "ranger",
-            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
-            RangerITEnv.RANGER_HIVE_REPO_NAME,
-            RangerAuthorizationProperties.RANGER_ADMIN_URL,
-            RANGER_ADMIN_URL,
-            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
-            RangerContainer.authType,
-            RangerAuthorizationProperties.RANGER_USERNAME,
-            RangerContainer.rangerUserName,
-            RangerAuthorizationProperties.RANGER_PASSWORD,
-            RangerContainer.rangerPassword);
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.URI, HIVE_METASTORE_URIS);
+    properties.put(IcebergConstants.CATALOG_BACKEND, "hive");
+    properties.put(
+        IcebergConstants.WAREHOUSE,
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse",
+            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT));
+    properties.put(IMPERSONATION_ENABLE, "true");
+    properties.put(AUTHORIZATION_PROVIDER, "ranger");
+    properties.put(RangerAuthorizationProperties.RANGER_SERVICE_TYPE, "HadoopSQL");
+    properties.put(
+        RangerAuthorizationProperties.RANGER_SERVICE_NAME, RangerITEnv.RANGER_HIVE_REPO_NAME);
+    properties.put(RangerAuthorizationProperties.RANGER_ADMIN_URL, RANGER_ADMIN_URL);
+    properties.put(RangerAuthorizationProperties.RANGER_AUTH_TYPE, RangerContainer.authType);
+    properties.put(RangerAuthorizationProperties.RANGER_USERNAME, RangerContainer.rangerUserName);
+    properties.put(RangerAuthorizationProperties.RANGER_PASSWORD, RangerContainer.rangerPassword);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
