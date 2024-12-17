@@ -117,7 +117,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     ) -> fuse3::Result<ReplyAttr> {
         // check the fh is associated with the file_id
         if let Some(fh) = fh {
-            self.fs.valid_file_id(inode, fh).await?;
+            self.fs.valid_file_handle_id(inode, fh).await?;
         }
 
         let file_stat = self.fs.stat(inode).await?;
@@ -136,7 +136,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     ) -> fuse3::Result<ReplyAttr> {
         // check the fh is associated with the file_id
         if let Some(fh) = fh {
-            self.fs.valid_file_id(inode, fh).await?;
+            self.fs.valid_file_handle_id(inode, fh).await?;
         }
 
         let new_file_stat = self

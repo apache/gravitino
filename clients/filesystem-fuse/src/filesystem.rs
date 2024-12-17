@@ -44,7 +44,7 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn get_file_path(&self, file_id: u64) -> String;
 
     /// Validate the file id and file handle, if file id and file handle is valid and it associated, return Ok
-    async fn valid_file_id(&self, file_id: u64, fh: u64) -> Result<()>;
+    async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()>;
 
     /// Get the file stat by file id. if the file id is valid, return the file stat
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
@@ -260,7 +260,7 @@ impl OpenedFile {
         let reader = self.reader.as_mut().ok_or(Errno::from(libc::EBADF))?;
         let result = reader.read(offset, size).await?;
 
-        // update the access time
+        // update the atime
         self.file_stat.atime = Timestamp::from(SystemTime::now());
 
         Ok(result)
@@ -270,7 +270,7 @@ impl OpenedFile {
         let writer = self.writer.as_mut().ok_or(Errno::from(libc::EBADF))?;
         let written = writer.write(offset, data).await?;
 
-        // update the file size
+        // update the file size ,mtime and atime
         let end = offset + data.len() as u64;
         if end > self.file_stat.size {
             self.file_stat.size = end;
@@ -365,7 +365,7 @@ pub struct SimpleFileSystem<T: PathFileSystem> {
     /// inode id generator
     file_id_generator: AtomicU64,
 
-    /// real system
+    /// real filesystem
     fs: T,
 }
 
@@ -411,6 +411,7 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
                 file_manager.insert(file_stat.parent_file_id, file_stat.file_id, &file_stat.path);
             }
             Some(file) => {
+                // use the exist file id
                 file_stat.set_file_id(file.parent_file_id, file.file_id);
             }
         }
@@ -439,6 +440,7 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
                 _ => return Err(Errno::from(libc::EINVAL)),
             }
         };
+        // set the exists file id
         file.set_file_id(file_entry.parent_file_id, file_id);
         let file = self.opened_file_manager.put_file(file);
         let file = file.lock().await;
@@ -449,6 +451,7 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
 #[async_trait]
 impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     async fn init(&self) -> Result<()> {
+        // init root directory
         self.file_entry_manager.write().await.insert(
             Self::ROOT_DIR_PARENT_FILE_ID,
             Self::ROOT_DIR_FILE_ID,
@@ -462,8 +465,8 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         file.map(|x| x.file_name).unwrap_or_else(|_| "".to_string())
     }
 
-    async fn valid_file_id(&self, _file_id: u64, fh: u64) -> Result<()> {
-        let file_id = self
+    async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()> {
+        let fh_file_id = self
             .opened_file_manager
             .get_file(fh)
             .ok_or(Errno::from(libc::EBADF))?
@@ -472,7 +475,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
             .file_stat
             .file_id;
 
-        (file_id == _file_id)
+        (file_id == fh_file_id)
             .then_some(())
             .ok_or(Errno::from(libc::EBADF))
     }
@@ -487,6 +490,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
         let parent_file = self.get_file_entry(parent_file_id).await?;
         let mut stat = self.fs.lookup(&parent_file.file_name, name).await?;
+        // fill the file id to file stat
         self.fill_file_id(&mut stat, parent_file_id).await;
         Ok(stat)
     }
@@ -518,14 +522,14 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
             .await?;
 
         file.set_file_id(parent_file_id, self.next_file_id());
+
+        // insert the new file to file entry manager
         {
             let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.insert(
-                file.file_stat.parent_file_id,
-                file.file_stat.file_id,
-                &file.file_stat.path,
-            );
+            file_manager.insert(parent_file_id, file.file_stat.file_id, &file.file_stat.path);
         }
+
+        // put the file to the opened file manager
         let file = self.opened_file_manager.put_file(file);
         let file = file.lock().await;
         Ok(file.file_handle())
@@ -536,6 +540,8 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         let mut file = self.fs.create_dir(&parent.file_name, name).await?;
 
         file.set_file_id(parent_file_id, self.next_file_id());
+
+        // insert the new file to file entry manager
         {
             let mut file_manager = self.file_entry_manager.write().await;
             file_manager.insert(file.parent_file_id, file.file_id, &file.path);
@@ -552,6 +558,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         let parent_file = self.get_file_entry(parent_file_id).await?;
         self.fs.remove_file(&parent_file.file_name, name).await?;
 
+        // remove the file from file entry manager
         {
             let mut file_id_manager = self.file_entry_manager.write().await;
             file_id_manager.remove(&join_file_path(&parent_file.file_name, name));
@@ -563,6 +570,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
         let parent_file = self.get_file_entry(parent_file_id).await?;
         self.fs.remove_dir(&parent_file.file_name, name).await?;
 
+        // remove the dir from file entry manager
         {
             let mut file_id_manager = self.file_entry_manager.write().await;
             file_id_manager.remove(&join_file_path(&parent_file.file_name, name));
@@ -592,6 +600,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
             opened_file.read(offset, size).await
         };
 
+        // update the file atime
         self.fs.set_attr(&file_stat.path, &file_stat, false).await?;
 
         data
@@ -608,6 +617,7 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
             (len, opened_file.file_stat.clone())
         };
 
+        // update the file size, mtime and atime
         self.fs.set_attr(&file_stat.path, &file_stat, false).await?;
 
         len
