@@ -16,24 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.authorization.chain;
 
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
-
-  public TestMySQLAuthorization() {}
-
+/** Implementation of a Chain authorization in Gravitino. */
+public class ChainAuthorization extends BaseAuthorization<ChainAuthorization> {
   @Override
   public String shortName() {
-    return "mysql";
+    return "chain";
   }
 
   @Override
   public AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
+    switch (catalogProvider) {
+      case "hive":
+        return new ChainAuthorizationPlugin(metalake, catalogProvider, config);
+      default:
+        throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
+    }
   }
 }

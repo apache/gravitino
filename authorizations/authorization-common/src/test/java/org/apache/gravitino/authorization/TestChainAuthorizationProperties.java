@@ -16,19 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 
 import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestChainAuthorizationProperties {
+  static final String METASTORE_URIS = "metastore.uris";
+  public static final String IMPERSONATION_ENABLE = "impersonation-enable";
+
   @Test
   void testChainOnePlugin() {
     Map<String, String> properties = Maps.newHashMap();
@@ -46,7 +47,7 @@ public class TestChainAuthorizationProperties {
   @Test
   void testChainTwoPlugins() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.METASTORE_URIS, "thrift://localhost:9083");
+    properties.put(METASTORE_URIS, "thrift://localhost:9083");
     properties.put("gravitino.bypass.hive.metastore.client.capability.check", "true");
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
@@ -66,6 +67,21 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
     Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
+  }
+
+  @Test
+  void testWithoutChains() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("authorization.chain.plugins", "");
+    properties.put("authorization.chain.hive1.provider", "ranger");
+    properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
+    properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
+    properties.put("authorization.chain.hive1.ranger.username", "admin");
+    properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
+    properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
   }
 
   @Test
@@ -180,7 +196,7 @@ public class TestChainAuthorizationProperties {
   @Test
   void testFetchRangerPrpoerties() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.METASTORE_URIS, "thrift://localhost:9083");
+    properties.put(METASTORE_URIS, "thrift://localhost:9083");
     properties.put("gravitino.bypass.hive.metastore.client.capability.check", "true");
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");

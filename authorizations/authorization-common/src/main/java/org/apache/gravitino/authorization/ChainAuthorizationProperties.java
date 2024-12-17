@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -49,14 +49,24 @@ import java.util.stream.Collectors;
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
  */
 public class ChainAuthorizationProperties {
-  public static final String PLUGINS_SPLITTER = ",";
+  private static final String PLUGINS_SPLITTER = ",";
   /** Chain authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
 
   /** Chain authorization plugin provider */
   public static final String CHAIN_PROVIDER = "authorization.chain.*.provider";
 
-  static Map<String, String> fetchAuthPluginProperties(
+  public static final String PREFIX = "authorization.chain";
+
+  public static String getPluginProvider(String pluginName, Map<String, String> properties) {
+    return properties.get(PREFIX + "." + pluginName + ".provider");
+  }
+
+  public static List<String> plugins(Map<String, String> properties) {
+    return Arrays.asList(properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER));
+  }
+
+  public static Map<String, String> fetchAuthPluginProperties(
       String pluginName, Map<String, String> properties) {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY)
@@ -100,6 +110,7 @@ public class ChainAuthorizationProperties {
     List<String> pluginNames =
         Arrays.stream(properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER))
             .map(String::trim)
+            .filter(v -> !v.isEmpty())
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         !pluginNames.isEmpty(),
