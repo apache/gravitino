@@ -36,6 +36,11 @@ Assuming:
 
 ### Create a catalog
 
+:::caution
+It is not recommended to use one data source to create multiple catalogs, 
+as multiple catalogs operating on the same source may result in unpredictable behavior.
+:::
+
 :::tip
 The code below is an example of creating a Hive catalog. For other relational catalogs, the code is
 similar, but the catalog type, provider, and properties may be different. For more details, please refer to the related doc.

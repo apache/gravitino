@@ -44,6 +44,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)
   implementation(libs.iceberg.aws)
+  implementation(libs.iceberg.azure)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.iceberg.gcp)
   implementation(libs.hadoop2.common) {

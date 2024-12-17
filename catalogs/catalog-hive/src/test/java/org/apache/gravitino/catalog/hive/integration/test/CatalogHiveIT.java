@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;

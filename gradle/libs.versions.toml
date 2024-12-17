@@ -18,6 +18,10 @@
 #
 [versions]
 awssdk = "2.28.3"
+azure-identity = "1.13.1"
+azure-storage-file-datalake = "12.20.0"
+reactor-netty-http = "1.2.1"
+reactor-netty-core = "1.2.1"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
@@ -120,6 +124,10 @@ aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", ve
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
 aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "awssdk" }
 aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssdk" }
+azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "azure-identity"}
+azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
+reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-http", version.ref = "reactor-netty-http"}
+reactor-netty-core = {group = "io.projectreactor.netty", name = "reactor-netty-core", version.ref = "reactor-netty-core"}
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
@@ -191,6 +199,8 @@ commons-configuration1 = { group = "commons-configuration", name = "commons-conf
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle", version.ref = "iceberg" }
+iceberg-azure = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg" }
+iceberg-azure-bundle = { group = "org.apache.iceberg", name = "iceberg-azure-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
