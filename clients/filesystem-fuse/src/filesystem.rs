@@ -271,7 +271,7 @@ impl OpenedFile {
         let written = writer.write(offset, data).await?;
 
         // update the file size ,mtime and atime
-        let end = offset + data.len() as u64;
+        let end = offset + written as u64;
         if end > self.file_stat.size {
             self.file_stat.size = end;
         }
@@ -365,7 +365,7 @@ pub trait FileWriter: Sync + Send {
     }
 }
 
-/// SimpleFileSystem is a simple implementation for the file system.
+/// DefaultRawFileSystem is a simple implementation for the file system.
 /// it is used to manage the file metadata and file handle.
 /// The operations of the file system are implemented by the PathFileSystem.
 /// Note: This class is not use in the production code, it is used for the demo and testing
@@ -676,13 +676,13 @@ impl FileEntryManager {
     }
 
     fn insert(&mut self, parent_file_id: u64, file_id: u64, path: &str) {
-        let file = FileEntry {
+        let file_entry = FileEntry {
             file_id,
             parent_file_id,
             path: path.to_string(),
         };
-        self.file_id_map.insert(file_id, file.clone());
-        self.file_path_map.insert(path.to_string(), file);
+        self.file_id_map.insert(file_id, file_entry.clone());
+        self.file_path_map.insert(path.to_string(), file_entry);
     }
 
     fn remove(&mut self, path: &str) {
