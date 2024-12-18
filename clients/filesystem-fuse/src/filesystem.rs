@@ -368,7 +368,6 @@ pub trait FileWriter: Sync + Send {
 /// DefaultRawFileSystem is a simple implementation for the file system.
 /// it is used to manage the file metadata and file handle.
 /// The operations of the file system are implemented by the PathFileSystem.
-/// Note: This class is not use in the production code, it is used for the demo and testing
 pub struct DefaultRawFileSystem<T: PathFileSystem> {
     /// file entries
     file_entry_manager: RwLock<FileEntryManager>,
