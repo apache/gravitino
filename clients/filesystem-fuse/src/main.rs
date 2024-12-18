@@ -37,19 +37,19 @@ async fn create_gvfs_fuse_filesystem() {
     // Gvfs-fuse filesystem structure:
     // FuseApiHandle
     // ├─ SimpleFileSystem (RawFileSystem)
-    // │  └─ FileSystemLog (PathFileSystem)
-    //      ├─ GravitinoComposedFileSystem (PathFileSystem)
-    //      │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    //      │  │  └─ OpenDALFileSystem (PathFileSystem)
-    //      │  │     └─ S3FileSystem (PathFileSystem)
-    //      │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    //      │  │  └─ OpenDALFileSystem (PathFileSystem)
-    //      │  │     └─ HDFSFileSystem (PathFileSystem)
-    //      │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    //      │  │  └─ NasFileSystem (PathFileSystem)
-    //      │  │     └─ JuiceFileSystem (PathFileSystem)
-    //      │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    //      │  │  └─ XXXFileSystem (PathFileSystem)
+    // │ └─ FileSystemLog (PathFileSystem)
+    // │    ├─ GravitinoComposedFileSystem (PathFileSystem)
+    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
+    // │    │  │  └─ OpenDALFileSystem (PathFileSystem)
+    // │    │  │     └─ S3FileSystem (PathFileSystem)
+    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
+    // │    │  │  └─ OpenDALFileSystem (PathFileSystem)
+    // │    │  │     └─ HDFSFileSystem (PathFileSystem)
+    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
+    // │    │  │  └─ NasFileSystem (PathFileSystem)
+    // │    │  │     └─ JuiceFileSystem (PathFileSystem)
+    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
+    // │    │  │  └─ XXXFileSystem (PathFileSystem)
     //
     // `SimpleFileSystem` is a low-level filesystem designed to communicate with FUSE APIs.
     // It manages file and directory relationships, as well as file mappings.
