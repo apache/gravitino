@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli;
 
 import java.util.HashSet;
-import java.util.Locale;
 
 /**
  * The {@code CommandActions} class defines a set of standard commands that can be used in the
@@ -62,6 +61,6 @@ public class CommandActions {
    * @return true if the command is valid, false otherwise.
    */
   public static boolean isValidCommand(String command) {
-    return VALID_COMMANDS.contains(command.toLowerCase(Locale.ROOT));
+    return VALID_COMMANDS.contains(command);
   }
 }

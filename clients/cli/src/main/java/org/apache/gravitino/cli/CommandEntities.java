@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli;
 
 import java.util.HashSet;
-import java.util.Locale;
 
 /**
  * The {@code CommandEntities} class defines a set of standard entities that can be used in the
@@ -62,6 +61,6 @@ public class CommandEntities {
    * @return true if the command is valid, false otherwise.
    */
   public static boolean isValidEntity(String entity) {
-    return VALID_ENTITIES.contains(entity.toLowerCase(Locale.ROOT));
+    return VALID_ENTITIES.contains(entity);
   }
 }
