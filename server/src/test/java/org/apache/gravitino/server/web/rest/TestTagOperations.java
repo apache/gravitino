@@ -60,6 +60,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -102,7 +103,7 @@ public class TestTagOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(tagManager).to(TagManager.class).ranked(2);
+            bind(tagManager).to(TagDispatcher.class).ranked(2);
             bindFactory(TestTagOperations.MockServletRequestFactory.class)
                 .to(HttpServletRequest.class);
           }

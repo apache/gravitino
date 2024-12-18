@@ -24,6 +24,7 @@ In order to use the Ranger Hadoop SQL Plugin, you need to configure the followin
 | `authorization.ranger.auth.type`    | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`      | No       | 0.6.0-incubating |
 | `authorization.ranger.username`     | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)        | No       | 0.6.0-incubating |
 | `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.6.0-incubating |
+| `authorization.ranger.service.type` | The Apache Ranger service type.                                                                                                                      | (none)        | No       | 0.8.0-incubating |
 | `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0-incubating |
 
 Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
@@ -46,6 +47,7 @@ authorization.ranger.admin.url=172.0.0.100:6080
 authorization.ranger.auth.type=simple
 authorization.ranger.username=Jack
 authorization.ranger.password=PWD123
+authorization.ranger.service.type=HadoopSQL
 authorization.ranger.service.name=hiveRepo
 ```
 

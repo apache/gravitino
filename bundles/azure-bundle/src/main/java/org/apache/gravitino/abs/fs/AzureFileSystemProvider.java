@@ -26,7 +26,7 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.storage.ABSProperties;
+import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -49,13 +49,13 @@ public class AzureFileSystemProvider implements FileSystemProvider {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, ImmutableMap.of());
 
-    if (config.containsKey(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)
-        && config.containsKey(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY)) {
+    if (config.containsKey(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)
+        && config.containsKey(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY)) {
       hadoopConfMap.put(
           String.format(
               "fs.azure.account.key.%s.dfs.core.windows.net",
-              config.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)),
-          config.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY));
+              config.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)),
+          config.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
     }
 
     if (!config.containsKey(ABFS_IMPL_KEY)) {

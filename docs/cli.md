@@ -853,6 +853,12 @@ gcli column list --name catalog_postgres.hr.departments
 gcli column details --name catalog_postgres.hr.departments.name --audit
 ```
 
+#### Show a column's audit information
+
+```bash
+gcli column details --name catalog_postgres.hr.departments.name --audit
+```
+
 #### Add a column
 
 ```bash

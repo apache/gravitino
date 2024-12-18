@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.server;
 
-import static org.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -26,7 +25,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
@@ -34,7 +32,6 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,8 +43,6 @@ import org.mockito.Mockito;
 public class TestGravitinoServer {
 
   private GravitinoServer gravitinoServer;
-  private final String ROCKS_DB_STORE_PATH =
-      "/tmp/gravitino_test_server_" + UUID.randomUUID().toString().replace("-", "");
   private ServerConfig spyServerConfig;
 
   @BeforeAll
@@ -55,8 +50,6 @@ public class TestGravitinoServer {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(
         ImmutableMap.of(
-            ENTITY_KV_ROCKSDB_BACKEND_PATH.getKey(),
-            ROCKS_DB_STORE_PATH,
             GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
             String.valueOf(RESTUtils.findAvailablePort(5000, 6000))),
         t -> true);
@@ -71,12 +64,6 @@ public class TestGravitinoServer {
 
   @BeforeEach
   public void setUp() {
-    // Remove rocksdb storage file if exists
-    try {
-      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
-    } catch (Exception e) {
-      // Ignore
-    }
     gravitinoServer = new GravitinoServer(spyServerConfig, GravitinoEnv.getInstance());
   }
 
@@ -103,12 +90,6 @@ public class TestGravitinoServer {
   @Test
   public void testInitialize() {
     gravitinoServer.initialize();
-  }
-
-  @Test
-  void testConfig() {
-    Assertions.assertEquals(
-        ROCKS_DB_STORE_PATH, spyServerConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
   }
 
   @Test

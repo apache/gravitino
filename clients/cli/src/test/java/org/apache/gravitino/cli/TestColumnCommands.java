@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AddColumn;
+import org.apache.gravitino.cli.commands.ColumnAudit;
 import org.apache.gravitino.cli.commands.DeleteColumn;
 import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.UpdateColumnAutoIncrement;
@@ -68,6 +69,33 @@ class TestColumnCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
     commandLine.handleCommandLine();
     verify(mockList).handle();
+  }
+
+  @Test
+  void testColumnAuditCommand() {
+    ColumnAudit mockAudit = mock(ColumnAudit.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.users.name");
+    when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DETAILS));
+    doReturn(mockAudit)
+        .when(commandLine)
+        .newColumnAudit(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "name");
+    commandLine.handleCommandLine();
+    verify(mockAudit).handle();
   }
 
   @Test

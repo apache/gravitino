@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.hive;
 import static org.apache.gravitino.catalog.hive.HiveCatalog.CATALOG_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.hive.HiveCatalog.SCHEMA_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.hive.HiveCatalog.TABLE_PROPERTIES_METADATA;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 
 import com.google.common.collect.Maps;
 import java.time.Instant;

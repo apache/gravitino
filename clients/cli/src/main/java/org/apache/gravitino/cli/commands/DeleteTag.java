@@ -57,11 +57,16 @@ public class DeleteTag extends Command {
     if (!AreYouSure.really(force)) {
       return;
     }
-    boolean hasOnlyOneTag = tags.length == 1;
-    if (hasOnlyOneTag) {
-      handleOnlyOneTag();
+
+    if (tags == null || tags.length == 0) {
+      System.err.println(ErrorMessages.TAG_EMPTY);
     } else {
-      handleMultipleTags();
+      boolean hasOnlyOneTag = tags.length == 1;
+      if (hasOnlyOneTag) {
+        handleOnlyOneTag();
+      } else {
+        handleMultipleTags();
+      }
     }
   }
 

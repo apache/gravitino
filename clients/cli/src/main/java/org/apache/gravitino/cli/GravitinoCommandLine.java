@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -26,7 +27,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -49,6 +54,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
+  // This joiner is used to join multiple outputs to be displayed, e.g. roles or groups
+  private static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
   /**
    * Gravitino Command line.
@@ -171,6 +178,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (CommandActions.LIST.equals(command)) {
       newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
+      if (Objects.isNull(metalake)) {
+        System.err.println("! " + CommandEntities.METALAKE + " is not defined");
+        return;
+      }
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
@@ -212,7 +223,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, metalake).handle();
+      newListCatalogs(url, ignore, outputFormat, metalake).handle();
       return;
     }
 
@@ -313,6 +324,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
+      List<String> missingEntities =
+          Stream.of(
+                  metalake == null ? CommandEntities.METALAKE : null,
+                  catalog == null ? CommandEntities.CATALOG : null,
+                  schema == null ? CommandEntities.SCHEMA : null)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toList());
+      if (!missingEntities.isEmpty()) {
+        System.err.println(
+            "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
+        return;
+      }
+
       newListTables(url, ignore, metalake, catalog, schema).handle();
       return;
     }
@@ -373,7 +397,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
-      newUserDetails(url, ignore, metalake, user).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        newUserAudit(url, ignore, metalake, user).handle();
+      } else {
+        newUserDetails(url, ignore, metalake, user).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       newListUsers(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
@@ -382,15 +410,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteUser(url, ignore, force, metalake, user).handle();
     } else if (CommandActions.REVOKE.equals(command)) {
-      String role = line.getOptionValue(GravitinoOptions.ROLE);
-      if (role != null) {
+      String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : roles) {
         newRemoveRoleFromUser(url, ignore, metalake, user, role).handle();
       }
+      System.out.printf("Remove roles %s from user %s%n", COMMA_JOINER.join(roles), user);
     } else if (CommandActions.GRANT.equals(command)) {
-      String role = line.getOptionValue(GravitinoOptions.ROLE);
-      if (role != null) {
+      String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : roles) {
         newAddRoleToUser(url, ignore, metalake, user, role).handle();
       }
+      System.out.printf("Grant roles %s to user %s%n", String.join(", ", roles), user);
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
       Main.exit(-1);
@@ -409,7 +439,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
-      newGroupDetails(url, ignore, metalake, group).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        newGroupAudit(url, ignore, metalake, group).handle();
+      } else {
+        newGroupDetails(url, ignore, metalake, group).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       newListGroups(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
@@ -418,15 +452,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       newDeleteGroup(url, ignore, force, metalake, group).handle();
     } else if (CommandActions.REVOKE.equals(command)) {
-      String role = line.getOptionValue(GravitinoOptions.ROLE);
-      if (role != null) {
+      String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : roles) {
         newRemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
       }
+      System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(roles), group);
     } else if (CommandActions.GRANT.equals(command)) {
-      String role = line.getOptionValue(GravitinoOptions.ROLE);
-      if (role != null) {
+      String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : roles) {
         newAddRoleToGroup(url, ignore, metalake, group, role).handle();
       }
+      System.out.printf("Grant roles %s to group %s%n", COMMA_JOINER.join(roles), group);
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
       Main.exit(-1);
@@ -513,7 +549,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.DETAILS.equals(command)) {
-      newRoleDetails(url, ignore, metalake, role).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        newRoleAudit(url, ignore, metalake, role).handle();
+      } else {
+        newRoleDetails(url, ignore, metalake, role).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       newListRoles(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
@@ -536,13 +576,22 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
     String table = name.getTableName();
-    String column = name.getColumnName();
 
     Command.setAuthenticationMode(auth, userName);
 
     if (CommandActions.LIST.equals(command)) {
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
-    } else if (CommandActions.CREATE.equals(command)) {
+      return;
+    }
+
+    String column = name.getColumnName();
+
+    if (line.hasOption(GravitinoOptions.AUDIT)) {
+      newColumnAudit(url, ignore, metalake, catalog, schema, table, column).handle();
+      return;
+    }
+
+    if (CommandActions.CREATE.equals(command)) {
       String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       String position = line.getOptionValue(GravitinoOptions.POSITION);
