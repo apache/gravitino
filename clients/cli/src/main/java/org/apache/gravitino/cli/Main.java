@@ -25,6 +25,8 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
+import java.util.Locale;
+
 /* Entry point for the Gravitino command line. */
 public class Main {
 
@@ -70,7 +72,7 @@ public class Main {
     String[] args = line.getArgs();
 
     if (args.length == 2) {
-      String action = args[1];
+      String action = args[1].toLowerCase(Locale.ENGLISH);
       if (CommandActions.isValidCommand(action)) {
         return action;
       }
@@ -96,7 +98,7 @@ public class Main {
     String[] args = line.getArgs();
 
     if (args.length >= 1) {
-      String entity = args[0];
+      String entity = args[0].toLowerCase(Locale.ENGLISH);
       if (CommandEntities.isValidEntity(entity)) {
         return entity;
       } else {
