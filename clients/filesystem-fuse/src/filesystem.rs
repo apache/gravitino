@@ -405,17 +405,17 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         self.file_entry_manager
             .read()
             .await
-            .get_file_by_id(file_id)
+            .get_by_id(file_id)
             .ok_or(Errno::from(libc::ENOENT))
     }
 
     async fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
-        self.file_entry_manager.read().await.get_file_by_path(path)
+        self.file_entry_manager.read().await.get_by_path(path)
     }
 
     async fn resolve_file_id_to_filestat(&self, file_stat: &mut FileStat, parent_file_id: u64) {
         let mut file_manager = self.file_entry_manager.write().await;
-        let file_entry = file_manager.get_file_by_path(&file_stat.path);
+        let file_entry = file_manager.get_by_path(&file_stat.path);
         match file_entry {
             None => {
                 // allocate new file id
@@ -454,7 +454,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         };
         // set the exists file id
         opened_file.set_file_id(file_entry.parent_file_id, file_id);
-        let file = self.opened_file_manager.put_file(opened_file);
+        let file = self.opened_file_manager.put(opened_file);
         let file = file.lock().await;
         Ok(file.file_handle())
     }
@@ -482,7 +482,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()> {
         let fh_file_id = self
             .opened_file_manager
-            .get_file(fh)
+            .get(fh)
             .ok_or(Errno::from(libc::EBADF))?
             .lock()
             .await
@@ -549,7 +549,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         }
 
         // put the file to the opened file manager
-        let opened_file = self.opened_file_manager.put_file(opened_file);
+        let opened_file = self.opened_file_manager.put(opened_file);
         let opened_file = opened_file.lock().await;
         Ok(opened_file.file_handle())
     }
@@ -600,7 +600,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
         let opened_file = self
             .opened_file_manager
-            .remove_file(fh)
+            .remove(fh)
             .ok_or(Errno::from(libc::EBADF))?;
         let mut file = opened_file.lock().await;
         file.close().await
@@ -611,7 +611,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         let data = {
             let opened_file = self
                 .opened_file_manager
-                .get_file(fh)
+                .get(fh)
                 .ok_or(Errno::from(libc::EBADF))?;
             let mut opened_file = opened_file.lock().await;
             file_stat = opened_file.file_stat.clone();
@@ -628,7 +628,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         let (len, file_stat) = {
             let opened_file = self
                 .opened_file_manager
-                .get_file(fh)
+                .get(fh)
                 .ok_or(Errno::from(libc::EBADF))?;
             let mut opened_file = opened_file.lock().await;
             let len = opened_file.write(offset, data).await;
@@ -667,11 +667,11 @@ impl FileEntryManager {
         }
     }
 
-    fn get_file_by_id(&self, file_id: u64) -> Option<FileEntry> {
+    fn get_by_id(&self, file_id: u64) -> Option<FileEntry> {
         self.file_id_map.get(&file_id).cloned()
     }
 
-    fn get_file_by_path(&self, path: &str) -> Option<FileEntry> {
+    fn get_by_path(&self, path: &str) -> Option<FileEntry> {
         self.file_path_map.get(path).cloned()
     }
 
@@ -758,18 +758,18 @@ mod tests {
     fn test_file_entry_manager() {
         let mut manager = FileEntryManager::new();
         manager.insert(1, 2, "a/b");
-        let file = manager.get_file_by_id(2).unwrap();
+        let file = manager.get_by_id(2).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
         assert_eq!(file.path, "a/b");
 
-        let file = manager.get_file_by_path("a/b").unwrap();
+        let file = manager.get_by_path("a/b").unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
         assert_eq!(file.path, "a/b");
 
         manager.remove("a/b");
-        assert!(manager.get_file_by_id(2).is_none());
-        assert!(manager.get_file_by_path("a/b").is_none());
+        assert!(manager.get_by_id(2).is_none());
+        assert!(manager.get_by_path("a/b").is_none());
     }
 }

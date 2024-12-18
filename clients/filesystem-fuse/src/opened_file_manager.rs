@@ -44,7 +44,7 @@ impl OpenedFileManager {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    pub(crate) fn put_file(&self, mut file: OpenedFile) -> Arc<Mutex<OpenedFile>> {
+    pub(crate) fn put(&self, mut file: OpenedFile) -> Arc<Mutex<OpenedFile>> {
         let file_handle_id = self.next_handle_id();
         file.handle_id = file_handle_id;
         let file_handle = Arc::new(Mutex::new(file));
@@ -53,13 +53,13 @@ impl OpenedFileManager {
         file_handle
     }
 
-    pub(crate) fn get_file(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
+    pub(crate) fn get(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
         self.file_handle_map
             .get(&handle_id)
             .map(|x| x.value().clone())
     }
 
-    pub(crate) fn remove_file(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
+    pub(crate) fn remove(&self, handle_id: u64) -> Option<Arc<Mutex<OpenedFile>>> {
         self.file_handle_map.remove(&handle_id).map(|x| x.1)
     }
 }
@@ -79,8 +79,8 @@ mod tests {
         let file1 = OpenedFile::new(file1_stat.clone());
         let file2 = OpenedFile::new(file2_stat.clone());
 
-        let handle_id1 = manager.put_file(file1).lock().await.handle_id;
-        let handle_id2 = manager.put_file(file2).lock().await.handle_id;
+        let handle_id1 = manager.put(file1).lock().await.handle_id;
+        let handle_id2 = manager.put(file2).lock().await.handle_id;
 
         // Test the file handle id is assigned.
         assert!(handle_id1 > 0 && handle_id2 > 0);
@@ -88,40 +88,23 @@ mod tests {
 
         // test get file by handle id
         assert_eq!(
-            manager
-                .get_file(handle_id1)
-                .unwrap()
-                .lock()
-                .await
-                .file_stat
-                .name,
+            manager.get(handle_id1).unwrap().lock().await.file_stat.name,
             file1_stat.name
         );
 
         assert_eq!(
-            manager
-                .get_file(handle_id2)
-                .unwrap()
-                .lock()
-                .await
-                .file_stat
-                .name,
+            manager.get(handle_id2).unwrap().lock().await.file_stat.name,
             file2_stat.name
         );
 
         // test remove file by handle id
         assert_eq!(
-            manager
-                .remove_file(handle_id1)
-                .unwrap()
-                .lock()
-                .await
-                .handle_id,
+            manager.remove(handle_id1).unwrap().lock().await.handle_id,
             handle_id1
         );
 
         // test get file by handle id after remove
-        assert!(manager.get_file(handle_id1).is_none());
-        assert!(manager.get_file(handle_id2).is_some());
+        assert!(manager.get(handle_id1).is_none());
+        assert!(manager.get(handle_id2).is_some());
     }
 }
