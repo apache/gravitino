@@ -194,25 +194,25 @@ pub struct FileStat {
 }
 
 impl FileStat {
-    pub fn new_file_with_path(path: &str, size: u64) -> Self {
+    pub fn new_file_filestat_with_path(path: &str, size: u64) -> Self {
         let (parent, name) = split_file_path(path);
-        Self::new_file(parent, name, size)
+        Self::new_file_filestat(parent, name, size)
     }
 
-    pub fn new_dir_with_path(path: &str) -> Self {
+    pub fn new_dir_filestat_with_path(path: &str) -> Self {
         let (parent, name) = split_file_path(path);
-        Self::new_dir(parent, name)
+        Self::new_dir_filestat(parent, name)
     }
 
-    pub fn new_file(parent: &str, name: &str, size: u64) -> Self {
-        Self::new_file_entry(parent, name, size, FileType::RegularFile)
+    pub fn new_file_filestat(parent: &str, name: &str, size: u64) -> Self {
+        Self::new_filestat(parent, name, size, FileType::RegularFile)
     }
 
-    pub fn new_dir(parent: &str, name: &str) -> Self {
-        Self::new_file_entry(parent, name, 0, FileType::Directory)
+    pub fn new_dir_filestat(parent: &str, name: &str) -> Self {
+        Self::new_filestat(parent, name, 0, FileType::Directory)
     }
 
-    pub fn new_file_entry(parent: &str, name: &str, size: u64, kind: FileType) -> Self {
+    pub fn new_filestat(parent: &str, name: &str, size: u64, kind: FileType) -> Self {
         let atime = Timestamp::from(SystemTime::now());
         Self {
             file_id: 0,
@@ -282,12 +282,24 @@ impl OpenedFile {
     }
 
     async fn close(&mut self) -> Result<()> {
+        let mut errors = Vec::new();
         if let Some(mut reader) = self.reader.take() {
-            reader.close().await?;
+            if let Err(e) = reader.close().await {
+                errors.push(e);
+            }
         }
+
         if let Some(mut writer) = self.writer.take() {
-            self.flush().await?;
-            writer.close().await?
+            if let Err(e) = self.flush().await {
+                errors.push(e);
+            }
+            if let Err(e) = writer.close().await {
+                errors.push(e);
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors.remove(0));
         }
         Ok(())
     }
@@ -357,7 +369,7 @@ pub trait FileWriter: Sync + Send {
 /// it is used to manage the file metadata and file handle.
 /// The operations of the file system are implemented by the PathFileSystem.
 /// Note: This class is not use in the production code, it is used for the demo and testing
-pub struct SimpleFileSystem<T: PathFileSystem> {
+pub struct DefaultRawFileSystem<T: PathFileSystem> {
     /// file entries
     file_entry_manager: RwLock<FileEntryManager>,
     /// opened files
@@ -369,7 +381,7 @@ pub struct SimpleFileSystem<T: PathFileSystem> {
     fs: T,
 }
 
-impl<T: PathFileSystem> SimpleFileSystem<T> {
+impl<T: PathFileSystem> DefaultRawFileSystem<T> {
     const INITIAL_FILE_ID: u64 = 10000;
     const ROOT_DIR_PARENT_FILE_ID: u64 = 0;
     const ROOT_DIR_FILE_ID: u64 = 1;
@@ -398,13 +410,13 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
     }
 
     async fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
-        self.file_entry_manager.read().await.get_file_by_name(path)
+        self.file_entry_manager.read().await.get_file_by_path(path)
     }
 
-    async fn fill_file_id(&self, file_stat: &mut FileStat, parent_file_id: u64) {
+    async fn resolve_file_id_to_filestat(&self, file_stat: &mut FileStat, parent_file_id: u64) {
         let mut file_manager = self.file_entry_manager.write().await;
-        let file = file_manager.get_file_by_name(&file_stat.path);
-        match file {
+        let file_entry = file_manager.get_file_by_path(&file_stat.path);
+        match file_entry {
             None => {
                 // allocate new file id
                 file_stat.set_file_id(parent_file_id, self.next_file_id());
@@ -425,31 +437,31 @@ impl<T: PathFileSystem> SimpleFileSystem<T> {
     ) -> Result<FileHandle> {
         let file_entry = self.get_file_entry(file_id).await?;
 
-        let mut file = {
+        let mut opened_file = {
             match kind {
                 FileType::Directory => {
                     self.fs
-                        .open_dir(&file_entry.file_name, OpenFileFlags(flags))
+                        .open_dir(&file_entry.path, OpenFileFlags(flags))
                         .await?
                 }
                 FileType::RegularFile => {
                     self.fs
-                        .open_file(&file_entry.file_name, OpenFileFlags(flags))
+                        .open_file(&file_entry.path, OpenFileFlags(flags))
                         .await?
                 }
                 _ => return Err(Errno::from(libc::EINVAL)),
             }
         };
         // set the exists file id
-        file.set_file_id(file_entry.parent_file_id, file_id);
-        let file = self.opened_file_manager.put_file(file);
+        opened_file.set_file_id(file_entry.parent_file_id, file_id);
+        let file = self.opened_file_manager.put_file(opened_file);
         let file = file.lock().await;
         Ok(file.file_handle())
     }
 }
 
 #[async_trait]
-impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
+impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn init(&self) -> Result<()> {
         // init root directory
         self.file_entry_manager.write().await.insert(
@@ -461,8 +473,10 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn get_file_path(&self, file_id: u64) -> String {
-        let file = self.get_file_entry(file_id).await;
-        file.map(|x| x.file_name).unwrap_or_else(|_| "".to_string())
+        let file_entry = self.get_file_entry(file_id).await;
+        file_entry
+            .map(|x| x.path)
+            .unwrap_or_else(|_| "".to_string())
     }
 
     async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()> {
@@ -481,27 +495,28 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn stat(&self, file_id: u64) -> Result<FileStat> {
-        let file = self.get_file_entry(file_id).await?;
-        let mut stat = self.fs.stat(&file.file_name).await?;
-        stat.set_file_id(file.parent_file_id, file.file_id);
-        Ok(stat)
+        let file_entry = self.get_file_entry(file_id).await?;
+        let mut file_stat = self.fs.stat(&file_entry.path).await?;
+        file_stat.set_file_id(file_entry.parent_file_id, file_entry.file_id);
+        Ok(file_stat)
     }
 
     async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
-        let parent_file = self.get_file_entry(parent_file_id).await?;
-        let mut stat = self.fs.lookup(&parent_file.file_name, name).await?;
+        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
+        let mut file_stat = self.fs.lookup(&parent_file_entry.path, name).await?;
         // fill the file id to file stat
-        self.fill_file_id(&mut stat, parent_file_id).await;
-        Ok(stat)
+        self.resolve_file_id_to_filestat(&mut file_stat, parent_file_id)
+            .await;
+        Ok(file_stat)
     }
 
     async fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
-        let file = self.get_file_entry(file_id).await?;
-        let mut files = self.fs.read_dir(&file.file_name).await?;
-        for file in files.iter_mut() {
-            self.fill_file_id(file, file.file_id).await;
+        let file_entry = self.get_file_entry(file_id).await?;
+        let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
+        for file in child_filestats.iter_mut() {
+            self.resolve_file_id_to_filestat(file, file.file_id).await;
         }
-        Ok(files)
+        Ok(child_filestats)
     }
 
     async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
@@ -515,77 +530,80 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
     }
 
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
-        let parent = self.get_file_entry(parent_file_id).await?;
-        let mut file = self
+        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
+        let mut opened_file = self
             .fs
-            .create_file(&parent.file_name, name, OpenFileFlags(flags))
+            .create_file(&parent_file_entry.path, name, OpenFileFlags(flags))
             .await?;
 
-        file.set_file_id(parent_file_id, self.next_file_id());
+        opened_file.set_file_id(parent_file_id, self.next_file_id());
 
         // insert the new file to file entry manager
         {
             let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.insert(parent_file_id, file.file_stat.file_id, &file.file_stat.path);
+            file_manager.insert(
+                parent_file_id,
+                opened_file.file_stat.file_id,
+                &opened_file.file_stat.path,
+            );
         }
 
         // put the file to the opened file manager
-        let file = self.opened_file_manager.put_file(file);
-        let file = file.lock().await;
-        Ok(file.file_handle())
+        let opened_file = self.opened_file_manager.put_file(opened_file);
+        let opened_file = opened_file.lock().await;
+        Ok(opened_file.file_handle())
     }
 
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64> {
-        let parent = self.get_file_entry(parent_file_id).await?;
-        let mut file = self.fs.create_dir(&parent.file_name, name).await?;
+        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
+        let mut filestat = self.fs.create_dir(&parent_file_entry.path, name).await?;
 
-        file.set_file_id(parent_file_id, self.next_file_id());
+        filestat.set_file_id(parent_file_id, self.next_file_id());
 
         // insert the new file to file entry manager
         {
             let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.insert(file.parent_file_id, file.file_id, &file.path);
+            file_manager.insert(filestat.parent_file_id, filestat.file_id, &filestat.path);
         }
-        Ok(file.file_id)
+        Ok(filestat.file_id)
     }
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
-        let file = self.get_file_entry(file_id).await?;
-        self.fs.set_attr(&file.file_name, file_stat, true).await
+        let file_entry = self.get_file_entry(file_id).await?;
+        self.fs.set_attr(&file_entry.path, file_stat, true).await
     }
 
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
-        let parent_file = self.get_file_entry(parent_file_id).await?;
-        self.fs.remove_file(&parent_file.file_name, name).await?;
+        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
+        self.fs.remove_file(&parent_file_entry.path, name).await?;
 
         // remove the file from file entry manager
         {
-            let mut file_id_manager = self.file_entry_manager.write().await;
-            file_id_manager.remove(&join_file_path(&parent_file.file_name, name));
+            let mut file_manager = self.file_entry_manager.write().await;
+            file_manager.remove(&join_file_path(&parent_file_entry.path, name));
         }
         Ok(())
     }
 
     async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
-        let parent_file = self.get_file_entry(parent_file_id).await?;
-        self.fs.remove_dir(&parent_file.file_name, name).await?;
+        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
+        self.fs.remove_dir(&parent_file_entry.path, name).await?;
 
         // remove the dir from file entry manager
         {
-            let mut file_id_manager = self.file_entry_manager.write().await;
-            file_id_manager.remove(&join_file_path(&parent_file.file_name, name));
+            let mut file_manager = self.file_entry_manager.write().await;
+            file_manager.remove(&join_file_path(&parent_file_entry.path, name));
         }
         Ok(())
     }
 
     async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
-        let file = self
+        let opened_file = self
             .opened_file_manager
             .remove_file(fh)
             .ok_or(Errno::from(libc::EBADF))?;
-        let mut file = file.lock().await;
-        file.close().await?;
-        Ok(())
+        let mut file = opened_file.lock().await;
+        file.close().await
     }
 
     async fn read(&self, _file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
@@ -629,23 +647,23 @@ impl<T: PathFileSystem> RawFileSystem for SimpleFileSystem<T> {
 struct FileEntry {
     file_id: u64,
     parent_file_id: u64,
-    file_name: String,
+    path: String,
 }
 
 /// FileEntryManager is manage all the file entries in memory. it is used manger the file relationship and name mapping.
 struct FileEntryManager {
-    // file_id_map is a map of file_id to file name.
+    // file_id_map is a map of file_id to file entry.
     file_id_map: HashMap<u64, FileEntry>,
 
-    // file_name_map is a map of file name to file id.
-    file_name_map: HashMap<String, FileEntry>,
+    // file_path_map is a map of file path to file entry.
+    file_path_map: HashMap<String, FileEntry>,
 }
 
 impl FileEntryManager {
     fn new() -> Self {
         Self {
             file_id_map: HashMap::new(),
-            file_name_map: HashMap::new(),
+            file_path_map: HashMap::new(),
         }
     }
 
@@ -653,22 +671,22 @@ impl FileEntryManager {
         self.file_id_map.get(&file_id).cloned()
     }
 
-    fn get_file_by_name(&self, file_name: &str) -> Option<FileEntry> {
-        self.file_name_map.get(file_name).cloned()
+    fn get_file_by_path(&self, path: &str) -> Option<FileEntry> {
+        self.file_path_map.get(path).cloned()
     }
 
-    fn insert(&mut self, parent_file_id: u64, file_id: u64, file_name: &str) {
+    fn insert(&mut self, parent_file_id: u64, file_id: u64, path: &str) {
         let file = FileEntry {
             file_id,
             parent_file_id,
-            file_name: file_name.to_string(),
+            path: path.to_string(),
         };
         self.file_id_map.insert(file_id, file.clone());
-        self.file_name_map.insert(file_name.to_string(), file);
+        self.file_path_map.insert(path.to_string(), file);
     }
 
-    fn remove(&mut self, file_name: &str) {
-        if let Some(file) = self.file_name_map.remove(file_name) {
+    fn remove(&mut self, path: &str) {
+        if let Some(file) = self.file_path_map.remove(path) {
             self.file_id_map.remove(&file.file_id);
         }
     }
@@ -681,28 +699,28 @@ mod tests {
     #[test]
     fn test_create_file_stat() {
         //test new file
-        let file_stat = FileStat::new_file("a", "b", 10);
+        let file_stat = FileStat::new_file_filestat("a", "b", 10);
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, "a/b");
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
         //test new dir
-        let file_stat = FileStat::new_dir("a", "b");
+        let file_stat = FileStat::new_dir_filestat("a", "b");
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, "a/b");
         assert_eq!(file_stat.size, 0);
         assert_eq!(file_stat.kind, FileType::Directory);
 
         //test new file with path
-        let file_stat = FileStat::new_file_with_path("a/b", 10);
+        let file_stat = FileStat::new_file_filestat_with_path("a/b", 10);
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, "a/b");
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
         //test new dir with path
-        let file_stat = FileStat::new_dir_with_path("a/b");
+        let file_stat = FileStat::new_dir_filestat_with_path("a/b");
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, "a/b");
         assert_eq!(file_stat.size, 0);
@@ -711,7 +729,7 @@ mod tests {
 
     #[test]
     fn test_file_stat_set_file_id() {
-        let mut file_stat = FileStat::new_file("a", "b", 10);
+        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
         file_stat.set_file_id(1, 2);
         assert_eq!(file_stat.file_id, 2);
         assert_eq!(file_stat.parent_file_id, 1);
@@ -720,13 +738,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "assertion failed: file_id != 0 && parent_file_id != 0")]
     fn test_file_stat_set_file_id_panic() {
-        let mut file_stat = FileStat::new_file("a", "b", 10);
+        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
         file_stat.set_file_id(1, 0);
     }
 
     #[test]
     fn test_open_file() {
-        let mut open_file = OpenedFile::new(FileStat::new_file("a", "b", 10));
+        let mut open_file = OpenedFile::new(FileStat::new_file_filestat("a", "b", 10));
         assert_eq!(open_file.file_stat.name, "b");
         assert_eq!(open_file.file_stat.size, 10);
 
@@ -743,15 +761,15 @@ mod tests {
         let file = manager.get_file_by_id(2).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.file_name, "a/b");
+        assert_eq!(file.path, "a/b");
 
-        let file = manager.get_file_by_name("a/b").unwrap();
+        let file = manager.get_file_by_path("a/b").unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.file_name, "a/b");
+        assert_eq!(file.path, "a/b");
 
         manager.remove("a/b");
         assert!(manager.get_file_by_id(2).is_none());
-        assert!(manager.get_file_by_name("a/b").is_none());
+        assert!(manager.get_file_by_path("a/b").is_none());
     }
 }

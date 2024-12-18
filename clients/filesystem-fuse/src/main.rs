@@ -36,7 +36,7 @@ async fn main() {
 async fn create_gvfs_fuse_filesystem() {
     // Gvfs-fuse filesystem structure:
     // FuseApiHandle
-    // ├─ SimpleFileSystem (RawFileSystem)
+    // ├─ DefaultRawFileSystem (RawFileSystem)
     // │ └─ FileSystemLog (PathFileSystem)
     // │    ├─ GravitinoComposedFileSystem (PathFileSystem)
     // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
