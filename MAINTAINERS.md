@@ -137,3 +137,4 @@ All contributions from the people listed are licensed under the Apache License v
 | Hiren Sharma   | hiirrxnn            | opensource4you   |
 | Chun-Hung Tseng| henrybear327        | opensource4you   |
 | Carl Chang     | ichuniq             | opensource4you   |
+| Chia-Ying Lee  | waukin              | opensource4you   |
