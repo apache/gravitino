@@ -441,13 +441,13 @@ public class TestableCommandLine {
   }
 
   protected RemoveRoleFromGroup newRemoveRoleFromGroup(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new RemoveRoleFromGroup(url, ignore, metalake, user, role);
+      String url, boolean ignore, String metalake, String group, String role) {
+    return new RemoveRoleFromGroup(url, ignore, metalake, group, role);
   }
 
   protected AddRoleToGroup newAddRoleToGroup(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new AddRoleToGroup(url, ignore, metalake, user, role);
+      String url, boolean ignore, String metalake, String group, String role) {
+    return new AddRoleToGroup(url, ignore, metalake, group, role);
   }
 
   protected RoleDetails newRoleDetails(String url, boolean ignore, String metalake, String role) {
