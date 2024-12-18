@@ -74,9 +74,9 @@ async fn create_gvfs_fuse_filesystem() {
 
     // `NasFileSystem` is a filesystem that uses a locally accessible path mounted by NAS tools, such as JuiceFS.
 
-    // `JuiceFileSystem` is a file system that use to manage juice mount and access JuiceFS storage.
+    // `JuiceFileSystem` is a file system that use to manage JuiceFS mount and access JuiceFS storage.
 
-    // `XXXXFileSystem` is a file system that use implement access file by your extent.
+    // `XXXFileSystem is a filesystem that allows you to implement file access through your own extensions.
 
     todo!("Implement the createGvfsFuseFileSystem function");
 }
