@@ -19,13 +19,12 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Locale;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-
-import java.util.Locale;
 
 /* Entry point for the Gravitino command line. */
 public class Main {
