@@ -74,7 +74,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* reserved */),
             stringRequiredPropertyEntry(
                 URI, "Iceberg catalog uri config", false /* immutable */, false /* hidden */),
-            stringRequiredPropertyEntry(
+            stringOptionalPropertyEntry(
                 WAREHOUSE,
                 "Iceberg catalog warehouse config",
                 false /* immutable */,
