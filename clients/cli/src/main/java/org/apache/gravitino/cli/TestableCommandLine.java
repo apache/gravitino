@@ -819,7 +819,6 @@ public class TestableCommandLine {
       String column,
       String defaultValue,
       String dataType) {
-    System.err.println(defaultValue + " " + dataType);
     return new UpdateColumnDefault(
         url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType);
   }
