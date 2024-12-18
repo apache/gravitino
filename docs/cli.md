@@ -419,7 +419,7 @@ gcli schema create --name catalog_postgres.new_db
 #### Display schema properties
 
 ```bash
-gcli schema properties --name catalog_postgres.hr
+gcli schema properties --name catalog_postgres.hr -i
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
@@ -581,10 +581,10 @@ gcli tag details --tag tagA
 #### Create tags
 
 ```bash
-gcli tag create --tag tagA tagB
-```
+ gcli tag create --tag tagA tagB
+ ```
 
-#### List all tags
+#### List all tag
 
 ```bash
 gcli tag list
@@ -733,7 +733,7 @@ gcli group revoke --group groupA --role admin
 gcli topic details --name kafka.default.topic3
 ```
 
-#### Create a topic
+#### Create a tag
 
 ```bash
 gcli topic create --name kafka.default.topic3
@@ -838,20 +838,7 @@ Note that some commands are not supported depending on what the database support
 When setting the datatype of a column the following basic types are currently supported:
 null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
 
-In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).
-
-
-#### Show all columns
-
-```bash
-gcli column list --name catalog_postgres.hr.departments
-```
-
-#### Show column's audit information
-
-```bash
-gcli column details --name catalog_postgres.hr.departments.name --audit
-```
+In addition decimal(precision,scale) and varchar(length).
 
 #### Show a column's audit information
 
