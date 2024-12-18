@@ -21,11 +21,12 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.Privileges;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
@@ -38,8 +39,7 @@ public class RevokePrivilegesFromRole extends Command {
 
   protected final String metalake;
   protected final String role;
-  protected final String entity;
-  protected final String entityType;
+  protected final FullName entity;
   protected final String[] privileges;
 
   /**
@@ -50,7 +50,6 @@ public class RevokePrivilegesFromRole extends Command {
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    * @param entity The name of the entity.
-   * @param entityType The type entity.
    * @param privileges The list of privileges.
    */
   public RevokePrivilegesFromRole(
@@ -58,13 +57,11 @@ public class RevokePrivilegesFromRole extends Command {
       boolean ignoreVersions,
       String metalake,
       String role,
-      String entity,
-      String entityType,
+      FullName entity,
       String[] privileges) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.entity = entity;
-    this.entityType = entityType;
     this.role = role;
     this.privileges = privileges;
   }
@@ -76,6 +73,7 @@ public class RevokePrivilegesFromRole extends Command {
       GravitinoClient client = buildClient(metalake);
       MetadataObject metadataObject = null;
       List<Privilege> privilegesList = new ArrayList<>();
+      String name = entity.getName();
 
       for (String privilege : privileges) {
         if (!Privileges.isValid(privilege)) {
@@ -90,30 +88,28 @@ public class RevokePrivilegesFromRole extends Command {
         privilegesList.add(privilegeDTO);
       }
 
-      switch (entityType) {
-        case CommandEntities.METALAKE:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.METALAKE);
-          break;
-        case CommandEntities.CATALOG:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.CATALOG);
-          break;
-        case CommandEntities.SCHEMA:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.SCHEMA);
-          break;
-        case CommandEntities.TABLE:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TABLE);
-          break;
-        case CommandEntities.TOPIC:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.TOPIC);
-          break;
-        case CommandEntities.FILESET:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.FILESET);
-          break;
-        case CommandEntities.COLUMN:
-          metadataObject = MetadataObjects.of(null, entity, MetadataObject.Type.COLUMN);
-          break;
-        default:
-          throw new IllegalArgumentException("Unknown entity type: " + entityType);
+      if (entity.hasColumnName()) {
+        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.COLUMN);
+      } else if (entity.hasTableName()) {
+        Catalog catalog = client.loadCatalog(entity.getCatalogName());
+        Catalog.Type catalogType = catalog.type();
+        if (catalogType == Catalog.Type.RELATIONAL) {
+          metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.TABLE);
+        } else if (catalogType == Catalog.Type.MESSAGING) {
+          metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.TOPIC);
+        } else if (catalogType == Catalog.Type.FILESET) {
+          metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.FILESET);
+        } else {
+          throw new IllegalArgumentException("Unknown entity type: " + name);
+        }
+      } else if (entity.hasSchemaName()) {
+        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.SCHEMA);
+      } else if (entity.hasCatalogName()) {
+        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.CATALOG);
+      } else if (entity.getMetalakeName() != null) {
+        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
+      } else {
+        throw new IllegalArgumentException("Unknown entity type: " + name);
       }
 
       client.revokePrivilegesFromRole(role, metadataObject, privilegesList);
@@ -132,6 +128,6 @@ public class RevokePrivilegesFromRole extends Command {
     }
 
     String all = String.join(",", privileges);
-    System.out.println(role + " revoked " + all + " on " + entity);
+    System.out.println(role + " revoked " + all + " on " + entity.getName());
   }
 }

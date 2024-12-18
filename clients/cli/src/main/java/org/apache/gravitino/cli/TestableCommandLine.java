@@ -870,10 +870,9 @@ public class TestableCommandLine {
       boolean ignore,
       String metalake,
       String role,
-      String entity,
-      String entityType,
+      FullName entity,
       String[] privileges) {
-    return new GrantPrivilegesToRole(url, ignore, metalake, role, entity, entityType, privileges);
+    return new GrantPrivilegesToRole(url, ignore, metalake, role, entity, privileges);
   }
 
   protected RevokePrivilegesFromRole newRevokePrivilegesFromRole(
@@ -881,10 +880,8 @@ public class TestableCommandLine {
       boolean ignore,
       String metalake,
       String role,
-      String entity,
-      String entityType,
+      FullName entity,
       String[] privileges) {
-    return new RevokePrivilegesFromRole(
-        url, ignore, metalake, role, entity, entityType, privileges);
+    return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
   }
 }

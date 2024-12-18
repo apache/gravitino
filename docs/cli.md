@@ -735,13 +735,13 @@ gcli group revoke --group groupA --role admin
 ### Grant a privilege
 
 ```bash
-gcli catalog grant --name catalog_postgres --role admin --privilege create_table modify_table
+gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Revoke a privilege
 
 ```bash
-gcli catalog revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Topic commands

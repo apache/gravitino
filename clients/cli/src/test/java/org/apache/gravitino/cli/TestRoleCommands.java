@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.cli;
 
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -170,17 +172,16 @@ class TestRoleCommands {
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.GRANT));
+                mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.GRANT));
     doReturn(mockGrant)
         .when(commandLine)
         .newGrantPrivilegesToRole(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "admin",
-            "catalog",
-            CommandEntities.CATALOG,
-            privileges);
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            eq("admin"),
+            any(),
+            eq(privileges));
     commandLine.handleCommandLine();
     verify(mockGrant).handle();
   }
@@ -200,17 +201,16 @@ class TestRoleCommands {
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.REVOKE));
+                mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.REVOKE));
     doReturn(mockRevoke)
         .when(commandLine)
         .newRevokePrivilegesFromRole(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "admin",
-            "catalog",
-            CommandEntities.CATALOG,
-            privileges);
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            eq("admin"),
+            any(),
+            eq(privileges));
     commandLine.handleCommandLine();
     verify(mockRevoke).handle();
   }
