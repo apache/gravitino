@@ -65,14 +65,11 @@ public class CreateTag extends Command {
       GravitinoClient client = buildClient(metalake);
       client.createTag(tags[0], comment, null);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (TagAlreadyExistsException err) {
-      System.err.println(ErrorMessages.TAG_EXISTS);
-      return;
+      exitWithError(ErrorMessages.TAG_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println("Tag " + tags[0] + " created");
@@ -87,14 +84,11 @@ public class CreateTag extends Command {
         created.add(tag);
       }
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (TagAlreadyExistsException err) {
-      System.err.println(ErrorMessages.TAG_EXISTS);
-      return;
+      exitWithError(ErrorMessages.TAG_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
     if (!created.isEmpty()) {
       System.out.println("Tags " + String.join(",", created) + " created");

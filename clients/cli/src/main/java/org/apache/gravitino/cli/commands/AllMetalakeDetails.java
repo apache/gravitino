@@ -45,8 +45,7 @@ public class AllMetalakeDetails extends Command {
       GravitinoAdminClient client = buildAdminClient();
       metalakes = client.listMetalakes();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     List<String> metalakeDetails = new ArrayList<>();

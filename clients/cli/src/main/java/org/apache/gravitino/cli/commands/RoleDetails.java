@@ -55,14 +55,11 @@ public class RoleDetails extends Command {
       GravitinoClient client = buildClient(metalake);
       objects = client.getRole(role).securableObjects();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_GROUP);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_GROUP);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     // TODO expand in securable objects PR

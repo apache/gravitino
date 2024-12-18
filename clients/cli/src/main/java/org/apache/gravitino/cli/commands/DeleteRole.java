@@ -61,14 +61,11 @@ public class DeleteRole extends Command {
       GravitinoClient client = buildClient(metalake);
       deleted = client.deleteRole(role);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ROLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

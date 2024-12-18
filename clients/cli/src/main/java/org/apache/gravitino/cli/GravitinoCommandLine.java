@@ -393,6 +393,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       }
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+      Main.exit(-1);
     }
   }
 
@@ -428,6 +429,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       }
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+      Main.exit(-1);
     }
   }
 
@@ -584,7 +586,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newUpdateColumnName(url, ignore, metalake, catalog, schema, table, column, newName)
             .handle();
       }
-      if (line.hasOption(GravitinoOptions.DATATYPE)) {
+      if (line.hasOption(GravitinoOptions.DATATYPE) && !line.hasOption(GravitinoOptions.DEFAULT)) {
         String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
         newUpdateColumnDatatype(url, ignore, metalake, catalog, schema, table, column, datatype)
             .handle();
@@ -633,9 +635,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
       while ((helpLine = reader.readLine()) != null) {
         helpMessage.append(helpLine).append(System.lineSeparator());
       }
-      System.err.print(helpMessage.toString());
+      System.out.print(helpMessage.toString());
     } catch (IOException e) {
       System.err.println("Failed to load help message: " + e.getMessage());
+      Main.exit(-1);
     }
   }
 
@@ -664,9 +667,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newSetOwner(url, ignore, metalake, entityName, entity, group, true).handle();
       } else {
         System.err.println(ErrorMessages.INVALID_SET_COMMAND);
+        Main.exit(-1);
       }
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+      Main.exit(-1);
     }
   }
 

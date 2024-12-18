@@ -59,8 +59,7 @@ public class ListColumns extends TableCommand {
       NameIdentifier name = NameIdentifier.of(schema, table);
       columns = tableCatalog().loadTable(name).columns();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     StringBuilder all = new StringBuilder();
