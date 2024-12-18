@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class DeleteMetalake extends Command {
@@ -57,6 +58,8 @@ public class DeleteMetalake extends Command {
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
+    } catch (MetalakeInUseException inUseException) {
+      System.err.println(metalake + " in use, plz disable it.");
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
