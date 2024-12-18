@@ -383,7 +383,7 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
     const INITIAL_FILE_ID: u64 = 10000;
-    const ROOT_DIR_PARENT_FILE_ID: u64 = 0;
+    const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
     const ROOT_DIR_FILE_ID: u64 = 1;
     const ROOT_DIR_NAME: &'static str = "";
 
