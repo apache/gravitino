@@ -40,14 +40,14 @@ async fn create_gvfs_fuse_filesystem() {
     // │ └─ FileSystemLog (PathFileSystem)
     // │    ├─ GravitinoComposedFileSystem (PathFileSystem)
     // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ OpenDALFileSystem (PathFileSystem)
-    // │    │  │     └─ S3FileSystem (PathFileSystem)
+    // │    │  │  └─ S3FileSystem (PathFileSystem)
+    // │    │  │     └─ OpenDALFileSystem (PathFileSystem)
     // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ OpenDALFileSystem (PathFileSystem)
-    // │    │  │     └─ HDFSFileSystem (PathFileSystem)
+    // │    │  │  └─ HDFSFileSystem (PathFileSystem)
+    // │    │  │     └─ OpenDALFileSystem (PathFileSystem)
     // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ NasFileSystem (PathFileSystem)
-    // │    │  │     └─ JuiceFileSystem (PathFileSystem)
+    // │    │  │  └─ JuiceFileSystem (PathFileSystem)
+    // │    │  │     └─ NasFileSystem (PathFileSystem)
     // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
     // │    │  │  └─ XXXFileSystem (PathFileSystem)
     //
@@ -59,7 +59,7 @@ async fn create_gvfs_fuse_filesystem() {
     // Similar implementations include permissions, caching, and metrics.
     //
     // `GravitinoComposeFileSystem` is a composite file system that can combine multiple `GravitinoFilesetFileSystem`.
-    //  It translates the part of catalog and schema of fileset path to a signal GravitinoFilesetFileSystem path.
+    // It use the part of catalog and schema of fileset path to a find actual GravitinoFilesetFileSystem. delegate the operation to the real storage.
     // If the user only mounts a fileset, this layer is not present. There will only be one below layer.
     //
     // `GravitinoFilesetFileSystem` is a file system that can access a fileset.It translates the fileset path to the real storage path.
@@ -68,14 +68,14 @@ async fn create_gvfs_fuse_filesystem() {
     // `OpenDALFileSystem` is a file system that use the OpenDAL to access real storage.
     // it can assess the S3, HDFS, gcs, azblob and other storage.
     //
-    // `S3FileSystem` is a file system that use to access S3 storage.
+    // `S3FileSystem` is a file system that use `OpenDALFileSystem` to access S3 storage.
     //
-    // `HDFSFileSystem` is a file system that use to access HDFS storage.
-
+    // `HDFSFileSystem` is a file system that use `OpenDALFileSystem` to access HDFS storage.
+    //
     // `NasFileSystem` is a filesystem that uses a locally accessible path mounted by NAS tools, such as JuiceFS.
-
-    // `JuiceFileSystem` is a file system that use to manage JuiceFS mount and access JuiceFS storage.
-
+    //
+    // `JuiceFileSystem` is a file that use `NasFileSystem` to access JuiceFS storage.
+    //
     // `XXXFileSystem is a filesystem that allows you to implement file access through your own extensions.
 
     todo!("Implement the createGvfsFuseFileSystem function");
