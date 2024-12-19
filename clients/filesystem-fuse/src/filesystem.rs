@@ -124,6 +124,7 @@ pub(crate) trait PathFileSystem: Send + Sync {
 }
 
 // FileSystemContext is the system environment for the fuse file system.
+#[derive(Debug)]
 pub(crate) struct FileSystemContext {
     // system user id
     pub(crate) uid: u32,

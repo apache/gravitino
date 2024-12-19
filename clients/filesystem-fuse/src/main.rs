@@ -25,7 +25,7 @@ use std::process::exit;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
     info!("Starting filesystem...");
     debug!("Shutdown filesystem...");
     exit(0);
