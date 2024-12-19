@@ -216,16 +216,17 @@ class TestUserCommands {
         .when(commandLine)
         .newRemoveRoleFromUser(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "admin");
-    commandLine.handleCommandLine();
-    verify(mockRemoveFirstRole).handle();
 
     // Verify second role
     doReturn(mockRemoveSecondRole)
         .when(commandLine)
         .newRemoveRoleFromUser(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "role1");
+
     commandLine.handleCommandLine();
+
     verify(mockRemoveSecondRole).handle();
+    verify(mockRemoveFirstRole).handle();
   }
 
   @Test
@@ -249,15 +250,16 @@ class TestUserCommands {
         .when(commandLine)
         .newAddRoleToUser(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "admin");
-    commandLine.handleCommandLine();
-    verify(mockAddFirstRole).handle();
 
     // Verify second role
     doReturn(mockAddSecondRole)
         .when(commandLine)
         .newAddRoleToUser(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "role1");
+
     commandLine.handleCommandLine();
+
+    verify(mockAddFirstRole).handle();
     verify(mockAddSecondRole).handle();
   }
 }

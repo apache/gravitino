@@ -54,14 +54,13 @@ public class ListIndexes extends TableCommand {
   /** Displays the details of a table's index. */
   @Override
   public void handle() {
-    Index[] indexes;
+    Index[] indexes = {};
 
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       indexes = tableCatalog().loadTable(name).index();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     StringBuilder all = new StringBuilder();

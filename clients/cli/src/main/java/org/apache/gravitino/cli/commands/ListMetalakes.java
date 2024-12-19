@@ -45,7 +45,7 @@ public class ListMetalakes extends Command {
       metalakes = client.listMetalakes();
       output(metalakes);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
+      exitWithError(exp.getMessage());
     }
   }
 }

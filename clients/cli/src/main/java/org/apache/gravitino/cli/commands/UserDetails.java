@@ -53,14 +53,11 @@ public class UserDetails extends Command {
       GravitinoClient client = buildClient(metalake);
       roles = client.getUser(user).roles();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     String all = String.join(",", roles);

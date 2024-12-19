@@ -54,14 +54,11 @@ public class ListTagProperties extends ListProperties {
       GravitinoClient client = buildClient(metalake);
       gTag = client.getTag(tag);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TAG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     Map<String, String> properties = gTag.properties();

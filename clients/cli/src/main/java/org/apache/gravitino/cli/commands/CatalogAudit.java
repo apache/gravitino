@@ -47,19 +47,16 @@ public class CatalogAudit extends AuditCommand {
   /** Displays the audit information of a specified catalog. */
   @Override
   public void handle() {
-    Catalog result;
+    Catalog result = null;
 
     try (GravitinoClient client = buildClient(metalake)) {
       result = client.loadCatalog(this.catalog);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (result != null) {

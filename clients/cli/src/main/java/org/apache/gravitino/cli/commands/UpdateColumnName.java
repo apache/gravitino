@@ -81,23 +81,17 @@ public class UpdateColumnName extends Command {
 
       client.loadCatalog(catalog).asTableCatalog().alterTable(columnName, change);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TABLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (NoSuchColumnException err) {
-      System.err.println(ErrorMessages.UNKNOWN_COLUMN);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_COLUMN);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(column + " name changed.");
