@@ -51,7 +51,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TagManager {
+public class TagManager implements TagDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(TagManager.class);
 

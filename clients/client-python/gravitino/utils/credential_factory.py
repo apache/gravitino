@@ -21,6 +21,7 @@ from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
+from gravitino.api.credential.oss_secret_key_credential import OSSSecretKeyCredential
 
 
 class CredentialFactory:
@@ -36,4 +37,6 @@ class CredentialFactory:
             return GCSTokenCredential(credential_info, expire_time_in_ms)
         if credential_type == OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE:
             return OSSTokenCredential(credential_info, expire_time_in_ms)
+        if credential_type == OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE:
+            return OSSSecretKeyCredential(credential_info, expire_time_in_ms)
         raise NotImplementedError(f"Credential type {credential_type} is not supported")

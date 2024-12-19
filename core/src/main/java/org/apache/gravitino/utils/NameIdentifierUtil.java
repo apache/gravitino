@@ -155,6 +155,26 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the model {@link NameIdentifier} from the give model version's namespace.
+   *
+   * @param modelVersionNs The model version's namespace
+   * @return The created model {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelIdentifier(Namespace modelVersionNs) {
+    return NameIdentifier.of(modelVersionNs.levels());
+  }
+
+  /**
+   * Create the model {@link NameIdentifier} from the give model version's name identifier.
+   *
+   * @param modelIdent The model version's name identifier
+   * @return The created model {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelIdentifier(NameIdentifier modelIdent) {
+    return NameIdentifier.of(modelIdent.namespace().levels());
+  }
+
+  /**
    * Create the model version {@link NameIdentifier} with the given metalake, catalog, schema, model
    * and version.
    *
@@ -168,6 +188,54 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofModelVersion(
       String metalake, String catalog, String schema, String model, int version) {
     return NameIdentifier.of(metalake, catalog, schema, model, String.valueOf(version));
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given metalake, catalog, schema, model
+   * and alias.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param model The model name
+   * @param alias The model version alias
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier ofModelVersion(
+      String metalake, String catalog, String schema, String model, String alias) {
+    return NameIdentifier.of(metalake, catalog, schema, model, alias);
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given model identifier and version.
+   *
+   * @param modelIdent The model identifier
+   * @param version The model version
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelVersionIdentifier(NameIdentifier modelIdent, int version) {
+    return ofModelVersion(
+        modelIdent.namespace().level(0),
+        modelIdent.namespace().level(1),
+        modelIdent.namespace().level(2),
+        modelIdent.name(),
+        version);
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given model identifier and alias.
+   *
+   * @param modelIdent The model identifier
+   * @param alias The model version alias
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelVersionIdentifier(NameIdentifier modelIdent, String alias) {
+    return ofModelVersion(
+        modelIdent.namespace().level(0),
+        modelIdent.namespace().level(1),
+        modelIdent.namespace().level(2),
+        modelIdent.name(),
+        alias);
   }
 
   /**
