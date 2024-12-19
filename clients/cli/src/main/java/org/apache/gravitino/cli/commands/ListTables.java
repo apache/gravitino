@@ -53,8 +53,7 @@ public class ListTables extends TableCommand {
     try {
       tables = tableCatalog().listTables(name);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     List<String> tableNames = new ArrayList<>();

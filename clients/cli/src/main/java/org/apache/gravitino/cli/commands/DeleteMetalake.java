@@ -55,11 +55,9 @@ public class DeleteMetalake extends Command {
       GravitinoAdminClient client = buildAdminClient();
       deleted = client.dropMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

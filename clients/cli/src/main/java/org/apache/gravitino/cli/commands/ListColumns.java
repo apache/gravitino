@@ -66,8 +66,7 @@ public class ListColumns extends TableCommand {
           ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
       return;
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     StringBuilder all = new StringBuilder();

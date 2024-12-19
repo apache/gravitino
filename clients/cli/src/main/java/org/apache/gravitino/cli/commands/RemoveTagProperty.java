@@ -57,14 +57,11 @@ public class RemoveTagProperty extends Command {
       TagChange change = TagChange.removeProperty(property);
       client.alterTag(tag, change);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TAG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(property + " property removed.");

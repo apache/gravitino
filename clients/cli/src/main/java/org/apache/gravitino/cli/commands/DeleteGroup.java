@@ -61,14 +61,11 @@ public class DeleteGroup extends Command {
       GravitinoClient client = buildClient(metalake);
       deleted = client.removeGroup(group);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchGroupException err) {
-      System.err.println(ErrorMessages.UNKNOWN_GROUP);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_GROUP);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

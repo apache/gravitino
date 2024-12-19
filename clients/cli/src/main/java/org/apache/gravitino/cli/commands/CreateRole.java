@@ -50,14 +50,11 @@ public class CreateRole extends Command {
       GravitinoClient client = buildClient(metalake);
       client.createRole(role, null, Collections.EMPTY_LIST);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (RoleAlreadyExistsException err) {
-      System.err.println(ErrorMessages.ROLE_EXISTS);
-      return;
+      exitWithError(ErrorMessages.ROLE_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(role + " created");
