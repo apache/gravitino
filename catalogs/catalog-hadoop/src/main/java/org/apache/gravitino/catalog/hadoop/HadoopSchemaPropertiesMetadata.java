@@ -24,6 +24,7 @@ import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class HadoopSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -49,6 +50,7 @@ public class HadoopSchemaPropertiesMetadata extends BasePropertiesMetadata {
                   false /* hidden */))
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
+          .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
           .build();
 
   @Override

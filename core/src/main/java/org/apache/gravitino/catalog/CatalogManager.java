@@ -80,6 +80,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.SupportsCredentialOperations;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -168,6 +169,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           });
     }
 
+    public <R> R doWithCredentialOps(ThrowableFunction<SupportsCredentialOperations, R> fn)
+        throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asCredentialOps() == null) {
+              throw new UnsupportedOperationException(
+                  "Catalog does not support credential operations");
+            }
+            return fn.apply(asCredentialOps());
+          });
+    }
+
     public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
       return classLoader.withClassLoader(
           cl -> {
@@ -235,6 +248,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     private TopicCatalog asTopics() {
       return catalog.ops() instanceof TopicCatalog ? (TopicCatalog) catalog.ops() : null;
+    }
+
+    private SupportsCredentialOperations asCredentialOps() {
+      return catalog.ops() instanceof SupportsCredentialOperations
+          ? (SupportsCredentialOperations) catalog.ops()
+          : null;
     }
   }
 
