@@ -20,8 +20,6 @@
 import org.gradle.api.tasks.Exec
 
 val checkRustEnvironment by tasks.registering(Exec::class) {
-  description = "Check if Rust environment."
-  group = "verification"
   commandLine("bash", "-c", "cargo --version")
   standardOutput = System.out
   errorOutput = System.err
@@ -30,36 +28,30 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
 
 val buildRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Compile the Rust project"
   workingDir = file("$projectDir")
-  commandLine("bash", "-c", "cargo build --release")
+  commandLine("bash", "-c", "make build")
 }
 
 val checkRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Check the Rust project"
   workingDir = file("$projectDir")
 
-  commandLine(
-    "bash",
-    "-c",
-    """
-          set -e
-          echo "Checking the code format"
-          cargo fmt --all -- --check
-
-          echo "Running clippy"
-          cargo clippy --all-targets --all-features --workspace -- -D warnings
-    """.trimIndent()
-  )
+  commandLine("bash", "-c", "make check")
 }
 
 val testRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Run tests in the Rust project"
-  group = "verification"
   workingDir = file("$projectDir")
-  commandLine("bash", "-c", "cargo test --release")
+  commandLine("bash", "-c", "make test")
+
+  standardOutput = System.out
+  errorOutput = System.err
+}
+
+val cleanRustProject by tasks.registering(Exec::class) {
+  dependsOn(checkRustEnvironment)
+  workingDir = file("$projectDir")
+  commandLine("bash", "-c", "make clean")
 
   standardOutput = System.out
   errorOutput = System.err
@@ -84,4 +76,8 @@ tasks.named("check") {
 
 tasks.named("test") {
   dependsOn(testRustProject)
+}
+
+tasks.named("clean") {
+  dependsOn(cleanRustProject)
 }

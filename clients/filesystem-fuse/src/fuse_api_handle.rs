@@ -117,7 +117,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     ) -> fuse3::Result<ReplyAttr> {
         // check the fh is associated with the file_id
         if let Some(fh) = fh {
-            self.fs.valid_file_id(inode, fh).await?;
+            self.fs.valid_file_handle_id(inode, fh).await?;
         }
 
         let file_stat = self.fs.stat(inode).await?;
@@ -136,7 +136,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     ) -> fuse3::Result<ReplyAttr> {
         // check the fh is associated with the file_id
         if let Some(fh) = fh {
-            self.fs.valid_file_id(inode, fh).await?;
+            self.fs.valid_file_handle_id(inode, fh).await?;
         }
 
         let new_file_stat = self
@@ -401,6 +401,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
 const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
     debug_assert!(file_st.file_id != 0 && file_st.parent_file_id != 0);
+    let perm = match file_st.kind {
+        Directory => context.default_dir_perm,
+        _ => context.default_file_perm,
+    };
     FileAttr {
         ino: file_st.file_id,
         size: file_st.size,
@@ -409,7 +413,7 @@ const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> 
         mtime: file_st.mtime,
         ctime: file_st.ctime,
         kind: file_st.kind,
-        perm: file_st.perm,
+        perm: perm,
         nlink: file_st.nlink,
         uid: context.uid,
         gid: context.gid,
@@ -469,7 +473,6 @@ mod test {
             path: "".to_string(),
             size: 10032,
             kind: FileType::RegularFile,
-            perm: 0,
             atime: Timestamp { sec: 10, nsec: 3 },
             mtime: Timestamp { sec: 12, nsec: 5 },
             ctime: Timestamp { sec: 15, nsec: 7 },
@@ -493,7 +496,7 @@ mod test {
         assert_eq!(file_attr.mtime, Timestamp { sec: 12, nsec: 5 });
         assert_eq!(file_attr.ctime, Timestamp { sec: 15, nsec: 7 });
         assert_eq!(file_attr.kind, FileType::RegularFile);
-        assert_eq!(file_attr.perm, 0);
+        assert_eq!(file_attr.perm, context.default_file_perm);
         assert_eq!(file_attr.nlink, 0);
         assert_eq!(file_attr.uid, 1);
         assert_eq!(file_attr.gid, 2);
