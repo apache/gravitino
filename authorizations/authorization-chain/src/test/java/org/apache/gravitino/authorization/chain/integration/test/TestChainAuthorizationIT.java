@@ -105,7 +105,7 @@ public class TestChainAuthorizationIT extends RangerBaseE2EIT {
                       "org.apache.kyuubi.plugin.spark.authz.ranger.RangerSparkExtension")
                   .enableHiveSupport()
                   .getOrCreate();
-          sparkSession.sql(SQL_SHOW_DATABASES); // must be called to activate the session
+          sparkSession.sql(SQL_SHOW_DATABASES); // must be called to activate the Spark session
         });
     createMetalake();
     createCatalog();
@@ -124,8 +124,14 @@ public class TestChainAuthorizationIT extends RangerBaseE2EIT {
     useCatalog();
 
     // First, fail to create the schema
-    Assertions.assertThrows(
-        org.apache.spark.sql.AnalysisException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    org.apache.kyuubi.plugin.spark.authz.AccessControlException accessControlException =
+        Assertions.assertThrows(
+            org.apache.kyuubi.plugin.spark.authz.AccessControlException.class,
+            () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertTrue(
+        accessControlException
+            .getMessage()
+            .contains("Permission denied: user [anonymous] does not have [create] privilege"));
 
     // Second, grant the `CREATE_SCHEMA` role
     String roleName = currentFunName();

@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 public class TestChainAuthorizationProperties {
   static final String METASTORE_URIS = "metastore.uris";
   public static final String IMPERSONATION_ENABLE = "impersonation-enable";
+
   @Test
   void testChainOnePlugin() {
     Map<String, String> properties = Maps.newHashMap();

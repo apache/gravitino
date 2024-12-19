@@ -237,7 +237,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             generateAuthorizationSecurableObject(
                                 rangerHDFSMetadataObject.names(),
                                 RangerHDFSMetadataObject.Type.PATH,
-                                    rangerPrivileges));
+                                rangerPrivileges));
                       }
                       break;
                     case SELECT_TABLE:
@@ -250,7 +250,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             generateAuthorizationSecurableObject(
                                 rangerHDFSMetadataObject.names(),
                                 RangerHDFSMetadataObject.Type.PATH,
-                                    rangerPrivileges));
+                                rangerPrivileges));
                       }
                       break;
                     case CREATE_FILESET:
@@ -282,7 +282,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             generateAuthorizationSecurableObject(
                                 rangerHDFSMetadataObject.names(),
                                 RangerHDFSMetadataObject.Type.PATH,
-                                    rangerPrivileges));
+                                rangerPrivileges));
                       }
                       break;
                     case CREATE_SCHEMA:
@@ -328,7 +328,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               generateAuthorizationSecurableObject(
                                   translateMetadataObject(securableObject).names(),
                                   RangerHDFSMetadataObject.Type.PATH,
-                                      rangerPrivileges));
+                                  rangerPrivileges));
                           break;
                         default:
                           throw new AuthorizationPluginException(
@@ -347,7 +347,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               generateAuthorizationSecurableObject(
                                   translateMetadataObject(securableObject).names(),
                                   RangerHDFSMetadataObject.Type.PATH,
-                                      rangerPrivileges));
+                                  rangerPrivileges));
                           break;
                         default:
                           throw new AuthorizationPluginException(
