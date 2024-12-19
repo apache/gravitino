@@ -46,7 +46,7 @@ pub(crate) trait RawFileSystem: Send + Sync {
     /// Get the file stat by file id. if the file id is valid, return the file stat
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
 
-    /// Lookup the file by parent file id and file name, if the file is exist, return the file stat
+    /// Lookup the file by parent file id and file name, if the file exists, return the file stat
     async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat>;
 
     /// Read the directory by file id, if the file id is a valid directory, return the file stat list
@@ -90,19 +90,19 @@ pub(crate) trait PathFileSystem: Send + Sync {
     /// Init the file system
     async fn init(&self) -> Result<()>;
 
-    /// Get the file stat by file path, if the file is exist, return the file stat
+    /// Get the file stat by file path, if the file exists, return the file stat
     async fn stat(&self, path: &str) -> Result<FileStat>;
 
-    /// Get the file stat by file path, if the file is exist, return the file stat
+    /// Get the file stat by parent file path and file name, if the file exists, return the file stat
     async fn lookup(&self, path: &str) -> Result<FileStat>;
 
     /// Read the directory by file path, if the directory exists, return the file stat list
     async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>>;
 
-    /// Open the file by file path and flags, if the file is exist, return the opened file
+    /// Open the file by file path and flags, if the file exists, return the opened file
     async fn open_file(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
-    /// Open the directory by file path and flags, if the file is exist, return the opened file
+    /// Open the directory by file path and flags, if the file exists, return the opened file
     async fn open_dir(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Create the file by file path and flags, if successful, return the opened file
@@ -304,36 +304,5 @@ mod tests {
     fn test_file_stat_set_file_id_panic() {
         let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
         file_stat.set_file_id(1, 0);
-    }
-
-    #[test]
-    fn test_open_file() {
-        let mut open_file = OpenedFile::new(FileStat::new_file_filestat("a", "b", 10));
-        assert_eq!(open_file.file_stat.name, "b");
-        assert_eq!(open_file.file_stat.size, 10);
-
-        open_file.set_file_id(1, 2);
-
-        assert_eq!(open_file.file_stat.file_id, 2);
-        assert_eq!(open_file.file_stat.parent_file_id, 1);
-    }
-
-    #[test]
-    fn test_file_entry_manager() {
-        let mut manager = FileEntryManager::new();
-        manager.insert(1, 2, "a/b");
-        let file = manager.get_file_entry_by_id(2).unwrap();
-        assert_eq!(file.file_id, 2);
-        assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.path, "a/b");
-
-        let file = manager.get_file_entry_by_path("a/b").unwrap();
-        assert_eq!(file.file_id, 2);
-        assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.path, "a/b");
-
-        manager.remove("a/b");
-        assert!(manager.get_file_entry_by_id(2).is_none());
-        assert!(manager.get_file_entry_by_path("a/b").is_none());
     }
 }

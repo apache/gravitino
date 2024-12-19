@@ -34,7 +34,7 @@ use std::ffi::{OsStr, OsString};
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
 
-pub struct FuseApiHandle<T: RawFileSystem> {
+pub(crate) struct FuseApiHandle<T: RawFileSystem> {
     fs: T,
     default_ttl: Duration,
     fs_context: FileSystemContext,

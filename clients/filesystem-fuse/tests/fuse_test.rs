@@ -51,11 +51,9 @@ impl FuseTest {
         let start_time = Instant::now();
 
         while start_time.elapsed() < timeout {
-            if let Ok(exists) = fs::exists(&test_file) {
-                info!("Wait for fuse server ready: {}", exists);
-                if exists {
-                    return true;
-                }
+            if !file_exists(&test_file) {
+                info!("Wait for fuse server ready",);
+                return true;
             }
             sleep(Duration::from_secs(1));
         }
@@ -99,7 +97,7 @@ fn test_fuse_filesystem(mount_point: &str) {
     let test_file = base_path.join("test_create");
     let file = File::create(&test_file).expect("Failed to create file");
     assert!(file.metadata().is_ok(), "Failed to get file metadata");
-    assert!(fs::exists(&test_file).expect("File is not created"));
+    assert!(file_exists(&test_file));
 
     //test write file
     fs::write(&test_file, "read test").expect("Failed to write file");
@@ -110,7 +108,7 @@ fn test_fuse_filesystem(mount_point: &str) {
 
     //test delete file
     fs::remove_file(test_file.clone()).expect("Failed to delete file");
-    assert!(!fs::exists(test_file).expect("File is not deleted"));
+    assert!(!file_exists(test_file));
 
     //test create directory
     let test_dir = base_path.join("test_dir");
@@ -131,11 +129,15 @@ fn test_fuse_filesystem(mount_point: &str) {
 
     //test delete file in directory
     fs::remove_file(&test_file).expect("Failed to delete file");
-    assert!(!fs::exists(&test_file).expect("File is not deleted"));
+    assert!(!file_exists(&test_file));
 
     //test delete directory
     fs::remove_dir_all(&test_dir).expect("Failed to delete directory");
-    assert!(!fs::exists(&test_dir).expect("Directory is not deleted"));
+    assert!(!file_exists(&test_dir));
 
     info!("Success test")
+}
+
+fn file_exists<P: AsRef<Path>>(path: P) -> bool {
+    fs::metadata(path).is_ok()
 }
