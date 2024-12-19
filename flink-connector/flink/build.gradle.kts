@@ -26,6 +26,7 @@ repositories {
   mavenCentral()
 }
 
+var paimonVersion: String = libs.versions.paimon.get()
 val flinkVersion: String = libs.versions.flink.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
@@ -37,15 +38,22 @@ val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
+}
+
 dependencies {
+  implementation(project(":core"))
   implementation(project(":catalogs:catalog-common"))
+
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
-
+  compileOnly(project(":catalogs:catalog-lakehouse-paimon"))
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
+  compileOnly("org.apache.paimon:paimon-flink-1.18:$paimonVersion")
 
   compileOnly(libs.hive2.exec) {
     artifact {
@@ -75,6 +83,7 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":core"))
   testImplementation(project(":common"))
+  testImplementation(project(":catalogs:catalog-lakehouse-paimon"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
@@ -90,6 +99,7 @@ dependencies {
   testImplementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-common:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-api-java:$flinkVersion")
+  testImplementation("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
 
   testImplementation(libs.hive2.exec) {
     artifact {
@@ -170,6 +180,7 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
+    dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
   }
 }
 
