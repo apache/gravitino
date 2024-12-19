@@ -95,7 +95,7 @@ public class RangerFilesetIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(false);
+    RangerITEnv.init(metalakeName, false);
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =

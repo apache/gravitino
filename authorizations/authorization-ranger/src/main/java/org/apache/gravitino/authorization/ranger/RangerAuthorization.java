@@ -33,7 +33,7 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(
+  public AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> properties) {
     Preconditions.checkArgument(
         properties.containsKey(RANGER_SERVICE_TYPE),
@@ -41,9 +41,9 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
     String serviceType = properties.get(RANGER_SERVICE_TYPE).toUpperCase();
     switch (serviceType) {
       case "HADOOPSQL":
-        return RangerAuthorizationHadoopSQLPlugin.getInstance(metalake, properties);
+        return new RangerAuthorizationHadoopSQLPlugin(metalake, properties);
       case "HDFS":
-        return RangerAuthorizationHDFSPlugin.getInstance(metalake, properties);
+        return new RangerAuthorizationHDFSPlugin(metalake, properties);
       default:
         throw new IllegalArgumentException("Unsupported service type: " + serviceType);
     }
