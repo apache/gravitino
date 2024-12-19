@@ -237,10 +237,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             generateAuthorizationSecurableObject(
                                 rangerHDFSMetadataObject.names(),
                                 RangerHDFSMetadataObject.Type.PATH,
-                                ImmutableSet.of(
-                                    RangerPrivileges.RangerHdfsPrivilege.READ,
-                                    RangerPrivileges.RangerHdfsPrivilege.WRITE,
-                                    RangerPrivileges.RangerHdfsPrivilege.EXECUTE)));
+                                    rangerPrivileges));
                       }
                       break;
                     case SELECT_TABLE:
@@ -253,13 +250,12 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             generateAuthorizationSecurableObject(
                                 rangerHDFSMetadataObject.names(),
                                 RangerHDFSMetadataObject.Type.PATH,
-                                ImmutableSet.of(
-                                    RangerPrivileges.RangerHdfsPrivilege.READ,
-                                    RangerPrivileges.RangerHdfsPrivilege.EXECUTE)));
+                                    rangerPrivileges));
                       }
                       break;
                     case CREATE_FILESET:
                     case WRITE_FILESET:
+                    case READ_FILESET:
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -286,9 +282,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             generateAuthorizationSecurableObject(
                                 rangerHDFSMetadataObject.names(),
                                 RangerHDFSMetadataObject.Type.PATH,
-                                ImmutableSet.of(
-                                    RangerPrivileges.RangerHdfsPrivilege.READ,
-                                    RangerPrivileges.RangerHdfsPrivilege.EXECUTE)));
+                                    rangerPrivileges));
                       }
                       break;
                     case CREATE_SCHEMA:
@@ -298,6 +292,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     case SELECT_TABLE:
                     case CREATE_FILESET:
                     case WRITE_FILESET:
+                    case READ_FILESET:
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -333,9 +328,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               generateAuthorizationSecurableObject(
                                   translateMetadataObject(securableObject).names(),
                                   RangerHDFSMetadataObject.Type.PATH,
-                                  ImmutableSet.of(
-                                      RangerPrivileges.RangerHdfsPrivilege.READ,
-                                      RangerPrivileges.RangerHdfsPrivilege.EXECUTE)));
+                                      rangerPrivileges));
                           break;
                         default:
                           throw new AuthorizationPluginException(
@@ -354,9 +347,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               generateAuthorizationSecurableObject(
                                   translateMetadataObject(securableObject).names(),
                                   RangerHDFSMetadataObject.Type.PATH,
-                                  ImmutableSet.of(
-                                      RangerPrivileges.RangerHdfsPrivilege.WRITE,
-                                      RangerPrivileges.RangerHdfsPrivilege.EXECUTE)));
+                                      rangerPrivileges));
                           break;
                         default:
                           throw new AuthorizationPluginException(
@@ -386,21 +377,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     switch (gravitinoMetadataObject.type()) {
       case METALAKE:
       case CATALOG:
-        // Add `/` recursive for the SCHEMA permission
-        rangerSecurableObjects.add(
-            generateAuthorizationSecurableObject(
-                ImmutableList.of(RangerHelper.RESOURCE_ROOT_PATH),
-                RangerHDFSMetadataObject.Type.PATH,
-                ownerMappingRule()));
-        //        // Add `/*` for the TABLE permission
-        //        rangerSecurableObjects.add(
-        //                generateAuthorizationSecurableObject(
-        //                        ImmutableList.of(RangerHelper.RESOURCE_ROOT_PATH),
-        //                        RangerHDFSMetadataObject.Type.PATH,
-        //                        ownerMappingRule()));
-        break;
       case SCHEMA:
-        return rangerSecurableObjects;
+        break;
       case FILESET:
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(

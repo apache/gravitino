@@ -213,12 +213,13 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
 
     // Second, grant the `CREATE_SCHEMA` role
+    String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName, Lists.newArrayList(Privileges.CreateSchema.allow()));
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(roleName), AuthConstants.ANONYMOUS_USER);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
     waitForUpdatingPolicies();
 
     // Third, succeed to create the schema

@@ -19,18 +19,16 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 
 import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.authorization.chain.ChainAuthorizationProperties;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
-import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestChainAuthorizationProperties {
+  static final String METASTORE_URIS = "metastore.uris";
+  public static final String IMPERSONATION_ENABLE = "impersonation-enable";
   @Test
   void testChainOnePlugin() {
     Map<String, String> properties = Maps.newHashMap();
@@ -48,7 +46,7 @@ public class TestChainAuthorizationProperties {
   @Test
   void testChainTwoPlugins() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.METASTORE_URIS, "thrift://localhost:9083");
+    properties.put(METASTORE_URIS, "thrift://localhost:9083");
     properties.put("gravitino.bypass.hive.metastore.client.capability.check", "true");
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
@@ -196,7 +194,7 @@ public class TestChainAuthorizationProperties {
   @Test
   void testFetchRangerPrpoerties() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.METASTORE_URIS, "thrift://localhost:9083");
+    properties.put(METASTORE_URIS, "thrift://localhost:9083");
     properties.put("gravitino.bypass.hive.metastore.client.capability.check", "true");
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
