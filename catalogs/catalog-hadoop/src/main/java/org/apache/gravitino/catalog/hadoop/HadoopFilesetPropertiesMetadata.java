@@ -24,6 +24,7 @@ import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -32,6 +33,7 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
     ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
     builder.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     builder.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
+    builder.putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
     return builder.build();
   }
 }
