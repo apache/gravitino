@@ -475,15 +475,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String user = line.getOptionValue(GravitinoOptions.USER);
 
     Command.setAuthenticationMode(auth, userName);
-    if (CommandActions.LIST.equals(command)) {
-      newListUsers(url, ignore, metalake).handle();
-      return;
-    }
-
-    if (Objects.isNull(user)) {
-      System.err.println("User is undefined. Please use --user to specify a user.");
-      return;
-    }
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -492,6 +483,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
         } else {
           newUserDetails(url, ignore, metalake, user).handle();
         }
+        break;
+
+      case CommandActions.LIST:
+        newListUsers(url, ignore, metalake).handle();
         break;
 
       case CommandActions.CREATE:
