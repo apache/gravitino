@@ -18,14 +18,12 @@
  */
 package org.apache.gravitino.connector.authorization.ranger;
 
-import java.util.Map;
-
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestRangerAuthorization
-    extends BaseAuthorization<TestRangerAuthorization> {
+public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthorization> {
 
   public TestRangerAuthorization() {}
 
@@ -35,11 +33,11 @@ public class TestRangerAuthorization
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(
-          String metalake, String catalogProvider, Map<String, String> properties) {
+  public AuthorizationPlugin newPlugin(
+      String metalake, String catalogProvider, Map<String, String> properties) {
     Preconditions.checkArgument(
-            properties.containsKey("authorization.ranger.service.type"),
-            String.format("%s is required", "authorization.ranger.service.type"));
+        properties.containsKey("authorization.ranger.service.type"),
+        String.format("%s is required", "authorization.ranger.service.type"));
     String serviceType = properties.get("authorization.ranger.service.type").toUpperCase();
     switch (serviceType) {
       case "HADOOPSQL":

@@ -171,12 +171,16 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   public abstract void createCatalog();
 
-  protected static void waitForUpdatingPolicies() throws InterruptedException {
+  protected static void waitForUpdatingPolicies() {
     // After Ranger authorization, Must wait a period of time for the Ranger Spark plugin to update
     // the policy Sleep time must be greater than the policy update interval
     // (ranger.plugin.spark.policy.pollIntervalMs) in the
     // `resources/ranger-spark-security.xml.template`
-    Thread.sleep(1000L);
+    try {
+      Thread.sleep(1000L);
+    } catch (InterruptedException e) {
+      LOG.error("Failed to sleep", e);
+    }
   }
 
   protected abstract void checkTableAllPrivilegesExceptForCreating();
@@ -200,7 +204,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   protected abstract void testAlterTable();
 
   @Test
-  void testCreateSchema() throws InterruptedException {
+  protected void testCreateSchema() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -209,13 +213,12 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
 
     // Second, grant the `CREATE_SCHEMA` role
-    String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName, Lists.newArrayList(Privileges.CreateSchema.allow()));
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), AuthConstants.ANONYMOUS_USER);
     waitForUpdatingPolicies();
 
     // Third, succeed to create the schema

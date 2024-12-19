@@ -30,12 +30,12 @@ public class ChainAuthorization extends BaseAuthorization<ChainAuthorization> {
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(
+  public AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
     switch (catalogProvider) {
       case "hive":
       case "test": // For testing purposes
-        return ChainAuthorizationPlugin.getInstance(metalake, catalogProvider, config);
+        return new ChainAuthorizationPlugin(metalake, catalogProvider, config);
       default:
         throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
     }

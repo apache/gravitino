@@ -22,21 +22,21 @@ import java.util.Map;
 
 /** Chain authorization operations plugin class. <br> */
 public class ChainAuthorizationPlugin extends ChainAuthorizationBase {
-  private static volatile ChainAuthorizationPlugin instance = null;
+  //  private static volatile ChainAuthorizationPlugin instance = null;
+  //
+  //  public static synchronized ChainAuthorizationPlugin getInstance(
+  //      String metalake, String catalogProvider, Map<String, String> config) {
+  //    if (instance == null) {
+  //      synchronized (ChainAuthorizationPlugin.class) {
+  //        if (instance == null) {
+  //          instance = new ChainAuthorizationPlugin(metalake, catalogProvider, config);
+  //        }
+  //      }
+  //    }
+  //    return instance;
+  //  }
 
-  public static synchronized ChainAuthorizationPlugin getInstance(
-      String metalake, String catalogProvider, Map<String, String> config) {
-    if (instance == null) {
-      synchronized (ChainAuthorizationPlugin.class) {
-        if (instance == null) {
-          instance = new ChainAuthorizationPlugin(metalake, catalogProvider, config);
-        }
-      }
-    }
-    return instance;
-  }
-
-  private ChainAuthorizationPlugin(
+  public ChainAuthorizationPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
     super(metalake, catalogProvider, config);
   }

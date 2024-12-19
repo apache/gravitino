@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  */
 public abstract class BaseAuthorization<T extends BaseAuthorization>
     implements AuthorizationProvider, Closeable {
-  private volatile AuthorizationPlugin plugin = null;
+  //  private volatile AuthorizationPlugin plugin = null;
 
   /**
    * Creates a new instance of AuthorizationPlugin. <br>
@@ -47,21 +47,21 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
    *
    * @return A new instance of AuthorizationHook.
    */
-  protected abstract AuthorizationPlugin newPlugin(
+  public abstract AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config);
 
-  public AuthorizationPlugin plugin(
-      String metalake, String catalogProvider, Map<String, String> config) {
-    if (plugin == null) {
-      synchronized (this) {
-        if (plugin == null) {
-          plugin = newPlugin(metalake, catalogProvider, config);
-        }
-      }
-    }
-
-    return plugin;
-  }
+  //  public AuthorizationPlugin plugin(
+  //      String metalake, String catalogProvider, Map<String, String> config) {
+  //    if (plugin == null) {
+  //      synchronized (this) {
+  //        if (plugin == null) {
+  //          plugin = newPlugin(metalake, catalogProvider, config);
+  //        }
+  //      }
+  //    }
+  //
+  //    return plugin;
+  //  }
 
   public static BaseAuthorization<?> createAuthorization(
       ClassLoader classLoader, String authorizationProvider) {
@@ -90,8 +90,8 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
 
   @Override
   public void close() throws IOException {
-    if (plugin != null) {
-      plugin.close();
-    }
+    //    if (plugin != null) {
+    //      plugin.close();
+    //    }
   }
 }

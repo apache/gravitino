@@ -27,10 +27,10 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
@@ -48,22 +48,33 @@ public abstract class ChainAuthorizationBase implements AuthorizationPlugin {
   private void initPlugins(String catalogProvider, Map<String, String> properties) {
     ChainAuthorizationProperties.validate(properties);
 
-    ChainAuthorizationProperties.plugins(properties).forEach(pluginName -> {
-      Map<String, String> pluginProperties = ChainAuthorizationProperties.fetchAuthPluginProperties(pluginName, properties);
-      String authProvider = ChainAuthorizationProperties.getPluginProvider(pluginName, properties);
-      if ("ranger".equals(authProvider)) {
-        RangerAuthorizationProperties.validate(pluginProperties);
-      } else {
-        throw new IllegalArgumentException("Unsupported provider: " + authProvider);
-      }
-    });
+    ChainAuthorizationProperties.plugins(properties)
+        .forEach(
+            pluginName -> {
+              Map<String, String> pluginProperties =
+                  ChainAuthorizationProperties.fetchAuthPluginProperties(pluginName, properties);
+              String authProvider =
+                  ChainAuthorizationProperties.getPluginProvider(pluginName, properties);
+              if ("ranger".equals(authProvider)) {
+                RangerAuthorizationProperties.validate(pluginProperties);
+              } else {
+                throw new IllegalArgumentException("Unsupported provider: " + authProvider);
+              }
+            });
 
-    ChainAuthorizationProperties.plugins(properties).forEach(pluginName -> {
-      String authProvider = ChainAuthorizationProperties.getPluginProvider(pluginName, properties);
-      Map<String, String> pluginConfig = ChainAuthorizationProperties.fetchAuthPluginProperties(pluginName, properties);
-      AuthorizationPlugin authorizationPlugin = BaseAuthorization.createAuthorization(this.getClass().getClassLoader(), authProvider).plugin(metalake, catalogProvider, pluginConfig);
-      plugins.add(authorizationPlugin);
-    });
+    ChainAuthorizationProperties.plugins(properties)
+        .forEach(
+            pluginName -> {
+              String authProvider =
+                  ChainAuthorizationProperties.getPluginProvider(pluginName, properties);
+              Map<String, String> pluginConfig =
+                  ChainAuthorizationProperties.fetchAuthPluginProperties(pluginName, properties);
+              AuthorizationPlugin authorizationPlugin =
+                  BaseAuthorization.createAuthorization(
+                          this.getClass().getClassLoader(), authProvider)
+                      .newPlugin(metalake, catalogProvider, pluginConfig);
+              plugins.add(authorizationPlugin);
+            });
   }
 
   @VisibleForTesting

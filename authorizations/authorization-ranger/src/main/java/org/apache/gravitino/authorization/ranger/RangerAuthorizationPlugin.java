@@ -395,8 +395,7 @@ public abstract class RangerAuthorizationPlugin
       onGroupAdded(groupEntity);
     }
 
-    List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
-        translateOwner(metadataObject);
+    List<AuthorizationSecurableObject> rangerSecurableObjects = translateOwner(metadataObject);
     String ownerRoleName;
     switch (metadataObject.type()) {
       case METALAKE:
@@ -427,14 +426,13 @@ public abstract class RangerAuthorizationPlugin
           LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
         }
 
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
-                AuthorizationSecurableObject -> {
-                  RangerPolicy policy =
-                      rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
+                rangerSecurableObject -> {
+                  RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
                   try {
                     if (policy == null) {
-                      policy = addOwnerRoleToNewPolicy(AuthorizationSecurableObject, ownerRoleName);
+                      policy = addOwnerRoleToNewPolicy(rangerSecurableObject, ownerRoleName);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
@@ -450,7 +448,7 @@ public abstract class RangerAuthorizationPlugin
       case TABLE:
       case FILESET:
         // The schema and table use user/group to manage the owner
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
                 AuthorizationSecurableObject -> {
                   RangerPolicy policy =

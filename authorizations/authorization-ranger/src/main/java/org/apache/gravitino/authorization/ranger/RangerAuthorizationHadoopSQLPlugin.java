@@ -48,23 +48,23 @@ import org.slf4j.LoggerFactory;
 public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG =
       LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
-  private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
+  //  private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
 
-  private RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
+  public RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
   }
 
-  public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
-      String metalake, Map<String, String> config) {
-    if (instance == null) {
-      synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
-        if (instance == null) {
-          instance = new RangerAuthorizationHadoopSQLPlugin(metalake, config);
-        }
-      }
-    }
-    return instance;
-  }
+  //  public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
+  //      String metalake, Map<String, String> config) {
+  //    if (instance == null) {
+  //      synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
+  //        if (instance == null) {
+  //          instance = new RangerAuthorizationHadoopSQLPlugin(metalake, config);
+  //        }
+  //      }
+  //    }
+  //    return instance;
+  //  }
 
   @Override
   /** Set the default mapping Gravitino privilege name to the Ranger rule */
@@ -167,25 +167,25 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   /** Translate the Gravitino securable object to the Ranger owner securable object. */
   @Override
   public List<AuthorizationSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
-    List<AuthorizationSecurableObject> AuthorizationSecurableObjects = new ArrayList<>();
+    List<AuthorizationSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
     switch (gravitinoMetadataObject.type()) {
       case METALAKE:
       case CATALOG:
         // Add `*` for the SCHEMA permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(RangerHelper.RESOURCE_ALL),
                 RangerHadoopSQLMetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `*.*` for the TABLE permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
                 RangerHadoopSQLMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `*.*.*` for the COLUMN permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(
                     RangerHelper.RESOURCE_ALL,
@@ -196,20 +196,20 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         break;
       case SCHEMA:
         // Add `{schema}` for the SCHEMA permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(gravitinoMetadataObject.name() /*Schema name*/),
                 RangerHadoopSQLMetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `{schema}.*` for the TABLE permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(
                     gravitinoMetadataObject.name() /*Schema name*/, RangerHelper.RESOURCE_ALL),
                 RangerHadoopSQLMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.*.*` for the COLUMN permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(
                     gravitinoMetadataObject.name() /*Schema name*/,
@@ -220,13 +220,13 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         break;
       case TABLE:
         // Add `{schema}.{table}` for the TABLE permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 translateMetadataObject(gravitinoMetadataObject).names(),
                 RangerHadoopSQLMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.{table}.*` for the COLUMN permission
-        AuthorizationSecurableObjects.add(
+        rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 Stream.concat(
                         translateMetadataObject(gravitinoMetadataObject).names().stream(),
@@ -241,13 +241,13 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
             gravitinoMetadataObject.type());
     }
 
-    return AuthorizationSecurableObjects;
+    return rangerSecurableObjects;
   }
 
   /** Translate the Gravitino securable object to the Ranger securable object. */
   @Override
   public List<AuthorizationSecurableObject> translatePrivilege(SecurableObject securableObject) {
-    List<AuthorizationSecurableObject> AuthorizationSecurableObjects = new ArrayList<>();
+    List<AuthorizationSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
     securableObject.privileges().stream()
         .filter(Objects::nonNull)
@@ -275,7 +275,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     case METALAKE:
                     case CATALOG:
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
                               RangerHadoopSQLMetadataObject.Type.SCHEMA,
@@ -292,7 +292,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     case METALAKE:
                     case CATALOG:
                       // Add Ranger privilege(`CREATE`) to SCHEMA(`*`)
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
                               RangerHadoopSQLMetadataObject.Type.SCHEMA,
@@ -309,7 +309,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     case METALAKE:
                     case CATALOG:
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
                               RangerHadoopSQLMetadataObject.Type.SCHEMA,
@@ -317,7 +317,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     case SCHEMA:
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`{schema}`)
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(securableObject.name() /*Schema name*/),
                               RangerHadoopSQLMetadataObject.Type.SCHEMA,
@@ -336,14 +336,14 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     case METALAKE:
                     case CATALOG:
                       // Add `*.*` for the TABLE permission
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(
                                   RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
                               RangerHadoopSQLMetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `*.*.*` for the COLUMN permission
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(
                                   RangerHelper.RESOURCE_ALL,
@@ -354,7 +354,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     case SCHEMA:
                       // Add `{schema}.*` for the TABLE permission
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
@@ -362,7 +362,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                               RangerHadoopSQLMetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `{schema}.*.*` for the COLUMN permission
-                      AuthorizationSecurableObjects.add(
+                      rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
@@ -378,13 +378,13 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                             gravitinoPrivilege.name(), securableObject.type());
                       } else {
                         // Add `{schema}.{table}` for the TABLE permission
-                        AuthorizationSecurableObjects.add(
+                        rangerSecurableObjects.add(
                             generateAuthorizationSecurableObject(
                                 translateMetadataObject(securableObject).names(),
                                 RangerHadoopSQLMetadataObject.Type.TABLE,
                                 rangerPrivileges));
                         // Add `{schema}.{table}.*` for the COLUMN permission
-                        AuthorizationSecurableObjects.add(
+                        rangerSecurableObjects.add(
                             generateAuthorizationSecurableObject(
                                 Stream.concat(
                                         translateMetadataObject(securableObject).names().stream(),
@@ -409,7 +409,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
               }
             });
 
-    return AuthorizationSecurableObjects;
+    return rangerSecurableObjects;
   }
 
   /**

@@ -20,8 +20,6 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-
-import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

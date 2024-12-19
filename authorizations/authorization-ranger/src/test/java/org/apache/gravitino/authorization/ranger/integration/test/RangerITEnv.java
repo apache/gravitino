@@ -31,11 +31,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
@@ -90,13 +90,13 @@ public class RangerITEnv {
 
   protected static RangerHelper rangerHDFSHelper;
 
-  public static void init(boolean allowAnyoneAccessHDFS) {
+  public static void init(String metalakeName, boolean allowAnyoneAccessHDFS) {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
 
     rangerAuthHivePlugin =
-        RangerAuthorizationHadoopSQLPlugin.getInstance(
-            "metalake",
+        new RangerAuthorizationHadoopSQLPlugin(
+            metalakeName,
             ImmutableMap.of(
                 RangerAuthorizationProperties.RANGER_ADMIN_URL,
                 String.format(
@@ -116,8 +116,8 @@ public class RangerITEnv {
 
     RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
         Mockito.spy(
-            RangerAuthorizationHDFSPlugin.getInstance(
-                "metalake",
+            new RangerAuthorizationHDFSPlugin(
+                metalakeName,
                 ImmutableMap.of(
                     RangerAuthorizationProperties.RANGER_ADMIN_URL,
                     String.format(
@@ -134,7 +134,7 @@ public class RangerITEnv {
                     "HDFS",
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
-    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFilesetPath(Mockito.any());
+    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getLocationPath(Mockito.any());
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =

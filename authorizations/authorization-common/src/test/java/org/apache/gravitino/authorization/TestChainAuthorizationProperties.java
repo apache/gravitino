@@ -18,18 +18,17 @@
  */
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
+import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
+
 import com.google.common.collect.Maps;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.authorization.chain.ChainAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 
 public class TestChainAuthorizationProperties {
   @Test
@@ -82,7 +81,7 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hive1.ranger.password", "admin");
     properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
-//    Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
+    //    Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
   }
 
   @Test

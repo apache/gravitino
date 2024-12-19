@@ -18,12 +18,11 @@
  */
 package org.apache.gravitino.authorization.chain;
 
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.google.common.collect.Lists;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
@@ -45,7 +44,8 @@ import org.junit.jupiter.api.Test;
 public class TestChainAuthorization {
   private static TestCatalog hiveCatalog;
   static AuditInfo auditInfo =
-          AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+      AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+
   @BeforeAll
   public static void setUp() {
     CatalogEntity hiveCatalogEntity =
@@ -60,10 +60,8 @@ public class TestChainAuthorization {
 
     Map<String, String> catalogConf = new HashMap<>();
     catalogConf.put(Catalog.AUTHORIZATION_PROVIDER, "chain");
-    catalogConf.put(
-        ChainAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
-    catalogConf.put(
-        "authorization.chain.hive1.provider", "test-ranger");
+    catalogConf.put(ChainAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
+    catalogConf.put("authorization.chain.hive1.provider", "test-ranger");
     catalogConf.put("authorization.chain.hive1.ranger.auth.type", "simple");
     catalogConf.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
     catalogConf.put("authorization.chain.hive1.ranger.username", "admin");
@@ -88,30 +86,30 @@ public class TestChainAuthorization {
 
   public RoleEntity mock3TableRole(String roleName) {
     SecurableObject securableObject1 =
-            SecurableObjects.parse(
-                    String.format("catalog.%s", roleName), // use unique db name to avoid conflict
-                    MetadataObject.Type.SCHEMA,
-                    Lists.newArrayList(Privileges.CreateTable.allow()));
+        SecurableObjects.parse(
+            String.format("catalog.%s", roleName), // use unique db name to avoid conflict
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.CreateTable.allow()));
 
     SecurableObject securableObject2 =
-            SecurableObjects.parse(
-                    String.format("catalog.%s.tab2", roleName),
-                    SecurableObject.Type.TABLE,
-                    Lists.newArrayList(Privileges.SelectTable.allow()));
+        SecurableObjects.parse(
+            String.format("catalog.%s.tab2", roleName),
+            SecurableObject.Type.TABLE,
+            Lists.newArrayList(Privileges.SelectTable.allow()));
 
     SecurableObject securableObject3 =
-            SecurableObjects.parse(
-                    String.format("catalog.%s.tab3", roleName),
-                    SecurableObject.Type.TABLE,
-                    Lists.newArrayList(Privileges.ModifyTable.allow()));
+        SecurableObjects.parse(
+            String.format("catalog.%s.tab3", roleName),
+            SecurableObject.Type.TABLE,
+            Lists.newArrayList(Privileges.ModifyTable.allow()));
 
     return RoleEntity.builder()
-            .withId(1L)
-            .withName(roleName)
-            .withAuditInfo(auditInfo)
-            .withSecurableObjects(
-                    Lists.newArrayList(securableObject1, securableObject2, securableObject3))
-            .build();
+        .withId(1L)
+        .withName(roleName)
+        .withAuditInfo(auditInfo)
+        .withSecurableObjects(
+            Lists.newArrayList(securableObject1, securableObject2, securableObject3))
+        .build();
   }
 
   @Test

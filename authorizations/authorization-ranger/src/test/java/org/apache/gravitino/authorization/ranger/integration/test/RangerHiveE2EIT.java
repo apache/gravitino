@@ -64,7 +64,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(true);
+    RangerITEnv.init(RangerBaseE2EIT.metalakeName, true);
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =

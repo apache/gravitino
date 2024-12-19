@@ -42,7 +42,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init(true);
+    RangerITEnv.init(RangerITEnv.currentFunName(), true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHDFSPlugin;
   }
 

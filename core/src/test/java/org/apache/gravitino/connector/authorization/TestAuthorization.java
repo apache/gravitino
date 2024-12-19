@@ -56,8 +56,10 @@ public class TestAuthorization {
         new TestCatalog()
             .withCatalogConf(
                 ImmutableMap.of(
-                    Catalog.AUTHORIZATION_PROVIDER, "test-ranger",
-                    "authorization.ranger.service.type", "HadoopSQL"))
+                    Catalog.AUTHORIZATION_PROVIDER,
+                    "test-ranger",
+                    "authorization.ranger.service.type",
+                    "HadoopSQL"))
             .withCatalogEntity(hiveCatalogEntity);
     IsolatedClassLoader isolatedClassLoader =
         new IsolatedClassLoader(
@@ -78,8 +80,10 @@ public class TestAuthorization {
         new TestCatalog()
             .withCatalogConf(
                 ImmutableMap.of(
-                        Catalog.AUTHORIZATION_PROVIDER, "test-ranger",
-                        "authorization.ranger.service.type", "HDFS"))
+                    Catalog.AUTHORIZATION_PROVIDER,
+                    "test-ranger",
+                    "authorization.ranger.service.type",
+                    "HDFS"))
             .withCatalogEntity(filesetEntity);
     filesetCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
   }

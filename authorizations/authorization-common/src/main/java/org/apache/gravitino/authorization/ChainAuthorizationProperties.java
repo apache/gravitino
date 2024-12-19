@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -68,7 +67,7 @@ public class ChainAuthorizationProperties {
   }
 
   public static Map<String, String> fetchAuthPluginProperties(
-          String pluginName, Map<String, String> properties) {
+      String pluginName, Map<String, String> properties) {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY)
             && properties.get(CHAIN_PLUGINS_PROPERTIES_KEY) != null,
