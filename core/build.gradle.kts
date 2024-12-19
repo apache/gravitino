@@ -71,3 +71,16 @@ tasks.test {
     environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
   }
 }
+
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  from(sourceSets["test"].output)
+}
+
+configurations {
+  create("testArtifacts")
+}
+
+artifacts {
+  add("testArtifacts", testJar)
+}

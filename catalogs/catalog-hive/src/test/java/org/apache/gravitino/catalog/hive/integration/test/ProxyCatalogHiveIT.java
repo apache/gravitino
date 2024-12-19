@@ -24,7 +24,6 @@ import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
@@ -422,22 +421,5 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
     anotherCatalogWithNotExistingName =
         anotherClientWithNotExistingName.loadMetalake(METALAKE_NAME).loadCatalog(CATALOG_NAME);
-  }
-
-  public static void setEnv(String key, String value) {
-    try {
-      Map<String, String> env = System.getenv();
-      Class<?> cl = env.getClass();
-      Field field = cl.getDeclaredField("m");
-      field.setAccessible(true);
-      Map<String, String> writableEnv = (Map<String, String>) field.get(env);
-      if (value == null) {
-        writableEnv.remove(key);
-      } else {
-        writableEnv.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to set environment variable", e);
-    }
   }
 }

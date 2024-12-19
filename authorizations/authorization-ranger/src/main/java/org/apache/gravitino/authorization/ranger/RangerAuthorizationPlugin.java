@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -226,7 +227,7 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject securableObject =
             ((RoleChange.AddSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
@@ -243,7 +244,7 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject securableObject =
             ((RoleChange.RemoveSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
@@ -260,12 +261,12 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject oldSecurableObject =
             ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(oldSecurableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
         SecurableObject newSecurableObject =
             ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         Preconditions.checkArgument(
@@ -394,8 +395,7 @@ public abstract class RangerAuthorizationPlugin
       onGroupAdded(groupEntity);
     }
 
-    List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
-        translateOwner(metadataObject);
+    List<AuthorizationSecurableObject> rangerSecurableObjects = translateOwner(metadataObject);
     String ownerRoleName;
     switch (metadataObject.type()) {
       case METALAKE:
@@ -426,14 +426,13 @@ public abstract class RangerAuthorizationPlugin
           LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
         }
 
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
-                AuthorizationSecurableObject -> {
-                  RangerPolicy policy =
-                      rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
+                rangerSecurableObject -> {
+                  RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
                   try {
                     if (policy == null) {
-                      policy = addOwnerRoleToNewPolicy(AuthorizationSecurableObject, ownerRoleName);
+                      policy = addOwnerRoleToNewPolicy(rangerSecurableObject, ownerRoleName);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
@@ -449,7 +448,7 @@ public abstract class RangerAuthorizationPlugin
       case TABLE:
       case FILESET:
         // The schema and table use user/group to manage the owner
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
                 AuthorizationSecurableObject -> {
                   RangerPolicy policy =
@@ -483,7 +482,7 @@ public abstract class RangerAuthorizationPlugin
    * 2. Create a role in the Ranger if the role does not exist. <br>
    * 3. Add this user to the role. <br>
    *
-   * @param roles The roles to grant to the group.
+   * @param roles The roles to grant to the user.
    * @param user The user to grant the roles.
    */
   @Override

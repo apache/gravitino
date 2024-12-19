@@ -31,11 +31,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
@@ -59,12 +59,12 @@ public class RangerITEnv {
   private static final Logger LOG = LoggerFactory.getLogger(RangerITEnv.class);
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
-  protected static final String RANGER_HIVE_REPO_NAME = "hiveDev";
+  public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
-  protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   protected static RangerClient rangerClient;
-  protected static final String HADOOP_USER_NAME = "gravitino";
+  public static final String HADOOP_USER_NAME = "gravitino";
   private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -90,13 +90,13 @@ public class RangerITEnv {
 
   protected static RangerHelper rangerHDFSHelper;
 
-  public static void init(boolean allowAnyoneAccessHDFS) {
+  public static void init(String metalakeName, boolean allowAnyoneAccessHDFS) {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
 
     rangerAuthHivePlugin =
-        RangerAuthorizationHadoopSQLPlugin.getInstance(
-            "metalake",
+        new RangerAuthorizationHadoopSQLPlugin(
+            metalakeName,
             ImmutableMap.of(
                 RangerAuthorizationProperties.RANGER_ADMIN_URL,
                 String.format(
@@ -116,8 +116,8 @@ public class RangerITEnv {
 
     RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
         Mockito.spy(
-            RangerAuthorizationHDFSPlugin.getInstance(
-                "metalake",
+            new RangerAuthorizationHDFSPlugin(
+                metalakeName,
                 ImmutableMap.of(
                     RangerAuthorizationProperties.RANGER_ADMIN_URL,
                     String.format(
@@ -134,7 +134,7 @@ public class RangerITEnv {
                     "HDFS",
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
-    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFileSetPath(Mockito.any());
+    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getLocationPath(Mockito.any());
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =
@@ -175,7 +175,7 @@ public class RangerITEnv {
     }
   }
 
-  static void startHiveRangerContainer() {
+  public static void startHiveRangerContainer() {
     containerSuite.startHiveRangerContainer(
         new HashMap<>(
             ImmutableMap.of(

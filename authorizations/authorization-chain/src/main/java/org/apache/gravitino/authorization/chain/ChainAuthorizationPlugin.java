@@ -16,24 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.authorization.chain;
 
 import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
+/** Chain authorization operations plugin class. <br> */
+public class ChainAuthorizationPlugin extends ChainAuthorizationBase {
+  //  private static volatile ChainAuthorizationPlugin instance = null;
+  //
+  //  public static synchronized ChainAuthorizationPlugin getInstance(
+  //      String metalake, String catalogProvider, Map<String, String> config) {
+  //    if (instance == null) {
+  //      synchronized (ChainAuthorizationPlugin.class) {
+  //        if (instance == null) {
+  //          instance = new ChainAuthorizationPlugin(metalake, catalogProvider, config);
+  //        }
+  //      }
+  //    }
+  //    return instance;
+  //  }
 
-  public TestMySQLAuthorization() {}
-
-  @Override
-  public String shortName() {
-    return "mysql";
-  }
-
-  @Override
-  protected AuthorizationPlugin newPlugin(
+  public ChainAuthorizationPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
+    super(metalake, catalogProvider, config);
   }
 }

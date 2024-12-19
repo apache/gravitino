@@ -38,7 +38,12 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
-
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":authorizations:authorization-common")) {
+    exclude(group = "*")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -70,7 +75,7 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
-  testImplementation(project(":catalogs:catalog-common"))
+
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
@@ -142,4 +147,17 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
   }
+}
+
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  from(sourceSets["test"].output)
+}
+
+configurations {
+  create("testArtifacts")
+}
+
+artifacts {
+  add("testArtifacts", testJar)
 }

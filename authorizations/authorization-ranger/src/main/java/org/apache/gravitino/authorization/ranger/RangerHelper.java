@@ -49,8 +49,10 @@ public class RangerHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHelper.class);
 
   public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
-  /** The `*` gives access to all resources */
+  /** The `*` gives access to all table resources */
   public static final String RESOURCE_ALL = "*";
+  /** The `/` gives access to all path resources */
+  public static final String RESOURCE_ROOT_PATH = "/test/";
   /** The owner privileges, the owner can do anything on the metadata object */
   private final Set<AuthorizationPrivilege> ownerPrivileges;
   /** The policy search keys */
