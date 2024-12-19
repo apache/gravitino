@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.connector.authorization.ranger;
 
-import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
@@ -29,23 +28,12 @@ public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthori
 
   @Override
   public String shortName() {
-    return "test-ranger";
+    return "ranger";
   }
 
   @Override
   public AuthorizationPlugin newPlugin(
-      String metalake, String catalogProvider, Map<String, String> properties) {
-    Preconditions.checkArgument(
-        properties.containsKey("authorization.ranger.service.type"),
-        String.format("%s is required", "authorization.ranger.service.type"));
-    String serviceType = properties.get("authorization.ranger.service.type").toUpperCase();
-    switch (serviceType) {
-      case "HADOOPSQL":
-        return new TestRangerAuthorizationHadoopSQLPlugin();
-      case "HDFS":
-        return new TestRangerAuthorizationHDFSPlugin();
-      default:
-        throw new IllegalArgumentException("Unsupported service type: " + serviceType);
-    }
+      String metalake, String catalogProvider, Map<String, String> config) {
+    return new TestRangerAuthorizationPlugin();
   }
 }
