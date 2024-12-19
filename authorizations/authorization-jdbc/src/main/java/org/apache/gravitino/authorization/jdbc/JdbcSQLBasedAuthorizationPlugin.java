@@ -359,8 +359,8 @@ abstract class JdbcSQLBasedAuthorizationPlugin
   /**
    * Convert the object name contains `*` to a list of AuthorizationSecurableObject.
    *
-   * @param object The
-   * @return
+   * @param object The object contains the name with `*` to be converted
+   * @return The list of AuthorizationSecurableObject
    */
   protected List<AuthorizationSecurableObject> convertResourceAll(
       AuthorizationSecurableObject object) {

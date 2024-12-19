@@ -23,15 +23,15 @@ import org.apache.gravitino.authorization.Privilege;
 
 public class JdbcPrivilege implements AuthorizationPrivilege {
 
-  private static final JdbcPrivilege SELECT_PRI = new JdbcPrivilege(Type.SELECT);
-  private static final JdbcPrivilege INSERT_PRI = new JdbcPrivilege(Type.INSERT);
-  private static final JdbcPrivilege UPDATE_PRI = new JdbcPrivilege(Type.UPDATE);
-  private static final JdbcPrivilege ALTER_PRI = new JdbcPrivilege(Type.ALTER);
-  private static final JdbcPrivilege DELETE_PRI = new JdbcPrivilege(Type.DELETE);
-  private static final JdbcPrivilege ALL_PRI = new JdbcPrivilege(Type.ALL);
-  private static final JdbcPrivilege CREATE_PRI = new JdbcPrivilege(Type.CREATE);
-  private static final JdbcPrivilege DROP_PRI = new JdbcPrivilege(Type.DROP);
-  private static final JdbcPrivilege USAGE_PRI = new JdbcPrivilege(Type.USAGE);
+  private static final JdbcPrivilege SELECT_PRIVILEGE = new JdbcPrivilege(Type.SELECT);
+  private static final JdbcPrivilege INSERT_PRIVILEGE = new JdbcPrivilege(Type.INSERT);
+  private static final JdbcPrivilege UPDATE_PRIVILEGE = new JdbcPrivilege(Type.UPDATE);
+  private static final JdbcPrivilege ALTER_PRIVILEGE = new JdbcPrivilege(Type.ALTER);
+  private static final JdbcPrivilege DELETE_PRIVILEGE = new JdbcPrivilege(Type.DELETE);
+  private static final JdbcPrivilege ALL_PRIVILEGE = new JdbcPrivilege(Type.ALL);
+  private static final JdbcPrivilege CREATE_PRIVILEGE = new JdbcPrivilege(Type.CREATE);
+  private static final JdbcPrivilege DROP_PRIVILEGE = new JdbcPrivilege(Type.DROP);
+  private static final JdbcPrivilege USAGE_PRIVILEGE = new JdbcPrivilege(Type.USAGE);
 
   private final Type type;
 
@@ -57,23 +57,23 @@ public class JdbcPrivilege implements AuthorizationPrivilege {
   static JdbcPrivilege valueOf(Type type) {
     switch (type) {
       case CREATE:
-        return CREATE_PRI;
+        return CREATE_PRIVILEGE;
       case DELETE:
-        return DELETE_PRI;
+        return DELETE_PRIVILEGE;
       case ALL:
-        return ALL_PRI;
+        return ALL_PRIVILEGE;
       case DROP:
-        return DROP_PRI;
+        return DROP_PRIVILEGE;
       case ALTER:
-        return ALTER_PRI;
+        return ALTER_PRIVILEGE;
       case INSERT:
-        return INSERT_PRI;
+        return INSERT_PRIVILEGE;
       case UPDATE:
-        return UPDATE_PRI;
+        return UPDATE_PRIVILEGE;
       case SELECT:
-        return SELECT_PRI;
+        return SELECT_PRIVILEGE;
       case USAGE:
-        return USAGE_PRI;
+        return USAGE_PRIVILEGE;
       default:
         throw new IllegalArgumentException(String.format("Unsupported parameter type %s", type));
     }
