@@ -59,13 +59,7 @@ public class DeleteMetalake extends Command {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
     } catch (MetalakeInUseException inUseException) {
-      System.err.println(
-          metalake
-              + " in use, please disable it first. for example: use shell\n"
-              + "curl -X PATCH -H \"Accept: application/vnd.gravitino.v1+json\" \\\n"
-              + "-H \"Content-Type: application/json\" -d '{\"inUse\": false}' \\\n"
-              + "http://localhost:8090/api/metalakes/"
-              + metalake);
+      System.err.println(metalake + " in use, please use rest interface disable it first.");
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
