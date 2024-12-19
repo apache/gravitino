@@ -531,6 +531,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
+    if (CommandActions.LIST.equals(command)) {
+      newListGroups(url, ignore, metalake).handle();
+      return;
+    }
+
+    if (Objects.isNull(group)) {
+      System.err.println("Group is undefined. Please use -g or --group to specify a group.");
+      return;
+    }
+
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
@@ -538,10 +548,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
         } else {
           newGroupDetails(url, ignore, metalake, group).handle();
         }
-        break;
-
-      case CommandActions.LIST:
-        newListGroups(url, ignore, metalake).handle();
         break;
 
       case CommandActions.CREATE:
