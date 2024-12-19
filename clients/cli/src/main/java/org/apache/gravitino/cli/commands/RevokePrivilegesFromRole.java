@@ -21,9 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
@@ -35,7 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
 /** Revokes one or more privileges. */
-public class RevokePrivilegesFromRole extends Command {
+public class RevokePrivilegesFromRole extends MetadataCommand {
 
   protected final String metalake;
   protected final String role;
@@ -71,9 +69,7 @@ public class RevokePrivilegesFromRole extends Command {
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      MetadataObject metadataObject = null;
       List<Privilege> privilegesList = new ArrayList<>();
-      String name = entity.getName();
 
       for (String privilege : privileges) {
         if (!Privileges.isValid(privilege)) {
@@ -88,30 +84,7 @@ public class RevokePrivilegesFromRole extends Command {
         privilegesList.add(privilegeDTO);
       }
 
-      if (entity.hasColumnName()) {
-        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.COLUMN);
-      } else if (entity.hasTableName()) {
-        Catalog catalog = client.loadCatalog(entity.getCatalogName());
-        Catalog.Type catalogType = catalog.type();
-        if (catalogType == Catalog.Type.RELATIONAL) {
-          metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.TABLE);
-        } else if (catalogType == Catalog.Type.MESSAGING) {
-          metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.TOPIC);
-        } else if (catalogType == Catalog.Type.FILESET) {
-          metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.FILESET);
-        } else {
-          throw new IllegalArgumentException("Unknown entity type: " + name);
-        }
-      } else if (entity.hasSchemaName()) {
-        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.SCHEMA);
-      } else if (entity.hasCatalogName()) {
-        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.CATALOG);
-      } else if (entity.getMetalakeName() != null) {
-        metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
-      } else {
-        throw new IllegalArgumentException("Unknown entity type: " + name);
-      }
-
+      MetadataObject metadataObject = constructMetadataObject(entity, client);
       client.revokePrivilegesFromRole(role, metadataObject, privilegesList);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
