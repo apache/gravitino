@@ -21,16 +21,23 @@ package org.apache.gravitino.credential.config;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.config.ConfigBuilder;
+import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.CredentialConstants;
 
-public class CredentialConfig {
+public class CredentialConfig extends Config {
+
+  private static final long DEFAULT_CREDENTIAL_CACHE_MAX_SIZE = 10_000L;
+  private static final long DEFAULT_CREDENTIAL_CACHE_EXPIRE_IN_SECS = 300;
 
   public static final Map<String, PropertyEntry<?>> CREDENTIAL_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               CredentialConstants.CREDENTIAL_PROVIDERS,
-              PropertyEntry.booleanPropertyEntry(
+              PropertyEntry.stringPropertyEntry(
                   CredentialConstants.CREDENTIAL_PROVIDERS,
                   "Credential providers for the Gravitino catalog, schema, fileset, table, etc.",
                   false /* required */,
@@ -38,5 +45,44 @@ public class CredentialConfig {
                   null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              CredentialConstants.CREDENTIAL_CACHE_EXPIRE_IN_SECS,
+              PropertyEntry.longPropertyEntry(
+                  CredentialConstants.CREDENTIAL_CACHE_EXPIRE_IN_SECS,
+                  "Max cache time for the credential.",
+                  false /* required */,
+                  false /* immutable */,
+                  DEFAULT_CREDENTIAL_CACHE_EXPIRE_IN_SECS /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.CREDENTIAL_CACHE_MAX_SIZE,
+              PropertyEntry.longPropertyEntry(
+                  CredentialConstants.CREDENTIAL_CACHE_MAX_SIZE,
+                  "Max size for the credential cache.",
+                  false /* required */,
+                  false /* immutable */,
+                  DEFAULT_CREDENTIAL_CACHE_MAX_SIZE /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .build();
+
+  public static final ConfigEntry<Long> CREDENTIAL_CACHE_EXPIRE_IN_SECS =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_EXPIRE_IN_SECS)
+          .doc("Max expire time for the credential cache.")
+          .version(ConfigConstants.VERSION_0_8_0)
+          .longConf()
+          .createWithDefault(DEFAULT_CREDENTIAL_CACHE_EXPIRE_IN_SECS);
+
+  public static final ConfigEntry<Long> CREDENTIAL_CACHE_MAZ_SIZE =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_MAX_SIZE)
+          .doc("Max cache size for the credential.")
+          .version(ConfigConstants.VERSION_0_8_0)
+          .longConf()
+          .createWithDefault(DEFAULT_CREDENTIAL_CACHE_MAX_SIZE);
+
+  public CredentialConfig(Map<String, String> properties) {
+    super(false);
+    loadFromMap(properties, k -> true);
+  }
 }
