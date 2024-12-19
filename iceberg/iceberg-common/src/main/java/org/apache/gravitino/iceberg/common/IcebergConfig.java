@@ -61,12 +61,12 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
-  public static final ConfigEntry<Optional<String>> CATALOG_WAREHOUSE =
+  public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(IcebergConstants.WAREHOUSE)
           .doc("Warehouse directory of catalog")
           .version(ConfigConstants.VERSION_0_2_0)
           .stringConf()
-          .createWithOptional();
+          .create();
 
   public static final ConfigEntry<String> CATALOG_URI =
       new ConfigBuilder(IcebergConstants.URI)
