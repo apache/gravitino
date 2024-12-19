@@ -294,7 +294,7 @@ class TestTableCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.user");
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
     when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
@@ -311,7 +311,7 @@ class TestTableCommands {
             "metalake_demo",
             "catalog",
             "schema",
-            "users",
+            "user",
             "property",
             "value");
     commandLine.handleCommandLine();
@@ -533,8 +533,7 @@ class TestTableCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
-        .thenReturn("catalog" + "." + "schema");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
 
     GravitinoCommandLine commandLine =
         spy(
