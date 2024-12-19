@@ -78,6 +78,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 WAREHOUSE,
                 "Iceberg catalog warehouse config",
                 false /* immutable */,
+                null, /* defaultValue */
                 false /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.IO_IMPL,
