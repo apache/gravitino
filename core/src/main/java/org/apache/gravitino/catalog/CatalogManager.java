@@ -95,6 +95,7 @@ import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -178,6 +179,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           });
     }
 
+    public <R> R doWithModelOps(ThrowableFunction<ModelCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asModels() == null) {
+              throw new UnsupportedOperationException("Catalog does not support model operations");
+            }
+            return fn.apply(asModels());
+          });
+    }
+
     public <R> R doWithCatalogOps(ThrowableFunction<CatalogOperations, R> fn) throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
     }
@@ -235,6 +246,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     private TopicCatalog asTopics() {
       return catalog.ops() instanceof TopicCatalog ? (TopicCatalog) catalog.ops() : null;
+    }
+
+    private ModelCatalog asModels() {
+      return catalog.ops() instanceof ModelCatalog ? (ModelCatalog) catalog.ops() : null;
     }
   }
 

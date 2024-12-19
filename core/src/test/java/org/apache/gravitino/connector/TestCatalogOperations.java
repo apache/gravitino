@@ -26,11 +26,13 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -38,6 +40,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestFileset;
+import org.apache.gravitino.TestModel;
+import org.apache.gravitino.TestModelVersion;
 import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.TestTopic;
@@ -47,8 +51,12 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -64,6 +72,9 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -76,7 +87,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TestCatalogOperations
-    implements CatalogOperations, TableCatalog, FilesetCatalog, TopicCatalog, SupportsSchemas {
+    implements CatalogOperations,
+        TableCatalog,
+        FilesetCatalog,
+        TopicCatalog,
+        ModelCatalog,
+        SupportsSchemas {
   private static final Logger LOG = LoggerFactory.getLogger(TestCatalogOperations.class);
 
   private final Map<NameIdentifier, TestTable> tables;
@@ -86,6 +102,12 @@ public class TestCatalogOperations
   private final Map<NameIdentifier, TestFileset> filesets;
 
   private final Map<NameIdentifier, TestTopic> topics;
+
+  private final Map<NameIdentifier, TestModel> models;
+
+  private final Map<Pair<NameIdentifier, Integer>, TestModelVersion> modelVersions;
+
+  private final Map<Pair<NameIdentifier, String>, Integer> modelAliasToVersion;
 
   public static final String FAIL_CREATE = "fail-create";
 
@@ -98,6 +120,9 @@ public class TestCatalogOperations
     schemas = Maps.newHashMap();
     filesets = Maps.newHashMap();
     topics = Maps.newHashMap();
+    models = Maps.newHashMap();
+    modelVersions = Maps.newHashMap();
+    modelAliasToVersion = Maps.newHashMap();
   }
 
   @Override
@@ -647,6 +672,227 @@ public class TestCatalogOperations
     if ("true".equals(properties.get(FAIL_TEST))) {
       throw new ConnectionFailedException("Connection failed");
     }
+  }
+
+  @Override
+  public NameIdentifier[] listModels(Namespace namespace) throws NoSuchSchemaException {
+    NameIdentifier modelSchemaIdent = NameIdentifier.of(namespace.levels());
+    if (!schemas.containsKey(modelSchemaIdent)) {
+      throw new NoSuchSchemaException("Schema %s does not exist", modelSchemaIdent);
+    }
+
+    return models.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Model getModel(NameIdentifier ident) throws NoSuchModelException {
+    if (models.containsKey(ident)) {
+      return models.get(ident);
+    } else {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+  }
+
+  @Override
+  public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchSchemaException, ModelAlreadyExistsException {
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    if (!schemas.containsKey(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
+    }
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    TestModel model =
+        TestModel.builder()
+            .withName(ident.name())
+            .withComment(comment)
+            .withProperties(properties)
+            .withLatestVersion(0)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    if (models.containsKey(ident)) {
+      throw new ModelAlreadyExistsException("Model %s already exists", ident);
+    } else {
+      models.put(ident, model);
+    }
+
+    return model;
+  }
+
+  @Override
+  public boolean deleteModel(NameIdentifier ident) {
+    if (!models.containsKey(ident)) {
+      return false;
+    }
+
+    models.remove(ident);
+
+    List<Pair<NameIdentifier, Integer>> deletedVersions =
+        modelVersions.entrySet().stream()
+            .filter(e -> e.getKey().getLeft().equals(ident))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+    deletedVersions.forEach(modelVersions::remove);
+
+    List<Pair<NameIdentifier, String>> deletedAliases =
+        modelAliasToVersion.entrySet().stream()
+            .filter(e -> e.getKey().getLeft().equals(ident))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+    deletedAliases.forEach(modelAliasToVersion::remove);
+
+    return true;
+  }
+
+  @Override
+  public int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    return modelVersions.entrySet().stream()
+        .filter(e -> e.getKey().getLeft().equals(ident))
+        .mapToInt(e -> e.getValue().version())
+        .toArray();
+  }
+
+  @Override
+  public ModelVersion getModelVersion(NameIdentifier ident, int version)
+      throws NoSuchModelVersionException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelVersionException("Model %s does not exist", ident);
+    }
+
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", versionPair);
+    }
+
+    return modelVersions.get(versionPair);
+  }
+
+  @Override
+  public ModelVersion getModelVersion(NameIdentifier ident, String alias)
+      throws NoSuchModelVersionException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelVersionException("Model %s does not exist", ident);
+    }
+
+    Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+    if (!modelAliasToVersion.containsKey(aliasPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", alias);
+    }
+
+    int version = modelAliasToVersion.get(aliasPair);
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", versionPair);
+    }
+
+    return modelVersions.get(versionPair);
+  }
+
+  @Override
+  public void linkModelVersion(
+      NameIdentifier ident,
+      String uri,
+      String[] aliases,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    String[] aliasArray = aliases != null ? aliases : new String[0];
+    for (String alias : aliasArray) {
+      Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+      if (modelAliasToVersion.containsKey(aliasPair)) {
+        throw new ModelVersionAliasesAlreadyExistException(
+            "Model version alias %s already exists", alias);
+      }
+    }
+
+    int version = models.get(ident).latestVersion();
+    TestModelVersion modelVersion =
+        TestModelVersion.builder()
+            .withVersion(version)
+            .withAliases(aliases)
+            .withComment(comment)
+            .withUri(uri)
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    modelVersions.put(versionPair, modelVersion);
+    for (String alias : aliasArray) {
+      Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+      modelAliasToVersion.put(aliasPair, version);
+    }
+
+    TestModel model = models.get(ident);
+    TestModel updatedModel =
+        TestModel.builder()
+            .withName(model.name())
+            .withComment(model.comment())
+            .withProperties(model.properties())
+            .withLatestVersion(version + 1)
+            .withAuditInfo(model.auditInfo())
+            .build();
+    models.put(ident, updatedModel);
+  }
+
+  @Override
+  public boolean deleteModelVersion(NameIdentifier ident, int version) {
+    if (!models.containsKey(ident)) {
+      return false;
+    }
+
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      return false;
+    }
+
+    TestModelVersion modelVersion = modelVersions.remove(versionPair);
+    if (modelVersion.aliases() != null) {
+      for (String alias : modelVersion.aliases()) {
+        Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+        modelAliasToVersion.remove(aliasPair);
+      }
+    }
+
+    return true;
+  }
+
+  @Override
+  public boolean deleteModelVersion(NameIdentifier ident, String alias) {
+    if (!models.containsKey(ident)) {
+      return false;
+    }
+
+    Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+    if (!modelAliasToVersion.containsKey(aliasPair)) {
+      return false;
+    }
+
+    int version = modelAliasToVersion.remove(aliasPair);
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      return false;
+    }
+
+    TestModelVersion modelVersion = modelVersions.remove(versionPair);
+    for (String modelVersionAlias : modelVersion.aliases()) {
+      Pair<NameIdentifier, String> modelAliasPair = Pair.of(ident, modelVersionAlias);
+      modelAliasToVersion.remove(modelAliasPair);
+    }
+
+    return true;
   }
 
   private boolean hasCallerContext() {
