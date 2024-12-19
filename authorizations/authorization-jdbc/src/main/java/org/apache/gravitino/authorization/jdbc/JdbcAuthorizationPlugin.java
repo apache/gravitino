@@ -42,6 +42,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,8 +54,7 @@ import org.slf4j.LoggerFactory;
  * JDBC-based authorization plugins can inherit this class and implement their own SQL statements.
  */
 @Unstable
-abstract class JdbcSQLBasedAuthorizationPlugin
-    implements AuthorizationPlugin, JdbcAuthorizationSQL {
+abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAuthorizationSQL {
 
   private static final String CONFIG_PREFIX = "authorization.jdbc.";
   public static final String JDBC_DRIVER = CONFIG_PREFIX + "driver";
@@ -61,12 +63,12 @@ abstract class JdbcSQLBasedAuthorizationPlugin
   public static final String JDBC_PASSWORD = CONFIG_PREFIX + "password";
 
   private static final String GROUP_PREFIX = "GRAVITINO_GROUP_";
-  private static final Logger LOG = LoggerFactory.getLogger(JdbcSQLBasedAuthorizationPlugin.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JdbcAuthorizationPlugin.class);
 
   protected BasicDataSource dataSource;
   protected JdbcSecurableObjectMappingProvider mappingProvider;
 
-  public JdbcSQLBasedAuthorizationPlugin(Map<String, String> config) {
+  public JdbcAuthorizationPlugin(Map<String, String> config) {
     // Initialize the data source
     dataSource = new BasicDataSource();
     String jdbcUrl = config.get(JDBC_URL);
@@ -279,9 +281,19 @@ abstract class JdbcSQLBasedAuthorizationPlugin
     beforeExecuteSQL();
 
     if (newOwner.type() == Owner.Type.USER) {
-      onUserAdded(new TemporaryUser(newOwner.name()));
+      onUserAdded(
+          UserEntity.builder()
+              .withName(newOwner.name())
+              .withId(0L)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build());
     } else if (newOwner.type() == Owner.Type.GROUP) {
-      onGroupAdded(new TemporaryGroup(newOwner.name()));
+      onGroupAdded(
+          GroupEntity.builder()
+              .withName(newOwner.name())
+              .withId(0L)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build());
     } else {
       throw new IllegalArgumentException(
           String.format("Don't support owner type %s", newOwner.type()));

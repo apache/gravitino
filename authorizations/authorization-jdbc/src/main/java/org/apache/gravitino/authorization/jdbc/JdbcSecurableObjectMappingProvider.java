@@ -58,13 +58,13 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
           Privilege.Name.USE_SCHEMA,
               Sets.newHashSet(JdbcPrivilege.valueOf(JdbcPrivilege.Type.USAGE)));
 
-  private final Map<Privilege.Name, PrivilegeScope> privilegeScopeMapping =
+  private final Map<Privilege.Name, MetadataObject.Type> privilegeScopeMapping =
       ImmutableMap.of(
-          Privilege.Name.CREATE_TABLE, PrivilegeScope.TABLE,
-          Privilege.Name.CREATE_SCHEMA, PrivilegeScope.DATABASE,
-          Privilege.Name.SELECT_TABLE, PrivilegeScope.TABLE,
-          Privilege.Name.MODIFY_TABLE, PrivilegeScope.TABLE,
-          Privilege.Name.USE_SCHEMA, PrivilegeScope.DATABASE);
+          Privilege.Name.CREATE_TABLE, MetadataObject.Type.TABLE,
+          Privilege.Name.CREATE_SCHEMA, MetadataObject.Type.SCHEMA,
+          Privilege.Name.SELECT_TABLE, MetadataObject.Type.TABLE,
+          Privilege.Name.MODIFY_TABLE, MetadataObject.Type.TABLE,
+          Privilege.Name.USE_SCHEMA, MetadataObject.Type.SCHEMA);
 
   private final Set<AuthorizationPrivilege> ownerPrivileges = ImmutableSet.of();
 
@@ -105,7 +105,7 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
     switch (securableObject.type()) {
       case METALAKE:
       case CATALOG:
-        convertPluginPrivileges(securableObject, databasePrivileges, tablePrivileges);
+        convertJdbcPrivileges(securableObject, databasePrivileges, tablePrivileges);
 
         if (!databasePrivileges.isEmpty()) {
           databaseObject =
@@ -122,7 +122,7 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
         break;
 
       case SCHEMA:
-        convertPluginPrivileges(securableObject, databasePrivileges, tablePrivileges);
+        convertJdbcPrivileges(securableObject, databasePrivileges, tablePrivileges);
         if (!databasePrivileges.isEmpty()) {
           databaseObject =
               new JdbcAuthorizationObject(securableObject.name(), null, databasePrivileges);
@@ -138,7 +138,7 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
         break;
 
       case TABLE:
-        convertPluginPrivileges(securableObject, databasePrivileges, tablePrivileges);
+        convertJdbcPrivileges(securableObject, databasePrivileges, tablePrivileges);
         if (!tablePrivileges.isEmpty()) {
           MetadataObject metadataObject =
               MetadataObjects.parse(securableObject.parent(), MetadataObject.Type.SCHEMA);
@@ -198,21 +198,16 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
     throw new UnsupportedOperationException("Not supported");
   }
 
-  private void convertPluginPrivileges(
+  private void convertJdbcPrivileges(
       SecurableObject securableObject,
       List<AuthorizationPrivilege> databasePrivileges,
       List<AuthorizationPrivilege> tablePrivileges) {
     for (Privilege privilege : securableObject.privileges()) {
-      if (privilegeScopeMapping.get(privilege.name()) == PrivilegeScope.DATABASE) {
+      if (privilegeScopeMapping.get(privilege.name()) == MetadataObject.Type.SCHEMA) {
         databasePrivileges.addAll(privilegeMapping.get(privilege.name()));
-      } else if (privilegeScopeMapping.get(privilege.name()) == PrivilegeScope.TABLE) {
+      } else if (privilegeScopeMapping.get(privilege.name()) == MetadataObject.Type.TABLE) {
         tablePrivileges.addAll(privilegeMapping.get(privilege.name()));
       }
     }
-  }
-
-  enum PrivilegeScope {
-    DATABASE,
-    TABLE
   }
 }

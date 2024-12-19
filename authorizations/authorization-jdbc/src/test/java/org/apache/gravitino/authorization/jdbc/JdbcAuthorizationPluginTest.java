@@ -35,10 +35,12 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class JdbcSQLBasedAuthorizationPluginTest {
+public class JdbcAuthorizationPluginTest {
   private static List<String> expectSQLs = Lists.newArrayList();
   private static List<MetadataObject.Type> expectTypes = Lists.newArrayList();
   private static List<String> expectObjectNames = Lists.newArrayList();
@@ -47,8 +49,8 @@ public class JdbcSQLBasedAuthorizationPluginTest {
   private static int currentSQLIndex = 0;
   private static int currentIndex = 0;
 
-  private static final JdbcSQLBasedAuthorizationPlugin plugin =
-      new JdbcSQLBasedAuthorizationPlugin(Collections.emptyMap()) {
+  private static final JdbcAuthorizationPlugin plugin =
+      new JdbcAuthorizationPlugin(Collections.emptyMap()) {
 
         @Override
         public List<String> getSetOwnerSQL(
@@ -71,29 +73,28 @@ public class JdbcSQLBasedAuthorizationPluginTest {
   public void testUserManagement() {
     expectSQLs = Lists.newArrayList("CREATE USER tmp");
     currentSQLIndex = 0;
-    plugin.onUserAdded(new TemporaryUser("tmp"));
+    plugin.onUserAdded(createUser("tmp"));
 
     Assertions.assertThrows(
-        UnsupportedOperationException.class, () -> plugin.onUserAcquired(new TemporaryUser("tmp")));
+        UnsupportedOperationException.class, () -> plugin.onUserAcquired(createUser("tmp")));
 
     expectSQLs = Lists.newArrayList("DROP USER tmp");
     currentSQLIndex = 0;
-    plugin.onUserRemoved(new TemporaryUser("tmp"));
+    plugin.onUserRemoved(createUser("tmp"));
   }
 
   @Test
   public void testGroupManagement() {
     expectSQLs = Lists.newArrayList("CREATE USER GRAVITINO_GROUP_tmp");
     currentSQLIndex = 0;
-    plugin.onGroupAdded(new TemporaryGroup("tmp"));
+    plugin.onGroupAdded(createGroup("tmp"));
 
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> plugin.onGroupAcquired(new TemporaryGroup("tmp")));
+        UnsupportedOperationException.class, () -> plugin.onGroupAcquired(createGroup("tmp")));
 
     expectSQLs = Lists.newArrayList("DROP USER GRAVITINO_GROUP_tmp");
     currentSQLIndex = 0;
-    plugin.onGroupRemoved(new TemporaryGroup("tmp"));
+    plugin.onGroupRemoved(createGroup("tmp"));
   }
 
   @Test
@@ -113,8 +114,8 @@ public class JdbcSQLBasedAuthorizationPluginTest {
   @Test
   public void testPermissionManagement() {
     Role role = new TemporaryRole("tmp");
-    Group group = new TemporaryGroup("tmp");
-    User user = new TemporaryUser("tmp");
+    Group group = createGroup("tmp");
+    User user = createUser("tmp");
 
     currentSQLIndex = 0;
     expectSQLs =
@@ -327,5 +328,13 @@ public class JdbcSQLBasedAuthorizationPluginTest {
     public Type type() {
       return type;
     }
+  }
+
+  private static Group createGroup(String name) {
+    return GroupEntity.builder().withId(0L).withName(name).withAuditInfo(AuditInfo.EMPTY).build();
+  }
+
+  private static User createUser(String name) {
+    return UserEntity.builder().withId(0L).withName(name).withAuditInfo(AuditInfo.EMPTY).build();
   }
 }
