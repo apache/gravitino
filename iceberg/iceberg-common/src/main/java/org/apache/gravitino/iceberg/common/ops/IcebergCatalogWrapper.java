@@ -86,6 +86,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         !IcebergCatalogBackend.REST.equals(catalogBackend)) {
       // check whether IcebergConfig.CATALOG_WAREHOUSE exists
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
+    }
+    if (!IcebergCatalogBackend.MEMORY.equals(catalogBackend)){
       this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
     this.catalog = IcebergCatalogUtil.loadCatalogBackend(catalogBackend, icebergConfig);
