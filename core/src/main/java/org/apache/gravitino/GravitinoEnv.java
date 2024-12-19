@@ -28,7 +28,7 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
-import org.apache.gravitino.catalog.CredentialManager;
+import org.apache.gravitino.credential.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;

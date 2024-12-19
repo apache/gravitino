@@ -26,7 +26,7 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
-import org.apache.gravitino.catalog.CredentialManager;
+import org.apache.gravitino.credential.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;

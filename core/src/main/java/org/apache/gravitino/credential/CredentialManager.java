@@ -17,12 +17,14 @@
  *  under the License.
  */
 
-package org.apache.gravitino.catalog;
+package org.apache.gravitino.credential;
 
 import java.util.List;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.OperationDispatcher;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -52,6 +54,7 @@ public class CredentialManager extends OperationDispatcher {
   @SuppressWarnings("UnusedVariable")
   private CredentialPrivilege getCredentialPrivilege(String user, NameIdentifier identifier)
       throws NotAuthorizedException {
+    // TODO: will implement in another PR
     return CredentialPrivilege.WRITE;
   }
 }

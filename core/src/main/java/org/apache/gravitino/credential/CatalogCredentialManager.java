@@ -48,7 +48,7 @@ public class CatalogCredentialManager {
     // todo: add credential cache
     CredentialProvider credentialProvider = credentialProviderMap.get(credentialType);
     if (credentialProvider == null) {
-      throw new NoSuchCredentialException("No such credential type: %s", credentialType);
+      throw new NoSuchCredentialException("No such credential: %s", credentialType);
     }
     return credentialProvider.getCredential(context);
   }
