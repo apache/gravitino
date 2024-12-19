@@ -404,17 +404,20 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         self.file_entry_manager
             .read()
             .await
-            .get_by_id(file_id)
+            .get_file_entry_by_id(file_id)
             .ok_or(Errno::from(libc::ENOENT))
     }
 
     async fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
-        self.file_entry_manager.read().await.get_by_path(path)
+        self.file_entry_manager
+            .read()
+            .await
+            .get_file_entry_by_path(path)
     }
 
     async fn resolve_file_id_to_filestat(&self, file_stat: &mut FileStat, parent_file_id: u64) {
         let mut file_manager = self.file_entry_manager.write().await;
-        let file_entry = file_manager.get_by_path(&file_stat.path);
+        let file_entry = file_manager.get_file_entry_by_path(&file_stat.path);
         match file_entry {
             None => {
                 // allocate new file id
@@ -666,11 +669,11 @@ impl FileEntryManager {
         }
     }
 
-    fn get_by_id(&self, file_id: u64) -> Option<FileEntry> {
+    fn get_file_entry_by_id(&self, file_id: u64) -> Option<FileEntry> {
         self.file_id_map.get(&file_id).cloned()
     }
 
-    fn get_by_path(&self, path: &str) -> Option<FileEntry> {
+    fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
         self.file_path_map.get(path).cloned()
     }
 
@@ -757,18 +760,18 @@ mod tests {
     fn test_file_entry_manager() {
         let mut manager = FileEntryManager::new();
         manager.insert(1, 2, "a/b");
-        let file = manager.get_by_id(2).unwrap();
+        let file = manager.get_file_entry_by_id(2).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
         assert_eq!(file.path, "a/b");
 
-        let file = manager.get_by_path("a/b").unwrap();
+        let file = manager.get_file_entry_by_path("a/b").unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
         assert_eq!(file.path, "a/b");
 
         manager.remove("a/b");
-        assert!(manager.get_by_id(2).is_none());
-        assert!(manager.get_by_path("a/b").is_none());
+        assert!(manager.get_file_entry_by_id(2).is_none());
+        assert!(manager.get_file_entry_by_path("a/b").is_none());
     }
 }
