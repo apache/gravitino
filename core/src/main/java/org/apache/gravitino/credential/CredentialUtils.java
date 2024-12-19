@@ -25,17 +25,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObject.Type;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {
 
   private static final Splitter splitter = Splitter.on(",");
+  private static final Set<MetadataObject.Type> supportsCredentialMetadataTypes = ImmutableSet.of(
+      Type.CATALOG, Type.FILESET
+  );
 
   public static Credential vendCredential(CredentialProvider credentialProvider, String[] path) {
     PathBasedCredentialContext pathBasedCredentialContext =
         new PathBasedCredentialContext(
             PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), ImmutableSet.of());
     return credentialProvider.getCredential(pathBasedCredentialContext);
+  }
+
+  public static boolean supportsCredentialOperations(MetadataObject metadataObject){
+    return supportsCredentialMetadataTypes.contains(metadataObject.type());
   }
 
   /**
