@@ -563,8 +563,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 }
 
-fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
-    debug!("file_st: {:?}, context: {:?}", file_st, context);
+const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
     debug_assert!(file_st.file_id != 0 && file_st.parent_file_id != 0);
     FileAttr {
         ino: file_st.file_id,
