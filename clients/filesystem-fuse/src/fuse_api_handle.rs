@@ -31,9 +31,173 @@ use fuse3::{Errno, FileType, Inode, SetAttr, Timestamp};
 use futures_util::stream;
 use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
+use log::debug;
 use std::ffi::{OsStr, OsString};
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
+
+pub(crate) struct FuseApiHandleDebug<T: RawFileSystem> {
+    inner: FuseApiHandle<T>,
+}
+
+impl<T: RawFileSystem> FuseApiHandleDebug<T> {
+    pub fn new(fs: T, context: FileSystemContext) -> Self {
+        Self {
+            inner: FuseApiHandle::new(fs, context),
+        }
+    }
+
+    pub async fn get_file_path(&self, file_id: u64) -> String {
+        debug!("get_file_path: file_id: {}", file_id);
+        let result = self.inner.get_file_path(file_id).await;
+        debug!("get_file_path result: {}", result);
+        result
+    }
+
+    async fn get_modified_file_stat(
+        &self,
+        file_id: u64,
+        size: Option<u64>,
+        atime: Option<Timestamp>,
+        mtime: Option<Timestamp>,
+    ) -> Result<FileStat, Errno> {
+        debug!("get_modified_file_stat: file_id: {}, size: {:?}, atime: {:?}, mtime: {:?}", file_id, size, atime, mtime);
+        let result = self.inner.get_modified_file_stat(file_id, size, atime, mtime).await;
+        debug!("get_modified_file_stat result: {:?}", result);
+        result
+    }
+}
+
+impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
+    async fn init(&self, req: Request) -> fuse3::Result<ReplyInit> {
+        debug!("init: req: {:?}", req);
+        let result = self.inner.init(req).await;
+        debug!("init result: {:?}", result);
+        result
+    }
+
+    async fn destroy(&self, req: Request) {
+        debug!("destroy: req: {:?}", req);
+        self.inner.destroy(req).await;
+        debug!("destroy completed");
+    }
+
+    async fn lookup(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<ReplyEntry> {
+        debug!("lookup: req: {:?}, parent: {:?}, name: {:?}", req, parent, name);
+        let result = self.inner.lookup(req, parent, name).await;
+        debug!("lookup result: {:?}", result);
+        result
+    }
+
+    async fn getattr(&self, req: Request, inode: Inode, fh: Option<u64>, flags: u32) -> fuse3::Result<ReplyAttr> {
+        debug!("getattr: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}", req, inode, fh, flags);
+        let result = self.inner.getattr(req, inode, fh, flags).await;
+        debug!("getattr result: {:?}", result);
+        result
+    }
+
+    async fn setattr(&self, req: Request, inode: Inode, fh: Option<u64>, set_attr: SetAttr) -> fuse3::Result<ReplyAttr> {
+        debug!("setattr: req: {:?}, inode: {:?}, fh: {:?}, set_attr: {:?}", req, inode, fh, set_attr);
+        let result = self.inner.setattr(req, inode, fh, set_attr).await;
+        debug!("setattr result: {:?}", result);
+        result
+    }
+
+    async fn mkdir(&self, req: Request, parent: Inode, name: &OsStr, mode: u32, umask: u32) -> fuse3::Result<ReplyEntry> {
+        debug!("mkdir: req: {:?}, parent: {:?}, name: {:?}, mode: {}, umask: {}", req, parent, name, mode, umask);
+        let result = self.inner.mkdir(req, parent, name, mode, umask).await;
+        debug!("mkdir result: {:?}", result);
+        result
+    }
+
+    async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
+        debug!("unlink: req: {:?}, parent: {:?}, name: {:?}", req, parent, name);
+        let result = self.inner.unlink(req, parent, name).await;
+        debug!("unlink result: {:?}", result);
+        result
+    }
+
+    async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
+        debug!("rmdir: req: {:?}, parent: {:?}, name: {:?}", req, parent, name);
+        let result = self.inner.rmdir(req, parent, name).await;
+        debug!("rmdir result: {:?}", result);
+        result
+    }
+
+    async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
+        debug!("open: req: {:?}, inode: {:?}, flags: {:?}", req, inode, flags);
+        let result = self.inner.open(req, inode, flags).await;
+        debug!("open result: {:?}", result);
+        result
+    }
+
+    async fn read(&self, req: Request, inode: Inode, fh: u64, offset: u64, size: u32) -> fuse3::Result<ReplyData> {
+        debug!("read: req: {:?}, inode: {:?}, fh: {:?}, offset: {:?}, size: {:?}", req, inode, fh, offset, size);
+        let result = self.inner.read(req, inode, fh, offset, size).await;
+        debug!("read result: {:?}", result);
+        result
+    }
+
+    async fn write(&self, req: Request, inode: Inode, fh: u64, offset: u64, data: &[u8], write_flags: u32, flags: u32) -> fuse3::Result<ReplyWrite> {
+        debug!("write: req: {:?}, inode: {:?}, fh: {:?}, offset: {:?}, data_len: {}, write_flags: {:?}, flags: {:?}", req, inode, fh, offset, data.len(), write_flags, flags);
+        let result = self.inner.write(req, inode, fh, offset, data, write_flags, flags).await;
+        debug!("write result: {:?}", result);
+        result
+    }
+
+    async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {
+        debug!("statfs: req: {:?}, inode: {:?}", req, inode);
+        let result = self.inner.statfs(req, inode).await;
+        debug!("statfs result: {:?}", result);
+        result
+    }
+
+    async fn release(&self, req: Request, inode: Inode, fh: u64, flags: u32, lock_owner: u64, flush: bool) -> fuse3::Result<()> {
+        debug!("release: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}, lock_owner: {:?}, flush: {:?}", req, inode, fh, flags, lock_owner, flush);
+        let result = self.inner.release(req, inode, fh, flags, lock_owner, flush).await;
+        debug!("release result: {:?}", result);
+        result
+    }
+
+    async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
+        debug!("opendir: req: {:?}, inode: {:?}, flags: {:?}", req, inode, flags);
+        let result = self.inner.opendir(req, inode, flags).await;
+        debug!("opendir result: {:?}", result);
+        result
+    }
+
+    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>> where T: 'a;
+
+    async fn readdir<'a>(&'a self, req: Request, parent: Inode, fh: u64, offset: i64) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
+        debug!("readdir: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}", req, parent, fh, offset);
+        let result = self.inner.readdir(req, parent, fh, offset).await;
+        debug!("readdir result: {:?}", result);
+        result
+    }
+
+    async fn releasedir(&self, req: Request, inode: Inode, fh: u64, flags: u32) -> fuse3::Result<()> {
+        debug!("releasedir: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}", req, inode, fh, flags);
+        let result = self.inner.releasedir(req, inode, fh, flags).await;
+        debug!("releasedir result: {:?}", result);
+        result
+    }
+
+    async fn create(&self, req: Request, parent: Inode, name: &OsStr, mode: u32, flags: u32) -> fuse3::Result<ReplyCreated> {
+        debug!("create: req: {:?}, parent: {:?}, name: {:?}, mode: {:?}, flags: {:?}", req, parent, name, mode, flags);
+        let result = self.inner.create(req, parent, name, mode, flags).await;
+        debug!("create result: {:?}", result);
+        result
+    }
+
+    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>> where T: 'a;
+
+    async fn readdirplus<'a>(&'a self, req: Request, parent: Inode, fh: u64, offset: u64, lock_owner: u64) -> fuse3::Result<ReplyDirectoryPlus<Self::DirEntryPlusStream<'a>>> {
+        debug!("readdirplus: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}, lock_owner: {:?}", req, parent, fh, offset, lock_owner);
+        let result = self.inner.readdirplus(req, parent, fh, offset, lock_owner).await;
+        debug!("readdirplus result: {:?}", result);
+        result
+    }
+}
 
 pub(crate) struct FuseApiHandle<T: RawFileSystem> {
     fs: T,
@@ -392,6 +556,8 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 }
 
 const fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
+fn fstat_to_file_attr(file_st: &FileStat, context: &FileSystemContext) -> FileAttr {
+    debug!("file_st: {:?}, context: {:?}", file_st, context);
     debug_assert!(file_st.file_id != 0 && file_st.parent_file_id != 0);
     let perm = match file_st.kind {
         Directory => context.default_dir_perm,
