@@ -545,6 +545,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.CREATE:
+        if (Objects.isNull(group)){
+          System.err.println("Group is undefined. Please use -g or --group to specify a group.");
+          return;
+        }
         newCreateGroup(url, ignore, metalake, group).handle();
         break;
 
