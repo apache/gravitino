@@ -19,12 +19,16 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateTable;
@@ -41,17 +45,30 @@ import org.apache.gravitino.cli.commands.TablePartition;
 import org.apache.gravitino.cli.commands.TableSortOrder;
 import org.apache.gravitino.cli.commands.UpdateTableComment;
 import org.apache.gravitino.cli.commands.UpdateTableName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestTableCommands {
   private CommandLine mockCommandLine;
   private Options mockOptions;
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
 
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -409,5 +426,114 @@ class TestTableCommands {
             "comment");
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListTableWithoutCatalog() {
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.LIST));
+
+    commandLine.handleCommandLine();
+    verify(commandLine, never())
+        .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake", null, null);
+    assertTrue(
+        errContent
+            .toString()
+            .contains(
+                "Missing required argument(s): "
+                    + CommandEntities.CATALOG
+                    + ", "
+                    + CommandEntities.SCHEMA));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListTableWithoutSchema() {
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.LIST));
+
+    commandLine.handleCommandLine();
+    verify(commandLine, never())
+        .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake", "catalog", null);
+    assertTrue(
+        errContent.toString().contains("Missing required argument(s): " + CommandEntities.SCHEMA));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailTableWithoutCatalog() {
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
+
+    commandLine.handleCommandLine();
+    verify(commandLine, never())
+        .newTableDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake", null, null, null);
+    assertTrue(
+        errContent
+            .toString()
+            .contains(
+                "Missing required argument(s): "
+                    + CommandEntities.CATALOG
+                    + ", "
+                    + CommandEntities.SCHEMA));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailTableWithoutSchema() {
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
+    commandLine.handleCommandLine();
+    verify(commandLine, never())
+        .newTableDetails(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake", "catalog", null, null);
+    assertTrue(
+        errContent.toString().contains("Missing required argument(s): " + CommandEntities.SCHEMA));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailTableWithoutTable() {
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog" + "." + "schema");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
+    commandLine.handleCommandLine();
+    verify(commandLine, never())
+        .newTableDetails(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake", "catalog", "schema", null);
+    assertTrue(
+        errContent.toString().contains("Missing required argument(s): " + CommandEntities.TABLE));
   }
 }
