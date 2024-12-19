@@ -16,7 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+mod default_raw_filesystem;
 mod filesystem;
 mod fuse_api_handle;
+mod opened_file;
 mod opened_file_manager;
 mod utils;

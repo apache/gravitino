@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::OpenedFile;
+use crate::opened_file::OpenedFile;
 use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

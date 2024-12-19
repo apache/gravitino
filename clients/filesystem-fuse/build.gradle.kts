@@ -20,8 +20,6 @@
 import org.gradle.api.tasks.Exec
 
 val checkRustEnvironment by tasks.registering(Exec::class) {
-  description = "Check if Rust environment."
-  group = "verification"
   commandLine("bash", "-c", "cargo --version")
   standardOutput = System.out
   errorOutput = System.err
@@ -30,14 +28,12 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
 
 val buildRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Compile the Rust project"
   workingDir = file("$projectDir")
   commandLine("bash", "-c", "make build")
 }
 
 val checkRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Check the Rust project"
   workingDir = file("$projectDir")
 
   commandLine("bash", "-c", "make check")
@@ -45,8 +41,6 @@ val checkRustProject by tasks.registering(Exec::class) {
 
 val testRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Run tests in the Rust project"
-  group = "verification"
   workingDir = file("$projectDir")
   commandLine("bash", "-c", "make test")
 
@@ -56,8 +50,6 @@ val testRustProject by tasks.registering(Exec::class) {
 
 val cleanRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Run tests in the Rust project"
-  group = "verification"
   workingDir = file("$projectDir")
   commandLine("bash", "-c", "make clean")
 
