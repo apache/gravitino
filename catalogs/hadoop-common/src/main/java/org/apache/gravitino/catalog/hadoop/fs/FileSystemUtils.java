@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
-import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
-import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.Constants.BUILTIN_HDFS_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.Constants.BUILTIN_LOCAL_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 
 import com.google.common.collect.Maps;
@@ -45,7 +45,7 @@ public class FileSystemUtils {
         fileSystemProviders != null
             ? Arrays.stream(fileSystemProviders.split(","))
                 .map(f -> f.trim().toLowerCase(Locale.ROOT))
-                .collect(java.util.stream.Collectors.toSet())
+                .collect(Collectors.toSet())
             : Sets.newHashSet();
 
     // Add built-in file system providers to the use list automatically.

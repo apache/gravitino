@@ -17,15 +17,10 @@
  * under the License.
  */
 
-plugins {
-  id("java")
-}
+package org.apache.gravitino.catalog.hadoop;
 
-// try to avoid adding extra dependencies because it is used by catalogs and connectors.
-dependencies {
-  implementation(project(":catalogs:catalog-common"))
-  implementation(libs.commons.lang3)
-  implementation(libs.hadoop3.client.api)
-  implementation(libs.hadoop3.client.runtime)
-  implementation(libs.guava)
+public class Constants {
+
+  public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
+  public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
 }
