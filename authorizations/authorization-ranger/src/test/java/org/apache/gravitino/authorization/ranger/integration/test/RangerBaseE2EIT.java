@@ -984,4 +984,37 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(roleName);
   }
+
+  // ISSUE-5892 Fix to grant privilege for the metalake
+  @Test
+  void testGrantPrivilegesForMetalake() throws InterruptedException {
+    // Choose a catalog
+    useCatalog();
+
+    // Create a schema
+    String roleName = currentFunName();
+    metalake.createRole(roleName, Collections.emptyMap(), Collections.emptyList());
+
+    // Grant a create schema privilege
+    metalake.grantPrivilegesToRole(
+        roleName,
+        MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE),
+        Lists.newArrayList(Privileges.CreateSchema.allow()));
+
+    // Fail to create a schema
+    Assertions.assertThrows(
+        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
+    Assertions.assertDoesNotThrow(() -> sparkSession.sql(SQL_CREATE_SCHEMA));
+
+    // Clean up
+    catalog.asSchemas().dropSchema(schemaName, false);
+    metalake.deleteRole(roleName);
+  }
 }
