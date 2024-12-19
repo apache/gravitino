@@ -194,55 +194,55 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-    return authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
+    return (AuthorizationPlugin) authorization;
   }
 
   public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
-    if (authorization != null) {
+    if (authorization == null) {
       synchronized (this) {
-        if (authorization != null) {
-          return;
+        if (authorization == null) {
+          String authorizationProvider =
+              (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
+          if (authorizationProvider == null) {
+            LOG.info("Authorization provider is not set!");
+            return;
+          }
+          try {
+            authorization =
+                classLoader.withClassLoader(
+                    cl -> {
+                      try {
+                        ServiceLoader<AuthorizationProvider> loader =
+                            ServiceLoader.load(AuthorizationProvider.class, cl);
+
+                        List<Class<? extends AuthorizationProvider>> providers =
+                            Streams.stream(loader.iterator())
+                                .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
+                                .map(AuthorizationProvider::getClass)
+                                .collect(Collectors.toList());
+                        if (providers.isEmpty()) {
+                          throw new IllegalArgumentException(
+                              "No authorization provider found for: " + authorizationProvider);
+                        } else if (providers.size() > 1) {
+                          throw new IllegalArgumentException(
+                              "Multiple authorization providers found for: "
+                                  + authorizationProvider);
+                        }
+                        return (BaseAuthorization<?>)
+                            Iterables.getOnlyElement(providers)
+                                .getDeclaredConstructor()
+                                .newInstance();
+                      } catch (Exception e) {
+                        LOG.error("Failed to create authorization instance", e);
+                        throw new RuntimeException(e);
+                      }
+                    });
+          } catch (Exception e) {
+            LOG.error("Failed to load authorization with class loader", e);
+            throw new RuntimeException(e);
+          }
         }
       }
-    }
-
-    String authorizationProvider =
-        (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
-    if (authorizationProvider == null) {
-      LOG.info("Authorization provider is not set!");
-      return;
-    }
-
-    try {
-      authorization =
-          classLoader.withClassLoader(
-              cl -> {
-                try {
-                  ServiceLoader<AuthorizationProvider> loader =
-                      ServiceLoader.load(AuthorizationProvider.class, cl);
-
-                  List<Class<? extends AuthorizationProvider>> providers =
-                      Streams.stream(loader.iterator())
-                          .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
-                          .map(AuthorizationProvider::getClass)
-                          .collect(Collectors.toList());
-                  if (providers.isEmpty()) {
-                    throw new IllegalArgumentException(
-                        "No authorization provider found for: " + authorizationProvider);
-                  } else if (providers.size() > 1) {
-                    throw new IllegalArgumentException(
-                        "Multiple authorization providers found for: " + authorizationProvider);
-                  }
-                  return (BaseAuthorization<?>)
-                      Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
-                } catch (Exception e) {
-                  LOG.error("Failed to create authorization instance", e);
-                  throw new RuntimeException(e);
-                }
-              });
-    } catch (Exception e) {
-      LOG.error("Failed to load authorization with class loader", e);
-      throw new RuntimeException(e);
     }
   }
 
