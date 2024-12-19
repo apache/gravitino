@@ -133,6 +133,23 @@ paths:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles~1%7Brole%7D"
 
   /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
+    parameters:
+      - $ref: '#/components/parameters/metalake'
+      - name: metadataObjectType
+        in: path
+        description: The type of the metadata object
+        required: true
+        schema:
+          type: string
+          enum:
+            - "CATALOG"
+            - "SCHEMA"
+            - "TABLE"
+            - "FILESET"
+            - "TOPIC"
+            - "ROLE"
+            - "METALAKE"
+      - $ref: '#/components/parameters/metadataObjectFullName'
     $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
 
   /metalakes/{metalake}/permissions/users/{user}/grant:
