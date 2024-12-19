@@ -619,7 +619,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (propertySet != null && valueSet != null) {
           newSetTagProperty(url, ignore, metalake, getOneTag(tags), propertySet, valueSet).handle();
         } else if (propertySet == null && valueSet == null) {
+          if (!hasEntity(name)) {
+            System.err.println(ErrorMessages.MALFORMED_NAME);
+            return;
+          }
           newTagEntity(url, ignore, metalake, name, tags).handle();
+        } else {
+          System.err.println(
+              "This command cannot be executed. The tag set command only supports configuring tag properties or attaching tags to entities.");
         }
         break;
 
@@ -627,12 +634,20 @@ public class GravitinoCommandLine extends TestableCommandLine {
         boolean isTag = line.hasOption(GravitinoOptions.TAG);
         if (!isTag) {
           boolean forceRemove = line.hasOption(GravitinoOptions.FORCE);
+          if (!hasEntity(name)) {
+            System.err.println(ErrorMessages.MALFORMED_NAME);
+            return;
+          }
           newRemoveAllTags(url, ignore, metalake, name, forceRemove).handle();
         } else {
           String propertyRemove = line.getOptionValue(GravitinoOptions.PROPERTY);
           if (propertyRemove != null) {
             newRemoveTagProperty(url, ignore, metalake, getOneTag(tags), propertyRemove).handle();
           } else {
+            if (!hasEntity(name)) {
+              System.err.println(ErrorMessages.MALFORMED_NAME);
+              return;
+            }
             newUntagEntity(url, ignore, metalake, name, tags).handle();
           }
         }
@@ -662,6 +677,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
   private String getOneTag(String[] tags) {
     Preconditions.checkArgument(tags.length <= 1, ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
     return tags[0];
+  }
+
+  private boolean hasEntity(FullName name) {
+    // TODO fileset and topic
+    return !(Objects.isNull(name.getCatalogName())
+        && Objects.isNull(name.getSchemaName())
+        && Objects.isNull(name.getTableName()));
   }
 
   /** Handles the command execution for Roles based on command type and the command line options. */

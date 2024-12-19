@@ -315,6 +315,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(false);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.table");
     GravitinoCommandLine commandLine =
         spy(
