@@ -66,7 +66,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
   // Underlying access control system plugin for this catalog.
-  private volatile BaseAuthorization<?> authorization;
+  private volatile AuthorizationPlugin authorizationPlugin;
 
   private CatalogEntity entity;
 
@@ -187,20 +187,20 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   public AuthorizationPlugin getAuthorizationPlugin() {
-    if (authorization == null) {
+    if (authorizationPlugin == null) {
       synchronized (this) {
-        if (authorization == null) {
+        if (authorizationPlugin == null) {
           return null;
         }
       }
     }
-    return (AuthorizationPlugin) authorization;
+    return authorizationPlugin;
   }
 
   public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
-    if (authorization == null) {
+    if (authorizationPlugin == null) {
       synchronized (this) {
-        if (authorization == null) {
+        if (authorizationPlugin == null) {
           String authorizationProvider =
               (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
           if (authorizationProvider == null) {
@@ -208,7 +208,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             return;
           }
           try {
-            authorization =
+            BaseAuthorization<?> authorization =
                 classLoader.withClassLoader(
                     cl -> {
                       try {
@@ -237,6 +237,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
                         throw new RuntimeException(e);
                       }
                     });
+            authorizationPlugin =
+                authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
             throw new RuntimeException(e);
@@ -252,9 +254,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       ops.close();
       ops = null;
     }
-    if (authorization != null) {
-      authorization.close();
-      authorization = null;
+    if (authorizationPlugin != null) {
+      authorizationPlugin.close();
+      authorizationPlugin = null;
     }
   }
 
