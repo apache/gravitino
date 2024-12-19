@@ -384,21 +384,25 @@ public class GravitinoCommandLine extends TestableCommandLine {
                 schema == null ? CommandEntities.SCHEMA : null)
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
-    if (!missingEntities.isEmpty()) {
-      System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
-      return;
-    }
 
     // Handle CommandActions.LIST action separately as it doesn't require the `table`
     if (CommandActions.LIST.equals(command)) {
+      if (!missingEntities.isEmpty()) {
+        System.err.println(
+            "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
+        return;
+      }
       newListTables(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
     String table = name.getTableName();
-
     if (Objects.isNull(table)) {
-      System.err.println("Missing required argument(s): " + CommandEntities.TABLE);
+      missingEntities.add(CommandEntities.TABLE);
+    }
+
+    if (!missingEntities.isEmpty()) {
+      System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
       return;
     }
 

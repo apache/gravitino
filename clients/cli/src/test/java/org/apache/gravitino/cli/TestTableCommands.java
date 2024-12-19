@@ -483,7 +483,9 @@ class TestTableCommands {
                 "Missing required argument(s): "
                     + CommandEntities.CATALOG
                     + ", "
-                    + CommandEntities.SCHEMA));
+                    + CommandEntities.SCHEMA
+                    + ", "
+                    + CommandEntities.TABLE));
   }
 
   @Test
@@ -500,7 +502,13 @@ class TestTableCommands {
     verify(commandLine, never())
         .newTableDetails(GravitinoCommandLine.DEFAULT_URL, false, METALAKE, CATALOG, null, null);
     assertTrue(
-        errContent.toString().contains("Missing required argument(s): " + CommandEntities.SCHEMA));
+        errContent
+            .toString()
+            .contains(
+                "Missing required argument(s): "
+                    + CommandEntities.SCHEMA
+                    + ", "
+                    + CommandEntities.TABLE));
   }
 
   @Test
