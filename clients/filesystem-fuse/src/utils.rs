@@ -19,6 +19,7 @@
 
 // join the parent and name to a path
 pub fn join_file_path(parent: &str, name: &str) -> String {
+    //TODO handle corner cases
     if parent.is_empty() {
         name.to_string()
     } else {
