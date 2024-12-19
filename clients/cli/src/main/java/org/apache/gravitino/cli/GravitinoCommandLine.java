@@ -127,7 +127,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (command.equals(CommandActions.HELP)) {
+    if (CommandActions.HELP.equals(command)) {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
       handleOwnerCommand();
@@ -895,14 +895,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
 
-    if (command.equals(CommandActions.LIST)) {
+    Command.setAuthenticationMode(auth, userName);
+
+    if (CommandActions.LIST.equals(command)) {
       newListTopics(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
     String topic = name.getTopicName();
-
-    Command.setAuthenticationMode(auth, userName);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -972,7 +972,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
-    if (command.equals(CommandActions.LIST)) {
+    if (CommandActions.LIST.equals(command)) {
       newListFilesets(url, ignore, metalake, catalog, schema).handle();
       return;
     }
