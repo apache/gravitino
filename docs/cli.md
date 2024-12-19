@@ -672,6 +672,12 @@ gcli catalog set --owner --group groupA --name postgres
 
 ### Role commands
 
+When granting or revoking privileges the following privileges can be used.
+
+create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants
+
+Note that some are only valid for certain entities.
+
 #### Display role details
 
 ```bash
@@ -721,8 +727,21 @@ gcli group grant --group groupA --role admin
 ```
 
 #### Remove a role from a group
+
 ```bash
 gcli group revoke --group groupA --role admin
+```
+
+### Grant a privilege
+
+```bash
+gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
+```
+
+### Revoke a privilege
+
+```bash
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Topic commands

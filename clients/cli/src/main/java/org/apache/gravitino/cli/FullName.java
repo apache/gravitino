@@ -134,6 +134,19 @@ public class FullName {
   }
 
   /**
+   * Retrieves the name from the command line options.
+   *
+   * @return The name, or null if not found.
+   */
+  public String getName() {
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      return line.getOptionValue(GravitinoOptions.NAME);
+    }
+
+    return null;
+  }
+
+  /**
    * Helper method to retrieve a specific part of the full name based on the position of the part.
    *
    * @param position The position of the name part in the full name string.

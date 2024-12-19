@@ -672,6 +672,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String role = line.getOptionValue(GravitinoOptions.ROLE);
+    String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
 
     Command.setAuthenticationMode(auth, userName);
 
@@ -695,6 +696,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
       case CommandActions.DELETE:
         boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
         newDeleteRole(url, ignore, forceDelete, metalake, role).handle();
+        break;
+
+      case CommandActions.GRANT:
+        newGrantPrivilegesToRole(url, ignore, metalake, role, name, privileges).handle();
+        break;
+
+      case CommandActions.REVOKE:
+        newRevokePrivilegesFromRole(url, ignore, metalake, role, name, privileges).handle();
         break;
 
       default:
