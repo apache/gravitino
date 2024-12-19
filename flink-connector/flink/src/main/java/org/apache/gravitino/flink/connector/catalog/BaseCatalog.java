@@ -85,10 +85,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
   private final PartitionConverter partitionConverter;
 
-  protected BaseCatalog(String catalogName, String defaultDatabase) {
+  protected BaseCatalog(
+      String catalogName,
+      String defaultDatabase,
+      PropertiesConverter propertiesConverter,
+      PartitionConverter partitionConverter) {
     super(catalogName, defaultDatabase);
-    this.propertiesConverter = getPropertiesConverter();
-    this.partitionConverter = getPartitionConverter();
+    this.propertiesConverter = propertiesConverter;
+    this.partitionConverter = partitionConverter;
   }
 
   protected abstract AbstractCatalog realCatalog();
@@ -507,10 +511,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws PartitionNotExistException, CatalogException {
     throw new UnsupportedOperationException();
   }
-
-  protected abstract PropertiesConverter getPropertiesConverter();
-
-  protected abstract PartitionConverter getPartitionConverter();
 
   protected CatalogBaseTable toFlinkTable(Table table) {
     org.apache.flink.table.api.Schema.Builder builder =

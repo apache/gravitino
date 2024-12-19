@@ -69,20 +69,8 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
 
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws ModelAlreadyExistsException {
+      throws NoSuchSchemaException, ModelAlreadyExistsException {
     return dispatcher.registerModel(normalizeNameIdentifier(ident), comment, properties);
-  }
-
-  @Override
-  public Model registerModel(
-      NameIdentifier ident,
-      String uri,
-      String[] aliases,
-      String comment,
-      Map<String, String> properties)
-      throws ModelAlreadyExistsException, ModelVersionAliasesAlreadyExistException {
-    return dispatcher.registerModel(
-        normalizeNameIdentifier(ident), uri, aliases, comment, properties);
   }
 
   @Override
@@ -120,15 +108,14 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   @Override
-  public ModelVersion linkModelVersion(
+  public void linkModelVersion(
       NameIdentifier ident,
       String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    return dispatcher.linkModelVersion(
-        normalizeCaseSensitive(ident), uri, aliases, comment, properties);
+    dispatcher.linkModelVersion(normalizeCaseSensitive(ident), uri, aliases, comment, properties);
   }
 
   @Override

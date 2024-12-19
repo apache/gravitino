@@ -446,6 +446,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(schemaPath));
 
       // Test drop non-empty schema with cascade = false
+      createSchema(name, comment, catalogPath, null);
       Fileset fs1 = createFileset("fs1", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
 
@@ -459,6 +460,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(fs1Path));
 
       // Test drop both managed and external filesets
+      createSchema(name, comment, catalogPath, null);
       Fileset fs2 = createFileset("fs2", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs2Path = new Path(fs2.storageLocation());
 
@@ -472,6 +474,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(fs.exists(fs3Path));
 
       // Test drop schema with different storage location
+      createSchema(name, comment, catalogPath, null);
       Path fs4Path = new Path(TEST_ROOT_PATH + "/fs4");
       createFileset("fs4", name, "comment", Fileset.Type.MANAGED, catalogPath, fs4Path.toString());
       ops.dropSchema(id, true);
