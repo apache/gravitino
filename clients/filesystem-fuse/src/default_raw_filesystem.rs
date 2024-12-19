@@ -35,7 +35,7 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
     file_entry_manager: RwLock<FileEntryManager>,
     /// opened files
     opened_file_manager: OpenedFileManager,
-    /// inode id generator
+    /// file id generator
     file_id_generator: AtomicU64,
 
     /// real filesystem
