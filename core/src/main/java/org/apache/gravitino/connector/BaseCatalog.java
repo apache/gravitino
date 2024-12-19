@@ -188,14 +188,22 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   public AuthorizationPlugin getAuthorizationPlugin() {
     if (authorization == null) {
-      return null;
+      synchronized (this) {
+        if (authorization == null) {
+          return null;
+        }
+      }
     }
-    return authorization.plugin(entity.namespace().level(0), provider(), this.conf);
+    return authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
   }
 
   public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
     if (authorization != null) {
-      return;
+      synchronized (this) {
+        if (authorization != null) {
+          return;
+        }
+      }
     }
 
     String authorizationProvider =
