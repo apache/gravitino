@@ -271,6 +271,11 @@ public class AuthorizationUtils {
       if (baseCatalog.getAuthorizationPlugin() != null) {
         consumer.accept(baseCatalog.getAuthorizationPlugin());
       }
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
+              catalog.type()));
     }
   }
 
