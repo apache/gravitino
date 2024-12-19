@@ -50,18 +50,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws ModelAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented");
-  }
-
-  @Override
-  public Model registerModel(
-      NameIdentifier ident,
-      String uri,
-      String[] aliases,
-      String comment,
-      Map<String, String> properties)
-      throws ModelAlreadyExistsException, ModelVersionAliasesAlreadyExistException {
+      throws NoSuchModelException, ModelAlreadyExistsException {
     throw new UnsupportedOperationException("Not implemented");
   }
 
@@ -88,7 +77,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   }
 
   @Override
-  public ModelVersion linkModelVersion(
+  public void linkModelVersion(
       NameIdentifier ident,
       String uri,
       String[] aliases,

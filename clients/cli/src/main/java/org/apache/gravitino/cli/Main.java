@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Locale;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -44,7 +45,7 @@ public class Main {
       String[] extra = line.getArgs();
       if (extra.length > 2) {
         System.err.println(ErrorMessages.TOO_MANY_ARGUMENTS);
-        Main.exit(-1);
+        exit(-1);
       }
       String command = resolveCommand(line);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
@@ -57,7 +58,7 @@ public class Main {
     } catch (ParseException exp) {
       System.err.println("Error parsing command line: " + exp.getMessage());
       GravitinoCommandLine.displayHelp(options);
-      Main.exit(-1);
+      exit(-1);
     }
   }
 
@@ -91,7 +92,7 @@ public class Main {
     String[] args = line.getArgs();
 
     if (args.length == 2) {
-      String action = args[1];
+      String action = args[1].toLowerCase(Locale.ENGLISH);
       if (CommandActions.isValidCommand(action)) {
         return action;
       }
@@ -103,7 +104,7 @@ public class Main {
     }
 
     System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-    Main.exit(-1);
+    exit(-1);
     return null; // not needed but gives error if not here
   }
 
@@ -118,12 +119,12 @@ public class Main {
     String[] args = line.getArgs();
 
     if (args.length >= 1) {
-      String entity = args[0];
+      String entity = args[0].toLowerCase(Locale.ENGLISH);
       if (CommandEntities.isValidEntity(entity)) {
         return entity;
       } else {
         System.err.println(ErrorMessages.UNKNOWN_ENTITY);
-        Main.exit(-1);
+        exit(-1);
       }
     }
 

@@ -284,6 +284,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             NonEmptySchemaException.class,
             RuntimeException.class);
 
+    // For managed schema, we don't need to drop the schema from the store again.
+    boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
+    if (isManagedSchema) {
+      return droppedFromCatalog;
+    }
+
     // For unmanaged schema, it could happen that the schema:
     // 1. Is not found in the catalog (dropped directly from underlying sources)
     // 2. Is found in the catalog but not in the store (not managed by Gravitino)
@@ -292,20 +298,15 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // In all situations, we try to delete the schema from the store, but we don't take the
     // return value of the store operation into account. We only take the return value of the
     // catalog into account.
-    //
-    // For managed schema, we should take the return value of the store operation into account.
-    boolean droppedFromStore = false;
     try {
-      droppedFromStore = store.delete(ident, SCHEMA, cascade);
+      store.delete(ident, SCHEMA, cascade);
     } catch (NoSuchEntityException e) {
       LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
-    return isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
-        ? droppedFromStore
-        : droppedFromCatalog;
+    return droppedFromCatalog;
   }
 
   private void importSchema(NameIdentifier identifier) {
