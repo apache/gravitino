@@ -50,6 +50,7 @@ import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.FilesetDetails;
+import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListAllTags;
@@ -85,6 +86,7 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
 import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
@@ -861,5 +863,25 @@ public class TestableCommandLine {
       String columnFile,
       String comment) {
     return new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment);
+  }
+
+  protected GrantPrivilegesToRole newGrantPrivilegesToRole(
+      String url,
+      boolean ignore,
+      String metalake,
+      String role,
+      FullName entity,
+      String[] privileges) {
+    return new GrantPrivilegesToRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected RevokePrivilegesFromRole newRevokePrivilegesFromRole(
+      String url,
+      boolean ignore,
+      String metalake,
+      String role,
+      FullName entity,
+      String[] privileges) {
+    return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
   }
 }
