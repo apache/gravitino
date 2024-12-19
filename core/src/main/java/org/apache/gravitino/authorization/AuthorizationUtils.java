@@ -173,9 +173,11 @@ public class AuthorizationUtils {
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
-      Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
-      for (Catalog catalog : catalogs) {
-        callAuthorizationPluginImpl(consumer, catalog);
+      NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
+      // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
+      // call authorization plugin method.
+      for (NameIdentifier catalog : catalogs) {
+        callAuthorizationPluginImpl(consumer, catalogManager.loadCatalog(catalog));
       }
     } else if (needApplyAuthorization(metadataObject.type())) {
       NameIdentifier catalogIdent =
@@ -269,6 +271,11 @@ public class AuthorizationUtils {
       if (baseCatalog.getAuthorizationPlugin() != null) {
         consumer.accept(baseCatalog.getAuthorizationPlugin());
       }
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
+              catalog.type()));
     }
   }
 
