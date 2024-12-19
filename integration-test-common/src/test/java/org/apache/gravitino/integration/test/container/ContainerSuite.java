@@ -69,6 +69,7 @@ public class ContainerSuite implements Closeable {
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
+  private static volatile ClickHouseContainer clickHouseContainer;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
   private static volatile OceanBaseContainer oceanBaseContainer;
@@ -373,6 +374,33 @@ public class ContainerSuite implements Closeable {
     }
     synchronized (MySQLContainer.class) {
       mySQLVersion5Container.createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startClickHouseContainer(TestDatabaseName testDatabaseName) {
+    if (clickHouseContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (clickHouseContainer == null) {
+          initIfNecessary();
+          // Start ClickHouse container
+          ClickHouseContainer.Builder clickHouseBuilder =
+              ClickHouseContainer.builder()
+                  .withHostName("gravitino-ci-clickhouse")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
+                          .build())
+                  .withExposePorts(ImmutableSet.of(ClickHouseContainer.CLICKHOUSE_PORT))
+                  .withNetwork(network);
+
+          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
+          container.start();
+          clickHouseContainer = container;
+        }
+      }
+    }
+    synchronized (ClickHouseContainer.class) {
+      clickHouseContainer.createDatabase(testDatabaseName);
     }
   }
 
@@ -711,5 +739,9 @@ public class ContainerSuite implements Closeable {
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);
     }
+  }
+
+  public ClickHouseContainer getClickHouseContainer() {
+    return clickHouseContainer;
   }
 }
