@@ -82,24 +82,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchModelException, ModelAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    TreeLockUtils.doWithTreeLock(
-        catalogIdent,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                catalogIdent,
-                c ->
-                    c.doWithPropertiesMeta(
-                        p -> {
-                          validatePropertyForCreate(p.filesetPropertiesMetadata(), properties);
-                          return null;
-                        }),
-                IllegalArgumentException.class));
-
-    long uid = idGenerator.nextId();
-    StringIdentifier stringId = StringIdentifier.fromId(uid);
-    Map<String, String> updatedProperties =
-        StringIdentifier.newPropertiesWithId(stringId, properties);
+    Map<String, String> updatedProperties = checkAndUpdateProperties(catalogIdent, properties);
 
     Model registeredModel =
         TreeLockUtils.doWithTreeLock(
@@ -185,24 +168,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    TreeLockUtils.doWithTreeLock(
-        catalogIdent,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                catalogIdent,
-                c ->
-                    c.doWithPropertiesMeta(
-                        p -> {
-                          validatePropertyForCreate(p.filesetPropertiesMetadata(), properties);
-                          return null;
-                        }),
-                IllegalArgumentException.class));
-
-    long uid = idGenerator.nextId();
-    StringIdentifier stringId = StringIdentifier.fromId(uid);
-    Map<String, String> updatedProperties =
-        StringIdentifier.newPropertiesWithId(stringId, properties);
+    Map<String, String> updatedProperties = checkAndUpdateProperties(catalogIdent, properties);
 
     TreeLockUtils.doWithTreeLock(
         ident,
@@ -255,5 +221,26 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 catalogIdent,
                 HasPropertyMetadata::modelPropertiesMetadata,
                 modelVersion.properties()));
+  }
+
+  private Map<String, String> checkAndUpdateProperties(
+      NameIdentifier catalogIdent, Map<String, String> properties) {
+    TreeLockUtils.doWithTreeLock(
+        catalogIdent,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                catalogIdent,
+                c ->
+                    c.doWithPropertiesMeta(
+                        p -> {
+                          validatePropertyForCreate(p.modelPropertiesMetadata(), properties);
+                          return null;
+                        }),
+                IllegalArgumentException.class));
+
+    long uid = idGenerator.nextId();
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    return StringIdentifier.newPropertiesWithId(stringId, properties);
   }
 }
