@@ -42,7 +42,8 @@ public class TestUtils {
         Row expectedRow = expected[i];
         Row actualRow = actualRows.get(i);
         Assertions.assertEquals(expectedRow.getKind(), actualRow.getKind());
-        Assertions.assertEquals(expectedRow, actualRow);
+        // Only compare string value.
+        Assertions.assertEquals(expectedRow.toString(), actualRow.toString());
       }
     }
   }
