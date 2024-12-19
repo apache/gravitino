@@ -561,10 +561,10 @@ The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObj
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/roles
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/roles
 ```
 
 </TabItem>
