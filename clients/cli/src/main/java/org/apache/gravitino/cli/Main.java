@@ -73,8 +73,7 @@ public class Main {
    */
   public static void exit(int code) {
     if (useExit) {
-      throw new RuntimeException("Exit with code " + code);
-      // System.exit(code);
+      System.exit(code);
     } else {
       throw new RuntimeException("Exit with code " + code);
     }
