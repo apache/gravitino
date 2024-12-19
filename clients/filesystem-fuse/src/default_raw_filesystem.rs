@@ -167,7 +167,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn lookup(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut file_stat = self.fs.lookup(&parent_file_entry.path, name).await?;
+        let path = join_file_path(&parent_file_entry.path, name);
+        let mut file_stat = self.fs.lookup(&path).await?;
         // fill the file id to file stat
         self.resolve_file_id_to_filestat(&mut file_stat, parent_file_id)
             .await;
@@ -200,10 +201,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         flags: u32,
     ) -> crate::filesystem::Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut opened_file = self
-            .fs
-            .create_file(&parent_file_entry.path, name, OpenFileFlags(flags))
-            .await?;
+        let path = join_file_path(&parent_file_entry.path, name);
+        let mut opened_file = self.fs.create_file(&path, OpenFileFlags(flags)).await?;
 
         opened_file.set_file_id(parent_file_id, self.next_file_id());
 
@@ -225,7 +224,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<u64> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut filestat = self.fs.create_dir(&parent_file_entry.path, name).await?;
+        let path = join_file_path(&parent_file_entry.path, name);
+        let mut filestat = self.fs.create_dir(&path).await?;
 
         filestat.set_file_id(parent_file_id, self.next_file_id());
 
@@ -244,24 +244,26 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        self.fs.remove_file(&parent_file_entry.path, name).await?;
+        let path = join_file_path(&parent_file_entry.path, name);
+        self.fs.remove_file(&path).await?;
 
         // remove the file from file entry manager
         {
             let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.remove(&join_file_path(&parent_file_entry.path, name));
+            file_manager.remove(&path);
         }
         Ok(())
     }
 
     async fn remove_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        self.fs.remove_dir(&parent_file_entry.path, name).await?;
+        let path = join_file_path(&parent_file_entry.path, name);
+        self.fs.remove_dir(&path).await?;
 
         // remove the dir from file entry manager
         {
             let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.remove(&join_file_path(&parent_file_entry.path, name));
+            file_manager.remove(&path);
         }
         Ok(())
     }

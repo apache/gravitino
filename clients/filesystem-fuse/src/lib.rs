@@ -19,6 +19,15 @@
 mod default_raw_filesystem;
 mod filesystem;
 mod fuse_api_handle;
+mod fuse_server;
+mod memory_filesystem;
+mod mount;
 mod opened_file;
 mod opened_file_manager;
 mod utils;
+
+pub async fn gvfs_mount() -> fuse3::Result<()> {
+    mount::mount().await
+}
+
+pub fn gvfs_unmount() {}

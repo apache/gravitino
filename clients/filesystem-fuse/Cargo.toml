@@ -42,4 +42,5 @@ libc = "0.2.168"
 log = "0.4.22"
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+regex = "1.11.1"
 
