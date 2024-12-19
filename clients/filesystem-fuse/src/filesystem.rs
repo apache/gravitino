@@ -96,7 +96,7 @@ pub(crate) trait PathFileSystem: Send + Sync {
     /// Get the file stat by parent file path and file name, if the file exists, return the file stat
     async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat>;
 
-    /// Read the directory by file path, if the is a valid directory, return the file stat list
+    /// Read the directory by file path, if the directory exists, return the file stat list
     async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>>;
 
     /// Open the file by file path and flags, if the file exists, return the opened file
