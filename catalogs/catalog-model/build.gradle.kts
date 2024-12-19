@@ -40,11 +40,17 @@ dependencies {
     exclude(group = "*")
   }
 
-  compileOnly(libs.guava)
-
+  implementation(libs.guava)
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.commons.io)
+  testImplementation(libs.commons.lang3)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.junit.jupiter.api)

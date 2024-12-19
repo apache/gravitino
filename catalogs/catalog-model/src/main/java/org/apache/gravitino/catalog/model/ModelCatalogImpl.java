@@ -20,12 +20,14 @@ package org.apache.gravitino.catalog.model;
 
 import java.util.Map;
 import org.apache.gravitino.CatalogProvider;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 
-public class ModelCatalog extends BaseCatalog<ModelCatalog> {
+public class ModelCatalogImpl extends BaseCatalog<ModelCatalogImpl> {
 
   private static final ModelCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
       new ModelCatalogPropertiesMetadata();
@@ -43,7 +45,8 @@ public class ModelCatalog extends BaseCatalog<ModelCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    return null;
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    return new ModelCatalogOperations(store);
   }
 
   @Override

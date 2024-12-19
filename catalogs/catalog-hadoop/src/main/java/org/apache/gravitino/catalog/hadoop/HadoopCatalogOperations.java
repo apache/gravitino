@@ -44,12 +44,12 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -74,7 +74,8 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
+public class HadoopCatalogOperations extends ManagedSchemaOperations
+    implements CatalogOperations, FilesetCatalog {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
@@ -104,7 +105,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this(GravitinoEnv.getInstance().entityStore());
   }
 
-  public EntityStore getStore() {
+  @Override
+  public EntityStore store() {
     return store;
   }
 
@@ -452,19 +454,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    try {
-      List<SchemaEntity> schemas =
-          store.list(namespace, SchemaEntity.class, Entity.EntityType.SCHEMA);
-      return schemas.stream()
-          .map(s -> NameIdentifier.of(namespace, s.name()))
-          .toArray(NameIdentifier[]::new);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to list schemas under namespace " + namespace, e);
-    }
-  }
-
-  @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
@@ -496,53 +485,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       }
     }
 
-    StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-    Preconditions.checkNotNull(stringId, "Property String identifier should not be null");
-
-    SchemaEntity schemaEntity =
-        SchemaEntity.builder()
-            .withName(ident.name())
-            .withId(stringId.id())
-            .withNamespace(ident.namespace())
-            .withComment(comment)
-            .withProperties(properties)
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .build();
-    try {
-      store.put(schemaEntity, true /* overwrite */);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to create schema " + ident, ioe);
-    }
-
-    return HadoopSchema.builder()
-        .withName(ident.name())
-        .withComment(comment)
-        .withProperties(schemaEntity.properties())
-        .withAuditInfo(schemaEntity.auditInfo())
-        .build();
-  }
-
-  @Override
-  public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    try {
-      SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
-
-      return HadoopSchema.builder()
-          .withName(ident.name())
-          .withComment(schemaEntity.comment())
-          .withProperties(schemaEntity.properties())
-          .withAuditInfo(schemaEntity.auditInfo())
-          .build();
-
-    } catch (NoSuchEntityException exception) {
-      throw new NoSuchSchemaException(exception, SCHEMA_DOES_NOT_EXIST_MSG, ident);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load schema " + ident, ioe);
-    }
+    return super.createSchema(ident, comment, properties);
   }
 
   @Override
@@ -556,32 +499,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
     }
 
-    try {
-      SchemaEntity entity =
-          store.update(
-              ident,
-              SchemaEntity.class,
-              Entity.EntityType.SCHEMA,
-              schemaEntity -> updateSchemaEntity(ident, schemaEntity, changes));
-
-      return HadoopSchema.builder()
-          .withName(ident.name())
-          .withComment(entity.comment())
-          .withProperties(entity.properties())
-          .withAuditInfo(entity.auditInfo())
-          .build();
-
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to update schema " + ident, ioe);
-    } catch (NoSuchEntityException nsee) {
-      throw new NoSuchSchemaException(nsee, SCHEMA_DOES_NOT_EXIST_MSG, ident);
-    } catch (AlreadyExistsException aee) {
-      throw new RuntimeException(
-          "Schema with the same name "
-              + ident.name()
-              + " already exists, this is unexpected because schema doesn't support rename",
-          aee);
-    }
+    return super.alterSchema(ident, changes);
   }
 
   @Override
@@ -598,6 +516,16 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           store.list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
       if (!filesets.isEmpty() && !cascade) {
         throw new NonEmptySchemaException("Schema %s is not empty", ident);
+      }
+
+      SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
+      Map<String, String> properties =
+          Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
+      Path schemaPath = getSchemaPath(ident.name(), properties);
+
+      boolean dropped = super.dropSchema(ident, cascade);
+      if (!dropped) {
+        return false;
       }
 
       // Delete all the managed filesets no matter whether the storage location is under the
@@ -635,30 +563,21 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 }
               });
 
-      SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
-      Map<String, String> properties =
-          Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
-
       // Delete the schema path if it exists and is empty.
-      Path schemaPath = getSchemaPath(ident.name(), properties);
-      // Nothing to delete if the schema path is not set.
-      if (schemaPath == null) {
-        return false;
-      }
-
-      FileSystem fs = getFileSystem(schemaPath, conf);
-      // Nothing to delete if the schema path does not exist.
-      if (!fs.exists(schemaPath)) {
-        return false;
-      }
-
-      FileStatus[] statuses = fs.listStatus(schemaPath);
-      if (statuses.length == 0) {
-        if (fs.delete(schemaPath, true)) {
-          LOG.info("Deleted schema {} location {}", ident, schemaPath);
-        } else {
-          LOG.warn("Failed to delete schema {} location {}", ident, schemaPath);
-          return false;
+      if (schemaPath != null) {
+        FileSystem fs = getFileSystem(schemaPath, conf);
+        if (fs.exists(schemaPath)) {
+          FileStatus[] statuses = fs.listStatus(schemaPath);
+          if (statuses.length == 0) {
+            if (fs.delete(schemaPath, true)) {
+              LOG.info("Deleted schema {} location {}", ident, schemaPath);
+            } else {
+              LOG.warn(
+                  "Failed to delete schema {} because it has files/folders under location {}",
+                  ident,
+                  schemaPath);
+            }
+          }
         }
       }
 
