@@ -94,19 +94,19 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn init(&self) -> Result<()>;
 
     /// Get the file stat by file path, if the file is exist, return the file stat
-    async fn stat(&self, name: &str) -> Result<FileStat>;
+    async fn stat(&self, path: &str) -> Result<FileStat>;
 
     /// Get the file stat by parent file path and file name, if the file is exist, return the file stat
     async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat>;
 
     /// Read the directory by file path, if the file is a valid directory, return the file stat list
-    async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>>;
+    async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>>;
 
     /// Open the file by file path and flags, if the file is exist, return the opened file
-    async fn open_file(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn open_file(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Open the directory by file path and flags, if the file is exist, return the opened file
-    async fn open_dir(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn open_dir(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Create the file by parent file path and file name and flags, if successful, return the opened file
     async fn create_file(
@@ -120,7 +120,7 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat>;
 
     /// Set the file attribute by file path and file stat
-    async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
+    async fn set_attr(&self, path: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
 
     /// Remove the file by parent file path and file name
     async fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
