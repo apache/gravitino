@@ -46,7 +46,7 @@ public class UpdateFilesetName extends Command {
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param fileset The name of the fileset.
-   * @param name The new metalake name.
+   * @param name The new fileset name.
    */
   public UpdateFilesetName(
       String url,
