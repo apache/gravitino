@@ -175,15 +175,15 @@ Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_na
 
 Gravitino Iceberg REST service supports generating SAS token to access ADLS data.
 
-| Configuration item                                  | Description                                                                                               | Default value | Required | Since Version    |
-|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl`                    | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS. | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.credential-provider-type`   | Supports `adls-token`, generates a temporary token according to the query data path.                      | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data.                                                 | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                  | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.azure-tenant-id`            | Azure Active Directory (AAD) tenant ID.                                                                   | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.azure-client-id`            | Azure Active Directory (AAD) client ID used for authentication.                                           | (none)        | Yes      | 0.8.0-incubating |
-| `gravitino.iceberg-rest.azure-client-secret`        | Azure Active Directory (AAD) client secret used for authentication.                                       | (none)        | Yes      | 0.8.0-incubating |
+| Configuration item                                  | Description                                                                                                                                                                                         | Default value | Required | Since Version    |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl`                    | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS.                                                                                           | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.credential-provider-type`   | Supports `adls-token` and `adls-account-key`. `adls-token` generates a temporary token according to the query data path while `adls-account-key` using the storage account key to access ADLS data. | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data.                                                                                                                                           | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                                                                                                            | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-tenant-id`            | Azure Active Directory (AAD) tenant ID, only used when `credential-provider-type` is `adls-token`.                                                                                                  | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-client-id`            | Azure Active Directory (AAD) client ID used for authentication, only used when `credential-provider-type` is `adls-token`.                                                                          | (none)        | Yes      | 0.8.0-incubating |
+| `gravitino.iceberg-rest.azure-client-secret`        | Azure Active Directory (AAD) client secret used for authentication, only used when `credential-provider-type` is `adls-token`.                                                                      | (none)        | Yes      | 0.8.0-incubating |
 
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 

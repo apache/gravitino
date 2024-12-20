@@ -165,4 +165,31 @@ public class TestCredentialFactory {
     Assertions.assertEquals(sasToken, adlsTokenCredential.sasToken());
     Assertions.assertEquals(expireTime, adlsTokenCredential.expireTimeInMs());
   }
+
+  @Test
+  void testADLSAccountKeyCredential() {
+    String storageAccountName = "storage-account-name";
+    String storageAccountKey = "storage-account-key";
+
+    Map<String, String> adlsAccountKeyCredentialInfo =
+        ImmutableMap.of(
+            ADLSAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            storageAccountName,
+            ADLSAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+            storageAccountKey);
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            ADLSAccountKeyCredential.ADLS_ACCOUNT_KEY_CREDENTIAL_TYPE,
+            adlsAccountKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        ADLSAccountKeyCredential.ADLS_ACCOUNT_KEY_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(ADLSAccountKeyCredential.class, credential);
+
+    ADLSAccountKeyCredential adlsAccountKeyCredential = (ADLSAccountKeyCredential) credential;
+    Assertions.assertEquals(storageAccountName, adlsAccountKeyCredential.accountName());
+    Assertions.assertEquals(storageAccountKey, adlsAccountKeyCredential.accountKey());
+    Assertions.assertEquals(expireTime, adlsAccountKeyCredential.expireTimeInMs());
+  }
 }
