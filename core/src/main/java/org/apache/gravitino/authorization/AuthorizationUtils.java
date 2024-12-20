@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -39,6 +41,7 @@ import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -144,8 +147,8 @@ public class AuthorizationUtils {
   public static void callAuthorizationPluginForSecurableObjects(
       String metalake,
       List<SecurableObject> securableObjects,
-      Set<String> catalogsAlreadySet,
-      Consumer<AuthorizationPlugin> consumer) {
+      BiConsumer<AuthorizationPlugin, String> consumer) {
+    Set<String> catalogsAlreadySet = Sets.newHashSet();
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
       if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
@@ -245,40 +248,6 @@ public class AuthorizationUtils {
     }
   }
 
-  private static void checkCatalogType(
-      NameIdentifier catalogIdent, Catalog.Type type, Privilege privilege) {
-    Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
-    if (catalog.type() != type) {
-      throw new IllegalPrivilegeException(
-          "Catalog %s type %s doesn't support privilege %s",
-          catalogIdent, catalog.type(), privilege);
-    }
-  }
-
-  private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {
-    return type == MetadataObject.Type.METALAKE;
-  }
-
-  private static boolean needApplyAuthorization(MetadataObject.Type type) {
-    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
-  }
-
-  private static void callAuthorizationPluginImpl(
-      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
-
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin());
-      }
-    } else {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
-              catalog.type()));
-    }
-  }
-
   public static void authorizationPluginRemovePrivileges(
       NameIdentifier ident, Entity.EntityType type) {
     // If we enable authorization, we should remove the privileges about the entity in the
@@ -311,6 +280,83 @@ public class AuthorizationUtils {
           authorizationPlugin -> {
             authorizationPlugin.onMetadataUpdated(renameObject);
           });
+    }
+  }
+
+  public static Role filterSecurableObjects(
+      RoleEntity role, String metalakeName, String catalogName) {
+    List<SecurableObject> securableObjects = role.securableObjects();
+    List<SecurableObject> filteredSecurableObjects = Lists.newArrayList();
+    for (SecurableObject securableObject : securableObjects) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalakeName, securableObject);
+      if (securableObject.type() == MetadataObject.Type.METALAKE) {
+        filteredSecurableObjects.add(securableObject);
+      } else {
+        NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+
+        if (catalogIdent.name().equals(catalogName)) {
+          filteredSecurableObjects.add(securableObject);
+        }
+      }
+    }
+
+    return RoleEntity.builder()
+        .withId(role.id())
+        .withName(role.name())
+        .withAuditInfo(role.auditInfo())
+        .withNamespace(role.namespace())
+        .withSecurableObjects(filteredSecurableObjects)
+        .withProperties(role.properties())
+        .build();
+  }
+
+  private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {
+    return type == MetadataObject.Type.METALAKE;
+  }
+
+  private static boolean needApplyAuthorization(MetadataObject.Type type) {
+    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
+  }
+
+  private static void callAuthorizationPluginImpl(
+      BiConsumer<AuthorizationPlugin, String> consumer, Catalog catalog) {
+
+    if (catalog instanceof BaseCatalog) {
+      BaseCatalog baseCatalog = (BaseCatalog) catalog;
+      if (baseCatalog.getAuthorizationPlugin() != null) {
+        consumer.accept(baseCatalog.getAuthorizationPlugin(), catalog.name());
+      }
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
+              catalog.type()));
+    }
+  }
+
+  private static void callAuthorizationPluginImpl(
+      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+
+    if (catalog instanceof BaseCatalog) {
+      BaseCatalog baseCatalog = (BaseCatalog) catalog;
+      if (baseCatalog.getAuthorizationPlugin() != null) {
+        consumer.accept(baseCatalog.getAuthorizationPlugin());
+      }
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
+              catalog.type()));
+    }
+  }
+
+  private static void checkCatalogType(
+      NameIdentifier catalogIdent, Catalog.Type type, Privilege privilege) {
+    Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
+    if (catalog.type() != type) {
+      throw new IllegalPrivilegeException(
+          "Catalog %s type %s doesn't support privilege %s",
+          catalogIdent, catalog.type(), privilege);
     }
   }
 }
