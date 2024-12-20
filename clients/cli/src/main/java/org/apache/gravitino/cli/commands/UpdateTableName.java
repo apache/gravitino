@@ -46,7 +46,7 @@ public class UpdateTableName extends Command {
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param table The name of the table.
-   * @param name The new metalake name.
+   * @param name The new table name.
    */
   public UpdateTableName(
       String url,
