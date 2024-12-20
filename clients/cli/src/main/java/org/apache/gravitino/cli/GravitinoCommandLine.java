@@ -998,10 +998,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();
         break;
 
-      case CommandActions.LIST:
-        newListFilesets(url, ignore, metalake, catalog, schema).handle();
-        break;
-
       case CommandActions.CREATE:
         {
           String comment = line.getOptionValue(GravitinoOptions.COMMENT);
