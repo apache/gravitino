@@ -169,12 +169,18 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake = loadMetalake;
   }
 
-  protected static void waitForUpdatingPolicies() throws InterruptedException {
+  public abstract void createCatalog();
+
+  protected static void waitForUpdatingPolicies() {
     // After Ranger authorization, Must wait a period of time for the Ranger Spark plugin to update
     // the policy Sleep time must be greater than the policy update interval
     // (ranger.plugin.spark.policy.pollIntervalMs) in the
     // `resources/ranger-spark-security.xml.template`
-    Thread.sleep(1000L);
+    try {
+      Thread.sleep(1000L);
+    } catch (InterruptedException e) {
+      LOG.error("Failed to sleep", e);
+    }
   }
 
   protected abstract void checkTableAllPrivilegesExceptForCreating();
@@ -198,7 +204,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   protected abstract void testAlterTable();
 
   @Test
-  void testCreateSchema() throws InterruptedException {
+  protected void testCreateSchema() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -979,6 +985,39 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
     // Fail to create a table
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+
+    // Clean up
+    catalog.asSchemas().dropSchema(schemaName, false);
+    metalake.deleteRole(roleName);
+  }
+
+  // ISSUE-5892 Fix to grant privilege for the metalake
+  @Test
+  void testGrantPrivilegesForMetalake() throws InterruptedException {
+    // Choose a catalog
+    useCatalog();
+
+    // Create a schema
+    String roleName = currentFunName();
+    metalake.createRole(roleName, Collections.emptyMap(), Collections.emptyList());
+
+    // Grant a create schema privilege
+    metalake.grantPrivilegesToRole(
+        roleName,
+        MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE),
+        Lists.newArrayList(Privileges.CreateSchema.allow()));
+
+    // Fail to create a schema
+    Assertions.assertThrows(
+        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
+    Assertions.assertDoesNotThrow(() -> sparkSession.sql(SQL_CREATE_SCHEMA));
 
     // Clean up
     catalog.asSchemas().dropSchema(schemaName, false);

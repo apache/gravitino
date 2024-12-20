@@ -77,17 +77,13 @@ public class DeleteTopic extends Command {
       GravitinoClient client = buildClient(metalake);
       deleted = client.loadCatalog(catalog).asTopicCatalog().dropTopic(name);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTopicException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TOPIC);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

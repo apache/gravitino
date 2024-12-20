@@ -71,17 +71,13 @@ public class CreateTopic extends Command {
       GravitinoClient client = buildClient(metalake);
       client.loadCatalog(catalog).asTopicCatalog().createTopic(name, comment, null, null);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (TopicAlreadyExistsException err) {
-      System.err.println(ErrorMessages.TOPIC_EXISTS);
-      return;
+      exitWithError(ErrorMessages.TOPIC_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(topic + " topic created.");

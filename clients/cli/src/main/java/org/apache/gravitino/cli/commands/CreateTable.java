@@ -72,45 +72,38 @@ public class CreateTable extends Command {
   /** Create a new table. */
   @Override
   public void handle() {
-    NameIdentifier tableName;
-    GravitinoClient client;
+    NameIdentifier tableName = null;
+    GravitinoClient client = null;
     ReadTableCSV readTableCSV = new ReadTableCSV();
     Map<String, List<String>> tableData;
-    Column[] columns;
+    Column[] columns = {};
 
     try {
       tableName = NameIdentifier.of(schema, table);
       client = buildClient(metalake);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println("Error initializing client or table name: " + exp.getMessage());
-      return;
+      exitWithError("Error initializing client or table name: " + exp.getMessage());
     }
 
     try {
       tableData = readTableCSV.parse(columnFile);
       columns = readTableCSV.columns(tableData);
     } catch (Exception exp) {
-      System.err.println("Error reading or parsing column file: " + exp.getMessage());
-      return;
+      exitWithError("Error reading or parsing column file: " + exp.getMessage());
     }
 
     try {
       client.loadCatalog(catalog).asTableCatalog().createTable(tableName, columns, comment, null);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (TableAlreadyExistsException err) {
-      System.err.println(ErrorMessages.TABLE_EXISTS);
-      return;
+      exitWithError(ErrorMessages.TABLE_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(table + " created");
