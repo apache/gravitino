@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import static org.apache.gravitino.authorization.AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG;
 import static org.apache.gravitino.authorization.AuthorizationUtils.ROLE_DOES_NOT_EXIST_MSG;
 import static org.apache.gravitino.authorization.AuthorizationUtils.USER_DOES_NOT_EXIST_MSG;
+import static org.apache.gravitino.authorization.AuthorizationUtils.filterSecurableObjects;
 
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -115,16 +116,21 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
+      List<SecurableObject> securableObjects = Lists.newArrayList();
+
       for (Role grantedRole : roleEntitiesToGrant) {
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            grantedRole.securableObjects(),
-            catalogs,
-            authorizationPlugin ->
-                authorizationPlugin.onGrantedRolesToUser(
-                    Lists.newArrayList(roleEntitiesToGrant), updatedUser));
+        securableObjects.addAll(grantedRole.securableObjects());
       }
+
+      AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+          metalake,
+          securableObjects,
+          (authorizationPlugin, catalogName) ->
+              authorizationPlugin.onGrantedRolesToUser(
+                  roleEntitiesToGrant.stream()
+                      .map(roleEntity -> filterSecurableObjects(roleEntity, metalake, catalogName))
+                      .collect(Collectors.toList()),
+                  updatedUser));
 
       return updatedUser;
     } catch (NoSuchEntityException nse) {
@@ -196,16 +202,21 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
+      List<SecurableObject> securableObjects = Lists.newArrayList();
+
       for (Role grantedRole : roleEntitiesToGrant) {
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            grantedRole.securableObjects(),
-            catalogs,
-            authorizationPlugin ->
-                authorizationPlugin.onGrantedRolesToGroup(
-                    Lists.newArrayList(roleEntitiesToGrant), updatedGroup));
+        securableObjects.addAll(grantedRole.securableObjects());
       }
+
+      AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+          metalake,
+          securableObjects,
+          (authorizationPlugin, catalogName) ->
+              authorizationPlugin.onGrantedRolesToGroup(
+                  roleEntitiesToGrant.stream()
+                      .map(roleEntity -> filterSecurableObjects(roleEntity, metalake, catalogName))
+                      .collect(Collectors.toList()),
+                  updatedGroup));
 
       return updatedGroup;
     } catch (NoSuchEntityException nse) {
@@ -276,16 +287,20 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
+      List<SecurableObject> securableObjects = Lists.newArrayList();
       for (Role grantedRole : roleEntitiesToRevoke) {
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            grantedRole.securableObjects(),
-            catalogs,
-            authorizationPlugin ->
-                authorizationPlugin.onRevokedRolesFromGroup(
-                    Lists.newArrayList(roleEntitiesToRevoke), updatedGroup));
+        securableObjects.addAll(grantedRole.securableObjects());
       }
+
+      AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+          metalake,
+          securableObjects,
+          (authorizationPlugin, catalogName) ->
+              authorizationPlugin.onRevokedRolesFromGroup(
+                  roleEntitiesToRevoke.stream()
+                      .map(roleEntity -> filterSecurableObjects(roleEntity, metalake, catalogName))
+                      .collect(Collectors.toList()),
+                  updatedGroup));
 
       return updatedGroup;
 
@@ -358,16 +373,20 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
+      List<SecurableObject> securableObjects = Lists.newArrayList();
       for (Role grantedRole : roleEntitiesToRevoke) {
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            grantedRole.securableObjects(),
-            catalogs,
-            authorizationPlugin ->
-                authorizationPlugin.onRevokedRolesFromUser(
-                    Lists.newArrayList(roleEntitiesToRevoke), updatedUser));
+        securableObjects.addAll(grantedRole.securableObjects());
       }
+
+      AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+          metalake,
+          securableObjects,
+          (authorizationPlugin, catalogName) ->
+              authorizationPlugin.onRevokedRolesFromUser(
+                  roleEntitiesToRevoke.stream()
+                      .map(roleEntity -> filterSecurableObjects(roleEntity, metalake, catalogName))
+                      .collect(Collectors.toList()),
+                  updatedUser));
 
       return updatedUser;
     } catch (NoSuchEntityException nse) {
