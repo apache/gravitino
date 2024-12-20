@@ -22,7 +22,7 @@ paths:
   /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectTypeWithoutColumn"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
 
     put:
