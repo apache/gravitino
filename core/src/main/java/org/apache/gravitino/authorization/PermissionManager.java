@@ -116,7 +116,6 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
       List<SecurableObject> securableObjects = Lists.newArrayList();
 
       for (Role grantedRole : roleEntitiesToGrant) {
@@ -126,7 +125,6 @@ class PermissionManager {
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           securableObjects,
-          catalogs,
           (authorizationPlugin, catalogName) ->
               authorizationPlugin.onGrantedRolesToUser(
                   roleEntitiesToGrant.stream()
@@ -204,7 +202,6 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
       List<SecurableObject> securableObjects = Lists.newArrayList();
 
       for (Role grantedRole : roleEntitiesToGrant) {
@@ -214,7 +211,6 @@ class PermissionManager {
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           securableObjects,
-          catalogs,
           (authorizationPlugin, catalogName) ->
               authorizationPlugin.onGrantedRolesToGroup(
                   roleEntitiesToGrant.stream()
@@ -291,7 +287,6 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
       List<SecurableObject> securableObjects = Lists.newArrayList();
       for (Role grantedRole : roleEntitiesToRevoke) {
         securableObjects.addAll(grantedRole.securableObjects());
@@ -300,7 +295,6 @@ class PermissionManager {
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           securableObjects,
-          catalogs,
           (authorizationPlugin, catalogName) ->
               authorizationPlugin.onRevokedRolesFromGroup(
                   roleEntitiesToRevoke.stream()
@@ -379,7 +373,6 @@ class PermissionManager {
                     .build();
               });
 
-      Set<String> catalogs = Sets.newHashSet();
       List<SecurableObject> securableObjects = Lists.newArrayList();
       for (Role grantedRole : roleEntitiesToRevoke) {
         securableObjects.addAll(grantedRole.securableObjects());
@@ -388,7 +381,6 @@ class PermissionManager {
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           securableObjects,
-          catalogs,
           (authorizationPlugin, catalogName) ->
               authorizationPlugin.onRevokedRolesFromUser(
                   roleEntitiesToRevoke.stream()

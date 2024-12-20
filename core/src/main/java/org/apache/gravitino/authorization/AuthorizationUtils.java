@@ -147,8 +147,8 @@ public class AuthorizationUtils {
   public static void callAuthorizationPluginForSecurableObjects(
       String metalake,
       List<SecurableObject> securableObjects,
-      Set<String> catalogsAlreadySet,
       BiConsumer<AuthorizationPlugin, String> consumer) {
+    Set<String> catalogsAlreadySet = Sets.newHashSet();
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
       if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {

@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -87,7 +86,6 @@ class RoleManager {
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           roleEntity.securableObjects(),
-          Sets.newHashSet(),
           (authorizationPlugin, catalogName) ->
               authorizationPlugin.onRoleCreated(
                   AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
@@ -124,7 +122,6 @@ class RoleManager {
         AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             roleEntity.securableObjects(),
-            Sets.newHashSet(),
             (authorizationPlugin, catalogName) ->
                 authorizationPlugin.onRoleDeleted(
                     AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
