@@ -537,6 +537,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     if (group == null && !CommandActions.LIST.equals(command)) {
       System.err.println(ErrorMessages.MISSING_GROUP);
+      return;
     }
 
     switch (command) {
