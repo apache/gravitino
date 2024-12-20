@@ -48,22 +48,9 @@ import org.slf4j.LoggerFactory;
 public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG =
       LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
-  private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
 
-  private RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
+  public RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
-  }
-
-  public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
-      String metalake, Map<String, String> config) {
-    if (instance == null) {
-      synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
-        if (instance == null) {
-          instance = new RangerAuthorizationHadoopSQLPlugin(metalake, config);
-        }
-      }
-    }
-    return instance;
   }
 
   @Override
