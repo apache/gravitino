@@ -53,14 +53,13 @@ public class TableDistribution extends TableCommand {
   /** Displays the strategy and bucket number of distirbution. */
   @Override
   public void handle() {
-    Distribution distribution;
+    Distribution distribution = null;
 
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       distribution = tableCatalog().loadTable(name).distribution();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(distribution.strategy() + "," + distribution.number());

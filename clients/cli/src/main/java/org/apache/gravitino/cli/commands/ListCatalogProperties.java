@@ -55,14 +55,11 @@ public class ListCatalogProperties extends ListProperties {
       GravitinoClient client = buildClient(metalake);
       gCatalog = client.loadCatalog(catalog);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     Map<String, String> properties = gCatalog.properties();

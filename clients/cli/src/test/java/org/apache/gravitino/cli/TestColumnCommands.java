@@ -366,7 +366,6 @@ class TestColumnCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.DEFAULT)).thenReturn("Fred Smith");
     when(mockCommandLine.hasOption(GravitinoOptions.DATATYPE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.DATATYPE)).thenReturn("varchar(100)");
-
     when(mockCommandLine.hasOption(GravitinoOptions.NULL)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.AUTO)).thenReturn(false);
 
