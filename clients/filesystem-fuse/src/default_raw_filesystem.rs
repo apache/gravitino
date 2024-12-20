@@ -282,15 +282,14 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         offset: u64,
         size: u32,
     ) -> crate::filesystem::Result<Bytes> {
-        let file_stat: FileStat;
-        let data = {
+        let (data, file_stat) = {
             let opened_file = self
                 .opened_file_manager
                 .get(fh)
                 .ok_or(Errno::from(libc::EBADF))?;
             let mut opened_file = opened_file.lock().await;
-            file_stat = opened_file.file_stat.clone();
-            opened_file.read(offset, size).await
+            let data = opened_file.read(offset, size).await;
+            (data, opened_file.file_stat.clone())
         };
 
         // update the file atime
