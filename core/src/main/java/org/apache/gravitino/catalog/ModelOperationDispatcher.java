@@ -38,7 +38,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class ModelOperationDispatcher extends OperationDispatcher implements ModelDispatcher {
 
@@ -134,7 +133,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         ident,
         () ->
             TreeLockUtils.doWithTreeLock(
-                NameIdentifierUtil.toModelVersionIdentifier(ident, version),
+                ident,
                 LockType.READ,
                 () ->
                     doWithCatalog(
@@ -150,7 +149,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         ident,
         () ->
             TreeLockUtils.doWithTreeLock(
-                NameIdentifierUtil.toModelVersionIdentifier(ident, alias),
+                ident,
                 LockType.READ,
                 () ->
                     doWithCatalog(
