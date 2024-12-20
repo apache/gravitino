@@ -39,7 +39,7 @@ public class UpdateTagName extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the tag.
    * @param tag The name of the catalog.
-   * @param name The new metalake name.
+   * @param name The new tag name.
    */
   public UpdateTagName(
       String url, boolean ignoreVersions, String metalake, String tag, String name) {
