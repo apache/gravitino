@@ -127,7 +127,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (command.equals(CommandActions.HELP)) {
+    if (CommandActions.HELP.equals(command)) {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
       handleOwnerCommand();
@@ -185,7 +185,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       case CommandActions.CREATE:
         if (Objects.isNull(metalake)) {
           System.err.println(CommandEntities.METALAKE + " is not defined");
-          return;
+          Main.exit(-1);
         }
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
         newCreateMetalake(url, ignore, metalake, comment).handle();
@@ -225,6 +225,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
+        Main.exit(-1);
         break;
     }
   }
@@ -300,6 +301,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
+        Main.exit(-1);
         break;
     }
   }
@@ -361,6 +363,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
+        Main.exit(-1);
         break;
     }
   }
@@ -391,7 +394,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (!missingEntities.isEmpty()) {
         System.err.println(
             "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
-        return;
+        Main.exit(-1);
       }
 
       newListTables(url, ignore, metalake, catalog, schema).handle();
@@ -521,6 +524,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
+        Main.exit(-1);
         break;
     }
   }
@@ -576,6 +580,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+        Main.exit(-1);
         break;
     }
   }
@@ -660,6 +665,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+        Main.exit(-1);
         break;
     }
   }
@@ -677,6 +683,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String role = line.getOptionValue(GravitinoOptions.ROLE);
+    String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
 
     Command.setAuthenticationMode(auth, userName);
 
@@ -702,8 +709,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
         newDeleteRole(url, ignore, forceDelete, metalake, role).handle();
         break;
 
+      case CommandActions.GRANT:
+        newGrantPrivilegesToRole(url, ignore, metalake, role, name, privileges).handle();
+        break;
+
+      case CommandActions.REVOKE:
+        newRevokePrivilegesFromRole(url, ignore, metalake, role, name, privileges).handle();
+        break;
+
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+        Main.exit(-1);
         break;
     }
   }
@@ -784,7 +800,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
             newUpdateColumnName(url, ignore, metalake, catalog, schema, table, column, newName)
                 .handle();
           }
-          if (line.hasOption(GravitinoOptions.DATATYPE)) {
+          if (line.hasOption(GravitinoOptions.DATATYPE)
+              && !line.hasOption(GravitinoOptions.DEFAULT)) {
             String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
             newUpdateColumnDatatype(url, ignore, metalake, catalog, schema, table, column, datatype)
                 .handle();
@@ -818,6 +835,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+        Main.exit(-1);
         break;
     }
   }
@@ -833,9 +851,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
       while ((helpLine = reader.readLine()) != null) {
         helpMessage.append(helpLine).append(System.lineSeparator());
       }
-      System.err.print(helpMessage.toString());
+      System.out.print(helpMessage.toString());
     } catch (IOException e) {
       System.err.println("Failed to load help message: " + e.getMessage());
+      Main.exit(-1);
     }
   }
 
@@ -889,15 +908,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
-    String topic = name.getTopicName();
 
     Command.setAuthenticationMode(auth, userName);
 
-    switch (command) {
-      case CommandActions.LIST:
-        newListTopics(url, ignore, metalake, catalog, schema).handle();
-        break;
+    if (CommandActions.LIST.equals(command)) {
+      newListTopics(url, ignore, metalake, catalog, schema).handle();
+      return;
+    }
 
+    String topic = name.getTopicName();
+
+    switch (command) {
       case CommandActions.DETAILS:
         newTopicDetails(url, ignore, metalake, catalog, schema, topic).handle();
         break;
@@ -962,9 +983,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
-    String fileset = name.getFilesetName();
 
     Command.setAuthenticationMode(auth, userName);
+
+    if (CommandActions.LIST.equals(command)) {
+      newListFilesets(url, ignore, metalake, catalog, schema).handle();
+      return;
+    }
+
+    String fileset = name.getFilesetName();
 
     switch (command) {
       case CommandActions.DETAILS:

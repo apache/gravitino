@@ -53,22 +53,18 @@ public class SchemaAudit extends AuditCommand {
   /** Displays the audit information of schema. */
   @Override
   public void handle() {
-    Schema result;
+    Schema result = null;
 
     try (GravitinoClient client = buildClient(metalake)) {
       result = client.loadCatalog(catalog).asSchemas().loadSchema(this.schema);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (result != null) {

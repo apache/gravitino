@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -125,7 +126,12 @@ public class TestMain {
   public void parseError() throws UnsupportedEncodingException {
     String[] args = {"--invalidOption"};
 
-    Main.main(args);
+    Main.useExit = false;
+    assertThrows(
+        RuntimeException.class,
+        () -> {
+          Main.main(args);
+        });
 
     assertTrue(errContent.toString().contains("Error parsing command line")); // Expect error
     assertTrue(outContent.toString().contains("usage:")); // Expect help output

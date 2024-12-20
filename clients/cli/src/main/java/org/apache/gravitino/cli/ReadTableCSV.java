@@ -145,6 +145,7 @@ public class ReadTableCSV {
       }
     } catch (IOException exp) {
       System.err.println(exp.getMessage());
+      Main.exit(-1);
     }
 
     return tableData;

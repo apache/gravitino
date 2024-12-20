@@ -53,14 +53,13 @@ public class TableAudit extends TableCommand {
   /** Displays the audit information of a table. */
   @Override
   public void handle() {
-    Table gTable;
+    Table gTable = null;
 
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       gTable = tableCatalog().loadTable(name);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     displayAuditInfo(gTable.auditInfo());

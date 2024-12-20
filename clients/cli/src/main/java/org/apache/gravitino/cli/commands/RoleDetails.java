@@ -20,7 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -55,19 +55,19 @@ public class RoleDetails extends Command {
       GravitinoClient client = buildClient(metalake);
       objects = client.getRole(role).securableObjects();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_GROUP);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_GROUP);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
-    // TODO expand in securable objects PR
-    String all = objects.stream().map(SecurableObject::name).collect(Collectors.joining(","));
-
-    System.out.println(all.toString());
+    for (SecurableObject object : objects) {
+      System.out.print(object.name() + "," + object.type() + ",");
+      for (Privilege privilege : object.privileges()) {
+        System.out.print(privilege.simpleString() + " ");
+      }
+    }
+    System.out.println("");
   }
 }
