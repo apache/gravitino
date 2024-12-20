@@ -235,8 +235,8 @@ impl FileWriter for MemoryFileWriter {
 }
 
 fn path_in_dir(dir: &Path, path: &Path) -> bool {
-    let regex = dir_child_reg_expr(dir.to_str().unwrap());
-    regex.is_match(path.to_str().unwrap())
+    let regex = dir_child_reg_expr(dir.to_string_lossy().as_ref());
+    regex.is_match(path.to_string_lossy().as_ref())
 }
 
 fn dir_child_reg_expr(path: &str) -> Regex {

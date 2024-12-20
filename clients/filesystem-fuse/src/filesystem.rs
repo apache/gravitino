@@ -21,6 +21,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -48,7 +49,7 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
 
     /// Lookup the file by parent file id and file name, if the file exists, return the file stat
-    async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat>;
+    async fn lookup(&self, parent_file_id: u64, name: &OsStr) -> Result<FileStat>;
 
     /// Read the directory by file id, if the file id is a valid directory, return the file stat list
     async fn read_dir(&self, dir_file_id: u64) -> Result<Vec<FileStat>>;
@@ -60,19 +61,24 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn open_dir(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
 
     /// Create the file by parent file id and file name and flags, if successful, return the file handle
-    async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle>;
+    async fn create_file(
+        &self,
+        parent_file_id: u64,
+        name: &OsStr,
+        flags: u32,
+    ) -> Result<FileHandle>;
 
     /// Create the directory by parent file id and file name, if successful, return the file id
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64>;
+    async fn create_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<u64>;
 
     /// Set the file attribute by file id and file stat
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
     /// Remove the file by parent file id and file name
-    async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()>;
+    async fn remove_file(&self, parent_file_id: u64, name: &OsStr) -> Result<()>;
 
     /// Remove the directory by parent file id and file name
-    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()>;
+    async fn remove_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<()>;
 
     /// Close the file by file id and file handle, if successful
     async fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
@@ -162,7 +168,7 @@ pub struct FileStat {
     pub(crate) parent_file_id: u64,
 
     // file name
-    pub(crate) name: String,
+    pub(crate) name: OsString,
 
     // file path of the fuse file system root
     pub(crate) path: PathBuf,
@@ -195,23 +201,23 @@ impl FileStat {
         Self::new_filestat(path, 0, Directory)
     }
 
-    pub fn new_file_filestat(parent: &Path, name: &str, size: u64) -> Self {
+    pub fn new_file_filestat(parent: &Path, name: &OsStr, size: u64) -> Self {
         let path = parent.join(name);
         Self::new_filestat(&path, size, RegularFile)
     }
 
-    pub fn new_dir_filestat(parent: &Path, name: &str) -> Self {
+    pub fn new_dir_filestat(parent: &Path, name: &OsStr) -> Self {
         let path = parent.join(name);
         Self::new_filestat(&path, 0, Directory)
     }
 
     pub fn new_filestat(path: &Path, size: u64, kind: FileType) -> Self {
         let atime = Timestamp::from(SystemTime::now());
-        let name = path.file_name().unwrap().to_string_lossy();
+        let name = path.file_name().unwrap();
         Self {
             file_id: 0,
             parent_file_id: 0,
-            name: name.into(),
+            name: name.to_os_string(),
             path: path.into(),
             size: size,
             kind: kind,
@@ -265,37 +271,37 @@ mod tests {
     #[test]
     fn test_create_file_stat() {
         //test new file
-        let file_stat = FileStat::new_file_filestat("a", "b", 10);
+        let file_stat = FileStat::new_file_filestat(Path::new("a"), "b".as_ref(), 10);
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
         //test new dir
-        let file_stat = FileStat::new_dir_filestat("a", "b");
+        let file_stat = FileStat::new_dir_filestat("a".as_ref(), "b".as_ref());
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
         assert_eq!(file_stat.kind, FileType::Directory);
 
         //test new file with path
-        let file_stat = FileStat::new_file_filestat_with_path("a/b", 10);
+        let file_stat = FileStat::new_file_filestat_with_path("a/b".as_ref(), 10);
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
         //test new dir with path
-        let file_stat = FileStat::new_dir_filestat_with_path("a/b");
+        let file_stat = FileStat::new_dir_filestat_with_path("a/b".as_ref());
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
         assert_eq!(file_stat.kind, FileType::Directory);
     }
 
     #[test]
     fn test_file_stat_set_file_id() {
-        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
+        let mut file_stat = FileStat::new_file_filestat("a".as_ref(), "b".as_ref(), 10);
         file_stat.set_file_id(1, 2);
         assert_eq!(file_stat.file_id, 2);
         assert_eq!(file_stat.parent_file_id, 1);
@@ -304,7 +310,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "assertion failed: file_id != 0 && parent_file_id != 0")]
     fn test_file_stat_set_file_id_panic() {
-        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
+        let mut file_stat = FileStat::new_file_filestat("a".as_ref(), "b".as_ref(), 10);
         file_stat.set_file_id(1, 0);
     }
 }

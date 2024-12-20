@@ -68,13 +68,14 @@ impl OpenedFileManager {
 mod tests {
     use super::*;
     use crate::filesystem::FileStat;
+    use std::path::Path;
 
     #[tokio::test]
     async fn test_opened_file_manager() {
         let manager = OpenedFileManager::new();
 
-        let file1_stat = FileStat::new_file_filestat("", "a.txt", 13);
-        let file2_stat = FileStat::new_file_filestat("", "b.txt", 18);
+        let file1_stat = FileStat::new_file_filestat(Path::new(""), "a.txt".as_ref(), 13);
+        let file2_stat = FileStat::new_file_filestat(Path::new(""), "b.txt".as_ref(), 18);
 
         let file1 = OpenedFile::new(file1_stat.clone());
         let file2 = OpenedFile::new(file2_stat.clone());

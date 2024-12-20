@@ -23,6 +23,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::{Errno, FileType};
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 use tokio::sync::RwLock;
@@ -165,7 +166,11 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(file_stat)
     }
 
-    async fn lookup(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<FileStat> {
+    async fn lookup(
+        &self,
+        parent_file_id: u64,
+        name: &OsStr,
+    ) -> crate::filesystem::Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
 
         // assume the path is a regular file. Some filesystems may need to check whether it is a file or directory by lookup.
@@ -200,7 +205,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn create_file(
         &self,
         parent_file_id: u64,
-        name: &str,
+        name: &OsStr,
         flags: u32,
     ) -> crate::filesystem::Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
@@ -225,7 +230,11 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(opened_file.file_handle())
     }
 
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<u64> {
+    async fn create_dir(
+        &self,
+        parent_file_id: u64,
+        name: &OsStr,
+    ) -> crate::filesystem::Result<u64> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let path = parent_file_entry.path.join(name);
         let mut filestat = self.fs.create_dir(&path).await?;
@@ -245,7 +254,11 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.set_attr(&file_entry.path, file_stat, true).await
     }
 
-    async fn remove_file(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
+    async fn remove_file(
+        &self,
+        parent_file_id: u64,
+        name: &OsStr,
+    ) -> crate::filesystem::Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let path = parent_file_entry.path.join(name);
         self.fs.remove_file(&path).await?;
@@ -258,7 +271,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(())
     }
 
-    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
+    async fn remove_dir(&self, parent_file_id: u64, name: &OsStr) -> crate::filesystem::Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let path = parent_file_entry.path.join(name);
         self.fs.remove_dir(&path).await?;
@@ -385,19 +398,19 @@ mod tests {
     #[test]
     fn test_file_entry_manager() {
         let mut manager = FileEntryManager::new();
-        manager.insert(1, 2, "a/b");
+        manager.insert(1, 2, Path::new("a/b"));
         let file = manager.get_file_entry_by_id(2).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.path, "a/b");
+        assert_eq!(file.path, Path::new("a/b"));
 
-        let file = manager.get_file_entry_by_path("a/b").unwrap();
+        let file = manager.get_file_entry_by_path(Path::new("a/b")).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.path, "a/b");
+        assert_eq!(file.path, Path::new("a/b"));
 
-        manager.remove("a/b");
+        manager.remove(Path::new("a/b"));
         assert!(manager.get_file_entry_by_id(2).is_none());
-        assert!(manager.get_file_entry_by_path("a/b").is_none());
+        assert!(manager.get_file_entry_by_path(Path::new("a/b")).is_none());
     }
 }
