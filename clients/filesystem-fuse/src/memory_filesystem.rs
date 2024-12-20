@@ -24,6 +24,7 @@ use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType};
 use regex::Regex;
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 
 // Simple in-memory file implementation of MemoryFileSystem
@@ -36,7 +37,7 @@ struct MemoryFile {
 // It is used for testing purposes
 pub struct MemoryFileSystem {
     // file_map is a map of file name to file size
-    file_map: RwLock<BTreeMap<String, MemoryFile>>,
+    file_map: RwLock<BTreeMap<PathBuf, MemoryFile>>,
 }
 
 impl MemoryFileSystem {
@@ -48,7 +49,7 @@ impl MemoryFileSystem {
         }
     }
 
-    fn create_file_stat(&self, path: &str, file: &MemoryFile) -> FileStat {
+    fn create_file_stat(&self, path: &Path, file: &MemoryFile) -> FileStat {
         match file.kind {
             Directory => FileStat::new_dir_filestat_with_path(path),
             _ => {
@@ -65,45 +66,44 @@ impl PathFileSystem for MemoryFileSystem {
             kind: Directory,
             data: Arc::new(Mutex::new(Vec::new())),
         };
-        self.file_map.write().unwrap().insert("/".to_string(), root);
+        let root_path = PathBuf::from("/");
+        self.file_map.write().unwrap().insert(root_path, root);
 
         let meta = MemoryFile {
             kind: RegularFile,
             data: Arc::new(Mutex::new(Vec::new())),
         };
-        self.file_map
-            .write()
-            .unwrap()
-            .insert(Self::FS_META_FILE_NAME.to_string(), meta);
+        let meta_file_path = Path::new(Self::FS_META_FILE_NAME).to_path_buf();
+        self.file_map.write().unwrap().insert(meta_file_path, meta);
         Ok(())
     }
 
-    async fn stat(&self, name: &str) -> Result<FileStat> {
+    async fn stat(&self, path: &Path) -> Result<FileStat> {
         self.file_map
             .read()
             .unwrap()
-            .get(name)
-            .map(|x| self.create_file_stat(name, x))
+            .get(path)
+            .map(|x| self.create_file_stat(path, x))
             .ok_or(Errno::from(libc::ENOENT))
     }
 
-    async fn lookup(&self, path: &str) -> Result<FileStat> {
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
         self.stat(path).await
     }
 
-    async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>> {
+    async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
         let file_map = self.file_map.read().unwrap();
 
         let results: Vec<FileStat> = file_map
             .iter()
-            .filter(|x| dir_child_reg_expr(path).is_match(x.0))
+            .filter(|x| path_in_dir(path, x.0))
             .map(|(k, v)| self.create_file_stat(k, v))
             .collect();
 
         Ok(results)
     }
 
-    async fn open_file(&self, path: &str, _flags: OpenFileFlags) -> Result<OpenedFile> {
+    async fn open_file(&self, path: &Path, _flags: OpenFileFlags) -> Result<OpenedFile> {
         let file_stat = self.stat(path).await?;
         let mut file = OpenedFile::new(file_stat.clone());
         match file.file_stat.kind {
@@ -125,11 +125,11 @@ impl PathFileSystem for MemoryFileSystem {
         }
     }
 
-    async fn open_dir(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile> {
-        self.open_file(name, flags).await
+    async fn open_dir(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
+        self.open_file(path, flags).await
     }
 
-    async fn create_file(&self, path: &str, _flags: OpenFileFlags) -> Result<OpenedFile> {
+    async fn create_file(&self, path: &Path, _flags: OpenFileFlags) -> Result<OpenedFile> {
         {
             let file_map = self.file_map.read().unwrap();
             if file_map.contains_key(path) {
@@ -153,7 +153,7 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(file)
     }
 
-    async fn create_dir(&self, path: &str) -> Result<FileStat> {
+    async fn create_dir(&self, path: &Path) -> Result<FileStat> {
         {
             let file_map = self.file_map.read().unwrap();
             if file_map.contains_key(path) {
@@ -173,11 +173,11 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(file)
     }
 
-    async fn set_attr(&self, _name: &str, _file_stat: &FileStat, _flush: bool) -> Result<()> {
+    async fn set_attr(&self, _name: &Path, _file_stat: &FileStat, _flush: bool) -> Result<()> {
         Ok(())
     }
 
-    async fn remove_file(&self, path: &str) -> Result<()> {
+    async fn remove_file(&self, path: &Path) -> Result<()> {
         let mut file_map = self.file_map.write().unwrap();
         if file_map.remove(path).is_none() {
             return Err(Errno::from(libc::ENOENT));
@@ -185,12 +185,9 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(())
     }
 
-    async fn remove_dir(&self, path: &str) -> Result<()> {
+    async fn remove_dir(&self, path: &Path) -> Result<()> {
         let mut file_map = self.file_map.write().unwrap();
-        let count = file_map
-            .iter()
-            .filter(|x| dir_child_reg_expr(path).is_match(x.0))
-            .count();
+        let count = file_map.iter().filter(|x| path_in_dir(path, x.0)).count();
 
         if count != 0 {
             return Err(Errno::from(libc::ENOTEMPTY));
@@ -237,11 +234,16 @@ impl FileWriter for MemoryFileWriter {
     }
 }
 
-fn dir_child_reg_expr(name: &str) -> Regex {
-    let regex_pattern = if name.is_empty() {
+fn path_in_dir(dir: &Path, path: &Path) -> bool {
+    let regex = dir_child_reg_expr(dir.to_str().unwrap());
+    regex.is_match(path.to_str().unwrap())
+}
+
+fn dir_child_reg_expr(path: &str) -> Regex {
+    let regex_pattern = if path.is_empty() {
         r"^[^/]+$".to_string()
     } else {
-        format!(r"^{}/[^/]+$", name)
+        format!(r"^{}/[^/]+$", path)
     };
     Regex::new(&regex_pattern).unwrap()
 }

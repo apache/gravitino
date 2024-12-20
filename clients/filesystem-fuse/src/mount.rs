@@ -47,9 +47,9 @@ pub async fn create_fuse_fs() -> impl Filesystem + Sync + 'static {
     let fs_context = FileSystemContext {
         uid: uid,
         gid: gid,
-        default_file_perm: 0,
-        default_dir_perm: 0,
-        block_size: 0,
+        default_file_perm: 0o644,
+        default_dir_perm: 0o755,
+        block_size: 4 * 1024,
     };
 
     let gvfs = MemoryFileSystem::new().await;

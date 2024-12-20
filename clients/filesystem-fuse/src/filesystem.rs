@@ -17,10 +17,11 @@
  * under the License.
  */
 use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
-use crate::utils::{join_file_path, split_file_path};
 use async_trait::async_trait;
 use bytes::Bytes;
+use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub(crate) type Result<T> = std::result::Result<T, Errno>;
@@ -91,34 +92,34 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn init(&self) -> Result<()>;
 
     /// Get the file stat by file path, if the file exists, return the file stat
-    async fn stat(&self, path: &str) -> Result<FileStat>;
+    async fn stat(&self, path: &Path) -> Result<FileStat>;
 
     /// Get the file stat by parent file path and file name, if the file exists, return the file stat
-    async fn lookup(&self, path: &str) -> Result<FileStat>;
+    async fn lookup(&self, path: &Path) -> Result<FileStat>;
 
     /// Read the directory by file path, if the directory exists, return the file stat list
-    async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>>;
+    async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>>;
 
     /// Open the file by file path and flags, if the file exists, return the opened file
-    async fn open_file(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Open the directory by file path and flags, if the file exists, return the opened file
-    async fn open_dir(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn open_dir(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Create the file by file path and flags, if successful, return the opened file
-    async fn create_file(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Create the directory by file path , if successful, return the file stat
-    async fn create_dir(&self, path: &str) -> Result<FileStat>;
+    async fn create_dir(&self, path: &Path) -> Result<FileStat>;
 
     /// Set the file attribute by file path and file stat
-    async fn set_attr(&self, path: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
+    async fn set_attr(&self, path: &Path, file_stat: &FileStat, flush: bool) -> Result<()>;
 
     /// Remove the file by file path
-    async fn remove_file(&self, path: &str) -> Result<()>;
+    async fn remove_file(&self, path: &Path) -> Result<()>;
 
     /// Remove the directory by file path
-    async fn remove_dir(&self, path: &str) -> Result<()>;
+    async fn remove_dir(&self, path: &Path) -> Result<()>;
 }
 
 // FileSystemContext is the system environment for the fuse file system.
@@ -164,7 +165,7 @@ pub struct FileStat {
     pub(crate) name: String,
 
     // file path of the fuse file system root
-    pub(crate) path: String,
+    pub(crate) path: PathBuf,
 
     // file size
     pub(crate) size: u64,
@@ -186,31 +187,32 @@ pub struct FileStat {
 }
 
 impl FileStat {
-    pub fn new_file_filestat_with_path(path: &str, size: u64) -> Self {
-        let (parent, name) = split_file_path(path);
-        Self::new_file_filestat(parent, name, size)
+    pub fn new_file_filestat_with_path(path: &Path, size: u64) -> Self {
+        Self::new_filestat(path, size, RegularFile)
     }
 
-    pub fn new_dir_filestat_with_path(path: &str) -> Self {
-        let (parent, name) = split_file_path(path);
-        Self::new_dir_filestat(parent, name)
+    pub fn new_dir_filestat_with_path(path: &Path) -> Self {
+        Self::new_filestat(path, 0, Directory)
     }
 
-    pub fn new_file_filestat(parent: &str, name: &str, size: u64) -> Self {
-        Self::new_filestat(parent, name, size, FileType::RegularFile)
+    pub fn new_file_filestat(parent: &Path, name: &str, size: u64) -> Self {
+        let path = parent.join(name);
+        Self::new_filestat(&path, size, RegularFile)
     }
 
-    pub fn new_dir_filestat(parent: &str, name: &str) -> Self {
-        Self::new_filestat(parent, name, 0, FileType::Directory)
+    pub fn new_dir_filestat(parent: &Path, name: &str) -> Self {
+        let path = parent.join(name);
+        Self::new_filestat(&path, 0, Directory)
     }
 
-    pub fn new_filestat(parent: &str, name: &str, size: u64, kind: FileType) -> Self {
+    pub fn new_filestat(path: &Path, size: u64, kind: FileType) -> Self {
         let atime = Timestamp::from(SystemTime::now());
+        let name = path.file_name().unwrap().to_string_lossy();
         Self {
             file_id: 0,
             parent_file_id: 0,
             name: name.into(),
-            path: join_file_path(parent, name),
+            path: path.into(),
             size: size,
             kind: kind,
             atime: atime,

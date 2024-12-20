@@ -19,11 +19,11 @@
 use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem};
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
-use crate::utils::join_file_path;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::{Errno, FileType};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 use tokio::sync::RwLock;
 
@@ -46,7 +46,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
     const INITIAL_FILE_ID: u64 = 10000;
     const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
     const ROOT_DIR_FILE_ID: u64 = 1;
-    const ROOT_DIR_NAME: &'static str = "";
+    const ROOT_DIR_PATH: &'static str = "/";
 
     pub(crate) fn new(fs: T) -> Self {
         Self {
@@ -70,7 +70,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
             .ok_or(Errno::from(libc::ENOENT))
     }
 
-    async fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
+    async fn get_file_entry_by_path(&self, path: &Path) -> Option<FileEntry> {
         self.file_entry_manager
             .read()
             .await
@@ -131,7 +131,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.file_entry_manager.write().await.insert(
             Self::ROOT_DIR_PARENT_FILE_ID,
             Self::ROOT_DIR_FILE_ID,
-            Self::ROOT_DIR_NAME,
+            Path::new(Self::ROOT_DIR_PATH),
         );
         self.fs.init().await
     }
@@ -139,7 +139,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn get_file_path(&self, file_id: u64) -> String {
         let file_entry = self.get_file_entry(file_id).await;
         file_entry
-            .map(|x| x.path)
+            .map(|x| x.path.to_string_lossy().to_string())
             .unwrap_or_else(|_| "".to_string())
     }
 
@@ -167,11 +167,14 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn lookup(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let path = join_file_path(&parent_file_entry.path, name);
+
+        // assume the path is a regular file. Some filesystems may need to check whether it is a file or directory by lookup.
+        let path = parent_file_entry.path.join(name);
         let mut file_stat = self.fs.lookup(&path).await?;
         // fill the file id to file stat
         self.resolve_file_id_to_filestat(&mut file_stat, parent_file_id)
             .await;
+
         Ok(file_stat)
     }
 
@@ -201,7 +204,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         flags: u32,
     ) -> crate::filesystem::Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let path = join_file_path(&parent_file_entry.path, name);
+        let path = parent_file_entry.path.join(name);
         let mut opened_file = self.fs.create_file(&path, OpenFileFlags(flags)).await?;
 
         opened_file.set_file_id(parent_file_id, self.next_file_id());
@@ -224,7 +227,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<u64> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let path = join_file_path(&parent_file_entry.path, name);
+        let path = parent_file_entry.path.join(name);
         let mut filestat = self.fs.create_dir(&path).await?;
 
         filestat.set_file_id(parent_file_id, self.next_file_id());
@@ -244,7 +247,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn remove_file(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let path = join_file_path(&parent_file_entry.path, name);
+        let path = parent_file_entry.path.join(name);
         self.fs.remove_file(&path).await?;
 
         // remove the file from file entry manager
@@ -257,7 +260,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn remove_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let path = join_file_path(&parent_file_entry.path, name);
+        let path = parent_file_entry.path.join(name);
         self.fs.remove_dir(&path).await?;
 
         // remove the dir from file entry manager
@@ -330,7 +333,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 struct FileEntry {
     file_id: u64,
     parent_file_id: u64,
-    path: String,
+    path: PathBuf,
 }
 
 /// FileEntryManager is manage all the file entries in memory. it is used manger the file relationship and name mapping.
@@ -339,7 +342,7 @@ struct FileEntryManager {
     file_id_map: HashMap<u64, FileEntry>,
 
     // file_path_map is a map of file path to file entry.
-    file_path_map: HashMap<String, FileEntry>,
+    file_path_map: HashMap<PathBuf, FileEntry>,
 }
 
 impl FileEntryManager {
@@ -354,21 +357,21 @@ impl FileEntryManager {
         self.file_id_map.get(&file_id).cloned()
     }
 
-    fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
+    fn get_file_entry_by_path(&self, path: &Path) -> Option<FileEntry> {
         self.file_path_map.get(path).cloned()
     }
 
-    fn insert(&mut self, parent_file_id: u64, file_id: u64, path: &str) {
+    fn insert(&mut self, parent_file_id: u64, file_id: u64, path: &Path) {
         let file_entry = FileEntry {
             file_id,
             parent_file_id,
-            path: path.to_string(),
+            path: path.into(),
         };
         self.file_id_map.insert(file_id, file_entry.clone());
-        self.file_path_map.insert(path.to_string(), file_entry);
+        self.file_path_map.insert(path.into(), file_entry);
     }
 
-    fn remove(&mut self, path: &str) {
+    fn remove(&mut self, path: &Path) {
         if let Some(file) = self.file_path_map.remove(path) {
             self.file_id_map.remove(&file.file_id);
         }
