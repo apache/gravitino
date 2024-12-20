@@ -400,7 +400,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
 
     String table = name.getTableName();
-    if (Objects.isNull(table)) {
+    if (table == null) {
       missingEntities.add(CommandEntities.TABLE);
     }
 
