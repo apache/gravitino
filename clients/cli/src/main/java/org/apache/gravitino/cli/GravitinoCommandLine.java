@@ -479,6 +479,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
+    if (user == null && !CommandActions.LIST.equals(command)) {
+      System.err.println(ErrorMessages.MISSING_USER);
+      return;
+    }
+
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
