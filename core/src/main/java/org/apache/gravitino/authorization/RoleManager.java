@@ -88,7 +88,9 @@ class RoleManager {
           metalake,
           roleEntity.securableObjects(),
           Sets.newHashSet(),
-          authorizationPlugin -> authorizationPlugin.onRoleCreated(roleEntity));
+          (authorizationPlugin, catalogName) ->
+              authorizationPlugin.onRoleCreated(
+                  AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
 
       return roleEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -123,7 +125,9 @@ class RoleManager {
             metalake,
             roleEntity.securableObjects(),
             Sets.newHashSet(),
-            authorizationPlugin -> authorizationPlugin.onRoleDeleted(roleEntity));
+            (authorizationPlugin, catalogName) ->
+                authorizationPlugin.onRoleDeleted(
+                    AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
       } catch (NoSuchEntityException nse) {
         // ignore, because the role may have been deleted.
       }
