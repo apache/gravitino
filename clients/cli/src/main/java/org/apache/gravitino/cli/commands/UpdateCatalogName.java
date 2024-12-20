@@ -39,7 +39,7 @@ public class UpdateCatalogName extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param name The new cataliog name.
+   * @param name The new catalog name.
    */
   public UpdateCatalogName(
       String url, boolean ignoreVersions, String metalake, String catalog, String name) {
