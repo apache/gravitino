@@ -167,11 +167,11 @@ public class TestCredentialFactory {
   }
 
   @Test
-  void testADLSAccountKeyCredential() {
+  void testAzureAccountKeyCredential() {
     String storageAccountName = "storage-account-name";
     String storageAccountKey = "storage-account-key";
 
-    Map<String, String> adlsAccountKeyCredentialInfo =
+    Map<String, String> azureAccountKeyCredentialInfo =
         ImmutableMap.of(
             AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
             storageAccountName,
@@ -181,7 +181,7 @@ public class TestCredentialFactory {
     Credential credential =
         CredentialFactory.create(
             AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
-            adlsAccountKeyCredentialInfo,
+            azureAccountKeyCredentialInfo,
             expireTime);
     Assertions.assertEquals(
         AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE, credential.credentialType());
