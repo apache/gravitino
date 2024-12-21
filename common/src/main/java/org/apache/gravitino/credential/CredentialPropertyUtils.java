@@ -62,9 +62,9 @@ public class CredentialPropertyUtils {
           ICEBERG_OSS_ACCESS_KEY_ID,
           OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
           ICEBERG_OSS_ACCESS_KEY_SECRET,
-          ADLSAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+          AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
           ICEBERG_ADLS_ACCOUNT_NAME,
-          ADLSAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
           ICEBERG_ADLS_ACCOUNT_KEY);
 
   /**
@@ -78,7 +78,7 @@ public class CredentialPropertyUtils {
         || credential instanceof S3SecretKeyCredential
         || credential instanceof OSSTokenCredential
         || credential instanceof OSSSecretKeyCredential
-        || credential instanceof ADLSAccountKeyCredential) {
+        || credential instanceof AzureAccountKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 

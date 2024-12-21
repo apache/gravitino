@@ -20,7 +20,7 @@
 package org.apache.gravitino.abs.credential;
 
 import java.util.Map;
-import org.apache.gravitino.credential.ADLSAccountKeyCredential;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialContext;
@@ -49,6 +49,6 @@ public class ADLSAccountKeyProvider implements CredentialProvider {
 
   @Override
   public Credential getCredential(CredentialContext context) {
-    return new ADLSAccountKeyCredential(accountName, accountKey);
+    return new AzureAccountKeyCredential(accountName, accountKey);
   }
 }

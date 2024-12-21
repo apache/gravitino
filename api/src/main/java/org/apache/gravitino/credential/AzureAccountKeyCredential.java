@@ -24,26 +24,26 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-/** ADLS account key credential. */
-public class ADLSAccountKeyCredential implements Credential {
+/** Azure account key credential. */
+public class AzureAccountKeyCredential implements Credential {
 
-  /** ADLS account key credential type. */
-  public static final String ADLS_ACCOUNT_KEY_CREDENTIAL_TYPE = "adls-account-key";
-  /** ADLS storage account name */
+  /** Azure account key credential type. */
+  public static final String AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE = "azure-account-key";
+  /** Azure storage account name */
   public static final String GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME = "azure-storage-account-name";
-  /** ADLS storage account key */
+  /** Azure storage account key */
   public static final String GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY = "azure-storage-account-key";
 
   private String accountName;
   private String accountKey;
 
   /**
-   * Constructs an instance of {@link ADLSAccountKeyCredential}.
+   * Constructs an instance of {@link AzureAccountKeyCredential}.
    *
-   * @param accountName The ADLS account name.
-   * @param accountKey The ADLS account key.
+   * @param accountName The Azure account name.
+   * @param accountKey The Azure account key.
    */
-  public ADLSAccountKeyCredential(String accountName, String accountKey) {
+  public AzureAccountKeyCredential(String accountName, String accountKey) {
     validate(accountName, accountKey, 0);
     this.accountName = accountName;
     this.accountKey = accountKey;
@@ -53,11 +53,11 @@ public class ADLSAccountKeyCredential implements Credential {
    * This is the constructor that is used by credential factory to create an instance of credential
    * according to the credential information.
    */
-  public ADLSAccountKeyCredential() {}
+  public AzureAccountKeyCredential() {}
 
   @Override
   public String credentialType() {
-    return ADLS_ACCOUNT_KEY_CREDENTIAL_TYPE;
+    return AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE;
   }
 
   @Override
@@ -83,18 +83,18 @@ public class ADLSAccountKeyCredential implements Credential {
   }
 
   /**
-   * Get ADLS account name
+   * Get Azure account name
    *
-   * @return The ADLS account name
+   * @return The Azure account name
    */
   public String accountName() {
     return accountName;
   }
 
   /**
-   * Get ADLS account key
+   * Get Azure account key
    *
-   * @return The ADLS account key
+   * @return The Azure account key
    */
   public String accountKey() {
     return accountKey;
@@ -102,10 +102,10 @@ public class ADLSAccountKeyCredential implements Credential {
 
   private void validate(String accountName, String accountKey, long expireTimeInMS) {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(accountName), "ADLS account name should not be empty.");
+        StringUtils.isNotBlank(accountName), "Azure account name should not be empty.");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(accountKey), "ADLS account key should not be empty.");
+        StringUtils.isNotBlank(accountKey), "Azure account key should not be empty.");
     Preconditions.checkArgument(
-        expireTimeInMS == 0, "The expire time of ADLSAccountKeyCredential is not 0");
+        expireTimeInMS == 0, "The expire time of AzureAccountKeyCredential is not 0");
   }
 }

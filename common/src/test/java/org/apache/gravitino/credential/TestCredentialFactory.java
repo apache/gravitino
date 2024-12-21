@@ -173,23 +173,23 @@ public class TestCredentialFactory {
 
     Map<String, String> adlsAccountKeyCredentialInfo =
         ImmutableMap.of(
-            ADLSAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
             storageAccountName,
-            ADLSAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+            AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
             storageAccountKey);
     long expireTime = 0;
     Credential credential =
         CredentialFactory.create(
-            ADLSAccountKeyCredential.ADLS_ACCOUNT_KEY_CREDENTIAL_TYPE,
+            AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
             adlsAccountKeyCredentialInfo,
             expireTime);
     Assertions.assertEquals(
-        ADLSAccountKeyCredential.ADLS_ACCOUNT_KEY_CREDENTIAL_TYPE, credential.credentialType());
-    Assertions.assertInstanceOf(ADLSAccountKeyCredential.class, credential);
+        AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(AzureAccountKeyCredential.class, credential);
 
-    ADLSAccountKeyCredential adlsAccountKeyCredential = (ADLSAccountKeyCredential) credential;
-    Assertions.assertEquals(storageAccountName, adlsAccountKeyCredential.accountName());
-    Assertions.assertEquals(storageAccountKey, adlsAccountKeyCredential.accountKey());
-    Assertions.assertEquals(expireTime, adlsAccountKeyCredential.expireTimeInMs());
+    AzureAccountKeyCredential azureAccountKeyCredential = (AzureAccountKeyCredential) credential;
+    Assertions.assertEquals(storageAccountName, azureAccountKeyCredential.accountName());
+    Assertions.assertEquals(storageAccountKey, azureAccountKeyCredential.accountKey());
+    Assertions.assertEquals(expireTime, azureAccountKeyCredential.expireTimeInMs());
   }
 }
