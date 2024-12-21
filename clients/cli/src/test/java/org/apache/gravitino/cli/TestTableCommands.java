@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -441,7 +442,7 @@ class TestTableCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.LIST));
 
-    commandLine.handleCommandLine();
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null);
     assertTrue(
@@ -467,7 +468,7 @@ class TestTableCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.LIST));
 
-    commandLine.handleCommandLine();
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null);
     assertTrue(
@@ -485,7 +486,7 @@ class TestTableCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
 
-    commandLine.handleCommandLine();
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null);
@@ -512,7 +513,7 @@ class TestTableCommands {
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
-    commandLine.handleCommandLine();
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null);
@@ -538,7 +539,8 @@ class TestTableCommands {
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
-    commandLine.handleCommandLine();
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);

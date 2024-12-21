@@ -393,7 +393,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       if (!missingEntities.isEmpty()) {
         System.err.println(
             "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
-        return;
+        Main.exit(-1);
       }
       newListTables(url, ignore, metalake, catalog, schema).handle();
       return;
@@ -406,7 +406,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     if (!missingEntities.isEmpty()) {
       System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
-      return;
+      Main.exit(-1);
     }
 
     switch (command) {
