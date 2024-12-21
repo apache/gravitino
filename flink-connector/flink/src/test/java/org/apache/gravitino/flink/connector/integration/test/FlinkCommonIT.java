@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,6 +72,10 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
+  protected boolean supportSchemaOperationWithCommentAndOptions() {
+    return true;
+  }
+
   @Test
   @EnabledIf("supportSchemaOperation")
   public void testCreateSchema() {
@@ -92,6 +97,108 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   @Test
   @EnabledIf("supportSchemaOperation")
   public void testGetSchema() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_get_schema";
+          try {
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(tableEnv.executeSql("USE " + schema), ResultKind.SUCCESS);
+
+            catalog.asSchemas().schemaExists(schema);
+            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, loadedSchema.name());
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+            Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperation")
+  public void testListSchema() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_list_schema";
+          String schema2 = "test_list_schema2";
+          String schema3 = "test_list_schema3";
+
+          try {
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema2), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema3), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("SHOW DATABASES"),
+                ResultKind.SUCCESS_WITH_CONTENT,
+                Row.of("default"),
+                Row.of(schema),
+                Row.of(schema2),
+                Row.of(schema3));
+
+            String[] schemas = catalog.asSchemas().listSchemas();
+            Arrays.sort(schemas);
+            Assertions.assertEquals(4, schemas.length);
+            Assertions.assertEquals("default", schemas[0]);
+            Assertions.assertEquals(schema, schemas[1]);
+            Assertions.assertEquals(schema2, schemas[2]);
+            Assertions.assertEquals(schema3, schemas[3]);
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+            catalog.asSchemas().dropSchema(schema2, true);
+            catalog.asSchemas().dropSchema(schema3, true);
+            Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testAlterSchemaWithCommentAndOptions() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_alter_schema";
+          try {
+            TestUtils.assertTableResult(
+                sql(
+                    "CREATE DATABASE IF NOT EXISTS %s "
+                        + "COMMENT 'test comment'"
+                        + "WITH ('key1' = 'value1', 'key2'='value2')",
+                    schema),
+                ResultKind.SUCCESS);
+
+            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, loadedSchema.name());
+            Assertions.assertEquals("test comment", loadedSchema.comment());
+            Assertions.assertEquals(3, loadedSchema.properties().size());
+            Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
+            Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
+            Assertions.assertNotNull(loadedSchema.properties().get("location"));
+
+            TestUtils.assertTableResult(
+                sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
+                ResultKind.SUCCESS);
+            Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, reloadedSchema.name());
+            Assertions.assertEquals("test comment", reloadedSchema.comment());
+            Assertions.assertEquals(4, reloadedSchema.properties().size());
+            Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
+            Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testGetSchemaWithCommentAndOptions() {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
@@ -125,8 +232,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportSchemaOperation")
-  public void testListSchema() {
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testListSchemaWithCommentAndOptions() {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
@@ -161,45 +268,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             catalog.asSchemas().dropSchema(schema2, true);
             catalog.asSchemas().dropSchema(schema3, true);
             Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
-          }
-        });
-  }
-
-  @Test
-  @EnabledIf("supportSchemaOperation")
-  public void testAlterSchema() {
-    doWithCatalog(
-        currentCatalog(),
-        catalog -> {
-          String schema = "test_alter_schema";
-          try {
-            TestUtils.assertTableResult(
-                sql(
-                    "CREATE DATABASE IF NOT EXISTS %s "
-                        + "COMMENT 'test comment'"
-                        + "WITH ('key1' = 'value1', 'key2'='value2')",
-                    schema),
-                ResultKind.SUCCESS);
-
-            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
-            Assertions.assertEquals(schema, loadedSchema.name());
-            Assertions.assertEquals("test comment", loadedSchema.comment());
-            Assertions.assertEquals(3, loadedSchema.properties().size());
-            Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
-            Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
-            Assertions.assertNotNull(loadedSchema.properties().get("location"));
-
-            TestUtils.assertTableResult(
-                sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
-                ResultKind.SUCCESS);
-            Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
-            Assertions.assertEquals(schema, reloadedSchema.name());
-            Assertions.assertEquals("test comment", reloadedSchema.comment());
-            Assertions.assertEquals(4, reloadedSchema.properties().size());
-            Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
-            Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
-          } finally {
-            catalog.asSchemas().dropSchema(schema, true);
           }
         });
   }
