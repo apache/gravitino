@@ -32,7 +32,7 @@ public class CredentialConstants {
   public static final String ADLS_TOKEN_CREDENTIAL_PROVIDER_TYPE = "adls-token";
   public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
 
-  public static final String ADLS_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE = "adls-account-key";
+  public static final String AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE = "azure-account-key";
 
   private CredentialConstants() {}
 }

@@ -38,7 +38,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
-import org.apache.gravitino.credential.config.ADLSCredentialConfig;
+import org.apache.gravitino.credential.config.AzureCredentialConfig;
 
 /** Generates ADLS token to access ADLS data. */
 public class ADLSTokenProvider implements CredentialProvider {
@@ -51,14 +51,14 @@ public class ADLSTokenProvider implements CredentialProvider {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    ADLSCredentialConfig adlsCredentialConfig = new ADLSCredentialConfig(properties);
-    this.storageAccountName = adlsCredentialConfig.storageAccountName();
-    this.tenantId = adlsCredentialConfig.tenantId();
-    this.clientId = adlsCredentialConfig.clientId();
-    this.clientSecret = adlsCredentialConfig.clientSecret();
+    AzureCredentialConfig azureCredentialConfig = new AzureCredentialConfig(properties);
+    this.storageAccountName = azureCredentialConfig.storageAccountName();
+    this.tenantId = azureCredentialConfig.tenantId();
+    this.clientId = azureCredentialConfig.clientId();
+    this.clientSecret = azureCredentialConfig.clientSecret();
     this.endpoint =
         String.format("https://%s.%s", storageAccountName, ADLSTokenCredential.ADLS_DOMAIN);
-    this.tokenExpireSecs = adlsCredentialConfig.tokenExpireInSecs();
+    this.tokenExpireSecs = azureCredentialConfig.adlsTokenExpireInSecs();
   }
 
   @Override

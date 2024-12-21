@@ -26,11 +26,10 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
-@Tag("gravitino-docker-test")
+// @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 

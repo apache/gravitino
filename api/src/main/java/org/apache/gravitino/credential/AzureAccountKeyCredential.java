@@ -44,7 +44,7 @@ public class AzureAccountKeyCredential implements Credential {
    * @param accountKey The Azure account key.
    */
   public AzureAccountKeyCredential(String accountName, String accountKey) {
-    validate(accountName, accountKey, 0);
+    validate(accountName, accountKey);
     this.accountName = accountName;
     this.accountKey = accountKey;
   }
@@ -77,7 +77,7 @@ public class AzureAccountKeyCredential implements Credential {
   public void initialize(Map<String, String> credentialInfo, long expireTimeInMS) {
     String accountName = credentialInfo.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
     String accountKey = credentialInfo.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    validate(accountName, accountKey, expireTimeInMS);
+    validate(accountName, accountKey);
     this.accountName = accountName;
     this.accountKey = accountKey;
   }
@@ -100,12 +100,10 @@ public class AzureAccountKeyCredential implements Credential {
     return accountKey;
   }
 
-  private void validate(String accountName, String accountKey, long expireTimeInMS) {
+  private void validate(String accountName, String accountKey) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(accountName), "Azure account name should not be empty.");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(accountKey), "Azure account key should not be empty.");
-    Preconditions.checkArgument(
-        expireTimeInMS == 0, "The expire time of AzureAccountKeyCredential is not 0");
   }
 }

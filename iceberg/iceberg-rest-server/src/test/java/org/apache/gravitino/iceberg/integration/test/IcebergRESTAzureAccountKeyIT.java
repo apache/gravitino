@@ -33,7 +33,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 @SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
-public class IcebergRESTADLSAccountKeyIT extends IcebergRESTJdbcCatalogIT {
+public class IcebergRESTAzureAccountKeyIT extends IcebergRESTJdbcCatalogIT {
 
   private String storageAccountName;
   private String storageAccountKey;
@@ -43,9 +43,10 @@ public class IcebergRESTADLSAccountKeyIT extends IcebergRESTJdbcCatalogIT {
   void initEnv() {
     this.storageAccountName =
         System.getenv()
-            .getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
+            .getOrDefault("GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
     this.storageAccountKey =
-        System.getenv().getOrDefault("GRAVITINO_ADLS_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
+        System.getenv()
+            .getOrDefault("GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
     this.warehousePath =
         String.format(
             "abfss://%s@%s.dfs.core.windows.net/data/test",
@@ -81,7 +82,7 @@ public class IcebergRESTADLSAccountKeyIT extends IcebergRESTJdbcCatalogIT {
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.ADLS_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE);
+        CredentialConstants.AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
         storageAccountName);

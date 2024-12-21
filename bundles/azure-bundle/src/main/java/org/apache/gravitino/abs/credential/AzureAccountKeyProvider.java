@@ -25,18 +25,18 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.config.ADLSCredentialConfig;
+import org.apache.gravitino.credential.config.AzureCredentialConfig;
 
-/** Generates ADLS account key to access ADLS data. */
-public class ADLSAccountKeyProvider implements CredentialProvider {
+/** Generates Azure account key to access data. */
+public class AzureAccountKeyProvider implements CredentialProvider {
   private String accountName;
   private String accountKey;
 
   @Override
   public void initialize(Map<String, String> properties) {
-    ADLSCredentialConfig adlsCredentialConfig = new ADLSCredentialConfig(properties);
-    this.accountName = adlsCredentialConfig.storageAccountName();
-    this.accountKey = adlsCredentialConfig.storageAccountKey();
+    AzureCredentialConfig azureCredentialConfig = new AzureCredentialConfig(properties);
+    this.accountName = azureCredentialConfig.storageAccountName();
+    this.accountKey = azureCredentialConfig.storageAccountKey();
   }
 
   @Override
@@ -44,7 +44,7 @@ public class ADLSAccountKeyProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.ADLS_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE;
+    return CredentialConstants.AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE;
   }
 
   @Override
