@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -85,7 +86,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (!IcebergCatalogBackend.MEMORY.equals(catalogBackend)
         && !IcebergCatalogBackend.REST.equals(catalogBackend)) {
       // check whether IcebergConfig.CATALOG_WAREHOUSE exists
-      icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
+      if (StringUtils.isBlank(icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE))) {
+        throw new IllegalArgumentException("The 'warehouse' parameter must have a value.");
+      }
     }
     if (!IcebergCatalogBackend.MEMORY.equals(catalogBackend)) {
       this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
