@@ -32,6 +32,8 @@ import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
+import org.apache.gravitino.cli.commands.DisableCatalog;
+import org.apache.gravitino.cli.commands.EnableCatalog;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
@@ -290,5 +292,65 @@ class TestCatalogCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new_name");
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
+  }
+
+  @Test
+  void testEnableCatalogCommand() {
+    EnableCatalog mockEnable = mock(EnableCatalog.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.ENABLE));
+    doReturn(mockEnable)
+        .when(commandLine)
+        .newEnableCatalog(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
+    commandLine.handleCommandLine();
+    verify(mockEnable).handle();
+  }
+
+  @Test
+  void testEnableCatalogCommandWithRecursive() {
+    EnableCatalog mockEnable = mock(EnableCatalog.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    when(mockCommandLine.hasOption(GravitinoOptions.RECURSIVE)).thenReturn(true);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.ENABLE));
+    doReturn(mockEnable)
+        .when(commandLine)
+        .newEnableCatalog(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", true);
+    commandLine.handleCommandLine();
+    verify(mockEnable).handle();
+  }
+
+  @Test
+  void testDisableCatalogCommand() {
+    DisableCatalog mockDisable = mock(DisableCatalog.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DISABLE));
+    doReturn(mockDisable)
+        .when(commandLine)
+        .newDisableCatalog(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+    commandLine.handleCommandLine();
+    verify(mockDisable).handle();
   }
 }
