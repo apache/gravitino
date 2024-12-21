@@ -49,6 +49,10 @@ import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
+import org.apache.gravitino.cli.commands.DisableCatalog;
+import org.apache.gravitino.cli.commands.DisableMetalake;
+import org.apache.gravitino.cli.commands.EnableCatalog;
+import org.apache.gravitino.cli.commands.EnableMetalake;
 import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
@@ -883,5 +887,25 @@ public class TestableCommandLine {
       FullName entity,
       String[] privileges) {
     return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected EnableMetalake newEnableMetalake(
+      String url, boolean ignore, String metalake, boolean isRecursive) {
+    return new EnableMetalake(url, ignore, metalake, isRecursive);
+  }
+
+  protected DisableMetalake newDisableMetalake(String url, boolean ignore, String metalake) {
+    return new DisableMetalake(url, ignore, metalake);
+  }
+
+  protected EnableCatalog newEnableCatalog(
+      String url, boolean ignore, String metalake, String catalog, boolean isRecursive) {
+
+    return new EnableCatalog(url, ignore, metalake, catalog, isRecursive);
+  }
+
+  protected DisableCatalog newDisableCatalog(
+      String url, boolean ignore, String metalake, String catalog) {
+    return new DisableCatalog(url, ignore, metalake, catalog);
   }
 }

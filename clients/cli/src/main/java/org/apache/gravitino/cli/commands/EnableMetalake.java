@@ -19,54 +19,43 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
+import java.util.Arrays;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DeleteMetalake extends Command {
-  protected final String metalake;
-  protected final boolean force;
+public class EnableMetalake extends Command {
 
-  /**
-   * Delete a metalake.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
-   * @param metalake The name of the metalake.
-   */
-  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
+  private final String metalake;
+  private Boolean isRecursive;
+
+  public EnableMetalake(String url, boolean ignoreVersions, String metalake, boolean isRecursive) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
+    this.isRecursive = isRecursive;
   }
 
-  /** Delete a metalake. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
-
+    StringBuilder msgBuilder = new StringBuilder(metalake);
     try {
       GravitinoAdminClient client = buildAdminClient();
-      deleted = client.dropMetalake(metalake);
+      client.enableMetalake(metalake);
+      msgBuilder.append(" has been enabled.");
+
+      if (isRecursive) {
+        GravitinoMetalake metalakeObject = client.loadMetalake(metalake);
+        String[] catalogs = metalakeObject.listCatalogs();
+        Arrays.stream(catalogs).forEach(metalakeObject::enableCatalog);
+        msgBuilder.append(" and all catalogs in this metalake has been recursively enabled.");
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (MetalakeInUseException inUseException) {
-      System.err.println(metalake + " in use, please use disable command disable it first.");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(metalake + " deleted.");
-    } else {
-      System.out.println(metalake + " not deleted.");
-    }
+    System.out.println(msgBuilder);
   }
 }

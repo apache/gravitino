@@ -19,54 +19,29 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DeleteMetalake extends Command {
-  protected final String metalake;
-  protected final boolean force;
+public class DisableMetalake extends Command {
+  private String metalake;
 
-  /**
-   * Delete a metalake.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
-   * @param metalake The name of the metalake.
-   */
-  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
+  public DisableMetalake(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
   }
 
-  /** Delete a metalake. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
-
     try {
       GravitinoAdminClient client = buildAdminClient();
-      deleted = client.dropMetalake(metalake);
+      client.disableMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (MetalakeInUseException inUseException) {
-      System.err.println(metalake + " in use, please use disable command disable it first.");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(metalake + " deleted.");
-    } else {
-      System.out.println(metalake + " not deleted.");
-    }
+    System.out.println(metalake + " has been disabled.");
   }
 }

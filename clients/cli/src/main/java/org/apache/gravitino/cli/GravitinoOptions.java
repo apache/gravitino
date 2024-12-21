@@ -59,6 +59,7 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String VALUE = "value";
   public static final String VERSION = "version";
+  public static final String RECURSIVE = "recursive";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -85,7 +86,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
 
-    // Create/update options
+    // Create/update/Enable/Disable options
     options.addOption(createArgOption(RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));
@@ -102,6 +103,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
+    options.addOption(createSimpleOption("R", RECURSIVE, "recursive operation"));
 
     // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));

@@ -223,6 +223,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
         }
         break;
 
+      case CommandActions.ENABLE:
+        boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
+        newEnableMetalake(url, ignore, metalake, recursive).handle();
+        break;
+
+      case CommandActions.DISABLE:
+        newDisableMetalake(url, ignore, metalake).handle();
+        break;
+
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
         Main.exit(-1);
@@ -297,6 +306,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
           String newName = line.getOptionValue(GravitinoOptions.RENAME);
           newUpdateCatalogName(url, ignore, metalake, catalog, newName).handle();
         }
+        break;
+      case CommandActions.ENABLE:
+        boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
+        newEnableCatalog(url, ignore, metalake, catalog, recursive).handle();
+        break;
+
+      case CommandActions.DISABLE:
+        newDisableCatalog(url, ignore, metalake, catalog).handle();
         break;
 
       default:

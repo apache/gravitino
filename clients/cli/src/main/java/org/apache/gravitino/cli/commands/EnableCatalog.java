@@ -16,57 +16,48 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DeleteMetalake extends Command {
-  protected final String metalake;
-  protected final boolean force;
+public class EnableCatalog extends Command {
+  private final String metalake;
+  private final String catalog;
+  private final boolean isRecursive;
 
-  /**
-   * Delete a metalake.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
-   * @param metalake The name of the metalake.
-   */
-  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
+  public EnableCatalog(
+      String url, boolean ignoreVersions, String metalake, String catalog, boolean isRecursive) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.isRecursive = isRecursive;
   }
 
-  /** Delete a metalake. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
-
     try {
-      GravitinoAdminClient client = buildAdminClient();
-      deleted = client.dropMetalake(metalake);
-    } catch (NoSuchMetalakeException err) {
+      if (isRecursive) {
+        GravitinoAdminClient adminClient = buildAdminClient();
+        adminClient.enableMetalake(metalake);
+      }
+      GravitinoClient client = buildClient(metalake);
+      client.enableCatalog(catalog);
+    } catch (NoSuchMetalakeException noSuchMetalakeException) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (MetalakeInUseException inUseException) {
-      System.err.println(metalake + " in use, please use disable command disable it first.");
+    } catch (NoSuchCatalogException noSuchCatalogException) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (MetalakeNotInUseException notInUseException) {
+      exitWithError(
+          metalake + " not in use. please use --recursive option, or enable metalake first");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(metalake + " deleted.");
-    } else {
-      System.out.println(metalake + " not deleted.");
-    }
+    System.out.println(metalake + "." + catalog + " has been enabled.");
   }
 }
