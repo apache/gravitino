@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -87,8 +86,9 @@ class RoleManager {
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           roleEntity.securableObjects(),
-          Sets.newHashSet(),
-          authorizationPlugin -> authorizationPlugin.onRoleCreated(roleEntity));
+          (authorizationPlugin, catalogName) ->
+              authorizationPlugin.onRoleCreated(
+                  AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
 
       return roleEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -122,8 +122,9 @@ class RoleManager {
         AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             roleEntity.securableObjects(),
-            Sets.newHashSet(),
-            authorizationPlugin -> authorizationPlugin.onRoleDeleted(roleEntity));
+            (authorizationPlugin, catalogName) ->
+                authorizationPlugin.onRoleDeleted(
+                    AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
       } catch (NoSuchEntityException nse) {
         // ignore, because the role may have been deleted.
       }

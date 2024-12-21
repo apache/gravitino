@@ -67,7 +67,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(true);
+    RangerITEnv.init(RangerBaseE2EIT.metalakeName, true);
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =
@@ -163,7 +163,8 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     sparkSession.sql(SQL_ALTER_TABLE_BACK);
   }
 
-  private static void createCatalog() {
+  @Override
+  public void createCatalog() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.URI, HIVE_METASTORE_URIS);
     properties.put(IcebergConstants.CATALOG_BACKEND, "hive");

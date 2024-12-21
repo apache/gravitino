@@ -70,20 +70,15 @@ public class TopicDetails extends Command {
       GravitinoClient client = buildClient(metalake);
       gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTopicException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TOPIC);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(gTopic.name() + "," + gTopic.comment());
