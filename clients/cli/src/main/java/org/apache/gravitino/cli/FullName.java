@@ -29,6 +29,8 @@ public class FullName {
   private final CommandLine line;
   private String metalakeEnv;
   private boolean matalakeSet = false;
+  private boolean isMissingNameInfoVisible = true;
+  private boolean isMalformedInfoVisible = true;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -159,14 +161,14 @@ public class FullName {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
       if (names.length <= position) {
-        System.err.println(ErrorMessages.MALFORMED_NAME);
+        showMalformedInfo();
         return null;
       }
 
       return names[position];
     }
 
-    System.err.println(ErrorMessages.MISSING_NAME);
+    showMissingNameInfo();
     return null;
   }
 
@@ -223,5 +225,19 @@ public class FullName {
    */
   public boolean hasColumnName() {
     return hasNamePart(4);
+  }
+
+  private void showMissingNameInfo() {
+    if (isMissingNameInfoVisible) {
+      System.err.println(ErrorMessages.MISSING_NAME);
+      isMissingNameInfoVisible = false;
+    }
+  }
+
+  private void showMalformedInfo() {
+    if (isMalformedInfoVisible) {
+      System.err.println(ErrorMessages.MALFORMED_NAME);
+      isMalformedInfoVisible = false;
+    }
   }
 }
