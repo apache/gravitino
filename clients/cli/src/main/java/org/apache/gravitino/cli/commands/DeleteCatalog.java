@@ -66,7 +66,7 @@ public class DeleteCatalog extends Command {
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (CatalogInUseException catalogInUseException) {
-      System.err.println(catalog + " in use, please use disable command disable it first.");
+      System.err.println(catalog + " in use, please disable it first.");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
