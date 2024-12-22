@@ -86,7 +86,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
 
-    // Create/update/Enable/Disable options
+    // very minor options
     options.addOption(createArgOption(RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));

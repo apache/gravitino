@@ -48,7 +48,7 @@ public class EnableMetalake extends Command {
         GravitinoMetalake metalakeObject = client.loadMetalake(metalake);
         String[] catalogs = metalakeObject.listCatalogs();
         Arrays.stream(catalogs).forEach(metalakeObject::enableCatalog);
-        msgBuilder.append(" and all catalogs in this metalake has been recursively enabled.");
+        msgBuilder.append(" and all catalogs in this metalake have been enabled.");
       }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
