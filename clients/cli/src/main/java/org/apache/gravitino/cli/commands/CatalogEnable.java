@@ -16,32 +16,48 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DisableMetalake extends Command {
-  private String metalake;
+public class CatalogEnable extends Command {
+  private final String metalake;
+  private final String catalog;
+  private final boolean isRecursive;
 
-  public DisableMetalake(String url, boolean ignoreVersions, String metalake) {
+  public CatalogEnable(
+      String url, boolean ignoreVersions, String metalake, String catalog, boolean isRecursive) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.isRecursive = isRecursive;
   }
 
   @Override
   public void handle() {
     try {
-      GravitinoAdminClient client = buildAdminClient();
-      client.disableMetalake(metalake);
-    } catch (NoSuchMetalakeException err) {
+      if (isRecursive) {
+        GravitinoAdminClient adminClient = buildAdminClient();
+        adminClient.enableMetalake(metalake);
+      }
+      GravitinoClient client = buildClient(metalake);
+      client.enableCatalog(catalog);
+    } catch (NoSuchMetalakeException noSuchMetalakeException) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException noSuchCatalogException) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (MetalakeNotInUseException notInUseException) {
+      exitWithError(
+          metalake + " not in use. please use --recursive option, or enable metalake first");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(metalake + " has been disabled.");
+    System.out.println(metalake + "." + catalog + " has been enabled.");
   }
 }

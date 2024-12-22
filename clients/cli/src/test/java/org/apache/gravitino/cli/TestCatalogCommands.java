@@ -32,8 +32,8 @@ import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
-import org.apache.gravitino.cli.commands.DisableCatalog;
-import org.apache.gravitino.cli.commands.EnableCatalog;
+import org.apache.gravitino.cli.commands.CatalogDisable;
+import org.apache.gravitino.cli.commands.CatalogEnable;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
@@ -296,7 +296,7 @@ class TestCatalogCommands {
 
   @Test
   void testEnableCatalogCommand() {
-    EnableCatalog mockEnable = mock(EnableCatalog.class);
+    CatalogEnable mockEnable = mock(CatalogEnable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -316,7 +316,7 @@ class TestCatalogCommands {
 
   @Test
   void testEnableCatalogCommandWithRecursive() {
-    EnableCatalog mockEnable = mock(EnableCatalog.class);
+    CatalogEnable mockEnable = mock(CatalogEnable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -337,7 +337,7 @@ class TestCatalogCommands {
 
   @Test
   void testDisableCatalogCommand() {
-    DisableCatalog mockDisable = mock(DisableCatalog.class);
+    CatalogDisable mockDisable = mock(CatalogDisable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);

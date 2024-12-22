@@ -49,10 +49,10 @@ import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
-import org.apache.gravitino.cli.commands.DisableCatalog;
-import org.apache.gravitino.cli.commands.DisableMetalake;
-import org.apache.gravitino.cli.commands.EnableCatalog;
-import org.apache.gravitino.cli.commands.EnableMetalake;
+import org.apache.gravitino.cli.commands.CatalogDisable;
+import org.apache.gravitino.cli.commands.MetalakeDisable;
+import org.apache.gravitino.cli.commands.CatalogEnable;
+import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
@@ -889,23 +889,23 @@ public class TestableCommandLine {
     return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
   }
 
-  protected EnableMetalake newEnableMetalake(
+  protected MetalakeEnable newEnableMetalake(
       String url, boolean ignore, String metalake, boolean isRecursive) {
-    return new EnableMetalake(url, ignore, metalake, isRecursive);
+    return new MetalakeEnable(url, ignore, metalake, isRecursive);
   }
 
-  protected DisableMetalake newDisableMetalake(String url, boolean ignore, String metalake) {
-    return new DisableMetalake(url, ignore, metalake);
+  protected MetalakeDisable newDisableMetalake(String url, boolean ignore, String metalake) {
+    return new MetalakeDisable(url, ignore, metalake);
   }
 
-  protected EnableCatalog newEnableCatalog(
+  protected CatalogEnable newEnableCatalog(
       String url, boolean ignore, String metalake, String catalog, boolean isRecursive) {
 
-    return new EnableCatalog(url, ignore, metalake, catalog, isRecursive);
+    return new CatalogEnable(url, ignore, metalake, catalog, isRecursive);
   }
 
-  protected DisableCatalog newDisableCatalog(
+  protected CatalogDisable newDisableCatalog(
       String url, boolean ignore, String metalake, String catalog) {
-    return new DisableCatalog(url, ignore, metalake, catalog);
+    return new CatalogDisable(url, ignore, metalake, catalog);
   }
 }

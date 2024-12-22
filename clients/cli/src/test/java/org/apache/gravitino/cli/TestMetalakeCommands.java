@@ -29,8 +29,8 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
-import org.apache.gravitino.cli.commands.DisableMetalake;
-import org.apache.gravitino.cli.commands.EnableMetalake;
+import org.apache.gravitino.cli.commands.MetalakeDisable;
+import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
@@ -285,7 +285,7 @@ class TestMetalakeCommands {
 
   @Test
   void testEnableMetalakeCommand() {
-    EnableMetalake mockEnable = mock(EnableMetalake.class);
+    MetalakeEnable mockEnable = mock(MetalakeEnable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     GravitinoCommandLine commandLine =
@@ -301,7 +301,7 @@ class TestMetalakeCommands {
 
   @Test
   void testEnableMetalakeCommandWithRecursive() {
-    EnableMetalake mockEnable = mock(EnableMetalake.class);
+    MetalakeEnable mockEnable = mock(MetalakeEnable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.RECURSIVE)).thenReturn(true);
@@ -318,7 +318,7 @@ class TestMetalakeCommands {
 
   @Test
   void testDisableMetalakeCommand() {
-    DisableMetalake mockDisable = mock(DisableMetalake.class);
+    MetalakeDisable mockDisable = mock(MetalakeDisable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
 

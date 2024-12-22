@@ -25,12 +25,12 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class EnableMetalake extends Command {
+public class MetalakeEnable extends Command {
 
   private final String metalake;
   private Boolean isRecursive;
 
-  public EnableMetalake(String url, boolean ignoreVersions, String metalake, boolean isRecursive) {
+  public MetalakeEnable(String url, boolean ignoreVersions, String metalake, boolean isRecursive) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.isRecursive = isRecursive;

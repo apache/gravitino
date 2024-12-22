@@ -23,12 +23,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DisableCatalog extends Command {
+public class CatalogDisable extends Command {
 
   private final String metalake;
   private final String catalog;
 
-  public DisableCatalog(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public CatalogDisable(String url, boolean ignoreVersions, String metalake, String catalog) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
