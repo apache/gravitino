@@ -23,14 +23,23 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Disable metalake. */
 public class MetalakeDisable extends Command {
   private String metalake;
 
+  /**
+   * Disable metalake
+   *
+   * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   */
   public MetalakeDisable(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
   }
 
+  /** Disable metalake. */
   @Override
   public void handle() {
     try {

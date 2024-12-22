@@ -23,17 +23,27 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Disable catalog. */
 public class CatalogDisable extends Command {
 
   private final String metalake;
   private final String catalog;
 
+  /**
+   * Disable catalog
+   *
+   * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   */
   public CatalogDisable(String url, boolean ignoreVersions, String metalake, String catalog) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
   }
 
+  /** Disable catalog. */
   @Override
   public void handle() {
     try {
