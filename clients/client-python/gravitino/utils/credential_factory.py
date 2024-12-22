@@ -18,7 +18,9 @@
 from typing import Dict
 
 from gravitino.api.credential.adls_token_credential import ADLSTokenCredential
-from gravitino.api.credential.azure_account_key_credential import AzureAccountKeyCredential
+from gravitino.api.credential.azure_account_key_credential import (
+    AzureAccountKeyCredential,
+)
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
@@ -44,6 +46,9 @@ class CredentialFactory:
             return OSSSecretKeyCredential(credential_info, expire_time_in_ms)
         if credential_type == ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE:
             return ADLSTokenCredential(credential_info, expire_time_in_ms)
-        if credential_type == AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE:
+        if (
+            credential_type
+            == AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE
+        ):
             return AzureAccountKeyCredential(credential_info, expire_time_in_ms)
         raise NotImplementedError(f"Credential type {credential_type} is not supported")
