@@ -279,13 +279,19 @@ gcli metalake remove --property test
 #### Enable a metalake
 
 ```bash
-gcli metalake enable -m metalake_demo
+gcli metalake update -m metalake_demo --enable
+```
+
+#### Enable a metalake and all catalogs
+
+```bash
+gcli metalake update -m metalake_demo --enable -R
 ```
 
 #### Disable a metalake
 
 ```bash
-gcli metalake disable -m metalake_demo
+gcli metalake update -m metalake_demo --disable
 ```
 
 ### Catalog commands
@@ -405,12 +411,19 @@ gcli catalog remove --name catalog_mysql --property test
 #### Enable a catalog
 
 ```bash
-gcli catalog enable -m metalake_demo --name catalog
+gcli catalog update -m metalake_demo --name catalog --enable 
 ```
+
+#### Enable a catalog and it's metalake
+
+```bash
+gcli catalog update -m metalake_demo --name catalog --enable  -R
+```
+
 #### Disable a catalog
 
 ```bash
-gcli catalog disable -m metalake_demo --name catalog
+gcli catalog update -m metalake_demo --name catalog --disable
 ```
 
 ### Schema commands
