@@ -60,6 +60,8 @@ public class GravitinoOptions {
   public static final String VALUE = "value";
   public static final String VERSION = "version";
   public static final String RECURSIVE = "recursive";
+  public static final String ENABLE = "enable";
+  public static final String DISABLE = "disable";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -85,6 +87,8 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(PARTITION, "display partition information"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
+    options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
+    options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
 
     // very minor options
     options.addOption(createArgOption(RENAME, "new entity name"));

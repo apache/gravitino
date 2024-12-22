@@ -212,6 +212,18 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.UPDATE:
+        if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
+          System.err.println("Unable to enable and disable at the same time");
+          Main.exit(-1);
+        }
+        if (line.hasOption(GravitinoOptions.ENABLE)) {
+          boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
+          newMetalakeEnable(url, ignore, metalake, recursive).handle();
+        }
+        if (line.hasOption(GravitinoOptions.DISABLE)) {
+          newMetalakeDisable(url, ignore, metalake).handle();
+        }
+
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           comment = line.getOptionValue(GravitinoOptions.COMMENT);
           newUpdateMetalakeComment(url, ignore, metalake, comment).handle();
@@ -221,15 +233,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           force = line.hasOption(GravitinoOptions.FORCE);
           newUpdateMetalakeName(url, ignore, force, metalake, newName).handle();
         }
-        break;
-
-      case CommandActions.ENABLE:
-        boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
-        newEnableMetalake(url, ignore, metalake, recursive).handle();
-        break;
-
-      case CommandActions.DISABLE:
-        newDisableMetalake(url, ignore, metalake).handle();
         break;
 
       default:
@@ -298,6 +301,18 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.UPDATE:
+        if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
+          System.err.println("Unable to enable and disable at the same time");
+          Main.exit(-1);
+        }
+        if (line.hasOption(GravitinoOptions.ENABLE)) {
+          boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
+          newCatalogEnable(url, ignore, metalake, catalog, recursive).handle();
+        }
+        if (line.hasOption(GravitinoOptions.DISABLE)) {
+          newCatalogDisable(url, ignore, metalake, catalog).handle();
+        }
+
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
           newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment).handle();
@@ -306,14 +321,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           String newName = line.getOptionValue(GravitinoOptions.RENAME);
           newUpdateCatalogName(url, ignore, metalake, catalog, newName).handle();
         }
-        break;
-      case CommandActions.ENABLE:
-        boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
-        newEnableCatalog(url, ignore, metalake, catalog, recursive).handle();
-        break;
-
-      case CommandActions.DISABLE:
-        newDisableCatalog(url, ignore, metalake, catalog).handle();
         break;
 
       default:
