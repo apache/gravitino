@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.security.Permission;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateSchema;
@@ -35,6 +41,7 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,10 +49,36 @@ class TestSchemaCommands {
   private CommandLine mockCommandLine;
   private Options mockOptions;
 
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+  private final SecurityManager securityManager =
+      new SecurityManager() {
+        public void checkPermission(Permission permission) {
+          if (permission.getName().startsWith("exitVM")) {
+            throw new RuntimeException(permission.getName());
+          }
+        }
+      };
+
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  void restoreSecurityManager() {
+    System.setSecurityManager(null);
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -244,5 +277,68 @@ class TestSchemaCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListSchemaWithoutCatalog() {
+    System.setSecurityManager(securityManager);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.SCHEMA, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListSchema(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null);
+    assertTrue(
+        errContent.toString().contains("Missing required argument(s): " + CommandEntities.CATALOG));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailsSchemaWithoutCatalog() {
+    System.setSecurityManager(securityManager);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.SCHEMA, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertTrue(
+        errContent
+            .toString()
+            .contains(
+                "Missing required argument(s): "
+                    + CommandEntities.CATALOG
+                    + ", "
+                    + CommandEntities.SCHEMA));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailsSchemaWithoutSchema() {
+    System.setSecurityManager(securityManager);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.SCHEMA, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertTrue(
+        errContent.toString().contains("Missing required argument(s): " + CommandEntities.SCHEMA));
   }
 }
