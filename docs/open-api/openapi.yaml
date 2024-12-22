@@ -477,7 +477,7 @@ components:
           - "TOPIC"
           - "ROLE"
           - "METALAKE"
-    metadataObjectTypeWithoutColumn:
+    metadataObjectTypeWithOwner:
       name: metadataObjectType
       in: path
       description: The type of the metadata object
