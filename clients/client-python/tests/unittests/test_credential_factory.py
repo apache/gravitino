@@ -19,6 +19,8 @@
 
 import unittest
 
+from gravitino.api.credential.adls_token_credential import ADLSTokenCredential
+from gravitino.api.credential.azure_account_key_credential import AzureAccountKeyCredential
 from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
@@ -42,6 +44,12 @@ class TestCredentialFactory(unittest.TestCase):
         check_credential = CredentialFactory.create(
             s3_credential.S3_TOKEN_CREDENTIAL_TYPE, credential_info, expire_time
         )
+        self.assertEqual(
+            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+
+        self.assertIsInstance(check_credential, S3TokenCredential)
         self.assertEqual("access_key", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
         self.assertEqual("session_token", check_credential.session_token())
@@ -59,43 +67,53 @@ class TestCredentialFactory(unittest.TestCase):
         check_credential = CredentialFactory.create(
             s3_credential.S3_SECRET_KEY_CREDENTIAL_TYPE, credential_info, expire_time
         )
+        self.assertEqual(
+            S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+
+        self.assertIsInstance(check_credential, S3SecretKeyCredential)
         self.assertEqual("access_key", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
         self.assertEqual(0, check_credential.expire_time_in_ms())
 
     def test_gcs_token_credential(self):
-        credential_info = {GCSTokenCredential._GCS_TOKEN_NAME: "token"}
-        credential = GCSTokenCredential(credential_info, 1000)
-        credential_info = credential.credential_info()
-        expire_time = credential.expire_time_in_ms()
+        gcs_credential_info = {GCSTokenCredential._GCS_TOKEN_NAME: "token"}
+        gcs_credential = GCSTokenCredential(gcs_credential_info, 1000)
+        credential_info = gcs_credential.credential_info()
+        expire_time = gcs_credential.expire_time_in_ms()
 
         check_credential = CredentialFactory.create(
-            credential.credential_type(), credential_info, expire_time
+            gcs_credential.credential_type(), credential_info, expire_time
         )
         self.assertEqual(
             GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
             check_credential.credential_type(),
         )
+
+        self.assertIsInstance(check_credential, GCSTokenCredential)
         self.assertEqual("token", check_credential.token())
         self.assertEqual(1000, check_credential.expire_time_in_ms())
 
     def test_oss_token_credential(self):
-        credential_info = {
+        oss_credential_info = {
             OSSTokenCredential._GRAVITINO_OSS_TOKEN: "token",
             OSSTokenCredential._GRAVITINO_OSS_SESSION_ACCESS_KEY_ID: "access_id",
             OSSTokenCredential._GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY: "secret_key",
         }
-        credential = OSSTokenCredential(credential_info, 1000)
-        credential_info = credential.credential_info()
-        expire_time = credential.expire_time_in_ms()
+        oss_credential = OSSTokenCredential(oss_credential_info, 1000)
+        credential_info = oss_credential.credential_info()
+        expire_time = oss_credential.expire_time_in_ms()
 
         check_credential = CredentialFactory.create(
-            credential.credential_type(), credential_info, expire_time
+            oss_credential.credential_type(), credential_info, expire_time
         )
         self.assertEqual(
             OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
             check_credential.credential_type(),
         )
+
+        self.assertIsInstance(check_credential, OSSTokenCredential)
         self.assertEqual("token", check_credential.security_token())
         self.assertEqual("access_id", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
@@ -113,6 +131,56 @@ class TestCredentialFactory(unittest.TestCase):
         check_credential = CredentialFactory.create(
             oss_credential.OSS_SECRET_KEY_CREDENTIAL_TYPE, credential_info, expire_time
         )
+        self.assertEqual(
+            OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+
+        self.assertIsInstance(check_credential, OSSSecretKeyCredential)
         self.assertEqual("access_key", check_credential.access_key_id())
         self.assertEqual("secret_key", check_credential.secret_access_key())
+        self.assertEqual(0, check_credential.expire_time_in_ms())
+
+    def test_adls_token_credential(self):
+        adls_credential_info = {
+            ADLSTokenCredential._GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME: "account_name",
+            ADLSTokenCredential._GRAVITINO_ADLS_SAS_TOKEN: "sas_token",
+        }
+        adls_credential = ADLSTokenCredential(adls_credential_info, 1000)
+        credential_info = adls_credential.credential_info()
+        expire_time = adls_credential.expire_time_in_ms()
+
+        check_credential = CredentialFactory.create(
+            adls_credential.credential_type(), credential_info, expire_time
+        )
+        self.assertEqual(
+            ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+
+        self.assertIsInstance(check_credential, ADLSTokenCredential)
+        self.assertEqual("account_name", check_credential.account_name())
+        self.assertEqual("sas_token", check_credential.sas_token())
+        self.assertEqual(1000, check_credential.expire_time_in_ms())
+
+    def test_azure_account_key_credential(self):
+        azure_credential_info = {
+            AzureAccountKeyCredential._GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME: "account_name",
+            AzureAccountKeyCredential._GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY: "account_key",
+        }
+        azure_credential = AzureAccountKeyCredential(azure_credential_info, 0)
+        credential_info = azure_credential.credential_info()
+        expire_time = azure_credential.expire_time_in_ms()
+
+        check_credential = CredentialFactory.create(
+            azure_credential.credential_type(), credential_info, expire_time
+        )
+        self.assertEqual(
+            AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+
+        self.assertIsInstance(check_credential, AzureAccountKeyCredential)
+        self.assertEqual("account_name", check_credential.account_name())
+        self.assertEqual("account_key", check_credential.account_key())
         self.assertEqual(0, check_credential.expire_time_in_ms())
