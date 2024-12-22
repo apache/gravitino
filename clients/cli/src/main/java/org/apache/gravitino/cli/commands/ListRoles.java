@@ -53,7 +53,7 @@ public class ListRoles extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", roles);
+    String all = roles.length == 0 ? "No roles exists." : String.join(",", roles);
 
     System.out.println(all.toString());
   }
