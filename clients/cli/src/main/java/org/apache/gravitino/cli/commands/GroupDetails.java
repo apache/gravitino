@@ -60,7 +60,7 @@ public class GroupDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", roles);
+    String all = roles.isEmpty() ? "Groups has no roles." : String.join(",", roles);
 
     System.out.println(all.toString());
   }
