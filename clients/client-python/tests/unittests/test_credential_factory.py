@@ -19,16 +19,16 @@
 
 import unittest
 
-from gravitino.api.credential.adls_token_credential import ADLSTokenCredential
-from gravitino.api.credential.azure_account_key_credential import (
-    AzureAccountKeyCredential,
-)
 from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from gravitino.utils.credential_factory import CredentialFactory
 from gravitino.api.credential.oss_secret_key_credential import OSSSecretKeyCredential
+from gravitino.api.credential.adls_token_credential import ADLSTokenCredential
+from gravitino.api.credential.azure_account_key_credential import (
+    AzureAccountKeyCredential,
+)
 
 
 class TestCredentialFactory(unittest.TestCase):
