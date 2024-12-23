@@ -469,6 +469,7 @@ components:
       schema:
         type: string
         enum:
+          - "METALAKE"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
@@ -476,8 +477,7 @@ components:
           - "FILESET"
           - "TOPIC"
           - "ROLE"
-          - "METALAKE"
-    metadataObjectTypeWithOwner:
+    metadataObjectTypeOfOwner:
       name: metadataObjectType
       in: path
       description: The type of the metadata object
@@ -485,13 +485,13 @@ components:
       schema:
         type: string
         enum:
+          - "METALAKE"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
           - "FILESET"
           - "TOPIC"
           - "ROLE"
-          - "METALAKE"
     metadataObjectFullName:
       name: metadataObjectFullName
       in: path
