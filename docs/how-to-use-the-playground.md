@@ -52,7 +52,7 @@ cd gravitino-playground
 #### Start
 
 ```
-./playground.sh docker start
+./playground.sh start
 ```
 
 #### Check status
