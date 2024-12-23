@@ -29,8 +29,8 @@ public class FullName {
   private final CommandLine line;
   private String metalakeEnv;
   private boolean matalakeSet = false;
-  private boolean isMissingNameInfoVisible = true;
-  private boolean isMalformedInfoVisible = true;
+  private boolean hasDisplayedMissingNameInfo = true;
+  private boolean hasDisplayedMalformedInfo = true;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -228,16 +228,16 @@ public class FullName {
   }
 
   private void showMissingNameInfo() {
-    if (isMissingNameInfoVisible) {
+    if (hasDisplayedMissingNameInfo) {
       System.err.println(ErrorMessages.MISSING_NAME);
-      isMissingNameInfoVisible = false;
+      hasDisplayedMissingNameInfo = false;
     }
   }
 
   private void showMalformedInfo() {
-    if (isMalformedInfoVisible) {
+    if (hasDisplayedMalformedInfo) {
       System.err.println(ErrorMessages.MALFORMED_NAME);
-      isMalformedInfoVisible = false;
+      hasDisplayedMalformedInfo = false;
     }
   }
 }
