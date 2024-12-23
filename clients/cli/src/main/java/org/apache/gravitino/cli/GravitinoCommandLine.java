@@ -756,7 +756,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (line.hasOption(GravitinoOptions.AUDIT)) {
           newColumnAudit(url, ignore, metalake, catalog, schema, table, column).handle();
         } else {
-          System.out.println(ErrorMessages.UNSUPPORTED_ACTION);
+          System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+          Main.exit(-1);
         }
         break;
 

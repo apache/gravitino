@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -118,6 +119,7 @@ class TestColumnCommands {
 
   @Test
   void testColumnDetailsCommand() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -128,7 +130,7 @@ class TestColumnCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DETAILS));
 
-    commandLine.handleCommandLine();
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newColumnAudit(
             GravitinoCommandLine.DEFAULT_URL,
@@ -138,7 +140,8 @@ class TestColumnCommands {
             "schema",
             "users",
             "name");
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.UNSUPPORTED_ACTION);
   }
 
