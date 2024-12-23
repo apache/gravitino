@@ -381,27 +381,33 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String schema = name.getSchemaName();
 
     Command.setAuthenticationMode(auth, userName);
+    List<String> missingEntities =
+        Stream.of(
+                catalog == null ? CommandEntities.CATALOG : null,
+                schema == null ? CommandEntities.SCHEMA : null)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
 
     // Handle CommandActions.LIST action separately as it doesn't require the `table`
     if (CommandActions.LIST.equals(command)) {
-      List<String> missingEntities =
-          Stream.of(
-                  metalake == null ? CommandEntities.METALAKE : null,
-                  catalog == null ? CommandEntities.CATALOG : null,
-                  schema == null ? CommandEntities.SCHEMA : null)
-              .filter(Objects::nonNull)
-              .collect(Collectors.toList());
       if (!missingEntities.isEmpty()) {
         System.err.println(
             "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
         Main.exit(-1);
       }
-
       newListTables(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
     String table = name.getTableName();
+    if (table == null) {
+      missingEntities.add(CommandEntities.TABLE);
+    }
+
+    if (!missingEntities.isEmpty()) {
+      System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
+      Main.exit(-1);
+    }
 
     switch (command) {
       case CommandActions.DETAILS:
