@@ -98,7 +98,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         file_id: u64,
         flags: u32,
         kind: FileType,
-    ) -> crate::filesystem::Result<FileHandle> {
+    ) -> Result<FileHandle> {
         let file_entry = self.get_file_entry(file_id).await?;
 
         let mut opened_file = {
@@ -122,17 +122,28 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         let file = file.lock().await;
         Ok(file.file_handle())
     }
+
+    async fn remove_file_entry_locked(&self, path: &str) {
+        let mut file_manager = self.file_entry_manager.write().await;
+        file_manager.remove(path);
+    }
+
+    async fn insert_file_entry_locked(&self, parent_file_id: u64, file_id: u64, path: &str) {
+        let mut file_manager = self.file_entry_manager.write().await;
+        file_manager.insert(parent_file_id, file_id, path);
+    }
 }
 
 #[async_trait]
 impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn init(&self) -> Result<()> {
         // init root directory
-        self.file_entry_manager.write().await.insert(
+        self.insert_file_entry_locked(
             Self::ROOT_DIR_PARENT_FILE_ID,
             Self::ROOT_DIR_FILE_ID,
             Self::ROOT_DIR_NAME,
-        );
+        )
+        .await;
         self.fs.init().await
     }
 
@@ -191,12 +202,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             .await
     }
 
-    async fn create_file(
-        &self,
-        parent_file_id: u64,
-        name: &str,
-        flags: u32,
-    ) -> crate::filesystem::Result<FileHandle> {
+    async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let mut opened_file = self
             .fs
@@ -206,14 +212,12 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         opened_file.set_file_id(parent_file_id, self.next_file_id());
 
         // insert the new file to file entry manager
-        {
-            let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.insert(
-                parent_file_id,
-                opened_file.file_stat.file_id,
-                &opened_file.file_stat.path,
-            );
-        }
+        self.insert_file_entry_locked(
+            parent_file_id,
+            opened_file.file_stat.file_id,
+            &opened_file.file_stat.path,
+        )
+        .await;
 
         // put the file to the opened file manager
         let opened_file = self.opened_file_manager.put(opened_file);
@@ -228,10 +232,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         filestat.set_file_id(parent_file_id, self.next_file_id());
 
         // insert the new file to file entry manager
-        {
-            let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.insert(filestat.parent_file_id, filestat.file_id, &filestat.path);
-        }
+        self.insert_file_entry_locked(parent_file_id, filestat.file_id, &filestat.path)
+            .await;
         Ok(filestat.file_id)
     }
 
@@ -245,10 +247,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.remove_file(&parent_file_entry.path, name).await?;
 
         // remove the file from file entry manager
-        {
-            let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.remove(&join_file_path(&parent_file_entry.path, name));
-        }
+        self.remove_file_entry_locked(&join_file_path(&parent_file_entry.path, name))
+            .await;
         Ok(())
     }
 
@@ -257,10 +257,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.remove_dir(&parent_file_entry.path, name).await?;
 
         // remove the dir from file entry manager
-        {
-            let mut file_manager = self.file_entry_manager.write().await;
-            file_manager.remove(&join_file_path(&parent_file_entry.path, name));
-        }
+        self.remove_file_entry_locked(&join_file_path(&parent_file_entry.path, name))
+            .await;
         Ok(())
     }
 
