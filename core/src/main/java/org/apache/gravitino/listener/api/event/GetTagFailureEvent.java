@@ -4,7 +4,7 @@ public class GetTagFailureEvent extends TagFailureEvent {
     private final String metalake;
     private final String name;
     public GetTagFailureEvent(String user, String metalake, String name, Exception exception) {
-        super(user, exception);
+        super(user, null, exception);
         this.name = name;
         this.metalake = metalake;
     }

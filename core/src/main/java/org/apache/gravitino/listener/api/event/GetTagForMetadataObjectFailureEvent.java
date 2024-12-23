@@ -7,7 +7,7 @@ public class GetTagForMetadataObjectFailureEvent extends TagFailureEvent {
     private final MetadataObject metadataObject;
     private final String name;
     public GetTagForMetadataObjectFailureEvent(String user, String metalake, MetadataObject metadataObject, String name, Exception exception) {
-        super(user, exception);
+        super(user, null, exception);
         this.metalake = metalake;
         this.metadataObject = metadataObject;
         this.name = name;

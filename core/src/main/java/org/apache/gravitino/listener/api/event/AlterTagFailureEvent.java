@@ -7,7 +7,7 @@ public class AlterTagFailureEvent extends TagFailureEvent {
     private final String name;
     private final TagChange[] changes;
     public AlterTagFailureEvent(String user, String metalake, String name, TagChange[] changes, Exception exception) {
-        super(user, exception);
+        super(user, null, exception);
         this.name = name;
         this.metalake = metalake;
         this.changes = changes;

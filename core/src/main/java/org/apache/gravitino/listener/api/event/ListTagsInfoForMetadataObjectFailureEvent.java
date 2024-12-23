@@ -6,7 +6,7 @@ public class ListTagsInfoForMetadataObjectFailureEvent extends TagFailureEvent {
     private final String metalake;
     private final MetadataObject metadataObject;
     public ListTagsInfoForMetadataObjectFailureEvent(String user, String metalake, MetadataObject metadataObject, Exception exception) {
-        super(user, exception);
+        super(user, null, exception);
         this.metalake = metalake;
         this.metadataObject = metadataObject;
     }

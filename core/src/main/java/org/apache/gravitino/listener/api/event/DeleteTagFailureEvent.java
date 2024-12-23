@@ -5,7 +5,7 @@ public class DeleteTagFailureEvent extends TagFailureEvent {
     private final String metalake;
     private final String name;
     public DeleteTagFailureEvent(String user, String metalake, String name, Exception exception) {
-        super(user, exception);
+        super(user, null, exception);
         this.metalake = metalake;
         this.name = name;
     }

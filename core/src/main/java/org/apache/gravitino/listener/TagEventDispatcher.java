@@ -38,6 +38,7 @@ import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.listener.api.info.TagInfo;
 
 /**
  * {@code TagEventDispatcher} is a decorator for {@link TagDispatcher} that not only delegates tag
@@ -46,10 +47,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * of tag operations.
  */
 public class TagEventDispatcher implements TagDispatcher {
-  @SuppressWarnings("unused")
   private final EventBus eventBus;
-
-  @SuppressWarnings("unused")
   private final TagDispatcher dispatcher;
 
   public TagEventDispatcher(EventBus eventBus, TagDispatcher dispatcher) {
@@ -96,13 +94,13 @@ public class TagEventDispatcher implements TagDispatcher {
   @Override
   public Tag createTag(
       String metalake, String name, String comment, Map<String, String> properties) {
-      MetalakeInfo metalakeInfo = new MetalakeInfo(name, comment, properties, null);
-    // TODO: createTagPreEvent
+      TagInfo tagInfo = new TagInfo(name, comment, properties);
+      // TODO: createTagPreEvent
     try {
       // TODO: createTagEvent
       return dispatcher.createTag(metalake, name, comment, properties);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new CreateTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, metalakeInfo, e));
+      eventBus.dispatchEvent(new CreateTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo, e));
       throw e;
     }
   }

@@ -1,18 +1,18 @@
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.listener.api.info.MetalakeInfo;
+import org.apache.gravitino.listener.api.info.TagInfo;
 
 public class CreateTagFailureEvent extends TagFailureEvent {
     private final String metalake;
-    private final MetalakeInfo metalakeInfo;
-    public CreateTagFailureEvent(String user, String metalake, MetalakeInfo metalakeInfo, Exception exception) {
-        super(user, exception);
+    private final TagInfo tagInfo;
+    public CreateTagFailureEvent(String user, String metalake, TagInfo tagInfo, Exception exception) {
+        super(user, null, exception);
         this.metalake = metalake;
-        this.metalakeInfo = metalakeInfo;
+        this.tagInfo = tagInfo;
     }
 
-    public MetalakeInfo metalakeInfo() {
-        return metalakeInfo;
+    public TagInfo tagInfo() {
+        return tagInfo;
     }
 
     public String metalake() {

@@ -8,7 +8,7 @@ public class AssociateTagsForMetadataObjectFailureEvent extends TagFailureEvent 
     private final String[] tagsToAdd;
     private final String[] tagsToRemove;
     public AssociateTagsForMetadataObjectFailureEvent(String user, String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove, Exception exception) {
-        super(user, exception);
+        super(user, null, exception);
         this.metalake = metalake;
         this.metadataObject = metadataObject;
         this.tagsToAdd = tagsToAdd;

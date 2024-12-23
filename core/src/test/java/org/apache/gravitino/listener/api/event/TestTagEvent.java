@@ -45,9 +45,9 @@ public class TestTagEvent {
             GravitinoRuntimeException.class, ((CreateTagFailureEvent) event).exception().getClass()
         );
         Assertions.assertEquals("metalake", ((CreateTagFailureEvent) event).metalake());
-        Assertions.assertEquals(tag.name(), ((CreateTagFailureEvent) event).metalakeInfo().name());
-        Assertions.assertEquals(tag.comment(), ((CreateTagFailureEvent) event).metalakeInfo().comment());
-        Assertions.assertEquals(tag.properties(), ((CreateTagFailureEvent) event).metalakeInfo().properties());
+        Assertions.assertEquals(tag.name(), ((CreateTagFailureEvent) event).tagInfo().name());
+        Assertions.assertEquals(tag.comment(), ((CreateTagFailureEvent) event).tagInfo().comment());
+        Assertions.assertEquals(tag.properties(), ((CreateTagFailureEvent) event).tagInfo().properties());
         Assertions.assertEquals(OperationType.CREATE_TAG, event.operationType());
         Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
     }
