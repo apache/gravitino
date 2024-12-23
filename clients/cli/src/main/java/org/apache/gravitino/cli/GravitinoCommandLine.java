@@ -21,7 +21,6 @@ package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +30,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -378,15 +379,28 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
-    String table = name.getTableName();
 
     Command.setAuthenticationMode(auth, userName);
+    List<String> missingEntities =
+        Stream.of(
+                catalog == null ? CommandEntities.CATALOG : null,
+                schema == null ? CommandEntities.SCHEMA : null)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
 
-    List<String> missingEntities = Lists.newArrayList();
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
+    // Handle CommandActions.LIST action separately as it doesn't require the `table`
+    if (CommandActions.LIST.equals(command)) {
+      if (!missingEntities.isEmpty()) {
+        System.err.println(
+            "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
+        Main.exit(-1);
+      }
+      newListTables(url, ignore, metalake, catalog, schema).handle();
+      return;
+    }
 
-    if (!CommandActions.LIST.equals(command) && table == null) {
+    String table = name.getTableName();
+    if (table == null) {
       missingEntities.add(CommandEntities.TABLE);
     }
 
@@ -410,9 +424,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
         } else {
           newTableDetails(url, ignore, metalake, catalog, schema, table).handle();
         }
-        break;
-      case CommandActions.LIST:
-        newListTables(url, ignore, metalake, catalog, schema).handle();
         break;
 
       case CommandActions.CREATE:

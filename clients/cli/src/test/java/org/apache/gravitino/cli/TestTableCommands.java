@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.security.Permission;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateTable;
@@ -60,26 +59,12 @@ class TestTableCommands {
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
 
-  private final SecurityManager securityManager =
-      new SecurityManager() {
-        public void checkPermission(Permission permission) {
-          if (permission.getName().startsWith("exitVM")) {
-            throw new RuntimeException(permission.getName());
-          }
-        }
-      };
-
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
     System.setOut(new PrintStream(outContent));
     System.setErr(new PrintStream(errContent));
-  }
-
-  @AfterEach
-  void restoreSecurityManager() {
-    System.setSecurityManager(null);
   }
 
   @AfterEach
@@ -448,7 +433,6 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testListTableWithoutCatalog() {
-    System.setSecurityManager(securityManager);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
@@ -474,7 +458,6 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testListTableWithoutSchema() {
-    System.setSecurityManager(securityManager);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -495,7 +478,6 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailTableWithoutCatalog() {
-    System.setSecurityManager(securityManager);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
 
@@ -523,7 +505,6 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailTableWithoutSchema() {
-    System.setSecurityManager(securityManager);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -549,7 +530,6 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailTableWithoutTable() {
-    System.setSecurityManager(securityManager);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
