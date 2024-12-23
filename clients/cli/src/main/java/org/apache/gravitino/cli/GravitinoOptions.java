@@ -90,7 +90,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
     options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
 
-    // very minor options
+    // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));

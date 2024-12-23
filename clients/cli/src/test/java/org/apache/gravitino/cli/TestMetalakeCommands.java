@@ -29,7 +29,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.security.Permission;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateMetalake;
@@ -56,14 +55,6 @@ class TestMetalakeCommands {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private final SecurityManager securityManager =
-      new SecurityManager() {
-        public void checkPermission(Permission permission) {
-          if (permission.getName().startsWith("exitVM")) {
-            throw new RuntimeException(permission.getName());
-          }
-        }
-      };
 
   @BeforeEach
   void setUp() {
@@ -74,8 +65,8 @@ class TestMetalakeCommands {
   }
 
   @AfterEach
-  void restoreSecurityManager() {
-    System.setSecurityManager(null);
+  void restoreExitFlg() {
+    Main.useExit = true;
   }
 
   @AfterEach
@@ -372,7 +363,7 @@ class TestMetalakeCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testMetalakeWithDisableAndEnableOptions() {
-    System.setSecurityManager(securityManager);
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
@@ -384,6 +375,8 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
 
     Assert.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", false);
     verify(commandLine, never())
         .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", false);
     assertTrue(errContent.toString().contains("Unable to enable and disable at the same time"));

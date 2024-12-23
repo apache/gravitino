@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.security.Permission;
 import java.util.HashMap;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
@@ -58,14 +57,6 @@ class TestCatalogCommands {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private final SecurityManager securityManager =
-      new SecurityManager() {
-        public void checkPermission(Permission permission) {
-          if (permission.getName().startsWith("exitVM")) {
-            throw new RuntimeException(permission.getName());
-          }
-        }
-      };
 
   @BeforeEach
   void setUp() {
@@ -76,8 +67,8 @@ class TestCatalogCommands {
   }
 
   @AfterEach
-  void restoreSecurityManager() {
-    System.setSecurityManager(null);
+  void restoreExitFlg() {
+    Main.useExit = true;
   }
 
   @AfterEach
@@ -393,7 +384,7 @@ class TestCatalogCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testCatalogWithDisableAndEnableOptions() {
-    System.setSecurityManager(securityManager);
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -410,6 +401,8 @@ class TestCatalogCommands {
     verify(commandLine, never())
         .newCatalogEnable(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
+    verify(commandLine, never())
+        .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "melake_demo", "catalog");
     assertTrue(errContent.toString().contains("Unable to enable and disable at the same time"));
   }
 }
