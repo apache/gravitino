@@ -213,6 +213,18 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.UPDATE:
+        if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
+          System.err.println("Unable to enable and disable at the same time");
+          Main.exit(-1);
+        }
+        if (line.hasOption(GravitinoOptions.ENABLE)) {
+          boolean enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
+          newMetalakeEnable(url, ignore, metalake, enableAllCatalogs).handle();
+        }
+        if (line.hasOption(GravitinoOptions.DISABLE)) {
+          newMetalakeDisable(url, ignore, metalake).handle();
+        }
+
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           comment = line.getOptionValue(GravitinoOptions.COMMENT);
           newUpdateMetalakeComment(url, ignore, metalake, comment).handle();
@@ -290,6 +302,18 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.UPDATE:
+        if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
+          System.err.println("Unable to enable and disable at the same time");
+          Main.exit(-1);
+        }
+        if (line.hasOption(GravitinoOptions.ENABLE)) {
+          boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
+          newCatalogEnable(url, ignore, metalake, catalog, enableMetalake).handle();
+        }
+        if (line.hasOption(GravitinoOptions.DISABLE)) {
+          newCatalogDisable(url, ignore, metalake, catalog).handle();
+        }
+
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
           newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment).handle();

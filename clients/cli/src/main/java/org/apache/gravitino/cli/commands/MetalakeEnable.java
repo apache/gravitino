@@ -19,62 +19,54 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
+import java.util.Arrays;
 import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.CatalogInUseException;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DeleteCatalog extends Command {
+/** Enable metalake. */
+public class MetalakeEnable extends Command {
 
-  protected final String metalake;
-  protected final String catalog;
-  protected final boolean force;
+  private final String metalake;
+  private Boolean enableAllCatalogs;
 
   /**
-   * Delete a catalog.
+   * Enable a metalake
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
+   * @param enableAllCatalogs Whether to enable all catalogs.
    */
-  public DeleteCatalog(
-      String url, boolean ignoreVersions, boolean force, String metalake, String catalog) {
+  public MetalakeEnable(
+      String url, boolean ignoreVersions, String metalake, boolean enableAllCatalogs) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
-    this.catalog = catalog;
+    this.enableAllCatalogs = enableAllCatalogs;
   }
 
-  /** Delete a catalog. */
+  /** Enable metalake. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
-
+    StringBuilder msgBuilder = new StringBuilder(metalake);
     try {
-      GravitinoClient client = buildClient(metalake);
-      deleted = client.dropCatalog(catalog);
+      GravitinoAdminClient client = buildAdminClient();
+      client.enableMetalake(metalake);
+      msgBuilder.append(" has been enabled.");
+
+      if (enableAllCatalogs) {
+        GravitinoMetalake metalakeObject = client.loadMetalake(metalake);
+        String[] catalogs = metalakeObject.listCatalogs();
+        Arrays.stream(catalogs).forEach(metalakeObject::enableCatalog);
+        msgBuilder.append(" and all catalogs in this metalake have been enabled.");
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException err) {
-      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (CatalogInUseException catalogInUseException) {
-      System.err.println(catalog + " in use, please disable it first.");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(catalog + " deleted.");
-    } else {
-      System.out.println(catalog + " not deleted.");
-    }
+    System.out.println(msgBuilder);
   }
 }

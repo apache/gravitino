@@ -19,62 +19,38 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.CatalogInUseException;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class DeleteCatalog extends Command {
-
-  protected final String metalake;
-  protected final String catalog;
-  protected final boolean force;
+/** Disable metalake. */
+public class MetalakeDisable extends Command {
+  private String metalake;
 
   /**
-   * Delete a catalog.
+   * Disable metalake
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
    */
-  public DeleteCatalog(
-      String url, boolean ignoreVersions, boolean force, String metalake, String catalog) {
+  public MetalakeDisable(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
-    this.catalog = catalog;
   }
 
-  /** Delete a catalog. */
+  /** Disable metalake. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
-
     try {
-      GravitinoClient client = buildClient(metalake);
-      deleted = client.dropCatalog(catalog);
+      GravitinoAdminClient client = buildAdminClient();
+      client.disableMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException err) {
-      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (CatalogInUseException catalogInUseException) {
-      System.err.println(catalog + " in use, please disable it first.");
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(catalog + " deleted.");
-    } else {
-      System.out.println(catalog + " not deleted.");
-    }
+    System.out.println(metalake + " has been disabled.");
   }
 }

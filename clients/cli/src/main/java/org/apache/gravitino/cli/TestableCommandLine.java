@@ -26,6 +26,8 @@ import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
+import org.apache.gravitino.cli.commands.CatalogDisable;
+import org.apache.gravitino.cli.commands.CatalogEnable;
 import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.ColumnAudit;
 import org.apache.gravitino.cli.commands.CreateCatalog;
@@ -75,6 +77,8 @@ import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
+import org.apache.gravitino.cli.commands.MetalakeDisable;
+import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
@@ -883,5 +887,24 @@ public class TestableCommandLine {
       FullName entity,
       String[] privileges) {
     return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected MetalakeEnable newMetalakeEnable(
+      String url, boolean ignore, String metalake, boolean enableAllCatalogs) {
+    return new MetalakeEnable(url, ignore, metalake, enableAllCatalogs);
+  }
+
+  protected MetalakeDisable newMetalakeDisable(String url, boolean ignore, String metalake) {
+    return new MetalakeDisable(url, ignore, metalake);
+  }
+
+  protected CatalogEnable newCatalogEnable(
+      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
+    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
+  }
+
+  protected CatalogDisable newCatalogDisable(
+      String url, boolean ignore, String metalake, String catalog) {
+    return new CatalogDisable(url, ignore, metalake, catalog);
   }
 }
