@@ -87,10 +87,6 @@ impl PathFileSystem for MemoryFileSystem {
             .ok_or(Errno::from(libc::ENOENT))
     }
 
-    async fn lookup(&self, path: &Path) -> Result<FileStat> {
-        self.stat(path).await
-    }
-
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
         let file_map = self.file_map.read().unwrap();
 

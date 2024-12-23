@@ -27,6 +27,11 @@ use std::time::SystemTime;
 
 pub(crate) type Result<T> = std::result::Result<T, Errno>;
 
+pub(crate) const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
+pub(crate) const ROOT_DIR_FILE_ID: u64 = 1;
+pub(crate) const ROOT_DIR_PATH: &'static str = "/";
+pub(crate) const INITIAL_FILE_ID: u64 = 10000;
+
 /// RawFileSystem interface for the file system implementation. it use by FuseApiHandle,
 /// it ues the file id to operate the file system apis
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system,
@@ -99,9 +104,6 @@ pub(crate) trait PathFileSystem: Send + Sync {
 
     /// Get the file stat by file path, if the file exists, return the file stat
     async fn stat(&self, path: &Path) -> Result<FileStat>;
-
-    /// Get the file stat by parent file path and file name, if the file exists, return the file stat
-    async fn lookup(&self, path: &Path) -> Result<FileStat>;
 
     /// Read the directory by file path, if the directory exists, return the file stat list
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>>;

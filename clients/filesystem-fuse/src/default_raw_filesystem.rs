@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem};
+use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem, INITIAL_FILE_ID, ROOT_DIR_FILE_ID, ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH};
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
 use async_trait::async_trait;
@@ -44,16 +44,12 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
-    const INITIAL_FILE_ID: u64 = 10000;
-    const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
-    const ROOT_DIR_FILE_ID: u64 = 1;
-    const ROOT_DIR_PATH: &'static str = "/";
 
     pub(crate) fn new(fs: T) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
             opened_file_manager: OpenedFileManager::new(),
-            file_id_generator: AtomicU64::new(Self::INITIAL_FILE_ID),
+            file_id_generator: AtomicU64::new(INITIAL_FILE_ID),
             fs,
         }
     }
@@ -130,9 +126,9 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn init(&self) -> crate::filesystem::Result<()> {
         // init root directory
         self.file_entry_manager.write().await.insert(
-            Self::ROOT_DIR_PARENT_FILE_ID,
-            Self::ROOT_DIR_FILE_ID,
-            Path::new(Self::ROOT_DIR_PATH),
+            ROOT_DIR_PARENT_FILE_ID,
+            ROOT_DIR_FILE_ID,
+            Path::new(ROOT_DIR_PATH),
         );
         self.fs.init().await
     }
@@ -175,7 +171,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
         // assume the path is a regular file. Some filesystems may need to check whether it is a file or directory by lookup.
         let path = parent_file_entry.path.join(name);
-        let mut file_stat = self.fs.lookup(&path).await?;
+        let mut file_stat = self.fs.stat(&path).await?;
         // fill the file id to file stat
         self.resolve_file_id_to_filestat(&mut file_stat, parent_file_id)
             .await;
