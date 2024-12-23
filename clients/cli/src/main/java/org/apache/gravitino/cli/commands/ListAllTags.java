@@ -53,7 +53,7 @@ public class ListAllTags extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = tags.length == 0 ? "No tags exists." : String.join(",", tags);
+    String all = tags.length == 0 ? "No tags exist." : String.join(",", tags);
 
     System.out.println(all.toString());
   }
