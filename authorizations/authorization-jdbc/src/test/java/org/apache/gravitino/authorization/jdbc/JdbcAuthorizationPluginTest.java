@@ -130,28 +130,20 @@ public class JdbcAuthorizationPluginTest {
 
     resetSQLIndex();
     expectSQLs =
-        Lists.newArrayList(
-            "CREATE USER GRAVITINO_GROUP_tmp",
-            "CREATE ROLE tmp",
-            "GRANT ROLE tmp TO USER GRAVITINO_GROUP_tmp");
+        Lists.newArrayList("CREATE ROLE tmp", "GRANT ROLE tmp TO USER GRAVITINO_GROUP_tmp");
     plugin.onGrantedRolesToGroup(Lists.newArrayList(role), group);
 
     resetSQLIndex();
-    expectSQLs =
-        Lists.newArrayList("CREATE USER tmp", "CREATE ROLE tmp", "GRANT ROLE tmp TO USER tmp");
+    expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "GRANT ROLE tmp TO USER tmp");
     plugin.onGrantedRolesToUser(Lists.newArrayList(role), user);
 
     resetSQLIndex();
     expectSQLs =
-        Lists.newArrayList(
-            "CREATE USER GRAVITINO_GROUP_tmp",
-            "CREATE ROLE tmp",
-            "REVOKE ROLE tmp FROM USER GRAVITINO_GROUP_tmp");
+        Lists.newArrayList("CREATE ROLE tmp", "REVOKE ROLE tmp FROM USER GRAVITINO_GROUP_tmp");
     plugin.onRevokedRolesFromGroup(Lists.newArrayList(role), group);
 
     resetSQLIndex();
-    expectSQLs =
-        Lists.newArrayList("CREATE USER tmp", "CREATE ROLE tmp", "REVOKE ROLE tmp FROM USER tmp");
+    expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "REVOKE ROLE tmp FROM USER tmp");
     plugin.onRevokedRolesFromUser(Lists.newArrayList(role), user);
 
     // Test metalake object and different role change

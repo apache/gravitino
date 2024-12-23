@@ -105,13 +105,13 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
 
         if (!databasePrivileges.isEmpty()) {
           databaseObject =
-              new JdbcSecurableObject(JdbcSecurableObject.ALL, null, databasePrivileges);
+              JdbcSecurableObject.create(JdbcSecurableObject.ALL, null, databasePrivileges);
           authObjects.add(databaseObject);
         }
 
         if (!tablePrivileges.isEmpty()) {
           tableObject =
-              new JdbcSecurableObject(
+              JdbcSecurableObject.create(
                   JdbcSecurableObject.ALL, JdbcSecurableObject.ALL, tablePrivileges);
           authObjects.add(tableObject);
         }
@@ -121,13 +121,13 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
         convertJdbcPrivileges(securableObject, databasePrivileges, tablePrivileges);
         if (!databasePrivileges.isEmpty()) {
           databaseObject =
-              new JdbcSecurableObject(securableObject.name(), null, databasePrivileges);
+              JdbcSecurableObject.create(securableObject.name(), null, databasePrivileges);
           authObjects.add(databaseObject);
         }
 
         if (!tablePrivileges.isEmpty()) {
           tableObject =
-              new JdbcSecurableObject(
+              JdbcSecurableObject.create(
                   securableObject.name(), JdbcSecurableObject.ALL, tablePrivileges);
           authObjects.add(tableObject);
         }
@@ -139,7 +139,7 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
           MetadataObject metadataObject =
               MetadataObjects.parse(securableObject.parent(), MetadataObject.Type.SCHEMA);
           tableObject =
-              new JdbcSecurableObject(
+              JdbcSecurableObject.create(
                   metadataObject.name(), securableObject.name(), tablePrivileges);
           authObjects.add(tableObject);
         }
@@ -160,20 +160,20 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
       case METALAKE:
       case CATALOG:
         objects.add(
-            new JdbcSecurableObject(
+            JdbcSecurableObject.create(
                 JdbcSecurableObject.ALL, null, Lists.newArrayList(JdbcPrivilege.ALL)));
         objects.add(
-            new JdbcSecurableObject(
+            JdbcSecurableObject.create(
                 JdbcSecurableObject.ALL,
                 JdbcSecurableObject.ALL,
                 Lists.newArrayList(JdbcPrivilege.ALL)));
         break;
       case SCHEMA:
         objects.add(
-            new JdbcSecurableObject(
+            JdbcSecurableObject.create(
                 metadataObject.name(), null, Lists.newArrayList(JdbcPrivilege.ALL)));
         objects.add(
-            new JdbcSecurableObject(
+            JdbcSecurableObject.create(
                 metadataObject.name(),
                 JdbcSecurableObject.ALL,
                 Lists.newArrayList(JdbcPrivilege.ALL)));
@@ -182,11 +182,12 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
         MetadataObject schema =
             MetadataObjects.parse(metadataObject.parent(), MetadataObject.Type.SCHEMA);
         objects.add(
-            new JdbcSecurableObject(
+            JdbcSecurableObject.create(
                 schema.name(), metadataObject.name(), Lists.newArrayList(JdbcPrivilege.ALL)));
         break;
       default:
-        throw new IllegalArgumentException("");
+        throw new IllegalArgumentException(
+            "Don't support metadata object type " + metadataObject.type());
     }
     return objects;
   }

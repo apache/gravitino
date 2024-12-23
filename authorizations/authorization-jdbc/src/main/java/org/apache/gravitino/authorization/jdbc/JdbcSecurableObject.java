@@ -35,9 +35,23 @@ public class JdbcSecurableObject extends JdbcMetadataObject
 
   List<AuthorizationPrivilege> privileges;
 
-  JdbcSecurableObject(String database, String table, List<AuthorizationPrivilege> privileges) {
-    super(database, table, table == null ? MetadataObject.Type.SCHEMA : MetadataObject.Type.TABLE);
+  private JdbcSecurableObject(
+      String parent,
+      String name,
+      MetadataObject.Type type,
+      List<AuthorizationPrivilege> privileges) {
+    super(parent, name, type);
     this.privileges = privileges;
+  }
+
+  static JdbcSecurableObject create(
+      String schema, String table, List<AuthorizationPrivilege> privileges) {
+    String parent = table == null ? null : schema;
+    String name = table == null ? schema : table;
+    MetadataObject.Type type =
+        table == null ? MetadataObject.Type.SCHEMA : MetadataObject.Type.TABLE;
+
+    return new JdbcSecurableObject(parent, name, type, privileges);
   }
 
   @Override

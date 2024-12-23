@@ -164,7 +164,6 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onGrantedRolesToUser(List<Role> roles, User user)
       throws AuthorizationPluginException {
-    onUserAdded(user);
 
     for (Role role : roles) {
       onRoleCreated(role);
@@ -179,7 +178,6 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onRevokedRolesFromUser(List<Role> roles, User user)
       throws AuthorizationPluginException {
-    onUserAdded(user);
 
     for (Role role : roles) {
       onRoleCreated(role);
@@ -194,7 +192,6 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onGrantedRolesToGroup(List<Role> roles, Group group)
       throws AuthorizationPluginException {
-    onGroupAdded(group);
 
     for (Role role : roles) {
       onRoleCreated(role);
@@ -210,7 +207,6 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group)
       throws AuthorizationPluginException {
-    onGroupAdded(group);
 
     for (Role role : roles) {
       onRoleCreated(role);
