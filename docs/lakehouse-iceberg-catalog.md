@@ -119,6 +119,22 @@ Please make sure the credential file is accessible by Gravitino, like using `exp
 Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
+#### ADLS 
+
+Supports using Azure account name and secret key to access ADLS data.
+
+| Configuration item           | Description                                                                                               | Default value | Required | Since Version    |
+|------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `io-impl`                    | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS. | (none)        | No       | 0.6.0-incubating |
+| `azure-storage-account-name` | The static storage account name used to access ADLS data.                                                 | (none)        | No       | 0.8.0-incubating |
+| `azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                  | (none)        | No       | 0.8.0-incubating |
+
+For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
+
+:::info
+Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+:::
+
 #### Other storages
 
 For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.

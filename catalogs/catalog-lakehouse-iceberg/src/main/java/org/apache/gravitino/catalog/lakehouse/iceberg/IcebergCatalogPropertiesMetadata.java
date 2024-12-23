@@ -33,6 +33,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -109,7 +110,20 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "OSS access key secret",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */));
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+                "Azure storage account name",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+                "Azure storage account key",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */)
+        );
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

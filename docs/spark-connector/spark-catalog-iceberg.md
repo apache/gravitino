@@ -133,6 +133,10 @@ You need to add OSS secret key to the Spark configuration using `spark.sql.catal
 
 No extra configuration is needed. Please make sure the credential file is accessible by Spark, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, and download [Iceberg GCP bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Spark.
 
+### ADLS
+
+You need to add Azure account secret to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.s3.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.s3.secret-access-key`. Additionally, download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it in the classpath of Spark.
+
 ### Other storage
 
 You may need to add custom configurations with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.
