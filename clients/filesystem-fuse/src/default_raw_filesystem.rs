@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem};
+use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem, Result};
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
 use crate::utils::join_file_path;
@@ -62,7 +62,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    async fn get_file_entry(&self, file_id: u64) -> crate::filesystem::Result<FileEntry> {
+    async fn get_file_entry(&self, file_id: u64) -> Result<FileEntry> {
         self.file_entry_manager
             .read()
             .await
@@ -126,7 +126,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
 
 #[async_trait]
 impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
-    async fn init(&self) -> crate::filesystem::Result<()> {
+    async fn init(&self) -> Result<()> {
         // init root directory
         self.file_entry_manager.write().await.insert(
             Self::ROOT_DIR_PARENT_FILE_ID,
@@ -136,14 +136,12 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.init().await
     }
 
-    async fn get_file_path(&self, file_id: u64) -> String {
+    async fn get_file_path(&self, file_id: u64) -> Result<String> {
         let file_entry = self.get_file_entry(file_id).await;
-        file_entry
-            .map(|x| x.path)
-            .unwrap_or_else(|_| "".to_string())
+        Ok(file_entry?.path)
     }
 
-    async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> crate::filesystem::Result<()> {
+    async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()> {
         let fh_file_id = self
             .opened_file_manager
             .get(fh)
@@ -158,14 +156,14 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             .ok_or(Errno::from(libc::EBADF))
     }
 
-    async fn stat(&self, file_id: u64) -> crate::filesystem::Result<FileStat> {
+    async fn stat(&self, file_id: u64) -> Result<FileStat> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut file_stat = self.fs.stat(&file_entry.path).await?;
         file_stat.set_file_id(file_entry.parent_file_id, file_entry.file_id);
         Ok(file_stat)
     }
 
-    async fn lookup(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<FileStat> {
+    async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let mut file_stat = self.fs.lookup(&parent_file_entry.path, name).await?;
         // fill the file id to file stat
@@ -174,7 +172,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(file_stat)
     }
 
-    async fn read_dir(&self, file_id: u64) -> crate::filesystem::Result<Vec<FileStat>> {
+    async fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
         for file in child_filestats.iter_mut() {
@@ -183,12 +181,12 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(child_filestats)
     }
 
-    async fn open_file(&self, file_id: u64, flags: u32) -> crate::filesystem::Result<FileHandle> {
+    async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
         self.open_file_internal(file_id, flags, FileType::RegularFile)
             .await
     }
 
-    async fn open_dir(&self, file_id: u64, flags: u32) -> crate::filesystem::Result<FileHandle> {
+    async fn open_dir(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
         self.open_file_internal(file_id, flags, FileType::Directory)
             .await
     }
@@ -223,7 +221,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(opened_file.file_handle())
     }
 
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<u64> {
+    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let mut filestat = self.fs.create_dir(&parent_file_entry.path, name).await?;
 
@@ -237,12 +235,12 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(filestat.file_id)
     }
 
-    async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> crate::filesystem::Result<()> {
+    async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
         let file_entry = self.get_file_entry(file_id).await?;
         self.fs.set_attr(&file_entry.path, file_stat, true).await
     }
 
-    async fn remove_file(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
+    async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         self.fs.remove_file(&parent_file_entry.path, name).await?;
 
@@ -254,7 +252,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(())
     }
 
-    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> crate::filesystem::Result<()> {
+    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         self.fs.remove_dir(&parent_file_entry.path, name).await?;
 
@@ -266,7 +264,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(())
     }
 
-    async fn close_file(&self, _file_id: u64, fh: u64) -> crate::filesystem::Result<()> {
+    async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
         let opened_file = self
             .opened_file_manager
             .remove(fh)

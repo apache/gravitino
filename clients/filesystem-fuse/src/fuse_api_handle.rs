@@ -52,10 +52,6 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         }
     }
 
-    pub async fn get_file_path(&self, file_id: u64) -> String {
-        self.fs.get_file_path(file_id).await
-    }
-
     async fn get_modified_file_stat(
         &self,
         file_id: u64,

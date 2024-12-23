@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::filesystem::RawFileSystem;
 
 // join the parent and name to a path
 pub fn join_file_path(parent: &str, name: &str) -> String {
@@ -33,6 +34,13 @@ pub fn split_file_path(path: &str) -> (&str, &str) {
         Some(pos) => (&path[..pos], &path[pos + 1..]),
         None => ("", path),
     }
+}
+
+// convert file id to string if file id is invalid return "Unknown"
+pub async fn file_id_to_string(file_id: u64, fs: &impl RawFileSystem) -> String {
+    fs.get_file_path(file_id)
+        .await
+        .unwrap_or("Unknown".to_string())
 }
 
 #[cfg(test)]
