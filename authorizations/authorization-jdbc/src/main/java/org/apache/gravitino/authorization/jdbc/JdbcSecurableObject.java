@@ -18,10 +18,7 @@
  */
 package org.apache.gravitino.authorization.jdbc;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
@@ -31,60 +28,17 @@ import org.apache.gravitino.authorization.AuthorizationSecurableObject;
  * object. JdbcAuthorizationObject has the database and table name. When table name is null, the
  * object represents a database. The database can't be null.
  */
-public class JdbcAuthorizationObject implements AuthorizationSecurableObject {
+public class JdbcSecurableObject extends JdbcMetadataObject
+    implements AuthorizationSecurableObject {
 
   public static final String ALL = "*";
-  private String database;
-  private String table;
 
   List<AuthorizationPrivilege> privileges;
 
-  JdbcAuthorizationObject(String database, String table, List<AuthorizationPrivilege> privileges) {
-    Preconditions.checkNotNull(database, "JDBC authorization object database can't null");
-    this.database = database;
-    this.table = table;
+  JdbcSecurableObject(String database, String table, List<AuthorizationPrivilege> privileges) {
+    super(database, table, table == null ? MetadataObject.Type.SCHEMA : MetadataObject.Type.TABLE);
     this.privileges = privileges;
   }
-
-  @Nullable
-  @Override
-  public String parent() {
-    if (table != null) {
-      return database;
-    }
-
-    return null;
-  }
-
-  @Override
-  public String name() {
-    if (table != null) {
-      return table;
-    }
-
-    return database;
-  }
-
-  @Override
-  public List<String> names() {
-    List<String> names = Lists.newArrayList();
-    names.add(database);
-    if (table != null) {
-      names.add(table);
-    }
-    return names;
-  }
-
-  @Override
-  public Type type() {
-    if (table != null) {
-      return () -> MetadataObject.Type.TABLE;
-    }
-    return () -> MetadataObject.Type.SCHEMA;
-  }
-
-  @Override
-  public void validateAuthorizationMetadataObject() throws IllegalArgumentException {}
 
   @Override
   public List<AuthorizationPrivilege> privileges() {

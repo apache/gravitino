@@ -42,21 +42,17 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
 
   private final Map<Privilege.Name, Set<AuthorizationPrivilege>> privilegeMapping =
       ImmutableMap.of(
-          Privilege.Name.CREATE_TABLE,
-              Sets.newHashSet(JdbcPrivilege.valueOf(JdbcPrivilege.Type.CREATE)),
-          Privilege.Name.CREATE_SCHEMA,
-              Sets.newHashSet(JdbcPrivilege.valueOf(JdbcPrivilege.Type.CREATE)),
-          Privilege.Name.SELECT_TABLE,
-              Sets.newHashSet(JdbcPrivilege.valueOf(JdbcPrivilege.Type.SELECT)),
+          Privilege.Name.CREATE_TABLE, Sets.newHashSet(JdbcPrivilege.CREATE),
+          Privilege.Name.CREATE_SCHEMA, Sets.newHashSet(JdbcPrivilege.CREATE),
+          Privilege.Name.SELECT_TABLE, Sets.newHashSet(JdbcPrivilege.SELECT),
           Privilege.Name.MODIFY_TABLE,
               Sets.newHashSet(
-                  JdbcPrivilege.valueOf(JdbcPrivilege.Type.SELECT),
-                  JdbcPrivilege.valueOf(JdbcPrivilege.Type.UPDATE),
-                  JdbcPrivilege.valueOf(JdbcPrivilege.Type.DELETE),
-                  JdbcPrivilege.valueOf(JdbcPrivilege.Type.INSERT),
-                  JdbcPrivilege.valueOf(JdbcPrivilege.Type.ALTER)),
-          Privilege.Name.USE_SCHEMA,
-              Sets.newHashSet(JdbcPrivilege.valueOf(JdbcPrivilege.Type.USAGE)));
+                  JdbcPrivilege.SELECT,
+                  JdbcPrivilege.UPDATE,
+                  JdbcPrivilege.DELETE,
+                  JdbcPrivilege.INSERT,
+                  JdbcPrivilege.ALTER),
+          Privilege.Name.USE_SCHEMA, Sets.newHashSet(JdbcPrivilege.USAGE));
 
   private final Map<Privilege.Name, MetadataObject.Type> privilegeScopeMapping =
       ImmutableMap.of(
@@ -100,8 +96,8 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
     List<AuthorizationSecurableObject> authObjects = Lists.newArrayList();
     List<AuthorizationPrivilege> databasePrivileges = Lists.newArrayList();
     List<AuthorizationPrivilege> tablePrivileges = Lists.newArrayList();
-    JdbcAuthorizationObject databaseObject;
-    JdbcAuthorizationObject tableObject;
+    JdbcSecurableObject databaseObject;
+    JdbcSecurableObject tableObject;
     switch (securableObject.type()) {
       case METALAKE:
       case CATALOG:
@@ -109,14 +105,14 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
 
         if (!databasePrivileges.isEmpty()) {
           databaseObject =
-              new JdbcAuthorizationObject(JdbcAuthorizationObject.ALL, null, databasePrivileges);
+              new JdbcSecurableObject(JdbcSecurableObject.ALL, null, databasePrivileges);
           authObjects.add(databaseObject);
         }
 
         if (!tablePrivileges.isEmpty()) {
           tableObject =
-              new JdbcAuthorizationObject(
-                  JdbcAuthorizationObject.ALL, JdbcAuthorizationObject.ALL, tablePrivileges);
+              new JdbcSecurableObject(
+                  JdbcSecurableObject.ALL, JdbcSecurableObject.ALL, tablePrivileges);
           authObjects.add(tableObject);
         }
         break;
@@ -125,14 +121,14 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
         convertJdbcPrivileges(securableObject, databasePrivileges, tablePrivileges);
         if (!databasePrivileges.isEmpty()) {
           databaseObject =
-              new JdbcAuthorizationObject(securableObject.name(), null, databasePrivileges);
+              new JdbcSecurableObject(securableObject.name(), null, databasePrivileges);
           authObjects.add(databaseObject);
         }
 
         if (!tablePrivileges.isEmpty()) {
           tableObject =
-              new JdbcAuthorizationObject(
-                  securableObject.name(), JdbcAuthorizationObject.ALL, tablePrivileges);
+              new JdbcSecurableObject(
+                  securableObject.name(), JdbcSecurableObject.ALL, tablePrivileges);
           authObjects.add(tableObject);
         }
         break;
@@ -143,7 +139,7 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
           MetadataObject metadataObject =
               MetadataObjects.parse(securableObject.parent(), MetadataObject.Type.SCHEMA);
           tableObject =
-              new JdbcAuthorizationObject(
+              new JdbcSecurableObject(
                   metadataObject.name(), securableObject.name(), tablePrivileges);
           authObjects.add(tableObject);
         }
@@ -160,35 +156,34 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
   @Override
   public List<AuthorizationSecurableObject> translateOwner(MetadataObject metadataObject) {
     List<AuthorizationSecurableObject> objects = Lists.newArrayList();
-    JdbcPrivilege allPrivilege = JdbcPrivilege.valueOf(JdbcPrivilege.Type.ALL);
     switch (metadataObject.type()) {
       case METALAKE:
       case CATALOG:
         objects.add(
-            new JdbcAuthorizationObject(
-                JdbcAuthorizationObject.ALL, null, Lists.newArrayList(allPrivilege)));
+            new JdbcSecurableObject(
+                JdbcSecurableObject.ALL, null, Lists.newArrayList(JdbcPrivilege.ALL)));
         objects.add(
-            new JdbcAuthorizationObject(
-                JdbcAuthorizationObject.ALL,
-                JdbcAuthorizationObject.ALL,
-                Lists.newArrayList(allPrivilege)));
+            new JdbcSecurableObject(
+                JdbcSecurableObject.ALL,
+                JdbcSecurableObject.ALL,
+                Lists.newArrayList(JdbcPrivilege.ALL)));
         break;
       case SCHEMA:
         objects.add(
-            new JdbcAuthorizationObject(
-                metadataObject.name(), null, Lists.newArrayList(allPrivilege)));
+            new JdbcSecurableObject(
+                metadataObject.name(), null, Lists.newArrayList(JdbcPrivilege.ALL)));
         objects.add(
-            new JdbcAuthorizationObject(
+            new JdbcSecurableObject(
                 metadataObject.name(),
-                JdbcAuthorizationObject.ALL,
-                Lists.newArrayList(allPrivilege)));
+                JdbcSecurableObject.ALL,
+                Lists.newArrayList(JdbcPrivilege.ALL)));
         break;
       case TABLE:
         MetadataObject schema =
             MetadataObjects.parse(metadataObject.parent(), MetadataObject.Type.SCHEMA);
         objects.add(
-            new JdbcAuthorizationObject(
-                schema.name(), metadataObject.name(), Lists.newArrayList(allPrivilege)));
+            new JdbcSecurableObject(
+                schema.name(), metadataObject.name(), Lists.newArrayList(JdbcPrivilege.ALL)));
         break;
       default:
         throw new IllegalArgumentException("");

@@ -402,7 +402,7 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
     List<AuthorizationSecurableObject> authObjects = mappingProvider.translatePrivilege(object);
     for (AuthorizationSecurableObject authObject : authObjects) {
       List<AuthorizationSecurableObject> convertedObjects = Lists.newArrayList();
-      if (authObject.name().equals(JdbcAuthorizationObject.ALL)) {
+      if (authObject.name().equals(JdbcSecurableObject.ALL)) {
         convertedObjects.addAll(convertResourceAll(authObject));
       } else {
         convertedObjects.add(authObject);
@@ -435,7 +435,7 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
         mappingProvider.translatePrivilege(removeObject);
     for (AuthorizationSecurableObject authObject : authObjects) {
       List<AuthorizationSecurableObject> convertedObjects = Lists.newArrayList();
-      if (authObject.name().equals(JdbcAuthorizationObject.ALL)) {
+      if (authObject.name().equals(JdbcSecurableObject.ALL)) {
         convertedObjects.addAll(convertResourceAll(authObject));
       } else {
         convertedObjects.add(authObject);
