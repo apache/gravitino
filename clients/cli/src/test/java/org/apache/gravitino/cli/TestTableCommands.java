@@ -68,6 +68,11 @@ class TestTableCommands {
   }
 
   @AfterEach
+  void restoreExitFlg() {
+    Main.useExit = true;
+  }
+
+  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -433,6 +438,7 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testListTableWithoutCatalog() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
@@ -458,6 +464,7 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testListTableWithoutSchema() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -478,6 +485,7 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailTableWithoutCatalog() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
 
@@ -505,6 +513,7 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailTableWithoutSchema() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -530,6 +539,7 @@ class TestTableCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailTableWithoutTable() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
