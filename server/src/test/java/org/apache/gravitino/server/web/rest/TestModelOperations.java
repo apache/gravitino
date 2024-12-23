@@ -122,7 +122,7 @@ public class TestModelOperations extends JerseyTest {
     Response response =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -137,7 +137,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp1 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
@@ -152,7 +152,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp3 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
@@ -167,7 +167,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp5 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp5.getStatus());
@@ -181,7 +181,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp6 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(
@@ -202,7 +202,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -220,7 +220,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
@@ -235,7 +235,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(
@@ -256,7 +256,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -274,7 +274,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp1 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
@@ -291,7 +291,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp2 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp2.getStatus());
@@ -309,7 +309,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp3 =
         target(modelPath())
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(
@@ -329,7 +329,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -345,7 +345,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
@@ -361,7 +361,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(
@@ -383,7 +383,7 @@ public class TestModelOperations extends JerseyTest {
             .path("model1")
             .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -400,7 +400,7 @@ public class TestModelOperations extends JerseyTest {
             .path("model1")
             .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
@@ -417,7 +417,7 @@ public class TestModelOperations extends JerseyTest {
             .path("model1")
             .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
@@ -436,7 +436,7 @@ public class TestModelOperations extends JerseyTest {
             .path("model1")
             .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp3.getStatus());
@@ -452,7 +452,7 @@ public class TestModelOperations extends JerseyTest {
             .path("model1")
             .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(
@@ -476,7 +476,7 @@ public class TestModelOperations extends JerseyTest {
             .path("versions")
             .path("0")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -497,7 +497,7 @@ public class TestModelOperations extends JerseyTest {
             .path("versions")
             .path("0")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
@@ -517,7 +517,7 @@ public class TestModelOperations extends JerseyTest {
             .path("versions")
             .path("0")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(
@@ -536,7 +536,7 @@ public class TestModelOperations extends JerseyTest {
             .path("aliases")
             .path("alias1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
@@ -557,7 +557,7 @@ public class TestModelOperations extends JerseyTest {
             .path("aliases")
             .path("alias1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp4.getStatus());
@@ -577,7 +577,7 @@ public class TestModelOperations extends JerseyTest {
             .path("aliases")
             .path("alias1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(
@@ -602,7 +602,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -620,7 +620,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
@@ -638,7 +638,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp2.getStatus());
@@ -657,7 +657,7 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(
@@ -679,7 +679,7 @@ public class TestModelOperations extends JerseyTest {
             .path("versions")
             .path("0")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -698,7 +698,7 @@ public class TestModelOperations extends JerseyTest {
             .path("versions")
             .path("0")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
@@ -717,7 +717,7 @@ public class TestModelOperations extends JerseyTest {
             .path("aliases")
             .path("alias1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
@@ -735,7 +735,7 @@ public class TestModelOperations extends JerseyTest {
             .path("aliases")
             .path("alias1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
@@ -756,7 +756,7 @@ public class TestModelOperations extends JerseyTest {
             .path("versions")
             .path("0")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(
@@ -777,7 +777,7 @@ public class TestModelOperations extends JerseyTest {
             .path("aliases")
             .path("alias1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.apache.gravitino.v1+json")
+            .accept("application/vnd.gravitino.v1+json")
             .delete();
 
     Assertions.assertEquals(

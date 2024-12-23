@@ -66,7 +66,7 @@ public class ModelOperations {
   }
 
   @GET
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-model", absolute = true)
   public Response listModels(
@@ -94,7 +94,7 @@ public class ModelOperations {
 
   @GET
   @Path("{model}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model", absolute = true)
   public Response getModel(
@@ -121,7 +121,7 @@ public class ModelOperations {
   }
 
   @POST
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "register-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-model", absolute = true)
   public Response registerModel(
@@ -160,7 +160,7 @@ public class ModelOperations {
 
   @DELETE
   @Path("{model}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model", absolute = true)
   public Response deleteModel(
@@ -192,7 +192,7 @@ public class ModelOperations {
 
   @GET
   @Path("{model}/versions")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-model-versions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-model-versions", absolute = true)
   public Response listModelVersions(
@@ -222,7 +222,7 @@ public class ModelOperations {
 
   @GET
   @Path("{model}/versions/{version}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-version", absolute = true)
   public Response getModelVersion(
@@ -258,7 +258,7 @@ public class ModelOperations {
 
   @GET
   @Path("{model}/aliases/{alias}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-alias", absolute = true)
   public Response getModelVersionAlias(
@@ -294,7 +294,7 @@ public class ModelOperations {
 
   @POST
   @Path("{model}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "link-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "link-model-version", absolute = true)
   public Response linkModelVersion(
@@ -330,7 +330,7 @@ public class ModelOperations {
 
   @DELETE
   @Path("{model}/versions/{version}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model-version", absolute = true)
   public Response deleteModelVersion(
@@ -370,7 +370,7 @@ public class ModelOperations {
 
   @DELETE
   @Path("{model}/aliases/{alias}")
-  @Produces("application/vnd.apache.gravitino.v1+json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model-alias", absolute = true)
   public Response deleteModelVersionAlias(
