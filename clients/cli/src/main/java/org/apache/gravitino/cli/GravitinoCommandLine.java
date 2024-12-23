@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -318,14 +319,29 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
 
     Command.setAuthenticationMode(auth, userName);
+    List<String> missingEntities = Lists.newArrayList();
+    if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
 
     // Handle the CommandActions.LIST action separately as it doesn't use `schema`
     if (CommandActions.LIST.equals(command)) {
+      if (!missingEntities.isEmpty()) {
+        System.err.println("Missing required argument(s): " + COMMA_JOINER.join(missingEntities));
+        Main.exit(-1);
+      }
       newListSchema(url, ignore, metalake, catalog).handle();
       return;
     }
 
     String schema = name.getSchemaName();
+    if (schema == null) {
+      missingEntities.add(CommandEntities.SCHEMA);
+    }
+
+    if (!missingEntities.isEmpty()) {
+      System.err.println("Missing required argument(s): " + COMMA_JOINER.join(missingEntities));
+      Main.exit(-1);
+    }
 
     switch (command) {
       case CommandActions.DETAILS:
