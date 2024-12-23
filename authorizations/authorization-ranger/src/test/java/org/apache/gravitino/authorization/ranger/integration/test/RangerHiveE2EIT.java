@@ -39,9 +39,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
@@ -233,6 +235,20 @@ public class RangerHiveE2EIT extends BaseIT {
     }
     client = null;
     RangerITEnv.cleanup();
+  }
+
+  // ISSUE-5947: can't rename a catalog or a metalake
+  @Test
+  void testRenameMetalakeOrCatalog() {
+    Assertions.assertDoesNotThrow(
+        () -> client.alterMetalake(metalakeName, MetalakeChange.rename("new_name")));
+    Assertions.assertDoesNotThrow(
+        () -> client.alterMetalake("new_name", MetalakeChange.rename(metalakeName)));
+
+    Assertions.assertDoesNotThrow(
+        () -> metalake.alterCatalog(catalogName, CatalogChange.rename("new_name")));
+    Assertions.assertDoesNotThrow(
+        () -> metalake.alterCatalog("new_name", CatalogChange.rename(catalogName)));
   }
 
   @Test

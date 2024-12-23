@@ -298,9 +298,14 @@ public class AuthorizationUtils {
           NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
       MetadataObjectChange renameObject =
           MetadataObjectChange.rename(oldMetadataObject, newMetadataObject);
+
+      String metalake = type == Entity.EntityType.METALAKE ? newName : ident.namespace().level(0);
+
+      // For a renamed catalog, we should pass the new name catalog, otherwise we can't find the
+      // catalog in the entity store
       callAuthorizationPluginForMetadataObject(
-          ident.namespace().level(0),
-          oldMetadataObject,
+          metalake,
+          newMetadataObject,
           authorizationPlugin -> {
             authorizationPlugin.onMetadataUpdated(renameObject);
           });
