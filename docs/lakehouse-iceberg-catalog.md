@@ -28,10 +28,7 @@ Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `
 - Works as a catalog proxy, supporting `Hive`, `JDBC` and `REST` as catalog backend.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
-- Supports multi storage.
-  - S3
-  - HDFS
-  - OSS
+- Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
 
 ### Catalog properties
