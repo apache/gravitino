@@ -22,7 +22,7 @@ paths:
   /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectTypeOfOwner"
+      - $ref: "#/components/parameters/metadataObjectTypeOfOwner"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
 
     put:
@@ -172,3 +172,20 @@ components:
           "..."
         ]
       }
+
+  parameters:
+    metadataObjectTypeOfOwner:
+      name: metadataObjectType
+      in: path
+      description: The type of the metadata object
+      required: true
+      schema:
+        type: string
+        enum:
+          - "METALAKE"
+          - "CATALOG"
+          - "SCHEMA"
+          - "TABLE"
+          - "FILESET"
+          - "TOPIC"
+          - "ROLE"

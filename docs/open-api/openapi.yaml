@@ -477,21 +477,6 @@ components:
           - "FILESET"
           - "TOPIC"
           - "ROLE"
-    metadataObjectTypeOfOwner:
-      name: metadataObjectType
-      in: path
-      description: The type of the metadata object
-      required: true
-      schema:
-        type: string
-        enum:
-          - "METALAKE"
-          - "CATALOG"
-          - "SCHEMA"
-          - "TABLE"
-          - "FILESET"
-          - "TOPIC"
-          - "ROLE"
     metadataObjectFullName:
       name: metadataObjectFullName
       in: path
