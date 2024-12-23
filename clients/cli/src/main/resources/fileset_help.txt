@@ -1,0 +1,33 @@
+gcli fileset [list|details|create|delete|update|properties|set|remove]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Create a fileset
+gcli fileset create --name hadoop.schema.fileset --properties managed=true,location=file:/tmp/root/schema/example
+
+List filesets
+gcli fileset list --name hadoop.schema
+
+Display a fileset's details
+gcli fileset details --name hadoop.schema.fileset
+
+Delete a fileset
+gcli fileset delete --name hadoop.schema.fileset
+
+Update a fileset's comment
+gcli fileset update --name hadoop.schema.fileset --comment new_comment
+
+Rename a fileset
+gcli fileset update --name hadoop.schema.fileset --rename new_name
+
+Display a fileset's properties
+gcli fileset properties --name hadoop.schema.fileset 
+
+Set a fileset's property
+gcli fileset set  --name hadoop.schema.fileset --property test --value value
+
+Remove a fileset's property
+gcli fileset remove --name hadoop.schema.fileset --property test
+

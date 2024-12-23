@@ -419,7 +419,7 @@ gcli schema create --name catalog_postgres.new_db
 #### Display schema properties
 
 ```bash
-gcli schema properties --name catalog_postgres.hr -i
+gcli schema properties --name catalog_postgres.hr
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
@@ -581,10 +581,10 @@ gcli tag details --tag tagA
 #### Create tags
 
 ```bash
- gcli tag create --tag tagA tagB
- ```
+gcli tag create --tag tagA tagB
+```
 
-#### List all tag
+#### List all tags
 
 ```bash
 gcli tag list
@@ -672,6 +672,12 @@ gcli catalog set --owner --group groupA --name postgres
 
 ### Role commands
 
+When granting or revoking privileges the following privileges can be used.
+
+create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants
+
+Note that some are only valid for certain entities.
+
 #### Display role details
 
 ```bash
@@ -721,8 +727,21 @@ gcli group grant --group groupA --role admin
 ```
 
 #### Remove a role from a group
+
 ```bash
 gcli group revoke --group groupA --role admin
+```
+
+### Grant a privilege
+
+```bash
+gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
+```
+
+### Revoke a privilege
+
+```bash
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Topic commands
@@ -733,7 +752,7 @@ gcli group revoke --group groupA --role admin
 gcli topic details --name kafka.default.topic3
 ```
 
-#### Create a tag
+#### Create a topic
 
 ```bash
 gcli topic create --name kafka.default.topic3
@@ -838,7 +857,20 @@ Note that some commands are not supported depending on what the database support
 When setting the datatype of a column the following basic types are currently supported:
 null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
 
-In addition decimal(precision,scale) and varchar(length).
+In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).
+
+
+#### Show all columns
+
+```bash
+gcli column list --name catalog_postgres.hr.departments
+```
+
+#### Show column's audit information
+
+```bash
+gcli column details --name catalog_postgres.hr.departments.name --audit
+```
 
 #### Show a column's audit information
 

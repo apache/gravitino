@@ -18,4 +18,4 @@ Create a schema
 gcli schema create --name catalog_postgres.new_db
 
 Display schema properties
-gcli schema properties --name catalog_postgres.hr -i
+gcli schema properties --name catalog_postgres.hr
