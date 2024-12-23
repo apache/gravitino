@@ -50,7 +50,7 @@ public class ListCatalogs extends Command {
       GravitinoClient client = buildClient(metalake);
       catalogs = client.listCatalogsInfo();
       if (catalogs.length == 0) {
-        System.out.println("No catalogs exists.");
+        System.out.println("No catalogs exist.");
       } else {
         output(catalogs);
       }

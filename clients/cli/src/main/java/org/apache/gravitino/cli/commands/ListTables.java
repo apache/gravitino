@@ -63,7 +63,7 @@ public class ListTables extends TableCommand {
 
     String all =
         tableNames.isEmpty()
-            ? "No tables exists."
+            ? "No tables exist."
             : Joiner.on(System.lineSeparator()).join(tableNames);
 
     System.out.println(all.toString());

@@ -68,7 +68,7 @@ public class ListTopics extends Command {
 
     String all =
         topics.length == 0
-            ? "No topics exists."
+            ? "No topics exist."
             : Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
     System.out.println(all);
   }
