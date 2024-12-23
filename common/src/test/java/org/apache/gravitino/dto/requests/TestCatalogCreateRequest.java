@@ -57,16 +57,15 @@ public class TestCatalogCreateRequest {
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
     CatalogCreateRequest deserRequest1 =
         JsonUtils.objectMapper().readValue(serJson1, CatalogCreateRequest.class);
+    Assertions.assertEquals(
+        deserRequest1.getType().name().toLowerCase(Locale.ROOT), deserRequest1.getProvider());
+    Assertions.assertNull(deserRequest1.getComment());
+    Assertions.assertNull(deserRequest1.getProperties());
 
     String json = "{\"name\":\"catalog_test\",\"type\":\"model\"}";
     CatalogCreateRequest deserRequest2 =
         JsonUtils.objectMapper().readValue(json, CatalogCreateRequest.class);
     Assertions.assertEquals("model", deserRequest2.getProvider());
-
-    Assertions.assertEquals(
-        deserRequest1.getType().name().toLowerCase(Locale.ROOT), deserRequest1.getProvider());
-    Assertions.assertNull(deserRequest1.getComment());
-    Assertions.assertNull(deserRequest1.getProperties());
 
     // Test using null provider with catalog type doesn't support managed catalog
     Assertions.assertThrows(
