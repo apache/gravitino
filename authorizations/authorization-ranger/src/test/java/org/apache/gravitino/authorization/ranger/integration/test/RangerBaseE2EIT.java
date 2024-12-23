@@ -199,7 +199,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   protected abstract void testAlterTable();
 
-  // ISSUE-5947: can't rename a catalog
+  // ISSUE-5947: can't rename a catalog or a metalake
   @Test
   void testRenameMetalakeOrCatalog() {
     Assertions.assertDoesNotThrow(
