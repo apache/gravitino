@@ -285,7 +285,7 @@ gcli metalake update -m metalake_demo --enable
 #### Enable a metalake and all catalogs
 
 ```bash
-gcli metalake update -m metalake_demo --enable -R
+gcli metalake update -m metalake_demo --enable --all
 ```
 
 #### Disable a metalake
@@ -417,7 +417,7 @@ gcli catalog update -m metalake_demo --name catalog --enable
 #### Enable a catalog and it's metalake
 
 ```bash
-gcli catalog update -m metalake_demo --name catalog --enable  -R
+gcli catalog update -m metalake_demo --name catalog --enable --all
 ```
 
 #### Disable a catalog
