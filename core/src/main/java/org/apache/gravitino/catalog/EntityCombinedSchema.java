@@ -61,7 +61,7 @@ public final class EntityCombinedSchema implements Schema {
     return of(schema, null);
   }
 
-  public EntityCombinedSchema withHiddenPropertiesSet(Set<String> hiddenProperties) {
+  public EntityCombinedSchema withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;
   }
