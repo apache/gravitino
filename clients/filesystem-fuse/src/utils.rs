@@ -36,8 +36,8 @@ pub fn split_file_path(path: &str) -> (&str, &str) {
     }
 }
 
-// convert file id to string if file id is invalid return "Unknown"
-pub async fn file_id_to_string(file_id: u64, fs: &impl RawFileSystem) -> String {
+// convert file id to file path string if file id is invalid return "Unknown"
+pub async fn file_id_to_file_path_string(file_id: u64, fs: &impl RawFileSystem) -> String {
     fs.get_file_path(file_id)
         .await
         .unwrap_or("Unknown".to_string())
