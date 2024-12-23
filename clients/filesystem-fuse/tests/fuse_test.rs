@@ -35,7 +35,8 @@ struct FuseTest {
 impl FuseTest {
     pub fn setup(&self) {
         info!("Start gvfs fuse server");
-        self.runtime.spawn(async move { gvfs_mount().await });
+        let mount_point = self.mount_point.clone();
+        self.runtime.spawn(async move { gvfs_mount(&mount_point).await });
         let success = Self::wait_for_fuse_server_ready(&self.mount_point, Duration::from_secs(15));
         assert!(success, "Fuse server cannot start up at 15 seconds");
     }
@@ -51,10 +52,10 @@ impl FuseTest {
         let start_time = Instant::now();
 
         while start_time.elapsed() < timeout {
-            if !file_exists(&test_file) {
-                info!("Wait for fuse server ready",);
+            if file_exists(&test_file) {
                 return true;
             }
+            info!("Wait for fuse server ready",);
             sleep(Duration::from_secs(1));
         }
         false
@@ -72,16 +73,15 @@ impl Drop for FuseTest {
 fn test_fuse_system_with_auto() {
     tracing_subscriber::fmt().init();
 
-    let test = FuseTest {
-        runtime: Arc::new(Runtime::new().unwrap()),
-        mount_point: "build/gvfs".to_string(),
-    };
-
-    test.setup();
-
     let mount_point = "build/gvfs";
     let _ = fs::create_dir_all(mount_point);
 
+    let test = FuseTest {
+        runtime: Arc::new(Runtime::new().unwrap()),
+        mount_point: mount_point.to_string(),
+    };
+
+    test.setup();
     test_fuse_filesystem(mount_point);
 }
 
@@ -135,7 +135,8 @@ fn test_fuse_filesystem(mount_point: &str) {
     fs::remove_dir_all(&test_dir).expect("Failed to delete directory");
     assert!(!file_exists(&test_dir));
 
-    info!("Success test")
+    info!("Success test");
+    sleep(Duration::from_secs(10));
 }
 
 fn file_exists<P: AsRef<Path>>(path: P) -> bool {

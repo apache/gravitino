@@ -27,9 +27,6 @@ use tokio::time::timeout;
 
 /// Represents a FUSE server capable of starting and stopping the FUSE filesystem.
 pub struct FuseServer {
-    // Notification for stop
-    close_notify: Arc<Notify>,
-
     // Shared handle to manage FUSE unmounting
     mount_handle: Arc<Mutex<Option<MountHandle>>>, // Shared handle to manage FUSE unmounting
 
@@ -41,7 +38,6 @@ impl FuseServer {
     /// Creates a new instance of `FuseServer`.
     pub fn new(mount_point: &str) -> Self {
         Self {
-            close_notify: Arc::new(Notify::new()),
             mount_handle: Arc::new(Mutex::new(None)),
             mount_point: mount_point.to_string(),
         }
@@ -70,18 +66,12 @@ impl FuseServer {
             *handle_guard = Some(mount_handle);
         }
 
-        // Wait for stop notification
-        self.close_notify.notified().await;
-
         info!("Received stop notification, FUSE filesystem will be unmounted.");
         Ok(())
     }
 
     /// Stops the FUSE filesystem and waits for unmounting to complete.
     pub async fn stop(&self) -> Result<()> {
-        // Notify stop
-        self.close_notify.notify_one();
-
         info!("Stopping FUSE filesystem...");
         let timeout_duration = Duration::from_secs(5);
 

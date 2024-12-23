@@ -22,23 +22,37 @@ use crate::fuse_api_handle::FuseApiHandle;
 use crate::fuse_server::FuseServer;
 use crate::memory_filesystem::MemoryFileSystem;
 use fuse3::raw::Filesystem;
-use log::{debug, info};
-use std::sync::Arc;
+use log::info;
+use std::sync::{Arc, LazyLock};
+use tokio::sync::Mutex;
 
-pub async fn mount() -> fuse3::Result<()> {
-    debug!("Starting gvfs-fuse server...");
-    let server = Arc::new(FuseServer::new("gvfs"));
+static SERVER: LazyLock<Mutex<Option<Arc<FuseServer>>>> = LazyLock::new(|| Mutex::new(None));
 
+pub async fn mount(mount_point: &str) -> fuse3::Result<()> {
+    info!("Starting gvfs-fuse server...");
+    let mut server = SERVER.lock().await;
+
+    let svr = Arc::new(FuseServer::new(mount_point));
     let fs = create_fuse_fs().await;
-    server.start(fs).await?;
+    let result = svr.start(fs).await;
 
-    tokio::signal::ctrl_c().await?;
-    info!("Received Ctrl+C, stopping server...");
-    server.stop().await
+    *server = Some(svr);
+    result
+
 }
 
 pub async fn unmount() {
-    todo!("Implement the unmount function");
+    info!("Stop gvfs-fuse server...");
+    let mut server = SERVER.lock().await;
+    info!("Stop gvfs-fuse server...0");
+    if server.is_none() {
+        info!("Stop gvfs-fuse server...1");
+        return;
+    }
+    info!("Stop gvfs-fuse server...2");
+    let svr = server.take().unwrap();
+    info!("Stop gvfs-fuse server...3");
+    let _ = svr.stop().await;
 }
 
 pub async fn create_fuse_fs() -> impl Filesystem + Sync + 'static {

@@ -22,7 +22,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType};
-use regex::Regex;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
@@ -41,7 +40,7 @@ pub struct MemoryFileSystem {
 }
 
 impl MemoryFileSystem {
-    const FS_META_FILE_NAME: &'static str = ".gvfs_meta";
+    const FS_META_FILE_NAME: &'static str = "/.gvfs_meta";
 
     pub(crate) async fn new() -> Self {
         Self {
@@ -231,15 +230,5 @@ impl FileWriter for MemoryFileWriter {
 }
 
 fn path_in_dir(dir: &Path, path: &Path) -> bool {
-    let regex = dir_child_reg_expr(dir.to_string_lossy().as_ref());
-    regex.is_match(path.to_string_lossy().as_ref())
-}
-
-fn dir_child_reg_expr(path: &str) -> Regex {
-    let regex_pattern = if path.is_empty() {
-        r"^[^/]+$".to_string()
-    } else {
-        format!(r"^{}/[^/]+$", path)
-    };
-    Regex::new(&regex_pattern).unwrap()
+    path.starts_with(dir) && path != dir
 }

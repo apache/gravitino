@@ -16,7 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem, INITIAL_FILE_ID, ROOT_DIR_FILE_ID, ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH};
+use crate::filesystem::{
+    FileStat, PathFileSystem, RawFileSystem, INITIAL_FILE_ID, ROOT_DIR_FILE_ID,
+    ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
+};
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
 use async_trait::async_trait;
@@ -44,7 +47,6 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
-
     pub(crate) fn new(fs: T) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
@@ -183,7 +185,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
         for file in child_filestats.iter_mut() {
-            self.resolve_file_id_to_filestat(file, file.file_id).await;
+            self.resolve_file_id_to_filestat(file, file_id).await;
         }
         Ok(child_filestats)
     }
