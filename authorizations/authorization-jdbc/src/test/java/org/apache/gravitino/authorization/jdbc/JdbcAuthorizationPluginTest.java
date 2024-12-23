@@ -18,12 +18,12 @@
  */
 package org.apache.gravitino.authorization.jdbc;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Group;
@@ -36,6 +36,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,9 +49,19 @@ public class JdbcAuthorizationPluginTest {
   private static List<Owner> expectNewOwners = Lists.newArrayList();
   private static int currentSQLIndex = 0;
   private static int currentIndex = 0;
+  private static final Map<String, String> properties =
+      ImmutableMap.of(
+          JdbcAuthorizationProperties.JDBC_URL,
+          "xx",
+          JdbcAuthorizationProperties.JDBC_USERNAME,
+          "xx",
+          JdbcAuthorizationProperties.JDBC_PASSWORD,
+          "xx",
+          JdbcAuthorizationProperties.JDBC_DRIVER,
+          "xx");
 
   private static final JdbcAuthorizationPlugin plugin =
-      new JdbcAuthorizationPlugin(Collections.emptyMap()) {
+      new JdbcAuthorizationPlugin(properties) {
 
         @Override
         public List<String> getSetOwnerSQL(
@@ -86,38 +97,38 @@ public class JdbcAuthorizationPluginTest {
   @Test
   public void testGroupManagement() {
     expectSQLs = Lists.newArrayList("CREATE USER GRAVITINO_GROUP_tmp");
-    currentSQLIndex = 0;
+    resetSQLIndex();
     plugin.onGroupAdded(createGroup("tmp"));
 
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> plugin.onGroupAcquired(createGroup("tmp")));
 
     expectSQLs = Lists.newArrayList("DROP USER GRAVITINO_GROUP_tmp");
-    currentSQLIndex = 0;
+    resetSQLIndex();
     plugin.onGroupRemoved(createGroup("tmp"));
   }
 
   @Test
   public void testRoleManagement() {
     expectSQLs = Lists.newArrayList("CREATE ROLE tmp");
-    currentSQLIndex = 0;
-    Role role = new TemporaryRole("tmp");
+    resetSQLIndex();
+    Role role = createRole("tmp");
     plugin.onRoleCreated(role);
 
     Assertions.assertThrows(UnsupportedOperationException.class, () -> plugin.onRoleAcquired(role));
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs = Lists.newArrayList("DROP ROLE tmp");
     plugin.onRoleDeleted(role);
   }
 
   @Test
   public void testPermissionManagement() {
-    Role role = new TemporaryRole("tmp");
+    Role role = createRole("tmp");
     Group group = createGroup("tmp");
     User user = createUser("tmp");
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs =
         Lists.newArrayList(
             "CREATE USER GRAVITINO_GROUP_tmp",
@@ -125,12 +136,12 @@ public class JdbcAuthorizationPluginTest {
             "GRANT ROLE tmp TO USER GRAVITINO_GROUP_tmp");
     plugin.onGrantedRolesToGroup(Lists.newArrayList(role), group);
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs =
         Lists.newArrayList("CREATE USER tmp", "CREATE ROLE tmp", "GRANT ROLE tmp TO USER tmp");
     plugin.onGrantedRolesToUser(Lists.newArrayList(role), user);
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs =
         Lists.newArrayList(
             "CREATE USER GRAVITINO_GROUP_tmp",
@@ -138,25 +149,25 @@ public class JdbcAuthorizationPluginTest {
             "REVOKE ROLE tmp FROM USER GRAVITINO_GROUP_tmp");
     plugin.onRevokedRolesFromGroup(Lists.newArrayList(role), group);
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs =
         Lists.newArrayList("CREATE USER tmp", "CREATE ROLE tmp", "REVOKE ROLE tmp FROM USER tmp");
     plugin.onRevokedRolesFromUser(Lists.newArrayList(role), user);
 
     // Test metalake object and different role change
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "GRANT SELECT ON TABLE *.* TO ROLE tmp");
     SecurableObject metalakeObject =
         SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.SelectTable.allow()));
     RoleChange roleChange = RoleChange.addSecurableObject("tmp", metalakeObject);
     plugin.onRoleUpdated(role, roleChange);
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "REVOKE SELECT ON TABLE *.* FROM ROLE tmp");
     roleChange = RoleChange.removeSecurableObject("tmp", metalakeObject);
     plugin.onRoleUpdated(role, roleChange);
 
-    currentSQLIndex = 0;
+    resetSQLIndex();
     expectSQLs =
         Lists.newArrayList(
             "CREATE ROLE tmp",
@@ -168,7 +179,7 @@ public class JdbcAuthorizationPluginTest {
     plugin.onRoleUpdated(role, roleChange);
 
     // Test catalog object
-    currentSQLIndex = 0;
+    resetSQLIndex();
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.SelectTable.allow()));
     roleChange = RoleChange.addSecurableObject("tmp", catalogObject);
@@ -176,7 +187,7 @@ public class JdbcAuthorizationPluginTest {
     plugin.onRoleUpdated(role, roleChange);
 
     // Test schema object
-    currentSQLIndex = 0;
+    resetSQLIndex();
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject, "schema", Lists.newArrayList(Privileges.SelectTable.allow()));
@@ -186,7 +197,7 @@ public class JdbcAuthorizationPluginTest {
     plugin.onRoleUpdated(role, roleChange);
 
     // Test table object
-    currentSQLIndex = 0;
+    resetSQLIndex();
     SecurableObject tableObject =
         SecurableObjects.ofTable(
             schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
@@ -217,13 +228,8 @@ public class JdbcAuthorizationPluginTest {
     plugin.onOwnerSet(metalakeObject, null, owner);
 
     // clean up
-    expectTypes.clear();
-    expectObjectNames.clear();
-    expectPreOwners.clear();
-    expectNewOwners.clear();
-    currentIndex = 0;
+    cleanup();
     expectSQLs = Lists.newArrayList("CREATE USER tmp");
-    currentSQLIndex = 0;
 
     // Test catalog object
     MetadataObject catalogObject = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
@@ -239,13 +245,8 @@ public class JdbcAuthorizationPluginTest {
     plugin.onOwnerSet(catalogObject, null, owner);
 
     // clean up
-    expectTypes.clear();
-    expectObjectNames.clear();
-    expectPreOwners.clear();
-    expectNewOwners.clear();
-    currentIndex = 0;
+    cleanup();
     expectSQLs = Lists.newArrayList("CREATE USER tmp");
-    currentSQLIndex = 0;
 
     // Test schema object
     MetadataObject schemaObject =
@@ -262,13 +263,8 @@ public class JdbcAuthorizationPluginTest {
     plugin.onOwnerSet(schemaObject, null, owner);
 
     // clean up
-    expectTypes.clear();
-    expectObjectNames.clear();
-    expectPreOwners.clear();
-    expectNewOwners.clear();
-    currentIndex = 0;
+    cleanup();
     expectSQLs = Lists.newArrayList("CREATE USER tmp");
-    currentSQLIndex = 0;
 
     // Test table object
     MetadataObject tableObject =
@@ -282,32 +278,17 @@ public class JdbcAuthorizationPluginTest {
     plugin.onOwnerSet(tableObject, null, owner);
   }
 
-  private static class TemporaryRole implements Role {
-    private final String name;
+  private static void resetSQLIndex() {
+    currentSQLIndex = 0;
+  }
 
-    public TemporaryRole(String name) {
-      this.name = name;
-    }
-
-    @Override
-    public Audit auditInfo() {
-      return AuditInfo.EMPTY;
-    }
-
-    @Override
-    public String name() {
-      return name;
-    }
-
-    @Override
-    public Map<String, String> properties() {
-      return Collections.emptyMap();
-    }
-
-    @Override
-    public List<SecurableObject> securableObjects() {
-      return Collections.emptyList();
-    }
+  private static void cleanup() {
+    expectTypes.clear();
+    expectObjectNames.clear();
+    expectPreOwners.clear();
+    expectNewOwners.clear();
+    currentIndex = 0;
+    currentSQLIndex = 0;
   }
 
   private static class TemporaryOwner implements Owner {
@@ -328,6 +309,10 @@ public class JdbcAuthorizationPluginTest {
     public Type type() {
       return type;
     }
+  }
+
+  private static Role createRole(String name) {
+    return RoleEntity.builder().withId(0L).withName(name).withAuditInfo(AuditInfo.EMPTY).build();
   }
 
   private static Group createGroup(String name) {

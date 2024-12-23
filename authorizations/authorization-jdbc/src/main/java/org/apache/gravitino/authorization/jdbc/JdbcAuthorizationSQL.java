@@ -31,33 +31,33 @@ interface JdbcAuthorizationSQL {
    * Get SQL statements for creating a user.
    *
    * @param username the username to create
-   * @return a SQL statement to create a user
+   * @return the SQL statement list to create a user
    */
-  String getCreateUserSQL(String username);
+  List<String> getCreateUserSQL(String username);
 
   /**
    * Get SQL statements for creating a group.
    *
    * @param username the username to drop
-   * @return a SQL statement to drop a user
+   * @return the SQL statement list to drop a user
    */
-  String getDropUserSQL(String username);
+  List<String> getDropUserSQL(String username);
 
   /**
    * Get SQL statements for creating a role.
    *
    * @param roleName the role name to create
-   * @return a SQL statement to create a role
+   * @return the SQL statement list to create a role
    */
-  String getCreateRoleSQL(String roleName);
+  List<String> getCreateRoleSQL(String roleName);
 
   /**
    * Get SQL statements for dropping a role.
    *
    * @param roleName the role name to drop
-   * @return a SQL statement to drop a role
+   * @return the SQL statement list to drop a role
    */
-  String getDropRoleSQL(String roleName);
+  List<String> getDropRoleSQL(String roleName);
 
   /**
    * Get SQL statements for granting privileges.
@@ -66,9 +66,9 @@ interface JdbcAuthorizationSQL {
    * @param objectType the object type in the database system
    * @param objectName the object name in the database system
    * @param roleName the role name to grant
-   * @return a sql statement to grant privilege
+   * @return the sql statement list to grant privilege
    */
-  String getGrantPrivilegeSQL(
+  List<String> getGrantPrivilegeSQL(
       String privilege, String objectType, String objectName, String roleName);
 
   /**
@@ -78,9 +78,9 @@ interface JdbcAuthorizationSQL {
    * @param objectType the object type in the database system
    * @param objectName the object name in the database system
    * @param roleName the role name to revoke
-   * @return a sql statement to revoke privilege
+   * @return the sql statement list to revoke privilege
    */
-  String getRevokePrivilegeSQL(
+  List<String> getRevokePrivilegeSQL(
       String privilege, String objectType, String objectName, String roleName);
 
   /**
@@ -89,9 +89,9 @@ interface JdbcAuthorizationSQL {
    * @param roleName the role name to grant
    * @param grantorType the grantor type, usually USER or ROLE
    * @param grantorName the grantor name
-   * @return a sql statement to grant role
+   * @return the sql statement list to grant role
    */
-  String getGrantRoleSQL(String roleName, String grantorType, String grantorName);
+  List<String> getGrantRoleSQL(String roleName, String grantorType, String grantorName);
 
   /**
    * Get SQL statements for revoking roles.
@@ -99,9 +99,9 @@ interface JdbcAuthorizationSQL {
    * @param roleName the role name to revoke
    * @param revokerType the revoker type, usually USER or ROLE
    * @param revokerName the revoker name
-   * @return a sql statement to revoke role
+   * @return the sql statement list to revoke role
    */
-  String getRevokeRoleSQL(String roleName, String revokerType, String revokerName);
+  List<String> getRevokeRoleSQL(String roleName, String revokerType, String revokerName);
 
   /**
    * Get SQL statements for setting owner.

@@ -56,12 +56,6 @@ import org.slf4j.LoggerFactory;
 @Unstable
 abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAuthorizationSQL {
 
-  private static final String CONFIG_PREFIX = "authorization.jdbc.";
-  public static final String JDBC_DRIVER = CONFIG_PREFIX + "driver";
-  public static final String JDBC_URL = CONFIG_PREFIX + "url";
-  public static final String JDBC_USERNAME = CONFIG_PREFIX + "username";
-  public static final String JDBC_PASSWORD = CONFIG_PREFIX + "password";
-
   private static final String GROUP_PREFIX = "GRAVITINO_GROUP_";
   private static final Logger LOG = LoggerFactory.getLogger(JdbcAuthorizationPlugin.class);
 
@@ -71,11 +65,13 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   public JdbcAuthorizationPlugin(Map<String, String> config) {
     // Initialize the data source
     dataSource = new BasicDataSource();
-    String jdbcUrl = config.get(JDBC_URL);
+    JdbcAuthorizationProperties.validate(config);
+
+    String jdbcUrl = config.get(JdbcAuthorizationProperties.JDBC_URL);
     dataSource.setUrl(jdbcUrl);
-    dataSource.setDriverClassName(config.get(JDBC_DRIVER));
-    dataSource.setUsername(config.get(JDBC_USERNAME));
-    dataSource.setPassword(config.get(JDBC_PASSWORD));
+    dataSource.setDriverClassName(config.get(JdbcAuthorizationProperties.JDBC_DRIVER));
+    dataSource.setUsername(config.get(JdbcAuthorizationProperties.JDBC_USERNAME));
+    dataSource.setPassword(config.get(JdbcAuthorizationProperties.JDBC_PASSWORD));
     dataSource.setDefaultAutoCommit(true);
     dataSource.setMaxTotal(20);
     dataSource.setMaxIdle(5);
@@ -95,6 +91,7 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
     if (dataSource != null) {
       try {
         dataSource.close();
+        dataSource = null;
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
@@ -111,10 +108,10 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
 
   @Override
   public Boolean onRoleCreated(Role role) throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
-    String sql = getCreateRoleSQL(role.name());
-    executeUpdateSQL(sql, "already exists");
+    List<String> sqls = getCreateRoleSQL(role.name());
+    for (String sql : sqls) {
+      executeUpdateSQL(sql, "already exists");
+    }
 
     if (role.securableObjects() != null) {
       for (SecurableObject object : role.securableObjects()) {
@@ -132,18 +129,16 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
 
   @Override
   public Boolean onRoleDeleted(Role role) throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
-    String sql = getDropRoleSQL(role.name());
-    executeUpdateSQL(sql);
+    List<String> sqls = getDropRoleSQL(role.name());
+    for (String sql : sqls) {
+      executeUpdateSQL(sql);
+    }
     return null;
   }
 
   @Override
   public Boolean onRoleUpdated(Role role, RoleChange... changes)
       throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     onRoleCreated(role);
     for (RoleChange change : changes) {
       if (change instanceof RoleChange.AddSecurableObject) {
@@ -159,7 +154,8 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
         revokeObjectPrivileges(role, removeObject);
         grantObjectPrivileges(role, addObject);
       } else {
-        throw new IllegalArgumentException(String.format("Don't support RoleChange %s", change));
+        throw new IllegalArgumentException(
+            String.format("RoleChange is not supported - %s", change));
       }
     }
     return true;
@@ -168,14 +164,14 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onGrantedRolesToUser(List<Role> roles, User user)
       throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     onUserAdded(user);
 
     for (Role role : roles) {
       onRoleCreated(role);
-      String sql = getGrantRoleSQL(role.name(), "USER", user.name());
-      executeUpdateSQL(sql);
+      List<String> sqls = getGrantRoleSQL(role.name(), "USER", user.name());
+      for (String sql : sqls) {
+        executeUpdateSQL(sql);
+      }
     }
     return true;
   }
@@ -183,14 +179,14 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onRevokedRolesFromUser(List<Role> roles, User user)
       throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     onUserAdded(user);
 
     for (Role role : roles) {
       onRoleCreated(role);
-      String sql = getRevokeRoleSQL(role.name(), "USER", user.name());
-      executeUpdateSQL(sql);
+      List<String> sqls = getRevokeRoleSQL(role.name(), "USER", user.name());
+      for (String sql : sqls) {
+        executeUpdateSQL(sql);
+      }
     }
     return true;
   }
@@ -198,15 +194,15 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onGrantedRolesToGroup(List<Role> roles, Group group)
       throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     onGroupAdded(group);
 
     for (Role role : roles) {
       onRoleCreated(role);
-      String sql =
+      List<String> sqls =
           getGrantRoleSQL(role.name(), "USER", String.format("%s%s", GROUP_PREFIX, group.name()));
-      executeUpdateSQL(sql);
+      for (String sql : sqls) {
+        executeUpdateSQL(sql);
+      }
     }
     return true;
   }
@@ -214,34 +210,34 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group)
       throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     onGroupAdded(group);
 
     for (Role role : roles) {
       onRoleCreated(role);
-      String sql =
+      List<String> sqls =
           getRevokeRoleSQL(role.name(), "USER", String.format("%s%s", GROUP_PREFIX, group.name()));
-      executeUpdateSQL(sql);
+      for (String sql : sqls) {
+        executeUpdateSQL(sql);
+      }
     }
     return true;
   }
 
   @Override
   public Boolean onUserAdded(User user) throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
-    String sql = getCreateUserSQL(user.name());
-    executeUpdateSQL(sql);
+    List<String> sqls = getCreateUserSQL(user.name());
+    for (String sql : sqls) {
+      executeUpdateSQL(sql);
+    }
     return true;
   }
 
   @Override
   public Boolean onUserRemoved(User user) throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
-    String sql = getDropUserSQL(user.name());
-    executeUpdateSQL(sql);
+    List<String> sqls = getDropUserSQL(user.name());
+    for (String sql : sqls) {
+      executeUpdateSQL(sql);
+    }
     return true;
   }
 
@@ -252,21 +248,21 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
 
   @Override
   public Boolean onGroupAdded(Group group) throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     String name = String.format("%s%s", GROUP_PREFIX, group.name());
-    String sql = getCreateUserSQL(name);
-    executeUpdateSQL(sql);
+    List<String> sqls = getCreateUserSQL(name);
+    for (String sql : sqls) {
+      executeUpdateSQL(sql);
+    }
     return true;
   }
 
   @Override
   public Boolean onGroupRemoved(Group group) throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     String name = String.format("%s%s", GROUP_PREFIX, group.name());
-    String sql = getDropUserSQL(name);
-    executeUpdateSQL(sql);
+    List<String> sqls = getDropUserSQL(name);
+    for (String sql : sqls) {
+      executeUpdateSQL(sql);
+    }
     return true;
   }
 
@@ -278,8 +274,6 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   @Override
   public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
       throws AuthorizationPluginException {
-    beforeExecuteSQL();
-
     if (newOwner.type() == Owner.Type.USER) {
       onUserAdded(
           UserEntity.builder()
@@ -312,51 +306,50 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   }
 
   @Override
-  public String getCreateUserSQL(String username) {
-    return String.format("CREATE USER %s", username);
+  public List<String> getCreateUserSQL(String username) {
+    return Lists.newArrayList(String.format("CREATE USER %s", username));
   }
 
   @Override
-  public String getDropUserSQL(String username) {
-    return String.format("DROP USER %s", username);
+  public List<String> getDropUserSQL(String username) {
+    return Lists.newArrayList(String.format("DROP USER %s", username));
   }
 
   @Override
-  public String getCreateRoleSQL(String roleName) {
-    return String.format("CREATE ROLE %s", roleName);
+  public List<String> getCreateRoleSQL(String roleName) {
+    return Lists.newArrayList(String.format("CREATE ROLE %s", roleName));
   }
 
   @Override
-  public String getDropRoleSQL(String roleName) {
-    return String.format("DROP ROLE %s", roleName);
+  public List<String> getDropRoleSQL(String roleName) {
+    return Lists.newArrayList(String.format("DROP ROLE %s", roleName));
   }
 
   @Override
-  public String getGrantPrivilegeSQL(
+  public List<String> getGrantPrivilegeSQL(
       String privilege, String objectType, String objectName, String roleName) {
-    return String.format(
-        "GRANT %s ON %s %s TO ROLE %s", privilege, objectType, objectName, roleName);
+    return Lists.newArrayList(
+        String.format("GRANT %s ON %s %s TO ROLE %s", privilege, objectType, objectName, roleName));
   }
 
   @Override
-  public String getRevokePrivilegeSQL(
+  public List<String> getRevokePrivilegeSQL(
       String privilege, String objectType, String objectName, String roleName) {
-    return String.format(
-        "REVOKE %s ON %s %s FROM ROLE %s", privilege, objectType, objectName, roleName);
+    return Lists.newArrayList(
+        String.format(
+            "REVOKE %s ON %s %s FROM ROLE %s", privilege, objectType, objectName, roleName));
   }
 
   @Override
-  public String getGrantRoleSQL(String roleName, String grantorType, String grantorName) {
-    return String.format("GRANT ROLE %s TO %s %s", roleName, grantorType, grantorName);
+  public List<String> getGrantRoleSQL(String roleName, String grantorType, String grantorName) {
+    return Lists.newArrayList(
+        String.format("GRANT ROLE %s TO %s %s", roleName, grantorType, grantorName));
   }
 
   @Override
-  public String getRevokeRoleSQL(String roleName, String revokerType, String revokerName) {
-    return String.format("REVOKE ROLE %s FROM %s %s", roleName, revokerType, revokerName);
-  }
-
-  protected void beforeExecuteSQL() {
-    // Do nothing by default.
+  public List<String> getRevokeRoleSQL(String roleName, String revokerType, String revokerName) {
+    return Lists.newArrayList(
+        String.format("REVOKE ROLE %s FROM %s %s", roleName, revokerType, revokerName));
   }
 
   @VisibleForTesting
@@ -388,7 +381,7 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
 
   protected AuthorizationPluginException toAuthorizationPluginException(SQLException se) {
     return new AuthorizationPluginException(
-        "Jdbc authorization plugin fail to execute SQL, error code: %d", se.getErrorCode());
+        "JDBC authorization plugin fail to execute SQL, error code: %d", se.getErrorCode());
   }
 
   void executeUpdateSQL(String sql, String ignoreErrorMsg) {
@@ -400,7 +393,7 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
       if (ignoreErrorMsg != null && se.getMessage().contains(ignoreErrorMsg)) {
         return;
       }
-      LOG.error("Jdbc authorization plugin exception: ", se);
+      LOG.error("JDBC authorization plugin exception: ", se);
       throw toAuthorizationPluginException(se);
     }
   }
@@ -423,13 +416,15 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
         // We don't grant the privileges in one SQL, because some privilege has been granted, it
         // will cause the failure of the SQL. So we grant the privileges one by one.
         for (String privilege : privileges) {
-          String sql =
+          List<String> sqls =
               getGrantPrivilegeSQL(
                   privilege,
                   convertedObject.metadataObjectType().name(),
                   convertedObject.fullName(),
                   role.name());
-          executeUpdateSQL(sql, "is already granted");
+          for (String sql : sqls) {
+            executeUpdateSQL(sql, "is already granted");
+          }
         }
       }
     }
@@ -454,13 +449,15 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
         for (String privilege : privileges) {
           // We don't revoke the privileges in one SQL, because some privilege has been revoked, it
           // will cause the failure of the SQL. So we revoke the privileges one by one.
-          String sql =
+          List<String> sqls =
               getRevokePrivilegeSQL(
                   privilege,
                   convertedObject.metadataObjectType().name(),
                   convertedObject.fullName(),
                   role.name());
-          executeUpdateSQL(sql, "Cannot find privilege Privilege");
+          for (String sql : sqls) {
+            executeUpdateSQL(sql, "Cannot find privilege Privilege");
+          }
         }
       }
     }

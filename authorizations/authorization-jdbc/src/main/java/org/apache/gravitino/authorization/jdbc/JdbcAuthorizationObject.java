@@ -40,7 +40,7 @@ public class JdbcAuthorizationObject implements AuthorizationSecurableObject {
   List<AuthorizationPrivilege> privileges;
 
   JdbcAuthorizationObject(String database, String table, List<AuthorizationPrivilege> privileges) {
-    Preconditions.checkNotNull(database, "Jdbc authorization object database can't null");
+    Preconditions.checkNotNull(database, "JDBC authorization object database can't null");
     this.database = database;
     this.table = table;
     this.privileges = privileges;

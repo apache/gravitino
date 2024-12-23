@@ -160,32 +160,35 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
   @Override
   public List<AuthorizationSecurableObject> translateOwner(MetadataObject metadataObject) {
     List<AuthorizationSecurableObject> objects = Lists.newArrayList();
-    JdbcPrivilege allPri = JdbcPrivilege.valueOf(JdbcPrivilege.Type.ALL);
+    JdbcPrivilege allPrivilege = JdbcPrivilege.valueOf(JdbcPrivilege.Type.ALL);
     switch (metadataObject.type()) {
       case METALAKE:
       case CATALOG:
         objects.add(
             new JdbcAuthorizationObject(
-                JdbcAuthorizationObject.ALL, null, Lists.newArrayList(allPri)));
+                JdbcAuthorizationObject.ALL, null, Lists.newArrayList(allPrivilege)));
         objects.add(
             new JdbcAuthorizationObject(
                 JdbcAuthorizationObject.ALL,
                 JdbcAuthorizationObject.ALL,
-                Lists.newArrayList(allPri)));
+                Lists.newArrayList(allPrivilege)));
         break;
       case SCHEMA:
         objects.add(
-            new JdbcAuthorizationObject(metadataObject.name(), null, Lists.newArrayList(allPri)));
+            new JdbcAuthorizationObject(
+                metadataObject.name(), null, Lists.newArrayList(allPrivilege)));
         objects.add(
             new JdbcAuthorizationObject(
-                metadataObject.name(), JdbcAuthorizationObject.ALL, Lists.newArrayList(allPri)));
+                metadataObject.name(),
+                JdbcAuthorizationObject.ALL,
+                Lists.newArrayList(allPrivilege)));
         break;
       case TABLE:
         MetadataObject schema =
             MetadataObjects.parse(metadataObject.parent(), MetadataObject.Type.SCHEMA);
         objects.add(
             new JdbcAuthorizationObject(
-                schema.name(), metadataObject.name(), Lists.newArrayList(allPri)));
+                schema.name(), metadataObject.name(), Lists.newArrayList(allPrivilege)));
         break;
       default:
         throw new IllegalArgumentException("");
