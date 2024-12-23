@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.security.Permission;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateSchema;
@@ -53,14 +52,6 @@ class TestSchemaCommands {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private final SecurityManager securityManager =
-      new SecurityManager() {
-        public void checkPermission(Permission permission) {
-          if (permission.getName().startsWith("exitVM")) {
-            throw new RuntimeException(permission.getName());
-          }
-        }
-      };
 
   @BeforeEach
   void setUp() {
@@ -71,8 +62,8 @@ class TestSchemaCommands {
   }
 
   @AfterEach
-  void restoreSecurityManager() {
-    System.setSecurityManager(null);
+  void restoreExitFlg() {
+    Main.useExit = true;
   }
 
   @AfterEach
@@ -282,7 +273,7 @@ class TestSchemaCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testListSchemaWithoutCatalog() {
-    System.setSecurityManager(securityManager);
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
@@ -302,7 +293,7 @@ class TestSchemaCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailsSchemaWithoutCatalog() {
-    System.setSecurityManager(securityManager);
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
@@ -326,7 +317,7 @@ class TestSchemaCommands {
   @Test
   @SuppressWarnings("DefaultCharset")
   void testDetailsSchemaWithoutSchema() {
-    System.setSecurityManager(securityManager);
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
