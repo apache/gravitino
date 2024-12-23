@@ -50,11 +50,9 @@ public class ListMetalakeProperties extends ListProperties {
       GravitinoAdminClient client = buildAdminClient();
       gMetalake = client.loadMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     Map<String, String> properties = gMetalake.properties();

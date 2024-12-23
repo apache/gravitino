@@ -125,7 +125,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -149,7 +149,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -158,7 +158,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedSchema.of(schema, schemaEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::schemaPropertiesMetadata, schema.properties()));
   }
@@ -214,7 +214,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(alteredSchema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -225,7 +225,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Case 1: The schema is not created by Gravitino.
     if (stringId == null) {
       return EntityCombinedSchema.of(alteredSchema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -258,7 +258,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             stringId.id());
 
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::schemaPropertiesMetadata,
@@ -375,7 +375,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -389,7 +389,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // storing string identifiers.
     if (stringId == null) {
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -408,7 +408,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             stringId.id());
 
     return EntityCombinedSchema.of(schema, schemaEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdentifier,
                 HasPropertyMetadata::schemaPropertiesMetadata,

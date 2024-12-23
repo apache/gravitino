@@ -39,7 +39,7 @@ public class UpdateCatalogName extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param name The new metalake name.
+   * @param name The new catalog name.
    */
   public UpdateCatalogName(
       String url, boolean ignoreVersions, String metalake, String catalog, String name) {
@@ -57,14 +57,11 @@ public class UpdateCatalogName extends Command {
       CatalogChange change = CatalogChange.rename(name);
       client.alterCatalog(catalog, change);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(catalog + " name changed.");

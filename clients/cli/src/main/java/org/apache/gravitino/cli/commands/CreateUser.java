@@ -49,14 +49,11 @@ public class CreateUser extends Command {
       GravitinoClient client = buildClient(metalake);
       client.addUser(user);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (UserAlreadyExistsException err) {
-      System.err.println(ErrorMessages.USER_EXISTS);
-      return;
+      exitWithError(ErrorMessages.USER_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(user + " created");
