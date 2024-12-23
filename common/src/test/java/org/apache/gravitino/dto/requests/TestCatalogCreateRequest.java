@@ -58,18 +58,24 @@ public class TestCatalogCreateRequest {
     CatalogCreateRequest deserRequest1 =
         JsonUtils.objectMapper().readValue(serJson1, CatalogCreateRequest.class);
 
+    String json = "{\"name\":\"catalog_test\",\"type\":\"model\"}";
+    CatalogCreateRequest deserRequest2 =
+        JsonUtils.objectMapper().readValue(json, CatalogCreateRequest.class);
+    Assertions.assertEquals("model", deserRequest2.getProvider());
+
     Assertions.assertEquals(
         deserRequest1.getType().name().toLowerCase(Locale.ROOT), deserRequest1.getProvider());
     Assertions.assertNull(deserRequest1.getComment());
     Assertions.assertNull(deserRequest1.getProperties());
 
     // Test using null provider with catalog type doesn't support managed catalog
-    CatalogCreateRequest request2 =
-        new CatalogCreateRequest("catalog_test", Catalog.Type.RELATIONAL, null, null, null);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new CatalogCreateRequest("catalog_test", Catalog.Type.RELATIONAL, null, null, null));
 
-    String serJson2 = JsonUtils.objectMapper().writeValueAsString(request2);
+    String json1 = "{\"name\":\"catalog_test\",\"type\":\"relational\"}";
     Assertions.assertThrows(
         JsonMappingException.class,
-        () -> JsonUtils.objectMapper().readValue(serJson2, CatalogCreateRequest.class));
+        () -> JsonUtils.objectMapper().readValue(json1, CatalogCreateRequest.class));
   }
 }

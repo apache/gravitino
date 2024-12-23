@@ -128,7 +128,7 @@ public class ExceptionHandlers {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
   }
 
-    public static Response handleModelException(
+  public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
   }
