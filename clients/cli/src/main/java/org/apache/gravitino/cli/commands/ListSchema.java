@@ -60,7 +60,7 @@ public class ListSchema extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = Joiner.on(",").join(schemas);
+    String all = schemas.length == 0 ? "No schemas exist." : Joiner.on(",").join(schemas);
 
     System.out.println(all.toString());
   }
