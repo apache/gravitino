@@ -72,7 +72,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                     NoSuchModelException.class));
 
     return EntityCombinedModel.of(model)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::modelPropertiesMetadata, model.properties()));
   }
@@ -95,7 +95,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                     ModelAlreadyExistsException.class));
 
     return EntityCombinedModel.of(registeredModel)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::modelPropertiesMetadata,
@@ -215,7 +215,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
     ModelVersion modelVersion = supplier.get();
     return EntityCombinedModelVersion.of(modelVersion)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::modelPropertiesMetadata,

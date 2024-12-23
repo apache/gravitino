@@ -50,7 +50,7 @@ public final class EntityCombinedModelVersion implements ModelVersion {
     return new EntityCombinedModelVersion(modelVersion, null);
   }
 
-  public EntityCombinedModelVersion withHiddenPropertiesSet(Set<String> hiddenProperties) {
+  public EntityCombinedModelVersion withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;
   }

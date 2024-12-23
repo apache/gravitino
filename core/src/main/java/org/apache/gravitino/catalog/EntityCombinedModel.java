@@ -48,7 +48,7 @@ public final class EntityCombinedModel implements Model {
     return new EntityCombinedModel(model, null);
   }
 
-  public EntityCombinedModel withHiddenPropertiesSet(Set<String> hiddenProperties) {
+  public EntityCombinedModel withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;
   }
