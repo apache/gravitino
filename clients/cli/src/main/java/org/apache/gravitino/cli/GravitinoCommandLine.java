@@ -217,8 +217,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
           Main.exit(-1);
         }
         if (line.hasOption(GravitinoOptions.ENABLE)) {
-          boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
-          newMetalakeEnable(url, ignore, metalake, recursive).handle();
+          boolean enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
+          newMetalakeEnable(url, ignore, metalake, enableAllCatalogs).handle();
         }
         if (line.hasOption(GravitinoOptions.DISABLE)) {
           newMetalakeDisable(url, ignore, metalake).handle();
@@ -306,8 +306,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
           Main.exit(-1);
         }
         if (line.hasOption(GravitinoOptions.ENABLE)) {
-          boolean recursive = line.hasOption(GravitinoOptions.RECURSIVE);
-          newCatalogEnable(url, ignore, metalake, catalog, recursive).handle();
+          boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
+          newCatalogEnable(url, ignore, metalake, catalog, enableMetalake).handle();
         }
         if (line.hasOption(GravitinoOptions.DISABLE)) {
           newCatalogDisable(url, ignore, metalake, catalog).handle();

@@ -59,7 +59,7 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String VALUE = "value";
   public static final String VERSION = "version";
-  public static final String RECURSIVE = "recursive";
+  public static final String ALL = "all";
   public static final String ENABLE = "enable";
   public static final String DISABLE = "disable";
 
@@ -107,7 +107,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
-    options.addOption(createSimpleOption("R", RECURSIVE, "recursive operation"));
+    options.addOption(createSimpleOption(null, ALL, "all operation for --enable"));
 
     // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));

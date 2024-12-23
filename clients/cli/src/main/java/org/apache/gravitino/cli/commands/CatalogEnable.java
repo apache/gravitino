@@ -29,7 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 public class CatalogEnable extends Command {
   private final String metalake;
   private final String catalog;
-  private final boolean isRecursive;
+  private final boolean enableMetalake;
 
   /**
    * Enable catalog
@@ -38,21 +38,21 @@ public class CatalogEnable extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param isRecursive Whether to enable it's metalake
+   * @param enableMetalake Whether to enable it's metalake
    */
   public CatalogEnable(
-      String url, boolean ignoreVersions, String metalake, String catalog, boolean isRecursive) {
+      String url, boolean ignoreVersions, String metalake, String catalog, boolean enableMetalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
-    this.isRecursive = isRecursive;
+    this.enableMetalake = enableMetalake;
   }
 
   /** Enable catalog. */
   @Override
   public void handle() {
     try {
-      if (isRecursive) {
+      if (enableMetalake) {
         GravitinoAdminClient adminClient = buildAdminClient();
         adminClient.enableMetalake(metalake);
       }

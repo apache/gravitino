@@ -890,8 +890,8 @@ public class TestableCommandLine {
   }
 
   protected MetalakeEnable newMetalakeEnable(
-      String url, boolean ignore, String metalake, boolean isRecursive) {
-    return new MetalakeEnable(url, ignore, metalake, isRecursive);
+      String url, boolean ignore, String metalake, boolean enableAllCatalogs) {
+    return new MetalakeEnable(url, ignore, metalake, enableAllCatalogs);
   }
 
   protected MetalakeDisable newMetalakeDisable(String url, boolean ignore, String metalake) {
@@ -899,9 +899,8 @@ public class TestableCommandLine {
   }
 
   protected CatalogEnable newCatalogEnable(
-      String url, boolean ignore, String metalake, String catalog, boolean isRecursive) {
-
-    return new CatalogEnable(url, ignore, metalake, catalog, isRecursive);
+      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
+    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
   }
 
   protected CatalogDisable newCatalogDisable(

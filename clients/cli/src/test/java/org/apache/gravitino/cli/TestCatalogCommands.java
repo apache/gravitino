@@ -346,7 +346,7 @@ class TestCatalogCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
-    when(mockCommandLine.hasOption(GravitinoOptions.RECURSIVE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.ALL)).thenReturn(true);
     when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
 
     GravitinoCommandLine commandLine =

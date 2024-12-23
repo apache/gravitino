@@ -328,7 +328,7 @@ class TestMetalakeCommands {
     MetalakeEnable mockEnable = mock(MetalakeEnable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
-    when(mockCommandLine.hasOption(GravitinoOptions.RECURSIVE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.ALL)).thenReturn(true);
     when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
     GravitinoCommandLine commandLine =
         spy(
