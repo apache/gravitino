@@ -45,6 +45,7 @@ impl OpenedFileManager {
     }
 
     pub(crate) fn put(&self, mut file: OpenedFile) -> Arc<Mutex<OpenedFile>> {
+        // Put the file into the file handle map, and allocate a file handle id for the file.
         let file_handle_id = self.next_handle_id();
         file.handle_id = file_handle_id;
         let file_handle = Arc::new(Mutex::new(file));
