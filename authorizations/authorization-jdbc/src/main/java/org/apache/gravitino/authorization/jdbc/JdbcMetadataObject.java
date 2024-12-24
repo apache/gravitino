@@ -100,8 +100,7 @@ public class JdbcMetadataObject implements AuthorizationMetadataObject {
           return type;
         }
       }
-      throw new IllegalArgumentException(
-          "No matching JdbcMetadataObject.Type for " + metadataType);
+      throw new IllegalArgumentException("No matching JdbcMetadataObject.Type for " + metadataType);
     }
   }
 }
