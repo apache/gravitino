@@ -22,23 +22,27 @@ from gravitino.api.credential.credential import Credential
 from gravitino.utils.precondition import Precondition
 
 
-class GCSTokenCredential(Credential, ABC):
-    """Represents the GCS token credential."""
+class ADLSTokenCredential(Credential, ABC):
+    """Represents ADLS token credential."""
 
-    GCS_TOKEN_CREDENTIAL_TYPE: str = "gcs-token"
-    _GCS_TOKEN_NAME: str = "token"
-
-    _expire_time_in_ms: int = 0
+    ADLS_SAS_TOKEN_CREDENTIAL_TYPE: str = "adls-sas-token"
+    ADLS_DOMAIN: str = "dfs.core.windows.net"
+    _STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
+    _SAS_TOKEN: str = "adls-sas-token"
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._token = credential_info.get(self._GCS_TOKEN_NAME, None)
+        self._account_name = credential_info.get(self._STORAGE_ACCOUNT_NAME, None)
+        self._sas_token = credential_info.get(self._SAS_TOKEN, None)
         self._expire_time_in_ms = expire_time_in_ms
         Precondition.check_string_not_empty(
-            self._token, "GCS token should not be empty"
+            self._account_name, "The ADLS account name should not be empty."
+        )
+        Precondition.check_string_not_empty(
+            self._sas_token, "The ADLS SAS token should not be empty."
         )
         Precondition.check_argument(
             self._expire_time_in_ms > 0,
-            "The expiration time of GCS token credential should be greater than 0",
+            "The expiration time of ADLS token credential should be greater than 0",
         )
 
     def credential_type(self) -> str:
@@ -47,7 +51,7 @@ class GCSTokenCredential(Credential, ABC):
         Returns:
              the type of the credential.
         """
-        return self.GCS_TOKEN_CREDENTIAL_TYPE
+        return self.ADLS_SAS_TOKEN_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since
@@ -64,12 +68,23 @@ class GCSTokenCredential(Credential, ABC):
         Returns:
              The credential information.
         """
-        return {self._GCS_TOKEN_NAME: self._token}
+        return {
+            self._STORAGE_ACCOUNT_NAME: self._account_name,
+            self._SAS_TOKEN: self._sas_token,
+        }
 
-    def token(self) -> str:
-        """The GCS token.
+    def account_name(self) -> str:
+        """The ADLS account name.
 
         Returns:
-            The GCS token.
+            The ADLS account name.
         """
-        return self._token
+        return self._account_name
+
+    def sas_token(self) -> str:
+        """The ADLS sas token.
+
+        Returns:
+            The ADLS sas token.
+        """
+        return self._sas_token
