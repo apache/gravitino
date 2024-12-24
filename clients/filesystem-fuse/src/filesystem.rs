@@ -279,7 +279,7 @@ pub(crate) mod tests {
         pub(crate) async fn test_path_file_system(fs: &impl PathFileSystem) {
             let mut root_dir_child_file_stats = HashMap::new();
 
-            // test root file
+            // test root dir
             let root_dir_path = Path::new("/");
             let root_file_stat = fs.stat(root_dir_path).await;
             assert!(root_file_stat.is_ok());
@@ -381,7 +381,7 @@ pub(crate) mod tests {
         pub(crate) async fn test_raw_file_system(fs: &impl RawFileSystem) {
             let mut root_dir_child_file_stats = HashMap::new();
 
-            // test root file
+            // test root dir
             let root_file_stat = fs.stat(ROOT_DIR_FILE_ID).await;
             assert!(root_file_stat.is_ok());
             let root_file_stat = root_file_stat.unwrap();
@@ -403,7 +403,7 @@ pub(crate) mod tests {
                 0,
             );
 
-            //test get file path
+            //test get meta file path
             let file_path = fs.get_file_path(meta_file_stat.file_id).await;
             assert!(file_path.is_ok());
             assert_eq!(file_path.unwrap(), meta_file_stat.path.to_string_lossy());
@@ -420,7 +420,7 @@ pub(crate) mod tests {
             );
             root_dir_child_file_stats.insert(meta_file_stat.path.clone(), meta_file_stat);
 
-            // test create file
+            // test create file file1.txt
             let file = fs
                 .create_file(ROOT_DIR_FILE_ID, "file1.txt".as_ref(), 0)
                 .await;
@@ -429,13 +429,29 @@ pub(crate) mod tests {
             assert!(file.handle_id > 0);
             assert!(file.file_id >= INITIAL_FILE_ID);
 
-            //test open file
+            //test open file file1.txt
             let file_handle = fs.open_file(file.file_id, 0).await;
             assert!(file_handle.is_ok());
             let file_handle = file_handle.unwrap();
             assert_eq!(file_handle.file_id, file.file_id);
 
-            // test stat file
+            //test write file file1.txt
+            let write_size = fs
+                .write(file.file_id, file_handle.handle_id, 0, "test".as_bytes())
+                .await;
+            assert!(write_size.is_ok());
+            assert_eq!(write_size.unwrap(), 4);
+
+            // test read file file1.txt
+            let read_data = fs.read(file.file_id, file_handle.handle_id, 0, 4).await;
+            assert!(read_data.is_ok());
+            assert_eq!(read_data.unwrap(), "test".as_bytes());
+
+            // test close file file1.txt
+            let close_file = fs.close_file(file.file_id, file_handle.handle_id).await;
+            assert!(close_file.is_ok());
+
+            // test stat file file1.txt
             let file_stat = fs.stat(file.file_id).await;
             assert!(file_stat.is_ok());
             let file_stat = file_stat.unwrap();
@@ -443,7 +459,7 @@ pub(crate) mod tests {
                 &file_stat,
                 Path::new("/file1.txt"),
                 RegularFile,
-                0,
+                write_size.unwrap() as u64,
             );
             root_dir_child_file_stats.insert(file_stat.path.clone(), file_stat);
 
@@ -504,18 +520,6 @@ pub(crate) mod tests {
             // test file not found
             let not_found_file = fs.stat(ROOT_DIR_FILE_ID + 1).await;
             assert!(not_found_file.is_err());
-
-            //test write file
-            let write_size = fs
-                .write(file.file_id, file_handle.handle_id, 0, "test".as_bytes())
-                .await;
-            assert!(write_size.is_ok());
-            assert_eq!(write_size.unwrap(), 4);
-
-            // test read file
-            let read_data = fs.read(file.file_id, file_handle.handle_id, 0, 4).await;
-            assert!(read_data.is_ok());
-            assert_eq!(read_data.unwrap(), "test".as_bytes());
         }
 
         fn assert_file_stat(file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
