@@ -44,7 +44,12 @@ public class SchemaDetails extends Command {
    * @param schema The name of the schenma.
    */
   public SchemaDetails(
-      String url, boolean ignoreVersions, String outputFormat, String metalake, String catalog, String schema) {
+      String url,
+      boolean ignoreVersions,
+      String outputFormat,
+      String metalake,
+      String catalog,
+      String schema) {
     super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
     this.catalog = catalog;
