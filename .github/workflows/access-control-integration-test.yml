@@ -90,6 +90,9 @@ jobs:
           ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test
           ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test
           ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test
+          ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-jdbc:test
+          ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-jdbc:test
+          ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-jdbc:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
