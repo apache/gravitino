@@ -29,6 +29,7 @@ pub(crate) type Result<T> = std::result::Result<T, Errno>;
 
 pub(crate) const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
 pub(crate) const ROOT_DIR_FILE_ID: u64 = 1;
+pub(crate) const ROOT_DIR_NAME: &str = "";
 pub(crate) const ROOT_DIR_PATH: &str = "/";
 pub(crate) const INITIAL_FILE_ID: u64 = 10000;
 
@@ -215,7 +216,8 @@ impl FileStat {
 
     pub fn new_filestat(path: &Path, size: u64, kind: FileType) -> Self {
         let atime = Timestamp::from(SystemTime::now());
-        let name = path.file_name().unwrap_or(OsStr::new(""));
+        // root directory name is ""
+        let name = path.file_name().unwrap_or(OsStr::new(ROOT_DIR_NAME));
         Self {
             file_id: 0,
             parent_file_id: 0,

@@ -176,7 +176,6 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn lookup(&self, parent_file_id: u64, name: &OsStr) -> Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
 
-        // assume the path is a regular file. Some filesystems may need to check whether it is a file or directory by lookup.
         let path = parent_file_entry.path.join(name);
         let mut file_stat = self.fs.stat(&path).await?;
         // fill the file id to file stat
