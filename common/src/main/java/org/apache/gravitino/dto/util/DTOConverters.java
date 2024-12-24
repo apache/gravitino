@@ -559,8 +559,9 @@ public class DTOConverters {
       if (Literals.NULL.equals(expression)) {
         return LiteralDTO.NULL;
       }
+      Object value = ((Literal) expression).value();
       return LiteralDTO.builder()
-          .withValue((((Literal) expression).value().toString()))
+          .withValue(value == null ? null : value.toString())
           .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {

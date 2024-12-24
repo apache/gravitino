@@ -102,4 +102,8 @@ public enum TestDatabaseName {
       return this.name().toLowerCase();
     }
   },
+
+  CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT,
+  CLICKHOUSE_CATALOG_CLICKHOUSE_IT,
+  CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT,
 }

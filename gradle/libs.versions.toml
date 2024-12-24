@@ -76,6 +76,8 @@ opencsv = "2.3"
 metrics = "4.2.25"
 prometheus = "0.16.0"
 mysql = "8.0.23"
+clickhouse = "0.7.1"
+lz4 = "1.8.0"
 postgresql = "42.6.0"
 immutables-value = "2.10.0"
 selenium = "3.141.59"
@@ -222,6 +224,7 @@ sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlit
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
+testcontainers-clickhouse = { group = "org.testcontainers", name = "clickhouse", version.ref = "testcontainers" }
 testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
 testcontainers-localstack = { group = "org.testcontainers", name = "localstack", version.ref = "testcontainers" }
@@ -241,6 +244,8 @@ prometheus-client = { group = "io.prometheus", name = "simpleclient", version.re
 prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwizard", version.ref = "prometheus" }
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
+clickhouse-driver = { group = "com.clickhouse", name = "clickhouse-jdbc", version.ref = "clickhouse" }
+lz4-java = { group = "org.lz4", name = "lz4-java", version.ref = "lz4" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
