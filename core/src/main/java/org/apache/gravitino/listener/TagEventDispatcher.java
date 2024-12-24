@@ -32,6 +32,17 @@ import org.apache.gravitino.listener.api.event.ListTagsFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterTagPreEvent;
+import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.CreateTagPreEvent;
+import org.apache.gravitino.listener.api.event.DeleteTagPreEvent;
+import org.apache.gravitino.listener.api.event.GetTagForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.GetTagPreEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -55,7 +66,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public String[] listTags(String metalake) {
-    // TODO: listTagsPreEvent
+    eventBus.dispatchEvent(new ListTagsPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       // TODO: listTagsEvent
       return dispatcher.listTags(metalake);
