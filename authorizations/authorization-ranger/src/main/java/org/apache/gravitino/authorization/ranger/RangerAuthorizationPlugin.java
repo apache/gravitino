@@ -52,7 +52,6 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -88,17 +87,13 @@ public abstract class RangerAuthorizationPlugin
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
-    String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
-    String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
-    rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
+    RangerAuthorizationProperties.validate(config);
+    String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
+    String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
+    rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
-    String password = config.get(AuthorizationPropertiesMeta.RANGER_PASSWORD);
-    rangerServiceName = config.get(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME);
-    Preconditions.checkArgument(rangerUrl != null, "Ranger admin URL is required");
-    Preconditions.checkArgument(authType != null, "Ranger auth type is required");
-    Preconditions.checkArgument(rangerAdminName != null, "Ranger username is required");
-    Preconditions.checkArgument(password != null, "Ranger password is required");
-    Preconditions.checkArgument(rangerServiceName != null, "Ranger service name is required");
+    String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
+    rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
     rangerHelper =
@@ -121,6 +116,57 @@ public abstract class RangerAuthorizationPlugin
    * @return The policy resource defines rule.
    */
   public abstract List<String> policyResourceDefinesRule();
+
+  /**
+   * Create a new policy for metadata object
+   *
+   * @return The RangerPolicy for metadata object.
+   */
+  protected abstract RangerPolicy createPolicyAddResources(
+      AuthorizationMetadataObject metadataObject);
+
+  protected RangerPolicy addOwnerToNewPolicy(
+      AuthorizationMetadataObject metadataObject, Owner newOwner) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+    ownerMappingRule()
+        .forEach(
+            ownerPrivilege -> {
+              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              if (newOwner != null) {
+                if (newOwner.type() == Owner.Type.USER) {
+                  policyItem.getUsers().add(newOwner.name());
+                } else {
+                  policyItem.getGroups().add(newOwner.name());
+                }
+                // mark the policy item is created by Gravitino
+                policyItem.getRoles().add(RangerHelper.GRAVITINO_OWNER_ROLE);
+              }
+              policy.getPolicyItems().add(policyItem);
+            });
+    return policy;
+  }
+
+  protected RangerPolicy addOwnerRoleToNewPolicy(
+      AuthorizationMetadataObject metadataObject, String ownerRoleName) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+
+    ownerMappingRule()
+        .forEach(
+            ownerPrivilege -> {
+              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.getRoles().add(rangerHelper.generateGravitinoRoleName(ownerRoleName));
+              policy.getPolicyItems().add(policyItem);
+            });
+    return policy;
+  }
 
   /**
    * Create a new role in the Ranger. <br>
@@ -180,7 +226,7 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject securableObject =
             ((RoleChange.AddSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
@@ -197,7 +243,7 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject securableObject =
             ((RoleChange.RemoveSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
@@ -214,12 +260,12 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject oldSecurableObject =
             ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(oldSecurableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
         SecurableObject newSecurableObject =
             ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         Preconditions.checkArgument(
@@ -277,9 +323,11 @@ public abstract class RangerAuthorizationPlugin
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
-        AuthorizationMetadataObject AuthorizationMetadataObject =
-            translateMetadataObject(metadataObject);
-        doRemoveMetadataObject(AuthorizationMetadataObject);
+        if (metadataObject.type() != MetadataObject.Type.FILESET) {
+          AuthorizationMetadataObject AuthorizationMetadataObject =
+              translateMetadataObject(metadataObject);
+          doRemoveMetadataObject(AuthorizationMetadataObject);
+        }
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
@@ -346,8 +394,7 @@ public abstract class RangerAuthorizationPlugin
       onGroupAdded(groupEntity);
     }
 
-    List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
-        translateOwner(metadataObject);
+    List<AuthorizationSecurableObject> rangerSecurableObjects = translateOwner(metadataObject);
     String ownerRoleName;
     switch (metadataObject.type()) {
       case METALAKE:
@@ -378,16 +425,13 @@ public abstract class RangerAuthorizationPlugin
           LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
         }
 
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
-                AuthorizationSecurableObject -> {
-                  RangerPolicy policy =
-                      rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
+                rangerSecurableObject -> {
+                  RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
                   try {
                     if (policy == null) {
-                      policy =
-                          rangerHelper.addOwnerRoleToNewPolicy(
-                              AuthorizationSecurableObject, ownerRoleName);
+                      policy = addOwnerRoleToNewPolicy(rangerSecurableObject, ownerRoleName);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
@@ -401,16 +445,16 @@ public abstract class RangerAuthorizationPlugin
         break;
       case SCHEMA:
       case TABLE:
+      case FILESET:
         // The schema and table use user/group to manage the owner
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
                 AuthorizationSecurableObject -> {
                   RangerPolicy policy =
                       rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
                   try {
                     if (policy == null) {
-                      policy =
-                          rangerHelper.addOwnerToNewPolicy(AuthorizationSecurableObject, newOwner);
+                      policy = addOwnerToNewPolicy(AuthorizationSecurableObject, newOwner);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwner(policy, preOwner, newOwner);
@@ -437,7 +481,7 @@ public abstract class RangerAuthorizationPlugin
    * 2. Create a role in the Ranger if the role does not exist. <br>
    * 3. Add this user to the role. <br>
    *
-   * @param roles The roles to grant to the group.
+   * @param roles The roles to grant to the user.
    * @param user The user to grant the roles.
    */
   @Override
@@ -684,7 +728,7 @@ public abstract class RangerAuthorizationPlugin
         return true;
       }
     } else {
-      policy = rangerHelper.createPolicyAddResources(securableObject);
+      policy = createPolicyAddResources(securableObject);
     }
 
     rangerHelper.addPolicyItem(policy, roleName, securableObject);
@@ -807,6 +851,9 @@ public abstract class RangerAuthorizationPlugin
       case COLUMN:
         removePolicyByMetadataObject(authMetadataObject.names());
         break;
+      case FILESET:
+        // can not get fileset path in this case, do nothing
+        break;
       default:
         throw new IllegalArgumentException(
             "Unsupported metadata object type: " + authMetadataObject.type());
@@ -819,7 +866,7 @@ public abstract class RangerAuthorizationPlugin
    */
   private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authMetadataObject) {
     Preconditions.checkArgument(
-        authMetadataObject.type() == RangerMetadataObject.Type.SCHEMA,
+        authMetadataObject.type() == RangerHadoopSQLMetadataObject.Type.SCHEMA,
         "The metadata object type must be SCHEMA");
     Preconditions.checkArgument(
         authMetadataObject.names().size() == 1, "The metadata object names must be 1");
@@ -893,6 +940,9 @@ public abstract class RangerAuthorizationPlugin
         break;
       case COLUMN:
         doRenameColumnMetadataObject(AuthorizationMetadataObject, newAuthMetadataObject);
+        break;
+      case FILESET:
+        // do nothing when fileset is renamed
         break;
       default:
         throw new IllegalArgumentException(
@@ -1083,22 +1133,10 @@ public abstract class RangerAuthorizationPlugin
   public void close() throws IOException {}
 
   /** Generate authorization securable object */
-  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
+  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
       List<String> names,
       AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges) {
-    AuthorizationMetadataObject authMetadataObject =
-        new RangerMetadataObject(
-            AuthorizationMetadataObject.getParentFullName(names),
-            AuthorizationMetadataObject.getLastName(names),
-            type);
-    authMetadataObject.validateAuthorizationMetadataObject();
-    return new RangerSecurableObject(
-        authMetadataObject.parent(),
-        authMetadataObject.name(),
-        authMetadataObject.type(),
-        privileges);
-  }
+      Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()

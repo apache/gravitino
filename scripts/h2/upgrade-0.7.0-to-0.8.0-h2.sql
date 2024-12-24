@@ -62,6 +62,6 @@ CREATE TABLE IF NOT EXISTS `model_version_alias_rel` (
     `model_version_alias` VARCHAR(128) NOT NULL COMMENT 'model version alias',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version alias deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mi_mv_mva_del` (`model_id`, `model_version`, `model_version_alias`, `deleted_at`),
+    UNIQUE KEY `uk_mi_mva_del` (`model_id`, `model_version_alias`, `deleted_at`),
     KEY `idx_mva` (`model_version_alias`)
 ) ENGINE=InnoDB;

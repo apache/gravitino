@@ -29,5 +29,10 @@ public class CredentialConstants {
   public static final String OSS_TOKEN_CREDENTIAL_PROVIDER = "oss-token";
   public static final String OSS_TOKEN_EXPIRE_IN_SECS = "oss-token-expire-in-secs";
 
+  public static final String ADLS_TOKEN_CREDENTIAL_PROVIDER_TYPE = "adls-token";
+  public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
+
+  public static final String AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE = "azure-account-key";
+
   private CredentialConstants() {}
 }

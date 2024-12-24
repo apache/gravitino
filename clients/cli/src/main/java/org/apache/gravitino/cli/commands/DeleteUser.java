@@ -61,14 +61,11 @@ public class DeleteUser extends Command {
       GravitinoClient client = buildClient(metalake);
       deleted = client.removeUser(user);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

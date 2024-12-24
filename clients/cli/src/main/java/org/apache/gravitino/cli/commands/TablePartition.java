@@ -54,13 +54,12 @@ public class TablePartition extends TableCommand {
   /** Displays the name and properties of partition. */
   @Override
   public void handle() {
-    Transform transforms[];
+    Transform transforms[] = {};
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       transforms = tableCatalog().loadTable(name).partitioning();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
     for (Transform transform : transforms) {
       Partition[] partitions = transform.assignments();

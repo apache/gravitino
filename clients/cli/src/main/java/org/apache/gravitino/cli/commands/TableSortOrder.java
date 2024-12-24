@@ -53,14 +53,13 @@ public class TableSortOrder extends TableCommand {
   /** Displays the expression, direction and nullOrdering number of sort order. */
   @Override
   public void handle() {
-    SortOrder[] sortOrders;
+    SortOrder[] sortOrders = {};
 
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       sortOrders = tableCatalog().loadTable(name).sortOrder();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
     for (SortOrder sortOrder : sortOrders) {
       System.out.printf(

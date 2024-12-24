@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.authorization.ranger.integration.test;
 
+import static org.mockito.Mockito.doReturn;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
@@ -30,12 +32,13 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
-import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -47,6 +50,7 @@ import org.apache.ranger.plugin.model.RangerRole;
 import org.apache.ranger.plugin.model.RangerService;
 import org.apache.ranger.plugin.util.SearchFilter;
 import org.junit.jupiter.api.Assertions;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,12 +59,12 @@ public class RangerITEnv {
   private static final Logger LOG = LoggerFactory.getLogger(RangerITEnv.class);
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
-  protected static final String RANGER_HIVE_REPO_NAME = "hiveDev";
+  public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
-  protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   protected static RangerClient rangerClient;
-  protected static final String HADOOP_USER_NAME = "gravitino";
+  public static final String HADOOP_USER_NAME = "gravitino";
   private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -81,29 +85,58 @@ public class RangerITEnv {
   // Search filter prefix file path constants
   public static final String SEARCH_FILTER_PATH = SearchFilter.RESOURCE_PREFIX + RESOURCE_PATH;
   public static RangerAuthorizationPlugin rangerAuthHivePlugin;
+  public static RangerAuthorizationPlugin rangerAuthHDFSPlugin;
   protected static RangerHelper rangerHelper;
 
-  public static void init() {
+  protected static RangerHelper rangerHDFSHelper;
+
+  public static void init(String metalakeName, boolean allowAnyoneAccessHDFS) {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
 
     rangerAuthHivePlugin =
-        RangerAuthorizationHadoopSQLPlugin.getInstance(
-            "metalake",
+        new RangerAuthorizationHadoopSQLPlugin(
+            metalakeName,
             ImmutableMap.of(
-                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                RangerAuthorizationProperties.RANGER_ADMIN_URL,
                 String.format(
                     "http://%s:%d",
                     containerSuite.getRangerContainer().getContainerIpAddress(),
                     RangerContainer.RANGER_SERVER_PORT),
-                AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                RangerAuthorizationProperties.RANGER_AUTH_TYPE,
                 RangerContainer.authType,
-                AuthorizationPropertiesMeta.RANGER_USERNAME,
+                RangerAuthorizationProperties.RANGER_USERNAME,
                 RangerContainer.rangerUserName,
-                AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                RangerAuthorizationProperties.RANGER_PASSWORD,
                 RangerContainer.rangerPassword,
-                AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+                "HadoopSQL",
+                RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
+
+    RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
+        Mockito.spy(
+            new RangerAuthorizationHDFSPlugin(
+                metalakeName,
+                ImmutableMap.of(
+                    RangerAuthorizationProperties.RANGER_ADMIN_URL,
+                    String.format(
+                        "http://%s:%d",
+                        containerSuite.getRangerContainer().getContainerIpAddress(),
+                        RangerContainer.RANGER_SERVER_PORT),
+                    RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+                    RangerContainer.authType,
+                    RangerAuthorizationProperties.RANGER_USERNAME,
+                    RangerContainer.rangerUserName,
+                    RangerAuthorizationProperties.RANGER_PASSWORD,
+                    RangerContainer.rangerPassword,
+                    RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+                    "HDFS",
+                    RangerAuthorizationProperties.RANGER_SERVICE_NAME,
+                    RangerITEnv.RANGER_HDFS_REPO_NAME)));
+    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getFileSetPath(Mockito.any());
+    rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
+
     rangerHelper =
         new RangerHelper(
             rangerClient,
@@ -112,12 +145,22 @@ public class RangerITEnv {
             rangerAuthHivePlugin.ownerMappingRule(),
             rangerAuthHivePlugin.policyResourceDefinesRule());
 
+    rangerHDFSHelper =
+        new RangerHelper(
+            rangerClient,
+            RangerContainer.rangerUserName,
+            RangerITEnv.RANGER_HDFS_REPO_NAME,
+            rangerAuthHDFSPlugin.ownerMappingRule(),
+            rangerAuthHDFSPlugin.policyResourceDefinesRule());
+
     if (!initRangerService) {
       synchronized (RangerITEnv.class) {
         // No IP address set, no impact on testing
         createRangerHdfsRepository("", true);
         createRangerHiveRepository("", true);
-        allowAnyoneAccessHDFS();
+        if (allowAnyoneAccessHDFS) {
+          allowAnyoneAccessHDFS();
+        }
         initRangerService = true;
       }
     }
@@ -132,7 +175,7 @@ public class RangerITEnv {
     }
   }
 
-  static void startHiveRangerContainer() {
+  public static void startHiveRangerContainer() {
     containerSuite.startHiveRangerContainer(
         new HashMap<>(
             ImmutableMap.of(

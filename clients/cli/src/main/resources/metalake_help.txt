@@ -38,3 +38,9 @@ gcli metalake set  --property test --value value
 
 Remove a metalake's property
 gcli metalake remove  --property test
+
+Enable a metalake
+gcli metalake update -m metalake_demo --enable
+
+Disable a metalke
+gcli metalake update -m metalake_demo --disable

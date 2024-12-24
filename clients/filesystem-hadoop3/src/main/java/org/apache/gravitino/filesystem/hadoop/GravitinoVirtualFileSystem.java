@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
-
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -27,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -34,6 +33,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +46,6 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
-import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
@@ -135,8 +134,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     initializeClient(configuration);
 
     // Register the default local and HDFS FileSystemProvider
-    String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
-    fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
+    fileSystemProvidersMap.putAll(getFileSystemProviders());
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
@@ -617,5 +615,25 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     public FileSystem getFileSystem() {
       return fileSystem;
     }
+  }
+
+  private static Map<String, FileSystemProvider> getFileSystemProviders() {
+    Map<String, FileSystemProvider> resultMap = Maps.newHashMap();
+    ServiceLoader<FileSystemProvider> allFileSystemProviders =
+        ServiceLoader.load(FileSystemProvider.class);
+
+    Streams.stream(allFileSystemProviders.iterator())
+        .forEach(
+            fileSystemProvider -> {
+              if (resultMap.containsKey(fileSystemProvider.scheme())) {
+                throw new UnsupportedOperationException(
+                    String.format(
+                        "File system provider: '%s' with scheme '%s' already exists in the provider list, "
+                            + "please make sure the file system provider scheme is unique.",
+                        fileSystemProvider.getClass().getName(), fileSystemProvider.scheme()));
+              }
+              resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);
+            });
+    return resultMap;
   }
 }

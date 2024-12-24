@@ -47,6 +47,7 @@ import org.apache.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -136,8 +137,8 @@ public class CatalogMysqlIT extends BaseIT {
 
     mysqlService = new MysqlService(MYSQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
-    createCatalog();
-    createSchema();
+    catalog = createCatalog(catalogName);
+    createSchema(catalog, schemaName);
   }
 
   @AfterAll
@@ -153,7 +154,7 @@ public class CatalogMysqlIT extends BaseIT {
   @AfterEach
   public void resetSchema() {
     clearTableAndSchema();
-    createSchema();
+    createSchema(catalog, schemaName);
   }
 
   private void clearTableAndSchema() {
@@ -176,7 +177,7 @@ public class CatalogMysqlIT extends BaseIT {
     metalake = loadMetalake;
   }
 
-  private void createCatalog() throws SQLException {
+  private Catalog createCatalog(String catalogName) throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
@@ -196,10 +197,10 @@ public class CatalogMysqlIT extends BaseIT {
     Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
-    catalog = loadCatalog;
+    return loadCatalog;
   }
 
-  private void createSchema() {
+  private void createSchema(Catalog catalog, String schemaName) {
     Map<String, String> prop = Maps.newHashMap();
 
     Schema createdSchema = catalog.asSchemas().createSchema(schemaName, schema_comment, prop);
@@ -255,6 +256,25 @@ public class CatalogMysqlIT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GRAVITINO_ENGINE_KEY, "InnoDB");
     return properties;
+  }
+
+  @Test
+  void testDropCatalog() throws SQLException {
+    // test drop catalog with legacy entity
+    String catalogName = GravitinoITUtils.genRandomName("drop_catalog_it");
+    Catalog catalog = createCatalog(catalogName);
+    String schemaName = GravitinoITUtils.genRandomName("drop_catalog_it");
+    createSchema(catalog, schemaName);
+
+    metalake.disableCatalog(catalogName);
+    Assertions.assertThrows(
+        NonEmptyCatalogException.class, () -> metalake.dropCatalog(catalogName));
+
+    // drop database externally
+    String sql = String.format("DROP DATABASE %s", schemaName);
+    mysqlService.executeQuery(sql);
+
+    Assertions.assertTrue(metalake.dropCatalog(catalogName));
   }
 
   @Test
@@ -643,7 +663,9 @@ public class CatalogMysqlIT extends BaseIT {
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
             + "  binary_col binary,\n"
-            + "  blob_col blob\n"
+            + "  blob_col blob,\n"
+            + "  bit_col_8 bit(8),\n"
+            + "  bit_col bit\n"
             + ");\n";
 
     mysqlService.executeQuery(sql);
@@ -693,6 +715,12 @@ public class CatalogMysqlIT extends BaseIT {
           break;
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        case "bit_col_8":
+          Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        case "bit_col":
+          Assertions.assertEquals(Types.BooleanType.get(), column.dataType());
           break;
         case "blob_col":
           Assertions.assertEquals(Types.ExternalType.of("BLOB"), column.dataType());
@@ -1691,13 +1719,13 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
-  void testUnparsedTypeConverter() {
+  void testParsedBitTypeConverter() {
     String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
     mysqlService.executeQuery(
         String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
-    Assertions.assertEquals(Types.ExternalType.of("BIT"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.BooleanType.get(), loadedTable.columns()[0].dataType());
   }
 
   @Test

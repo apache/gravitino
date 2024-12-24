@@ -27,10 +27,12 @@ import static org.mockito.Mockito.when;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
+import org.apache.gravitino.cli.commands.UserAudit;
 import org.apache.gravitino.cli.commands.UserDetails;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,6 +79,25 @@ class TestUserCommands {
         .newUserDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
+  }
+
+  @Test
+  void testUserAuditCommand() {
+    UserAudit mockAudit = mock(UserAudit.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("admin");
+    when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.USER, CommandActions.DETAILS));
+    doReturn(mockAudit)
+        .when(commandLine)
+        .newUserAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
+    commandLine.handleCommandLine();
+    verify(mockAudit).handle();
   }
 
   @Test
@@ -172,5 +193,73 @@ class TestUserCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "admin");
     commandLine.handleCommandLine();
     verify(mockAdd).handle();
+  }
+
+  @Test
+  void testRemoveRolesFromUserCommand() {
+    RemoveRoleFromUser mockRemoveFirstRole = mock(RemoveRoleFromUser.class);
+    RemoveRoleFromUser mockRemoveSecondRole = mock(RemoveRoleFromUser.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("user");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE))
+        .thenReturn(new String[] {"admin", "role1"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.USER, CommandActions.REVOKE));
+    // Verify first role
+    doReturn(mockRemoveFirstRole)
+        .when(commandLine)
+        .newRemoveRoleFromUser(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "admin");
+
+    // Verify second role
+    doReturn(mockRemoveSecondRole)
+        .when(commandLine)
+        .newRemoveRoleFromUser(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "role1");
+
+    commandLine.handleCommandLine();
+
+    verify(mockRemoveSecondRole).handle();
+    verify(mockRemoveFirstRole).handle();
+  }
+
+  @Test
+  void testAddRolesToUserCommand() {
+    AddRoleToUser mockAddFirstRole = mock(AddRoleToUser.class);
+    AddRoleToUser mockAddSecondRole = mock(AddRoleToUser.class);
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("user");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE))
+        .thenReturn(new String[] {"admin", "role1"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.USER, CommandActions.GRANT));
+    // Verify first role
+    doReturn(mockAddFirstRole)
+        .when(commandLine)
+        .newAddRoleToUser(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "admin");
+
+    // Verify second role
+    doReturn(mockAddSecondRole)
+        .when(commandLine)
+        .newAddRoleToUser(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "role1");
+
+    commandLine.handleCommandLine();
+
+    verify(mockAddFirstRole).handle();
+    verify(mockAddSecondRole).handle();
   }
 }

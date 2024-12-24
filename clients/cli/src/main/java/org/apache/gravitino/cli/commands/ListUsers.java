@@ -48,11 +48,9 @@ public class ListUsers extends Command {
       GravitinoClient client = buildClient(metalake);
       users = client.listUserNames();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     String all = String.join(",", users);
