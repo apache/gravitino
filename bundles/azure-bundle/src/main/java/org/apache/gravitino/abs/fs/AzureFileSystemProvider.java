@@ -19,17 +19,22 @@
 
 package org.apache.gravitino.abs.fs;
 
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.gravitino.catalog.hadoop.common.Properties;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.azurebfs.services.AuthType;
 
 public class AzureFileSystemProvider implements FileSystemProvider {
 
@@ -60,6 +65,17 @@ public class AzureFileSystemProvider implements FileSystemProvider {
 
     if (!config.containsKey(ABFS_IMPL_KEY)) {
       configuration.set(ABFS_IMPL_KEY, ABFS_IMPL);
+    }
+
+    if (config.containsKey(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL)
+        && Boolean.parseBoolean(config.get(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL))) {
+      String pathString = path.toString();
+      String accountSuffix = pathString.split("@")[1].split("/")[0];
+
+      configuration.set(FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME, AuthType.SAS.name());
+      configuration.set(
+          FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountSuffix,
+          AzureSasCredentialProvider.class.getName());
     }
 
     hadoopConfMap.forEach(configuration::set);

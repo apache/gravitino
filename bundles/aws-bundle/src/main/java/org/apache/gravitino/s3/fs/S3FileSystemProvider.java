@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.gravitino.catalog.hadoop.common.Properties;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.storage.S3Properties;
@@ -48,10 +49,17 @@ public class S3FileSystemProvider implements FileSystemProvider {
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
     if (!hadoopConfMap.containsKey(Constants.AWS_CREDENTIALS_PROVIDER)) {
-      configuration.set(
+      hadoopConfMap.put(
           Constants.AWS_CREDENTIALS_PROVIDER, Constants.ASSUMED_ROLE_CREDENTIALS_DEFAULT);
     }
     hadoopConfMap.forEach(configuration::set);
+
+    if (config.containsKey(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL)
+        && Boolean.parseBoolean(config.get(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL))) {
+      configuration.set(
+          "fs.s3a.aws.credentials.provider", S3SessionCredentialProvider.class.getName());
+    }
+
     return S3AFileSystem.newInstance(path.toUri(), configuration);
   }
 

@@ -45,6 +45,7 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
+import org.apache.gravitino.catalog.hadoop.common.Properties;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
@@ -78,7 +79,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private String metalakeName;
   private Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private ScheduledThreadPoolExecutor catalogCleanScheduler;
-  private Cache<String, FileSystem> internalFileSystemCache;
+  private Cache<NameIdentifier, FileSystem> internalFileSystemCache;
   private ScheduledThreadPoolExecutor internalFileSystemCleanScheduler;
 
   // The pattern is used to match gvfs path. The scheme prefix (gvfs://fileset) is optional.
@@ -144,7 +145,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @VisibleForTesting
-  Cache<String, FileSystem> internalFileSystemCache() {
+  Cache<NameIdentifier, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
   }
 
@@ -382,7 +383,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
     FileSystem fs =
         internalFileSystemCache.get(
-            scheme,
+            identifier,
             str -> {
               try {
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
@@ -393,6 +394,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 }
 
                 Map<String, String> maps = getConfigMap(getConf());
+                if (maps.containsKey(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL)
+                    && maps.get(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL).equals("true")) {
+                  // If enable the cloud store credential, we should pass the configuration here.
+                  maps.put("gravitino.fileset.identifier", identifier.toString());
+                }
+
                 return provider.getFileSystem(filePath, maps);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(

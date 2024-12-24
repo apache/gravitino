@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.gravitino.catalog.hadoop.common.Properties;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.storage.OSSProperties;
@@ -61,6 +62,13 @@ public class OSSFileSystemProvider implements FileSystemProvider {
     }
 
     hadoopConfMap.forEach(configuration::set);
+
+    if (config.containsKey(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL)
+        && Boolean.parseBoolean(config.get(Properties.USE_GRAVITINO_CLOUD_STORE_CREDENTIAL))) {
+      configuration.set(
+          "fs.oss.credentials.provider", OSSSessionCredentialProvider.class.getName());
+    }
+
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
   }
 
