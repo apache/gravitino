@@ -26,24 +26,27 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
 
 struct FuseTest {
     runtime: Arc<Runtime>,
     mount_point: String,
+    gvfs_mount: Option<JoinHandle<fuse3::Result<()>>>,
 }
 
 impl FuseTest {
-    pub fn setup(&self) {
+    pub fn setup(&mut self) {
         info!("Start gvfs fuse server");
         let mount_point = self.mount_point.clone();
-        self.runtime.spawn(async move { gvfs_mount(&mount_point).await });
+        self.runtime
+            .spawn(async move { gvfs_mount(&mount_point).await });
         let success = Self::wait_for_fuse_server_ready(&self.mount_point, Duration::from_secs(15));
         assert!(success, "Fuse server cannot start up at 15 seconds");
     }
 
-    pub fn shutdown(&self) {
+    pub fn shutdown(&mut self) {
         self.runtime.block_on(async {
-            gvfs_unmount();
+            gvfs_unmount().await;
         });
     }
 
@@ -76,9 +79,10 @@ fn test_fuse_system_with_auto() {
     let mount_point = "build/gvfs";
     let _ = fs::create_dir_all(mount_point);
 
-    let test = FuseTest {
+    let mut test = FuseTest {
         runtime: Arc::new(Runtime::new().unwrap()),
         mount_point: mount_point.to_string(),
+        gvfs_mount: None,
     };
 
     test.setup();
@@ -136,7 +140,8 @@ fn test_fuse_filesystem(mount_point: &str) {
     assert!(!file_exists(&test_dir));
 
     info!("Success test");
-    sleep(Duration::from_secs(10));
+
+    sleep(Duration::from_secs(15));
 }
 
 fn file_exists<P: AsRef<Path>>(path: P) -> bool {

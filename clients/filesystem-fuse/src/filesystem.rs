@@ -29,7 +29,7 @@ pub(crate) type Result<T> = std::result::Result<T, Errno>;
 
 pub(crate) const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
 pub(crate) const ROOT_DIR_FILE_ID: u64 = 1;
-pub(crate) const ROOT_DIR_PATH: &'static str = "/";
+pub(crate) const ROOT_DIR_PATH: &str = "/";
 pub(crate) const INITIAL_FILE_ID: u64 = 10000;
 
 /// RawFileSystem interface for the file system implementation. it use by FuseApiHandle,
@@ -268,10 +268,10 @@ pub trait FileWriter: Sync + Send {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use super::*;
     use crate::default_raw_filesystem::DefaultRawFileSystem;
     use crate::memory_filesystem::MemoryFileSystem;
-    use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_create_file_stat() {
@@ -319,7 +319,6 @@ mod tests {
         file_stat.set_file_id(1, 0);
     }
 
-
     #[tokio::test]
     async fn test_memory_file_system() {
         let fs = MemoryFileSystem::new().await;
@@ -333,14 +332,14 @@ mod tests {
         // test root file
         let root_dir_path = Path::new("/");
         let root_file_stat = fs.stat(root_dir_path).await;
-        assert_eq!(root_file_stat.is_ok(), true);
+        assert!(root_file_stat.is_ok());
         let root_file_stat = root_file_stat.unwrap();
         assert_file_stat(&root_file_stat, root_dir_path, Directory, 0);
 
         // test meta file
         let meta_file_path = Path::new("/.gvfs_meta");
         let meta_file_stat = fs.stat(meta_file_path).await;
-        assert_eq!(meta_file_stat.is_ok(), true);
+        assert!(meta_file_stat.is_ok());
         let meta_file_stat = meta_file_stat.unwrap();
         assert_file_stat(&meta_file_stat, meta_file_path, FileType::RegularFile, 0);
         root_dir_child_file_stats.insert(meta_file_stat.path.clone(), meta_file_stat);
@@ -348,7 +347,7 @@ mod tests {
         // test create file
         let file_path = Path::new("/file1.txt");
         let opened_file = fs.create_file(file_path, OpenFileFlags(0)).await;
-        assert_eq!(opened_file.is_ok(), true);
+        assert!(opened_file.is_ok());
         let file = opened_file.unwrap();
         assert_file_stat(&file.file_stat, file_path, FileType::RegularFile, 0);
         root_dir_child_file_stats.insert(file.file_stat.path.clone(), file.file_stat.clone());
@@ -356,14 +355,14 @@ mod tests {
         // test create dir
         let dir_path = Path::new("/dir1");
         let dir_stat = fs.create_dir(dir_path).await;
-        assert_eq!(dir_stat.is_ok(), true);
+        assert!(dir_stat.is_ok());
         let dir_stat = dir_stat.unwrap();
         assert_file_stat(&dir_stat, dir_path, Directory, 0);
         root_dir_child_file_stats.insert(dir_stat.path.clone(), dir_stat);
 
         // test list dir
         let list_dir = fs.read_dir(Path::new("/")).await;
-        assert_eq!(list_dir.is_ok(), true);
+        assert!(list_dir.is_ok());
         let list_dir = list_dir.unwrap();
         assert_eq!(list_dir.len(), root_dir_child_file_stats.len());
         for file_stat in list_dir {
@@ -379,17 +378,17 @@ mod tests {
 
         // test remove file
         let remove_file = fs.remove_file(file_path).await;
-        assert_eq!(remove_file.is_ok(), true);
+        assert!(remove_file.is_ok());
         root_dir_child_file_stats.remove(file_path);
 
         // test remove dir
         let remove_dir = fs.remove_dir(dir_path).await;
-        assert_eq!(remove_dir.is_ok(), true);
+        assert!(remove_dir.is_ok());
         root_dir_child_file_stats.remove(dir_path);
 
         // test list dir
         let list_dir = fs.read_dir(Path::new("/")).await;
-        assert_eq!(list_dir.is_ok(), true);
+        assert!(list_dir.is_ok());
 
         let list_dir = list_dir.unwrap();
         assert_eq!(list_dir.len(), root_dir_child_file_stats.len());
@@ -406,7 +405,7 @@ mod tests {
 
         // test file not found
         let not_found_file = fs.stat(Path::new("/not_found.txt")).await;
-        assert_eq!(not_found_file.is_err(), true);
+        assert!(not_found_file.is_err());
     }
 
     fn assert_file_stat(file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
@@ -415,17 +414,15 @@ mod tests {
         assert_eq!(file_stat.size, size);
     }
 
-
     #[tokio::test]
     async fn test_default_raw_file_system() {
         let memory_fs = MemoryFileSystem::new().await;
-        let raw_fs = DefaultRawFileSystem::new(memory_fs).await;
+        let raw_fs = DefaultRawFileSystem::new(memory_fs);
         let _ = raw_fs.init().await;
         test_raw_file_system(&raw_fs).await;
     }
 
-    async fn test_raw_file_system(fs: &impl PathFileSystem) {
-        let mut root_dir_child_file_stats = HashMap::new();
-
+    async fn test_raw_file_system(fs: &impl RawFileSystem) {
+        let _ = fs.init().await;
     }
 }

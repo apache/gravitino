@@ -30,28 +30,25 @@ static SERVER: LazyLock<Mutex<Option<Arc<FuseServer>>>> = LazyLock::new(|| Mutex
 
 pub async fn mount(mount_point: &str) -> fuse3::Result<()> {
     info!("Starting gvfs-fuse server...");
-    let mut server = SERVER.lock().await;
-
     let svr = Arc::new(FuseServer::new(mount_point));
+    {
+        let mut server = SERVER.lock().await;
+        *server = Some(svr.clone());
+    }
     let fs = create_fuse_fs().await;
-    let result = svr.start(fs).await;
-
-    *server = Some(svr);
-    result
-
+    svr.start(fs).await
 }
 
 pub async fn unmount() {
     info!("Stop gvfs-fuse server...");
-    let mut server = SERVER.lock().await;
-    info!("Stop gvfs-fuse server...0");
-    if server.is_none() {
-        info!("Stop gvfs-fuse server...1");
-        return;
-    }
-    info!("Stop gvfs-fuse server...2");
-    let svr = server.take().unwrap();
-    info!("Stop gvfs-fuse server...3");
+    let svr = {
+        let mut server = SERVER.lock().await;
+        if server.is_none() {
+            info!("Server is already stopped.");
+            return;
+        }
+        server.take().unwrap()
+    };
     let _ = svr.stop().await;
 }
 

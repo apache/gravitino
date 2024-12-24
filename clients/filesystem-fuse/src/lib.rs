@@ -32,5 +32,4 @@ pub async fn gvfs_mount(mount_point: &str) -> fuse3::Result<()> {
 
 pub async fn gvfs_unmount() {
     mount::unmount().await;
-
 }

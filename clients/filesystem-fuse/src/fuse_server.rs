@@ -16,19 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use fuse3::raw::{Filesystem, MountHandle, Session};
+use fuse3::raw::{Filesystem, Session};
 use fuse3::{MountOptions, Result};
 use log::{error, info};
 use std::process::exit;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::{Mutex, Notify};
-use tokio::time::timeout;
+use tokio::select;
+use tokio::sync::Notify;
 
 /// Represents a FUSE server capable of starting and stopping the FUSE filesystem.
 pub struct FuseServer {
-    // Shared handle to manage FUSE unmounting
-    mount_handle: Arc<Mutex<Option<MountHandle>>>, // Shared handle to manage FUSE unmounting
+    // Notification for stop
+    close_notify: Arc<Notify>,
 
     // Mount point of the FUSE filesystem
     mount_point: String,
@@ -38,7 +37,7 @@ impl FuseServer {
     /// Creates a new instance of `FuseServer`.
     pub fn new(mount_point: &str) -> Self {
         Self {
-            mount_handle: Arc::new(Mutex::new(None)),
+            close_notify: Arc::new(Default::default()),
             mount_point: mount_point.to_string(),
         }
     }
@@ -57,49 +56,30 @@ impl FuseServer {
         );
 
         let mount_options = MountOptions::default();
-        let mount_handle = Session::new(mount_options)
+        let mut mount_handle = Session::new(mount_options)
             .mount_with_unprivileged(fuse_fs, &self.mount_point)
             .await?;
 
-        {
-            let mut handle_guard = self.mount_handle.lock().await;
-            *handle_guard = Some(mount_handle);
-        }
+        let handle = &mut mount_handle;
 
-        info!("Received stop notification, FUSE filesystem will be unmounted.");
+        select! {
+            res = handle => res?,
+            _ = self.close_notify.notified() => {
+               if let Err(e) = mount_handle.unmount().await {
+                    error!("Failed to unmount FUSE filesystem: {:?}", e);
+                } else {
+                    info!("FUSE filesystem unmounted successfully.");
+                }
+            }
+        }
+        self.close_notify.notify_one();
         Ok(())
     }
 
-    /// Stops the FUSE filesystem and waits for unmounting to complete.
-    pub async fn stop(&self) -> Result<()> {
+    /// Stops the FUSE filesystem.
+    pub async fn stop(&self) {
         info!("Stopping FUSE filesystem...");
-        let timeout_duration = Duration::from_secs(5);
-
-        let handle = {
-            let mut handle_guard = self.mount_handle.lock().await;
-            handle_guard.take() // Take the handle out to unmount
-        };
-
-        if let Some(mount_handle) = handle {
-            let res = timeout(timeout_duration, mount_handle.unmount()).await;
-
-            match res {
-                Ok(Ok(())) => {
-                    info!("FUSE filesystem unmounted successfully.");
-                    Ok(())
-                }
-                Ok(Err(e)) => {
-                    error!("Failed to unmount FUSE filesystem: {:?}", e);
-                    Err(e.into())
-                }
-                Err(_) => {
-                    error!("Unmount timed out.");
-                    Err(libc::ETIMEDOUT.into())
-                }
-            }
-        } else {
-            error!("No active mount handle to unmount.");
-            Err(libc::EBADF.into())
-        }
+        self.close_notify.notify_one();
+        self.close_notify.notified().await;
     }
 }
