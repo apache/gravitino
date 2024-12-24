@@ -23,10 +23,7 @@ import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
 
-/**
- * Get {@link PathWithCredentialType}, the catalog operation should implement this interface to
- * generate the path based credentials.
- */
+/** The catalog operation should implement this interface to generate the path based credentials. */
 @Evolving
 public interface SupportsPathBasedCredentials {
 

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+/** Represents the privilege to get credential from credential providers. */
 public enum CredentialPrivilege {
   READ,
   WRITE,
