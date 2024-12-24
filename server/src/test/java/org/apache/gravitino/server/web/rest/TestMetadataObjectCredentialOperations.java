@@ -31,8 +31,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -59,7 +59,8 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     }
   }
 
-  private CredentialManager credentialManager = mock(CredentialManager.class);
+  private CredentialOperationDispatcher credentialOperationDispatcher =
+      mock(CredentialOperationDispatcher.class);
 
   private String metalake = "test_metalake";
 
@@ -78,7 +79,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(credentialManager).to(CredentialManager.class).ranked(2);
+            bind(credentialOperationDispatcher).to(CredentialOperationDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -101,7 +102,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
     S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
     // Test return one credential
-    when(credentialManager.getCredentials(any())).thenReturn(Arrays.asList(credential));
+    when(credentialOperationDispatcher.getCredentials(any())).thenReturn(Arrays.asList(credential));
     Response response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
@@ -123,7 +124,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     Assertions.assertEquals(0, credentialToTest.expireTimeInMs());
 
     // Test doesn't return credential
-    when(credentialManager.getCredentials(any())).thenReturn(null);
+    when(credentialOperationDispatcher.getCredentials(any())).thenReturn(null);
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
@@ -140,7 +141,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
     // Test throws NoSuchCredentialException
     doThrow(new NoSuchCredentialException("mock error"))
-        .when(credentialManager)
+        .when(credentialOperationDispatcher)
         .getCredentials(any());
     response =
         target(basePath(metalake))

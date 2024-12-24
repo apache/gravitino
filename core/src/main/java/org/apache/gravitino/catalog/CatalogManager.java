@@ -126,6 +126,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
+
     private BaseCatalog catalog;
     private IsolatedClassLoader classLoader;
 
@@ -167,6 +168,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             }
             return fn.apply(asFilesets());
           });
+    }
+
+    public <R> R doWithCredentialOps(ThrowableFunction<BaseCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(cl -> fn.apply(catalog));
     }
 
     public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
