@@ -205,25 +205,27 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut opened_file = self
+        let mut opened_file_with_out_file_handle_id = self
             .fs
             .create_file(&parent_file_entry.path, name, OpenFileFlags(flags))
             .await?;
 
-        opened_file.set_file_id(parent_file_id, self.next_file_id());
+        opened_file_with_out_file_handle_id.set_file_id(parent_file_id, self.next_file_id());
 
         // insert the new file to file entry manager
         self.insert_file_entry_locked(
             parent_file_id,
-            opened_file.file_stat.file_id,
-            &opened_file.file_stat.path,
+            opened_file_with_out_file_handle_id.file_stat.file_id,
+            &opened_file_with_out_file_handle_id.file_stat.path,
         )
         .await;
 
-        // put the file to the opened file manager
-        let opened_file = self.opened_file_manager.put(opened_file);
-        let opened_file = opened_file.lock().await;
-        Ok(opened_file.file_handle())
+        // put the openfile to the opened file manager and allocate a file handle id
+        let opened_file_with_file_handle_id = self
+            .opened_file_manager
+            .put(opened_file_with_out_file_handle_id);
+        let opened_file_with_file_handle_id = opened_file_with_file_handle_id.lock().await;
+        Ok(opened_file_with_file_handle_id.file_handle())
     }
 
     async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64> {
