@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.connector.credential.PathBasedCredentialContext;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {

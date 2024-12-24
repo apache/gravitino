@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential;
+package org.apache.gravitino.connector.credential;
 
 import com.google.common.base.Preconditions;
 import java.util.Set;

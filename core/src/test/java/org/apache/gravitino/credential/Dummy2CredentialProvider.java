@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
+import org.apache.gravitino.connector.credential.CatalogCredentialContext;
+import org.apache.gravitino.connector.credential.CredentialContext;
+import org.apache.gravitino.connector.credential.PathBasedCredentialContext;
 
 public class Dummy2CredentialProvider implements CredentialProvider {
   Map<String, String> properties;

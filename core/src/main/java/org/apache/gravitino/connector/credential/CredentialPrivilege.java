@@ -17,22 +17,9 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential;
+package org.apache.gravitino.connector.credential;
 
-import com.google.common.base.Preconditions;
-import javax.validation.constraints.NotNull;
-
-/** CatalogCredentialContext is generated when user requesting catalog credentials. */
-public class CatalogCredentialContext implements CredentialContext {
-  @NotNull private final String userName;
-
-  public CatalogCredentialContext(String userName) {
-    Preconditions.checkNotNull(userName, "User name should not be null");
-    this.userName = userName;
-  }
-
-  @Override
-  public String getUserName() {
-    return userName;
-  }
+public enum CredentialPrivilege {
+  READ,
+  WRITE,
 }

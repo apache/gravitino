@@ -20,8 +20,8 @@
 package org.apache.gravitino.s3.credential;
 
 import java.util.Map;
+import org.apache.gravitino.connector.credential.CredentialContext;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;

@@ -59,8 +59,8 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     }
   }
 
-  private CredentialOperationDispatcher credentialOperationDispatcher = mock(
-      CredentialOperationDispatcher.class);
+  private CredentialOperationDispatcher credentialOperationDispatcher =
+      mock(CredentialOperationDispatcher.class);
 
   private String metalake = "test_metalake";
 

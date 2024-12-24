@@ -115,7 +115,9 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
-            bind(gravitinoEnv.credentialOperationDispatcher()).to(CredentialOperationDispatcher.class).ranked(1);
+            bind(gravitinoEnv.credentialOperationDispatcher())
+                .to(CredentialOperationDispatcher.class)
+                .ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);

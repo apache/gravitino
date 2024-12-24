@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential;
+package org.apache.gravitino.connector.credential;
 
 /** Contains credential context information to get credential from a credential provider. */
 public interface CredentialContext {

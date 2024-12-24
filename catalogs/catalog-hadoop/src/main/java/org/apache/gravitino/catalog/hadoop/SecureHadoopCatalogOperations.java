@@ -20,14 +20,11 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -41,14 +38,8 @@ import org.apache.gravitino.catalog.hadoop.authentication.UserContext;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.SupportsCredentialOperations;
 import org.apache.gravitino.connector.SupportsSchemas;
-import org.apache.gravitino.credential.CatalogCredentialContext;
-import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.CredentialUtils;
-import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -61,20 +52,17 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("removal")
 public class SecureHadoopCatalogOperations
-    implements CatalogOperations, SupportsSchemas, FilesetCatalog, SupportsCredentialOperations {
+    implements CatalogOperations, SupportsSchemas, FilesetCatalog, SupportsPathBasedCredentials {
 
   public static final Logger LOG = LoggerFactory.getLogger(SecureHadoopCatalogOperations.class);
 
   private final HadoopCatalogOperations hadoopCatalogOperations;
-  private Map<String, CredentialProvider> catalogCredentialProviders;
-  private Map<String, String> catalogProperties;
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
 
@@ -188,8 +176,6 @@ public class SecureHadoopCatalogOperations
             config,
             hadoopCatalogOperations.getHadoopConf(),
             info);
-    this.catalogProperties = info.properties();
-    this.catalogCredentialProviders = CredentialUtils.loadCredentialProviders(catalogProperties);
   }
 
   @Override
@@ -262,17 +248,16 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public Map<String, CredentialContext> getCredentialContexts(
-      NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
-    if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
-      return getCatalogCredentialContexts();
-    }
-    return getFilesetCredentialContexts(nameIdentifier, privilege);
+  public Map<String, String> schemaProperties(NameIdentifier schemaIdentifier) {
+    return loadSchema(schemaIdentifier).properties();
   }
 
   @Override
-  public Map<String, CredentialProvider> getCatalogCredentialProviders() {
-    return catalogCredentialProviders;
+  public PathBasedCredentialContextInfo getPathBasedCredentialContextInfo(
+      NameIdentifier nameIdentifier) {
+    Fileset fileset = loadFileset(nameIdentifier);
+    return new PathBasedCredentialContextInfo(
+        Arrays.asList(fileset.storageLocation()), fileset.properties());
   }
 
   /**
@@ -286,41 +271,5 @@ public class SecureHadoopCatalogOperations
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
     subject.getPrincipals().add(new UserPrincipal(apiUser));
-  }
-
-  private Map<String, CredentialContext> getCatalogCredentialContexts() {
-    CatalogCredentialContext context =
-        new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
-    Set<String> providers = CredentialUtils.getCredentialProviders(() -> catalogProperties);
-    return providers.stream().collect(Collectors.toMap(provider -> provider, provider -> context));
-  }
-
-  private Map<String, CredentialContext> getFilesetCredentialContexts(
-      NameIdentifier filesetIdentifier, CredentialPrivilege privilege) {
-    Fileset fileset = loadFileset(filesetIdentifier);
-    String location = fileset.storageLocation();
-    Set<String> writePaths = new HashSet<>();
-    Set<String> readPaths = new HashSet<>();
-    if (CredentialPrivilege.WRITE.equals(privilege)) {
-      writePaths.add(location);
-    } else {
-      readPaths.add(location);
-    }
-    CredentialContext credentialContext =
-        new PathBasedCredentialContext(PrincipalUtils.getCurrentUserName(), writePaths, readPaths);
-
-    Namespace namespace = filesetIdentifier.namespace();
-    Preconditions.checkArgument(
-        namespace.levels().length == 3, "" + "The namespace of fileset should be 3 levels");
-    NameIdentifier namespaceIdentifier =
-        NameIdentifier.of(namespace.levels()[0], namespace.levels()[1], namespace.levels()[2]);
-    Set<String> providers =
-        CredentialUtils.getCredentialProviders(
-            () -> fileset.properties(),
-            () -> loadSchema(namespaceIdentifier).properties(),
-            () -> catalogProperties);
-
-    return providers.stream()
-        .collect(Collectors.toMap(provider -> provider, provider -> credentialContext));
   }
 }

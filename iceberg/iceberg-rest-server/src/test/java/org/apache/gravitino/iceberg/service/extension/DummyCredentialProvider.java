@@ -24,8 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
+import org.apache.gravitino.connector.credential.CredentialContext;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 
 public class DummyCredentialProvider implements CredentialProvider {

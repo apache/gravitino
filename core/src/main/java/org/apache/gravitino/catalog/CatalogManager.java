@@ -78,9 +78,9 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.connector.SupportsCredentialOperations;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.credential.SupportsCredentialOperations;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -127,6 +127,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
+
     private BaseCatalog catalog;
     private IsolatedClassLoader classLoader;
 
@@ -172,14 +173,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     public <R> R doWithCredentialOps(ThrowableFunction<SupportsCredentialOperations, R> fn)
         throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asCredentialOps() == null) {
-              throw new UnsupportedOperationException(
-                  "Catalog does not support credential operations");
-            }
-            return fn.apply(asCredentialOps());
-          });
+      return classLoader.withClassLoader(cl -> fn.apply(catalog));
     }
 
     public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
@@ -263,12 +257,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     private ModelCatalog asModels() {
       return catalog.ops() instanceof ModelCatalog ? (ModelCatalog) catalog.ops() : null;
-    }
-
-    private SupportsCredentialOperations asCredentialOps() {
-      return catalog.ops() instanceof SupportsCredentialOperations
-          ? (SupportsCredentialOperations) catalog.ops()
-          : null;
     }
   }
 
