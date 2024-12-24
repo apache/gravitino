@@ -42,7 +42,7 @@ public class TestCredentialFactory {
             S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, s3TokenCredentialInfo, expireTime);
     Assertions.assertEquals(
         S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, s3TokenCredential.credentialType());
-    Assertions.assertTrue(s3TokenCredential instanceof S3TokenCredential);
+    Assertions.assertInstanceOf(S3TokenCredential.class, s3TokenCredential);
     S3TokenCredential s3TokenCredential1 = (S3TokenCredential) s3TokenCredential;
     Assertions.assertEquals("accessKeyId", s3TokenCredential1.accessKeyId());
     Assertions.assertEquals("secretAccessKey", s3TokenCredential1.secretAccessKey());
@@ -67,7 +67,7 @@ public class TestCredentialFactory {
     Assertions.assertEquals(
         S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE,
         s3SecretKeyCredential.credentialType());
-    Assertions.assertTrue(s3SecretKeyCredential instanceof S3SecretKeyCredential);
+    Assertions.assertInstanceOf(S3SecretKeyCredential.class, s3SecretKeyCredential);
     S3SecretKeyCredential s3SecretKeyCredential1 = (S3SecretKeyCredential) s3SecretKeyCredential;
     Assertions.assertEquals("accessKeyId", s3SecretKeyCredential1.accessKeyId());
     Assertions.assertEquals("secretAccessKey", s3SecretKeyCredential1.secretAccessKey());
@@ -84,7 +84,7 @@ public class TestCredentialFactory {
             GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE, gcsTokenCredentialInfo, expireTime);
     Assertions.assertEquals(
         GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE, gcsTokenCredential.credentialType());
-    Assertions.assertTrue(gcsTokenCredential instanceof GCSTokenCredential);
+    Assertions.assertInstanceOf(GCSTokenCredential.class, gcsTokenCredential);
     GCSTokenCredential gcsTokenCredential1 = (GCSTokenCredential) gcsTokenCredential;
     Assertions.assertEquals("accessToken", gcsTokenCredential1.token());
     Assertions.assertEquals(expireTime, gcsTokenCredential1.expireTimeInMs());
@@ -106,11 +106,90 @@ public class TestCredentialFactory {
             OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenCredentialInfo, expireTime);
     Assertions.assertEquals(
         OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenCredential.credentialType());
-    Assertions.assertTrue(ossTokenCredential instanceof OSSTokenCredential);
+    Assertions.assertInstanceOf(OSSTokenCredential.class, ossTokenCredential);
     OSSTokenCredential ossTokenCredential1 = (OSSTokenCredential) ossTokenCredential;
     Assertions.assertEquals("access-id", ossTokenCredential1.accessKeyId());
     Assertions.assertEquals("secret-key", ossTokenCredential1.secretAccessKey());
     Assertions.assertEquals("token", ossTokenCredential1.securityToken());
     Assertions.assertEquals(expireTime, ossTokenCredential1.expireTimeInMs());
+  }
+
+  @Test
+  void testOSSSecretKeyTokenCredential() {
+    Map<String, String> ossSecretKeyCredentialInfo =
+        ImmutableMap.of(
+            OSSSecretKeyCredential.GRAVITINO_OSS_STATIC_ACCESS_KEY_ID,
+            "accessKeyId",
+            OSSSecretKeyCredential.GRAVITINO_OSS_STATIC_SECRET_ACCESS_KEY,
+            "secretAccessKey");
+    long expireTime = 0;
+    Credential ossSecretKeyCredential =
+        CredentialFactory.create(
+            OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+            ossSecretKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+        ossSecretKeyCredential.credentialType());
+    Assertions.assertInstanceOf(OSSSecretKeyCredential.class, ossSecretKeyCredential);
+    OSSSecretKeyCredential ossSecretKeyCredential1 =
+        (OSSSecretKeyCredential) ossSecretKeyCredential;
+    Assertions.assertEquals("accessKeyId", ossSecretKeyCredential1.accessKeyId());
+    Assertions.assertEquals("secretAccessKey", ossSecretKeyCredential1.secretAccessKey());
+    Assertions.assertEquals(expireTime, ossSecretKeyCredential1.expireTimeInMs());
+  }
+
+  @Test
+  void testADLSTokenCredential() {
+    String storageAccountName = "storage-account-name";
+    String sasToken = "sas-token";
+
+    Map<String, String> adlsTokenCredentialInfo =
+        ImmutableMap.of(
+            ADLSTokenCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            storageAccountName,
+            ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN,
+            sasToken);
+    long expireTime = 100;
+    Credential credential =
+        CredentialFactory.create(
+            ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE,
+            adlsTokenCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(ADLSTokenCredential.class, credential);
+
+    ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
+    Assertions.assertEquals(storageAccountName, adlsTokenCredential.accountName());
+    Assertions.assertEquals(sasToken, adlsTokenCredential.sasToken());
+    Assertions.assertEquals(expireTime, adlsTokenCredential.expireTimeInMs());
+  }
+
+  @Test
+  void testAzureAccountKeyCredential() {
+    String storageAccountName = "storage-account-name";
+    String storageAccountKey = "storage-account-key";
+
+    Map<String, String> azureAccountKeyCredentialInfo =
+        ImmutableMap.of(
+            AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            storageAccountName,
+            AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+            storageAccountKey);
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
+            azureAccountKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(AzureAccountKeyCredential.class, credential);
+
+    AzureAccountKeyCredential azureAccountKeyCredential = (AzureAccountKeyCredential) credential;
+    Assertions.assertEquals(storageAccountName, azureAccountKeyCredential.accountName());
+    Assertions.assertEquals(storageAccountKey, azureAccountKeyCredential.accountKey());
+    Assertions.assertEquals(expireTime, azureAccountKeyCredential.expireTimeInMs());
   }
 }

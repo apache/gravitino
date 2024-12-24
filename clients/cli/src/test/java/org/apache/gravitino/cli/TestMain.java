@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -125,7 +126,12 @@ public class TestMain {
   public void parseError() throws UnsupportedEncodingException {
     String[] args = {"--invalidOption"};
 
-    Main.main(args);
+    Main.useExit = false;
+    assertThrows(
+        RuntimeException.class,
+        () -> {
+          Main.main(args);
+        });
 
     assertTrue(errContent.toString().contains("Error parsing command line")); // Expect error
     assertTrue(outContent.toString().contains("usage:")); // Expect help output
@@ -142,5 +148,57 @@ public class TestMain {
     assertEquals(CommandActions.DETAILS, command);
     String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.CATALOG, entity);
+  }
+
+  @Test
+  public void metalakeWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"metalake", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.METALAKE);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @Test
+  public void catalogWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"catalog", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.CATALOG);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @Test
+  public void schemaWithHelpOption() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"schema", "--help"};
+    CommandLine line = parser.parse(options, args);
+
+    assertEquals(Main.resolveEntity(line), CommandEntities.SCHEMA);
+    assertEquals(Main.resolveCommand(line), CommandActions.HELP);
+  }
+
+  @SuppressWarnings("DefaultCharset")
+  public void CreateTagWithNoTag() {
+    String[] args = {"tag", "create", "--metalake", "metalake_test_no_tag"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void DeleteTagWithNoTag() {
+    String[] args = {"tag", "delete", "--metalake", "metalake_test_no_tag", "-f"};
+
+    Main.main(args);
+
+    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
   }
 }

@@ -20,7 +20,6 @@
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -92,15 +91,14 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
 
     // Pass this configuration to the real file system
     conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
-    conf.set(FS_FILESYSTEM_PROVIDERS, "gcs");
   }
 
   @AfterAll
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();

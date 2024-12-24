@@ -65,7 +65,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("Warehouse directory of catalog")
           .version(ConfigConstants.VERSION_0_2_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> CATALOG_URI =

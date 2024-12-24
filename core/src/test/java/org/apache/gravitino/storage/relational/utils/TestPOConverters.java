@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
@@ -34,9 +35,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
@@ -47,6 +50,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
@@ -62,13 +66,17 @@ import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestPOConverters {
@@ -986,6 +994,172 @@ public class TestPOConverters {
     ModelEntity convertedModelWithEmptyProperties =
         POConverters.fromModelPO(modelPOWithEmptyProperties, namespace);
     assertEquals(expectedModelWithEmptyProperties, convertedModelWithEmptyProperties);
+  }
+
+  @Test
+  public void testInitModelVersionPO() throws JsonProcessingException {
+    NameIdentifier modelIdent = NameIdentifierUtil.ofModel("m", "c", "s", "model1");
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+
+    ModelVersionEntity modelVersionEntity =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(modelIdent)
+            .withVersion(1)
+            .withAliases(ImmutableList.of("alias1"))
+            .withComment("this is test")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withUri("hdfs://localhost/test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelVersionPO.Builder builder1 =
+        ModelVersionPO.builder()
+            .withModelId(1L)
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L);
+
+    ModelVersionPO modelVersionPO =
+        POConverters.initializeModelVersionPO(modelVersionEntity, builder1);
+    Assertions.assertEquals(1, modelVersionPO.getModelVersion());
+    Assertions.assertEquals(1L, modelVersionPO.getModelId());
+    Assertions.assertEquals(1L, modelVersionPO.getMetalakeId());
+    Assertions.assertEquals(1L, modelVersionPO.getCatalogId());
+    Assertions.assertEquals(1L, modelVersionPO.getSchemaId());
+    Assertions.assertEquals("this is test", modelVersionPO.getModelVersionComment());
+    Assertions.assertEquals("hdfs://localhost/test", modelVersionPO.getModelVersionUri());
+    Assertions.assertEquals(0L, modelVersionPO.getDeletedAt());
+
+    Map<String, String> resultProperties =
+        JsonUtils.anyFieldMapper().readValue(modelVersionPO.getModelVersionProperties(), Map.class);
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), resultProperties);
+
+    AuditInfo resultAuditInfo =
+        JsonUtils.anyFieldMapper().readValue(modelVersionPO.getAuditInfo(), AuditInfo.class);
+    Assertions.assertEquals(auditInfo, resultAuditInfo);
+
+    List<ModelVersionAliasRelPO> aliasPOs =
+        POConverters.initializeModelVersionAliasRelPO(
+            modelVersionEntity, modelVersionPO.getModelId());
+    Assertions.assertEquals(1, aliasPOs.size());
+    Assertions.assertEquals(1, aliasPOs.get(0).getModelVersion());
+    Assertions.assertEquals("alias1", aliasPOs.get(0).getModelVersionAlias());
+    Assertions.assertEquals(1L, aliasPOs.get(0).getModelId());
+    Assertions.assertEquals(0L, aliasPOs.get(0).getDeletedAt());
+
+    // Test with null fields
+    ModelVersionEntity modelVersionEntityWithNull =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(modelIdent)
+            .withVersion(1)
+            .withAliases(null)
+            .withComment(null)
+            .withProperties(null)
+            .withUri("hdfs://localhost/test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelVersionPO.Builder builder2 =
+        ModelVersionPO.builder()
+            .withModelId(1L)
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L);
+
+    ModelVersionPO modelVersionPOWithNull =
+        POConverters.initializeModelVersionPO(modelVersionEntityWithNull, builder2);
+    Assertions.assertNull(modelVersionPOWithNull.getModelVersionComment());
+
+    Map<String, String> resultPropertiesWithNull =
+        JsonUtils.anyFieldMapper()
+            .readValue(modelVersionPOWithNull.getModelVersionProperties(), Map.class);
+    Assertions.assertNull(resultPropertiesWithNull);
+
+    List<ModelVersionAliasRelPO> aliasPOsWithNull =
+        POConverters.initializeModelVersionAliasRelPO(
+            modelVersionEntityWithNull, modelVersionPOWithNull.getModelId());
+    Assertions.assertEquals(0, aliasPOsWithNull.size());
+  }
+
+  @Test
+  public void testFromModelVersionPO() throws JsonProcessingException {
+    NameIdentifier modelIdent = NameIdentifierUtil.ofModel("m", "c", "s", "model1");
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Map<String, String> properties = ImmutableMap.of("key", "value");
+    List<String> aliases = ImmutableList.of("alias1", "alias2");
+
+    ModelVersionPO modelVersionPO =
+        ModelVersionPO.builder()
+            .withModelVersion(1)
+            .withModelId(1L)
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L)
+            .withModelVersionComment("this is test")
+            .withModelVersionProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+            .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelVersionUri("hdfs://localhost/test")
+            .withDeletedAt(0L)
+            .build();
+    List<ModelVersionAliasRelPO> aliasPOs =
+        aliases.stream()
+            .map(
+                a ->
+                    ModelVersionAliasRelPO.builder()
+                        .withModelVersionAlias(a)
+                        .withModelVersion(1)
+                        .withModelId(1L)
+                        .withDeletedAt(0L)
+                        .build())
+            .collect(Collectors.toList());
+
+    ModelVersionEntity expectedModelVersion =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(modelIdent)
+            .withVersion(1)
+            .withAliases(aliases)
+            .withComment("this is test")
+            .withProperties(properties)
+            .withUri("hdfs://localhost/test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelVersionEntity convertedModelVersion =
+        POConverters.fromModelVersionPO(modelIdent, modelVersionPO, aliasPOs);
+    assertEquals(expectedModelVersion, convertedModelVersion);
+
+    // test null fields
+    ModelVersionPO modelVersionPOWithNull =
+        ModelVersionPO.builder()
+            .withModelVersion(1)
+            .withModelId(1L)
+            .withMetalakeId(1L)
+            .withCatalogId(1L)
+            .withSchemaId(1L)
+            .withModelVersionComment(null)
+            .withModelVersionProperties(JsonUtils.anyFieldMapper().writeValueAsString(null))
+            .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelVersionUri("hdfs://localhost/test")
+            .withDeletedAt(0L)
+            .build();
+    List<ModelVersionAliasRelPO> aliasPOsWithNull = Collections.emptyList();
+
+    ModelVersionEntity expectedModelVersionWithNull =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(modelIdent)
+            .withVersion(1)
+            .withAliases(Collections.emptyList())
+            .withComment(null)
+            .withProperties(null)
+            .withUri("hdfs://localhost/test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ModelVersionEntity convertedModelVersionWithNull =
+        POConverters.fromModelVersionPO(modelIdent, modelVersionPOWithNull, aliasPOsWithNull);
+    assertEquals(expectedModelVersionWithNull, convertedModelVersionWithNull);
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

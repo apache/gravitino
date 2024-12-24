@@ -48,14 +48,12 @@ public class ListAllTags extends Command {
       GravitinoClient client = buildClient(metalake);
       tags = client.listTags();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", tags);
+    String all = tags.length == 0 ? "No tags exist." : String.join(",", tags);
 
     System.out.println(all.toString());
   }

@@ -28,6 +28,7 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
+import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
@@ -61,6 +62,7 @@ import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
+import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
@@ -70,6 +72,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,6 +108,10 @@ public class GravitinoEnv {
 
   private MetalakeDispatcher metalakeDispatcher;
 
+  private CredentialManager credentialManager;
+
+  private TagDispatcher tagDispatcher;
+
   private AccessControlDispatcher accessControlDispatcher;
 
   private IdGenerator idGenerator;
@@ -119,7 +126,6 @@ public class GravitinoEnv {
 
   private AuditLogManager auditLogManager;
 
-  private TagManager tagManager;
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
@@ -258,6 +264,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the {@link CredentialManager} associated with the Gravitino environment.
+   *
+   * @return The {@link CredentialManager} instance.
+   */
+  public CredentialManager credentialManager() {
+    return credentialManager;
+  }
+
+  /**
    * Get the IdGenerator associated with the Gravitino environment.
    *
    * @return The IdGenerator instance.
@@ -309,12 +324,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the TagManager associated with the Gravitino environment.
+   * Get the tagDispatcher associated with the Gravitino environment.
    *
-   * @return The TagManager instance.
+   * @return The tagDispatcher instance.
    */
-  public TagManager tagManager() {
-    return tagManager;
+  public TagDispatcher tagDispatcher() {
+    return tagDispatcher;
   }
 
   /**
@@ -417,6 +432,8 @@ public class GravitinoEnv {
         new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
+    this.credentialManager = new CredentialManager(catalogManager, entityStore, idGenerator);
+
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaOperationDispatcher);
@@ -483,7 +500,7 @@ public class GravitinoEnv {
     // Tree lock
     this.lockManager = new LockManager(config);
 
-    // Tag manager
-    this.tagManager = new TagManager(idGenerator, entityStore);
+    // Create and initialize Tag related modules
+    this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
   }
 }

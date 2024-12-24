@@ -573,7 +573,7 @@ CREATE TABLE IF NOT EXISTS model_version_alias_rel (
     model_version_alias VARCHAR(128) NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE (model_id, model_version, model_version_alias, deleted_at)
+    UNIQUE (model_id, model_version_alias, deleted_at)
     );
 
 CREATE INDEX IF NOT EXISTS idx_model_version_alias on model_version_alias_rel (model_version_alias);

@@ -57,11 +57,16 @@ public class DeleteTag extends Command {
     if (!AreYouSure.really(force)) {
       return;
     }
-    boolean hasOnlyOneTag = tags.length == 1;
-    if (hasOnlyOneTag) {
-      handleOnlyOneTag();
+
+    if (tags == null || tags.length == 0) {
+      System.err.println(ErrorMessages.TAG_EMPTY);
     } else {
-      handleMultipleTags();
+      boolean hasOnlyOneTag = tags.length == 1;
+      if (hasOnlyOneTag) {
+        handleOnlyOneTag();
+      } else {
+        handleMultipleTags();
+      }
     }
   }
 
@@ -75,14 +80,11 @@ public class DeleteTag extends Command {
         }
       }
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TAG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
     if (!deleted.isEmpty()) {
       System.out.println("Tags " + String.join(",", deleted) + " deleted.");
@@ -101,14 +103,11 @@ public class DeleteTag extends Command {
       GravitinoClient client = buildClient(metalake);
       deleted = client.deleteTag(tags[0]);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TAG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

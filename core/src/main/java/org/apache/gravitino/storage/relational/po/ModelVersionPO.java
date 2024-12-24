@@ -112,11 +112,6 @@ public class ModelVersionPO {
     }
 
     public ModelVersionPO build() {
-      Preconditions.checkArgument(modelVersionPO.modelId != null, "Model id is required");
-      Preconditions.checkArgument(modelVersionPO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(modelVersionPO.catalogId != null, "Catalog id is required");
-      Preconditions.checkArgument(modelVersionPO.schemaId != null, "Schema id is required");
-      Preconditions.checkArgument(modelVersionPO.modelVersion != null, "Model version is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(modelVersionPO.modelVersionUri),
           "Model version uri cannot be empty");

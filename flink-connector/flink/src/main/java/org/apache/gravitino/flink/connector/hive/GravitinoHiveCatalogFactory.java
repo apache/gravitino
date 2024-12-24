@@ -28,8 +28,11 @@ import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactory;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
-import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -38,7 +41,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
  * Factory for creating instances of {@link GravitinoHiveCatalog}. It will be created by SPI
  * discovery in Flink.
  */
-public class GravitinoHiveCatalogFactory implements CatalogFactory {
+public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
   private HiveCatalogFactory hiveCatalogFactory;
 
   @Override
@@ -60,6 +63,8 @@ public class GravitinoHiveCatalogFactory implements CatalogFactory {
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
+        propertiesConverter(),
+        partitionConverter(),
         hiveConf,
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
   }
@@ -80,5 +85,45 @@ public class GravitinoHiveCatalogFactory implements CatalogFactory {
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
     return hiveCatalogFactory.optionalOptions();
+  }
+
+  /**
+   * Define gravitino catalog provider {@link org.apache.gravitino.CatalogProvider}.
+   *
+   * @return The requested gravitino catalog provider.
+   */
+  @Override
+  public String gravitinoCatalogProvider() {
+    return "hive";
+  }
+
+  /**
+   * Define gravitino catalog type {@link org.apache.gravitino.Catalog.Type}.
+   *
+   * @return The requested gravitino catalog type.
+   */
+  @Override
+  public org.apache.gravitino.Catalog.Type gravitinoCatalogType() {
+    return org.apache.gravitino.Catalog.Type.RELATIONAL;
+  }
+
+  /**
+   * Define properties converter {@link PropertiesConverter}.
+   *
+   * @return The requested property converter.
+   */
+  @Override
+  public PropertiesConverter propertiesConverter() {
+    return HivePropertiesConverter.INSTANCE;
+  }
+
+  /**
+   * Define partition converter.
+   *
+   * @return The requested partition converter.
+   */
+  @Override
+  public PartitionConverter partitionConverter() {
+    return DefaultPartitionConverter.INSTANCE;
   }
 }
