@@ -42,17 +42,6 @@ public class RangerPathBaseMetadataObject implements AuthorizationMetadataObject
     public MetadataObject.Type metadataObjectType() {
       return metadataType;
     }
-
-    public static RangerHadoopSQLMetadataObject.Type fromMetadataType(
-        MetadataObject.Type metadataType) {
-      for (RangerHadoopSQLMetadataObject.Type type : RangerHadoopSQLMetadataObject.Type.values()) {
-        if (type.metadataObjectType() == metadataType) {
-          return type;
-        }
-      }
-      throw new IllegalArgumentException(
-          "No matching RangerMetadataObject.Type for " + metadataType);
-    }
   }
 
   private final String path;

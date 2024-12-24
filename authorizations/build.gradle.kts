@@ -17,6 +17,18 @@
  * under the License.
  */
 
-tasks.all {
-    enabled = false
+tasks {
+  test {
+    subprojects.forEach {
+      dependsOn(":${project.name}:${it.name}:test")
+    }
+  }
+
+  register("copyLibAndConfig", Copy::class) {
+    subprojects.forEach {
+      if (!it.name.startsWith("authorization-common")) {
+        dependsOn(":${project.name}:${it.name}:copyLibAndConfig")
+      }
+    }
+  }
 }

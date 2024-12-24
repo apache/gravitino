@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.common;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -33,7 +33,12 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.type", "hive");
     properties.put("authorization.ranger.service.name", "hiveDev");
-    Assertions.assertDoesNotThrow(() -> RangerAuthorizationProperties.validate(properties));
+    Assertions.assertDoesNotThrow(
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 
   @Test
@@ -45,7 +50,12 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.service.type", "hive");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
+        IllegalArgumentException.class,
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 
   @Test
@@ -57,7 +67,12 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.service.type", "hive");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
+        IllegalArgumentException.class,
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 
   @Test
@@ -69,7 +84,12 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.service.type", "hive");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
+        IllegalArgumentException.class,
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 
   @Test
@@ -81,7 +101,12 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.service.type", "hive");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
+        IllegalArgumentException.class,
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 
   @Test
@@ -93,7 +118,12 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.name", "hiveDev");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
+        IllegalArgumentException.class,
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 
   @Test
@@ -105,6 +135,11 @@ public class TestRangerAuthorizationProperties {
     properties.put("authorization.ranger.password", "admin");
     properties.put("authorization.ranger.service.type", "hive");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> RangerAuthorizationProperties.validate(properties));
+        IllegalArgumentException.class,
+        () -> {
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(properties);
+          rangerAuthProperties.validate();
+        });
   }
 }

@@ -58,7 +58,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -79,6 +78,7 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
@@ -944,7 +944,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String catalogPkgPath = buildPkgPath(conf, provider);
       String catalogConfPath = buildConfPath(conf, provider);
       ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
-      buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
+      BaseAuthorization.buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
       return IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -1059,37 +1059,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     return pkgPath;
-  }
-
-  private Optional<String> buildAuthorizationPkgPath(Map<String, String> conf) {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-
-    String authorizationProvider = conf.get(Catalog.AUTHORIZATION_PROVIDER);
-    if (StringUtils.isBlank(authorizationProvider)) {
-      return Optional.empty();
-    }
-
-    String pkgPath;
-    if (testEnv) {
-      // In test, the authorization package is under the build directory.
-      pkgPath =
-          String.join(
-              File.separator,
-              gravitinoHome,
-              "authorizations",
-              "authorization-" + authorizationProvider,
-              "build",
-              "libs");
-    } else {
-      // In real environment, the authorization package is under the authorization directory.
-      pkgPath =
-          String.join(
-              File.separator, gravitinoHome, "authorizations", authorizationProvider, "libs");
-    }
-
-    return Optional.of(pkgPath);
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {

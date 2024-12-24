@@ -26,6 +26,7 @@ import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +58,7 @@ import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -421,5 +423,41 @@ public class BaseIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
     copyBundleJarsToDirectory(bundleName, hadoopLibDirs);
+  }
+
+  public static void runInEnv(String key, String value, Runnable lambda) {
+    String originalValue = System.getenv(key);
+    try {
+      setEnv(key, value);
+      if (key.equals("HADOOP_USER_NAME") && value != null) {
+        UserGroupInformation.setLoginUser(null);
+        System.setProperty("user.name", value);
+      }
+      lambda.run();
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to set environment variable", e);
+    } finally {
+      setEnv(key, originalValue);
+      if (key.equals("HADOOP_USER_NAME") && value != null) {
+        System.setProperty("user.name", originalValue);
+      }
+    }
+  }
+
+  public static void setEnv(String key, String value) {
+    try {
+      Map<String, String> env = System.getenv();
+      Class<?> cl = env.getClass();
+      Field field = cl.getDeclaredField("m");
+      field.setAccessible(true);
+      Map<String, String> writableEnv = (Map<String, String>) field.get(env);
+      if (value == null) {
+        writableEnv.remove(key);
+      } else {
+        writableEnv.put(key, value);
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to set environment variable", e);
+    }
   }
 }

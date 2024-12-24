@@ -16,21 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.common;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 
 import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestChainAuthorizationProperties {
+public class TestChainedAuthorizationProperties {
+  static final String METASTORE_URIS = "metastore.uris";
+  public static final String IMPERSONATION_ENABLE = "impersonation-enable";
+
   @Test
-  void testChainOnePlugin() {
+  void testChainedOnePlugin() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("authorization.chain.plugins", "hive1");
     properties.put("authorization.chain.hive1.provider", "ranger");
@@ -40,13 +41,15 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hive1.ranger.password", "admin");
     properties.put("authorization.chain.hive1.ranger.service.type", "hive");
     properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
-    Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertDoesNotThrow(() -> chainedAuthProperties.validate());
   }
 
   @Test
-  void testChainTwoPlugins() {
+  void testChainedTwoPlugins() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.METASTORE_URIS, "thrift://localhost:9083");
+    properties.put(METASTORE_URIS, "thrift://localhost:9083");
     properties.put("gravitino.bypass.hive.metastore.client.capability.check", "true");
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
@@ -65,7 +68,25 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertDoesNotThrow(() -> chainedAuthProperties.validate());
+  }
+
+  @Test
+  void testWithoutPlugins() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("authorization.chain.plugins", "");
+    properties.put("authorization.chain.hive1.provider", "ranger");
+    properties.put("authorization.chain.hive1.ranger.auth.type", "simple");
+    properties.put("authorization.chain.hive1.ranger.admin.url", "http://localhost:6080");
+    properties.put("authorization.chain.hive1.ranger.username", "admin");
+    properties.put("authorization.chain.hive1.ranger.password", "admin");
+    properties.put("authorization.chain.hive1.ranger.service.type", "hive");
+    properties.put("authorization.chain.hive1.ranger.service.name", "hiveDev");
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> chainedAuthProperties.validate());
   }
 
   @Test
@@ -86,7 +107,9 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    Assertions.assertDoesNotThrow(() -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertDoesNotThrow(() -> chainedAuthProperties.validate());
   }
 
   @Test
@@ -107,8 +130,9 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> chainedAuthProperties.validate());
   }
 
   @Test
@@ -129,8 +153,9 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> chainedAuthProperties.validate());
   }
 
   @Test
@@ -151,8 +176,9 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.plug3.ranger.service.name", "hdfsDev");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> chainedAuthProperties.validate());
   }
 
   @Test
@@ -173,14 +199,15 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ChainAuthorizationProperties.validate(properties));
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> chainedAuthProperties.validate());
   }
 
   @Test
   void testFetchRangerPrpoerties() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.METASTORE_URIS, "thrift://localhost:9083");
+    properties.put(METASTORE_URIS, "thrift://localhost:9083");
     properties.put("gravitino.bypass.hive.metastore.client.capability.check", "true");
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "chain");
@@ -199,15 +226,25 @@ public class TestChainAuthorizationProperties {
     properties.put("authorization.chain.hdfs1.ranger.password", "admin");
     properties.put("authorization.chain.hdfs1.ranger.service.type", "hadoop");
     properties.put("authorization.chain.hdfs1.ranger.service.name", "hdfsDev");
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
 
-    Map<String, String> rangerHiveProperties =
-        ChainAuthorizationProperties.fetchAuthPluginProperties("hive1", properties);
     Assertions.assertDoesNotThrow(
-        () -> RangerAuthorizationProperties.validate(rangerHiveProperties));
+        () -> {
+          Map<String, String> rangerHiveProperties =
+              chainedAuthProperties.fetchAuthPluginProperties("hive1");
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(rangerHiveProperties);
+          rangerAuthProperties.validate();
+        });
 
-    Map<String, String> rangerHDFSProperties =
-        ChainAuthorizationProperties.fetchAuthPluginProperties("hdfs1", properties);
     Assertions.assertDoesNotThrow(
-        () -> RangerAuthorizationProperties.validate(rangerHDFSProperties));
+        () -> {
+          Map<String, String> rangerHDFSProperties =
+              chainedAuthProperties.fetchAuthPluginProperties("hdfs1");
+          RangerAuthorizationProperties rangerAuthProperties =
+              new RangerAuthorizationProperties(rangerHDFSProperties);
+          rangerAuthProperties.validate();
+        });
   }
 }

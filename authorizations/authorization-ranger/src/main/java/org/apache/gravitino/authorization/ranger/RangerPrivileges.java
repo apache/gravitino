@@ -116,6 +116,32 @@ public class RangerPrivileges {
     }
   }
 
+  public static class RangerHDFSPrivilegeImpl implements AuthorizationPrivilege {
+    private AuthorizationPrivilege rangerHivePrivilege;
+    private Privilege.Condition condition;
+
+    public RangerHDFSPrivilegeImpl(
+        AuthorizationPrivilege rangerHivePrivilege, Privilege.Condition condition) {
+      this.rangerHivePrivilege = rangerHivePrivilege;
+      this.condition = condition;
+    }
+
+    @Override
+    public String getName() {
+      return rangerHivePrivilege.getName();
+    }
+
+    @Override
+    public Privilege.Condition condition() {
+      return condition;
+    }
+
+    @Override
+    public boolean equalsTo(String value) {
+      return rangerHivePrivilege.equalsTo(value);
+    }
+  }
+
   static List<Class<? extends Enum<? extends AuthorizationPrivilege>>> allRangerPrivileges =
       Lists.newArrayList(
           RangerHadoopSQLPrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
