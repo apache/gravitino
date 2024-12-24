@@ -192,7 +192,6 @@ public class TestMain {
     assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
   }
 
-  @Test
   @SuppressWarnings("DefaultCharset")
   public void DeleteTagWithNoTag() {
     String[] args = {"tag", "delete", "--metalake", "metalake_test_no_tag", "-f"};

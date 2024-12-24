@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
@@ -37,6 +39,7 @@ import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.CatalogDisable;
 import org.apache.gravitino.cli.commands.CatalogEnable;
+import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
@@ -316,6 +319,36 @@ class TestCatalogCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new_name");
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testCatalogDetailsCommandWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newCatalogDetails(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            Command.OUTPUT_FORMAT_TABLE,
+            "metalake_demo",
+            "catalog");
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        "Missing --name option."
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.CATALOG);
   }
 
   @Test

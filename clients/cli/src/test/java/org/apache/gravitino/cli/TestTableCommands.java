@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateTable;
@@ -451,14 +452,15 @@ class TestTableCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null);
-    assertTrue(
-        errContent
-            .toString()
-            .contains(
-                "Missing required argument(s): "
-                    + CommandEntities.CATALOG
-                    + ", "
-                    + CommandEntities.SCHEMA));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.CATALOG
+            + ", "
+            + CommandEntities.SCHEMA);
   }
 
   @Test
@@ -478,8 +480,13 @@ class TestTableCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null);
-    assertTrue(
-        errContent.toString().contains("Missing required argument(s): " + CommandEntities.SCHEMA));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.SCHEMA);
   }
 
   @Test
@@ -498,16 +505,17 @@ class TestTableCommands {
     verify(commandLine, never())
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null);
-    assertTrue(
-        errContent
-            .toString()
-            .contains(
-                "Missing required argument(s): "
-                    + CommandEntities.CATALOG
-                    + ", "
-                    + CommandEntities.SCHEMA
-                    + ", "
-                    + CommandEntities.TABLE));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.CATALOG
+            + ", "
+            + CommandEntities.SCHEMA
+            + ", "
+            + CommandEntities.TABLE);
   }
 
   @Test
@@ -526,14 +534,15 @@ class TestTableCommands {
     verify(commandLine, never())
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null);
-    assertTrue(
-        errContent
-            .toString()
-            .contains(
-                "Missing required argument(s): "
-                    + CommandEntities.SCHEMA
-                    + ", "
-                    + CommandEntities.TABLE));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.SCHEMA
+            + ", "
+            + CommandEntities.TABLE);
   }
 
   @Test
@@ -554,7 +563,12 @@ class TestTableCommands {
     verify(commandLine, never())
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
-    assertTrue(
-        errContent.toString().contains("Missing required argument(s): " + CommandEntities.TABLE));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.TABLE);
   }
 }

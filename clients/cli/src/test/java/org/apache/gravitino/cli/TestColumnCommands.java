@@ -28,9 +28,11 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.base.Joiner;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AddColumn;
@@ -62,6 +64,11 @@ class TestColumnCommands {
     mockOptions = mock(Options.class);
     System.setOut(new PrintStream(outContent));
     System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  void restoreExitFlg() {
+    Main.useExit = true;
   }
 
   @AfterEach
@@ -434,5 +441,209 @@ class TestColumnCommands {
             "varchar(100)");
     commandLine.handleCommandLine();
     verify(mockUpdateDefault).handle();
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + Joiner.on(", ")
+                .join(
+                    Arrays.asList(
+                        CommandEntities.CATALOG,
+                        CommandEntities.SCHEMA,
+                        CommandEntities.TABLE,
+                        CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutSchema() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + Joiner.on(", ")
+                .join(
+                    Arrays.asList(
+                        CommandEntities.SCHEMA, CommandEntities.TABLE, CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutTable() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            null,
+            null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + Joiner.on(", ").join(Arrays.asList(CommandEntities.TABLE, CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutColumn() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + Joiner.on(", ").join(Arrays.asList(CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListColumnCommandWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListColumns(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + Joiner.on(", ")
+                .join(
+                    Arrays.asList(
+                        CommandEntities.CATALOG, CommandEntities.SCHEMA, CommandEntities.TABLE)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListColumnCommandWithoutSchema() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListColumns(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.TABLE)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListColumnCommandWithoutTable() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListColumns(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + "Missing required argument(s): "
+            + CommandEntities.TABLE);
   }
 }
