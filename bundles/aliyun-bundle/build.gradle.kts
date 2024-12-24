@@ -51,6 +51,7 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 }
 
 tasks.withType(ShadowJar::class.java) {
