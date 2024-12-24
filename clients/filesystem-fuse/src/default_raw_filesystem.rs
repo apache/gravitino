@@ -205,23 +205,23 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut file_with_out_id = self
+        let mut file_without_id = self
             .fs
             .create_file(&parent_file_entry.path, name, OpenFileFlags(flags))
             .await?;
 
-        file_with_out_id.set_file_id(parent_file_id, self.next_file_id());
+        file_without_id.set_file_id(parent_file_id, self.next_file_id());
 
         // insert the new file to file entry manager
         self.insert_file_entry_locked(
             parent_file_id,
-            file_with_out_id.file_stat.file_id,
-            &file_with_out_id.file_stat.path,
+            file_without_id.file_stat.file_id,
+            &file_without_id.file_stat.path,
         )
         .await;
 
         // put the openfile to the opened file manager and allocate a file handle id
-        let file_with_id = self.opened_file_manager.put(file_with_out_id);
+        let file_with_id = self.opened_file_manager.put(file_without_id);
         let opened_file_with_file_handle_id = file_with_id.lock().await;
         Ok(opened_file_with_file_handle_id.file_handle())
     }
