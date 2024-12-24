@@ -99,6 +99,8 @@ public class S3FileSystemProvider implements FileSystemProvider {
         LOGGER.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
             provider);
+        configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+        return;
       }
     }
 
