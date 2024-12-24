@@ -21,9 +21,22 @@ package org.apache.gravitino.listener;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.listener.api.event.AlterTagPreEvent;
+import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.CreateTagPreEvent;
+import org.apache.gravitino.listener.api.event.DeleteTagPreEvent;
+import org.apache.gravitino.listener.api.event.GetTagForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.GetTagPreEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
+import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * {@code TagEventDispatcher} is a decorator for {@link TagDispatcher} that not only delegates tag
@@ -45,7 +58,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public String[] listTags(String metalake) {
-    // TODO: listTagsPreEvent
+    eventBus.dispatchEvent(new ListTagsPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       // TODO: listTagsEvent
       return dispatcher.listTags(metalake);
