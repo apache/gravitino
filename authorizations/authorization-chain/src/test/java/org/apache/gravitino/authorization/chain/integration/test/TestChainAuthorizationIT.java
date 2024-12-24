@@ -155,7 +155,7 @@ public class TestChainAuthorizationIT extends RangerBaseE2EIT {
   }
 
   @Test
-  public void testCreateSchema() throws IOException {
+  public void testCreateSchemaInCatalog() throws IOException {
     // Choose a catalog
     useCatalog();
 
@@ -245,6 +245,11 @@ public class TestChainAuthorizationIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "comment", catalogConf);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
+  }
+
+  @Test
+  public void testCreateSchema() throws InterruptedException {
+    // TODO
   }
 
   @Test

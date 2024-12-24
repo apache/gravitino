@@ -438,6 +438,9 @@ public class BaseIT {
       throw new IllegalStateException("Failed to set environment variable", e);
     } finally {
       setEnv(key, originalValue);
+      if (key.equals("HADOOP_USER_NAME") && value != null) {
+        System.setProperty("user.name", originalValue);
+      }
     }
   }
 

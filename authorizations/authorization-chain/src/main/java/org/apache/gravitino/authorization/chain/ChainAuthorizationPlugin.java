@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization.chain;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -27,11 +26,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.AuthorizationProperties;
 import org.apache.gravitino.authorization.ChainAuthorizationProperties;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
@@ -52,29 +51,27 @@ public class ChainAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   private void initPlugins(String catalogProvider, Map<String, String> properties) {
-    ChainAuthorizationProperties.validate(properties);
+    ChainAuthorizationProperties chainAuthorizationProperties =
+        new ChainAuthorizationProperties(properties);
+    chainAuthorizationProperties.validate();
     // Validate the properties for each plugin
-    ChainAuthorizationProperties.plugins(properties)
+    chainAuthorizationProperties
+        .plugins()
         .forEach(
             pluginName -> {
               Map<String, String> pluginProperties =
-                  ChainAuthorizationProperties.fetchAuthPluginProperties(pluginName, properties);
-              String authProvider =
-                  ChainAuthorizationProperties.getPluginProvider(pluginName, properties);
-              if ("ranger".equals(authProvider)) {
-                RangerAuthorizationProperties.validate(pluginProperties);
-              } else {
-                throw new IllegalArgumentException("Unsupported provider: " + authProvider);
-              }
+                  chainAuthorizationProperties.fetchAuthPluginProperties(pluginName);
+              String authProvider = chainAuthorizationProperties.getPluginProvider(pluginName);
+              AuthorizationProperties.validate(authProvider, pluginProperties);
             });
     // Create the plugins
-    ChainAuthorizationProperties.plugins(properties)
+    chainAuthorizationProperties
+        .plugins()
         .forEach(
             pluginName -> {
-              String authProvider =
-                  ChainAuthorizationProperties.getPluginProvider(pluginName, properties);
+              String authProvider = chainAuthorizationProperties.getPluginProvider(pluginName);
               Map<String, String> pluginConfig =
-                  ChainAuthorizationProperties.fetchAuthPluginProperties(pluginName, properties);
+                  chainAuthorizationProperties.fetchAuthPluginProperties(pluginName);
 
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
               BaseAuthorization.buildAuthorizationPkgPath(
@@ -92,11 +89,6 @@ public class ChainAuthorizationPlugin implements AuthorizationPlugin {
                 throw new RuntimeException(e);
               }
             });
-  }
-
-  @VisibleForTesting
-  public final List<AuthorizationPlugin> getPlugins() {
-    return plugins;
   }
 
   @Override
