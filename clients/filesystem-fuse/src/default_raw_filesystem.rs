@@ -257,8 +257,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.remove_file(&path).await?;
 
         // remove the file from file entry manager
-        self.remove_file_entry_locked(&parent_file_entry.path.join(name))
-            .await;
+        self.remove_file_entry_locked(&path).await;
         Ok(())
     }
 
@@ -268,8 +267,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.remove_dir(&path).await?;
 
         // remove the dir from file entry manager
-        self.remove_file_entry_locked(&parent_file_entry.path.join(name))
-            .await;
+        self.remove_file_entry_locked(&path).await;
         Ok(())
     }
 
@@ -409,6 +407,7 @@ mod tests {
         let memory_fs = MemoryFileSystem::new().await;
         let raw_fs = DefaultRawFileSystem::new(memory_fs);
         let _ = raw_fs.init().await;
-        TestRawFileSystem::test_raw_file_system(&raw_fs).await;
+        let mut tester = TestRawFileSystem::new(raw_fs);
+        tester.test_raw_file_system().await;
     }
 }

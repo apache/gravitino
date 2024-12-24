@@ -244,6 +244,7 @@ mod tests {
     async fn test_memory_file_system() {
         let fs = MemoryFileSystem::new().await;
         let _ = fs.init().await;
-        TestPathFileSystem::test_path_file_system(&fs).await;
+        let mut tester = TestPathFileSystem::new(fs);
+        tester.test_path_file_system().await;
     }
 }

@@ -273,256 +273,362 @@ pub(crate) mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    pub(crate) struct TestPathFileSystem();
+    pub(crate) struct TestPathFileSystem<F: PathFileSystem> {
+        files: HashMap<PathBuf, FileStat>,
+        fs: F,
+    }
 
-    impl TestPathFileSystem {
-        pub(crate) async fn test_path_file_system(fs: &impl PathFileSystem) {
-            let mut root_dir_child_file_stats = HashMap::new();
+    impl<F: PathFileSystem> TestPathFileSystem<F> {
+        pub(crate) fn new(fs: F) -> Self {
+            Self {
+                files: HashMap::new(),
+                fs,
+            }
+        }
 
-            // test root dir
+        pub(crate) async fn test_path_file_system(&mut self) {
+            // Test root dir
+            self.test_root_dir().await;
+
+            // Test stat file
+            self.test_stat_file(Path::new("/.gvfs_meta"), RegularFile, 0)
+                .await;
+
+            // Test create file
+            self.test_create_file(Path::new("/file1.txt")).await;
+
+            // Test create dir
+            self.test_create_dir(Path::new("/dir1")).await;
+
+            // Test list dir
+            self.test_list_dir(Path::new("/")).await;
+
+            // Test remove file
+            self.test_remove_file(Path::new("/file1.txt")).await;
+
+            // Test remove dir
+            self.test_remove_dir(Path::new("/dir1")).await;
+
+            // Test file not found
+            self.test_file_not_found(Path::new("unknown")).await;
+
+            // Test list dir
+            self.test_list_dir(Path::new("/")).await;
+        }
+
+        async fn test_root_dir(&mut self) {
             let root_dir_path = Path::new("/");
-            let root_file_stat = fs.stat(root_dir_path).await;
+            let root_file_stat = self.fs.stat(root_dir_path).await;
             assert!(root_file_stat.is_ok());
             let root_file_stat = root_file_stat.unwrap();
-            TestPathFileSystem::assert_file_stat(&root_file_stat, root_dir_path, Directory, 0);
+            self.assert_file_stat(&root_file_stat, root_dir_path, Directory, 0);
+        }
 
-            // test meta file
-            let meta_file_path = Path::new("/.gvfs_meta");
-            let meta_file_stat = fs.stat(meta_file_path).await;
-            assert!(meta_file_stat.is_ok());
-            let meta_file_stat = meta_file_stat.unwrap();
-            TestPathFileSystem::assert_file_stat(
-                &meta_file_stat,
-                meta_file_path,
-                FileType::RegularFile,
-                0,
-            );
-            root_dir_child_file_stats.insert(meta_file_stat.path.clone(), meta_file_stat);
+        async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
+            let file_stat = self.fs.stat(path).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+            self.assert_file_stat(&file_stat, path, expect_kind, expect_size);
+            self.files.insert(file_stat.path.clone(), file_stat);
+        }
 
-            // test create file
-            let file_path = Path::new("/file1.txt");
-            let opened_file = fs.create_file(file_path, OpenFileFlags(0)).await;
+        async fn test_create_file(&mut self, path: &Path) {
+            let opened_file = self.fs.create_file(path, OpenFileFlags(0)).await;
             assert!(opened_file.is_ok());
             let file = opened_file.unwrap();
-            TestPathFileSystem::assert_file_stat(
-                &file.file_stat,
-                file_path,
-                FileType::RegularFile,
-                0,
-            );
-            root_dir_child_file_stats.insert(file.file_stat.path.clone(), file.file_stat.clone());
+            self.assert_file_stat(&file.file_stat, path, FileType::RegularFile, 0);
+            self.test_stat_file(path, RegularFile, 0).await;
+        }
 
-            // test create dir
-            let dir_path = Path::new("/dir1");
-            let dir_stat = fs.create_dir(dir_path).await;
+        async fn test_create_dir(&mut self, path: &Path) {
+            let dir_stat = self.fs.create_dir(path).await;
             assert!(dir_stat.is_ok());
             let dir_stat = dir_stat.unwrap();
-            TestPathFileSystem::assert_file_stat(&dir_stat, dir_path, Directory, 0);
-            root_dir_child_file_stats.insert(dir_stat.path.clone(), dir_stat);
+            self.assert_file_stat(&dir_stat, path, Directory, 0);
+            self.test_stat_file(path, Directory, 0).await;
+        }
 
-            // test list dir
-            let list_dir = fs.read_dir(Path::new("/")).await;
+        async fn test_list_dir(&self, path: &Path) {
+            let list_dir = self.fs.read_dir(path).await;
             assert!(list_dir.is_ok());
             let list_dir = list_dir.unwrap();
-            assert_eq!(list_dir.len(), root_dir_child_file_stats.len());
+            assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
-                assert!(root_dir_child_file_stats.contains_key(&file_stat.path));
-                let actual_file_stat = root_dir_child_file_stats.get(&file_stat.path).unwrap();
-                TestPathFileSystem::assert_file_stat(
+                assert!(self.files.contains_key(&file_stat.path));
+                let actual_file_stat = self.files.get(&file_stat.path).unwrap();
+                self.assert_file_stat(
                     &file_stat,
                     &actual_file_stat.path,
                     actual_file_stat.kind,
                     actual_file_stat.size,
                 );
             }
+        }
 
-            // test remove file
-            let remove_file = fs.remove_file(file_path).await;
+        async fn test_remove_file(&mut self, path: &Path) {
+            let remove_file = self.fs.remove_file(path).await;
             assert!(remove_file.is_ok());
-            root_dir_child_file_stats.remove(file_path);
+            self.files.remove(path);
 
-            // test remove dir
-            let remove_dir = fs.remove_dir(dir_path).await;
+            self.test_file_not_found(path).await;
+        }
+
+        async fn test_remove_dir(&mut self, path: &Path) {
+            let remove_dir = self.fs.remove_dir(path).await;
             assert!(remove_dir.is_ok());
-            root_dir_child_file_stats.remove(dir_path);
+            self.files.remove(path);
 
-            // test list dir
-            let list_dir = fs.read_dir(Path::new("/")).await;
-            assert!(list_dir.is_ok());
+            self.test_file_not_found(path).await;
+        }
 
-            let list_dir = list_dir.unwrap();
-            assert_eq!(list_dir.len(), root_dir_child_file_stats.len());
-            for file_stat in list_dir {
-                assert!(root_dir_child_file_stats.contains_key(&file_stat.path));
-                let actual_file_stat = root_dir_child_file_stats.get(&file_stat.path).unwrap();
-                TestPathFileSystem::assert_file_stat(
-                    &file_stat,
-                    &actual_file_stat.path,
-                    actual_file_stat.kind,
-                    actual_file_stat.size,
-                );
-            }
-
-            // test file not found
-            let not_found_file = fs.stat(Path::new("/not_found.txt")).await;
+        async fn test_file_not_found(&self, path: &Path) {
+            let not_found_file = self.fs.stat(path).await;
             assert!(not_found_file.is_err());
         }
 
-        fn assert_file_stat(file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
+        fn assert_file_stat(&self, file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
             assert_eq!(file_stat.path, path);
             assert_eq!(file_stat.kind, kind);
             assert_eq!(file_stat.size, size);
         }
     }
 
-    pub(crate) struct TestRawFileSystem();
+    pub(crate) struct TestRawFileSystem<F: RawFileSystem> {
+        fs: F,
+        files: HashMap<u64, FileStat>,
+    }
 
-    impl TestRawFileSystem {
-        pub(crate) async fn test_raw_file_system(fs: &impl RawFileSystem) {
-            let mut root_dir_child_file_stats = HashMap::new();
+    impl<F: RawFileSystem> TestRawFileSystem<F> {
+        pub(crate) fn new(fs: F) -> Self {
+            Self {
+                fs,
+                files: HashMap::new(),
+            }
+        }
 
-            // test root dir
-            let root_file_stat = fs.stat(ROOT_DIR_FILE_ID).await;
+        pub(crate) async fn test_raw_file_system(&mut self) {
+            // Test root dir
+            self.test_root_dir().await;
+
+            let parent_file_id = ROOT_DIR_FILE_ID;
+            // Test lookup file
+            let file_id = self
+                .test_lookup_file(parent_file_id, ".gvfs_meta".as_ref(), RegularFile, 0)
+                .await;
+
+            // Test get file stat
+            self.test_stat_file(file_id, Path::new("/.gvfs_meta"), RegularFile, 0)
+                .await;
+
+            // Test get file path
+            self.test_get_file_path(file_id, "/.gvfs_meta").await;
+
+            // Test create file
+            self.test_create_file(parent_file_id, "file1.txt".as_ref())
+                .await;
+
+            // Test open file
+            let file_handle = self
+                .test_open_file(parent_file_id, "file1.txt".as_ref())
+                .await;
+
+            // Test write file
+            self.test_write_file(&file_handle, "test").await;
+
+            // Test read file
+            self.test_read_file(&file_handle, "test").await;
+
+            // Test close file
+            self.test_close_file(&file_handle).await;
+
+            // Test create dir
+            self.test_create_dir(parent_file_id, "dir1".as_ref()).await;
+
+            // Test list dir
+            self.test_list_dir(parent_file_id).await;
+
+            // Test remove file
+            self.test_remove_file(parent_file_id, "file1.txt".as_ref())
+                .await;
+
+            // Test remove dir
+            self.test_remove_dir(parent_file_id, "dir1".as_ref()).await;
+
+            // Test list dir again
+            self.test_list_dir(parent_file_id).await;
+
+            // Test file not found
+            self.test_file_not_found(23).await;
+        }
+
+        async fn test_root_dir(&self) {
+            let root_file_stat = self.fs.stat(ROOT_DIR_FILE_ID).await;
             assert!(root_file_stat.is_ok());
             let root_file_stat = root_file_stat.unwrap();
-            TestRawFileSystem::assert_file_stat(
+            self.assert_file_stat(
                 &root_file_stat,
                 Path::new(ROOT_DIR_PATH),
-                Directory,
+                FileType::Directory,
                 0,
             );
+        }
 
-            // test lookup meta file
-            let meta_file_stat = fs.lookup(ROOT_DIR_FILE_ID, ".gvfs_meta".as_ref()).await;
-            assert!(meta_file_stat.is_ok());
-            let meta_file_stat = meta_file_stat.unwrap();
-            TestRawFileSystem::assert_file_stat(
-                &meta_file_stat,
-                Path::new("/.gvfs_meta"),
-                RegularFile,
-                0,
-            );
+        async fn test_lookup_file(
+            &mut self,
+            parent_file_id: u64,
+            expect_name: &OsStr,
+            expect_kind: FileType,
+            expect_size: u64,
+        ) -> u64 {
+            let file_stat = self.fs.lookup(parent_file_id, expect_name).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+            self.assert_file_stat(&file_stat, &file_stat.path, expect_kind, expect_size);
+            assert_eq!(file_stat.name, expect_name);
+            let file_id = file_stat.file_id;
+            self.files.insert(file_stat.file_id, file_stat);
+            file_id
+        }
 
-            //test get meta file path
-            let file_path = fs.get_file_path(meta_file_stat.file_id).await;
+        async fn test_get_file_path(&mut self, file_id: u64, expect_path: &str) {
+            let file_path = self.fs.get_file_path(file_id).await;
             assert!(file_path.is_ok());
-            assert_eq!(file_path.unwrap(), meta_file_stat.path.to_string_lossy());
+            assert_eq!(file_path.unwrap(), expect_path);
+        }
 
-            // test stat meta file
-            let meta_file_stat = fs.stat(meta_file_stat.file_id).await;
-            assert!(meta_file_stat.is_ok());
-            let meta_file_stat = meta_file_stat.unwrap();
-            TestRawFileSystem::assert_file_stat(
-                &meta_file_stat,
-                Path::new("/.gvfs_meta"),
-                RegularFile,
-                0,
-            );
-            root_dir_child_file_stats.insert(meta_file_stat.path.clone(), meta_file_stat);
+        async fn test_stat_file(
+            &mut self,
+            file_id: u64,
+            expect_path: &Path,
+            expect_kind: FileType,
+            expect_size: u64,
+        ) {
+            let file_stat = self.fs.stat(file_id).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+            self.assert_file_stat(&file_stat, expect_path, expect_kind, expect_size);
+            self.files.insert(file_stat.file_id, file_stat);
+        }
 
-            // test create file file1.txt
-            let file = fs
-                .create_file(ROOT_DIR_FILE_ID, "file1.txt".as_ref(), 0)
-                .await;
+        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) {
+            let file = self.fs.create_file(root_file_id, name, 0).await;
             assert!(file.is_ok());
             let file = file.unwrap();
             assert!(file.handle_id > 0);
             assert!(file.file_id >= INITIAL_FILE_ID);
+            let file_stat = self.fs.stat(file.file_id).await;
+            assert!(file_stat.is_ok());
 
-            //test open file file1.txt
-            let file_handle = fs.open_file(file.file_id, 0).await;
+            self.test_stat_file(file.file_id, &file_stat.unwrap().path, RegularFile, 0)
+                .await;
+        }
+
+        async fn test_open_file(&self, root_file_id: u64, name: &OsStr) -> FileHandle {
+            let file = self.fs.lookup(root_file_id, name).await.unwrap();
+            let file_handle = self.fs.open_file(file.file_id, 0).await;
             assert!(file_handle.is_ok());
             let file_handle = file_handle.unwrap();
             assert_eq!(file_handle.file_id, file.file_id);
+            file_handle
+        }
 
-            //test write file file1.txt
-            let write_size = fs
-                .write(file.file_id, file_handle.handle_id, 0, "test".as_bytes())
+        async fn test_write_file(&mut self, file_handle: &FileHandle, content: &str) {
+            let write_size = self
+                .fs
+                .write(
+                    file_handle.file_id,
+                    file_handle.handle_id,
+                    0,
+                    content.as_bytes(),
+                )
                 .await;
             assert!(write_size.is_ok());
-            assert_eq!(write_size.unwrap(), 4);
+            assert_eq!(write_size.unwrap(), content.len() as u32);
 
-            // test read file file1.txt
-            let read_data = fs.read(file.file_id, file_handle.handle_id, 0, 4).await;
+            self.files.get_mut(&file_handle.file_id).unwrap().size = content.len() as u64;
+        }
+
+        async fn test_read_file(&self, file_handle: &FileHandle, expected_content: &str) {
+            let read_data = self
+                .fs
+                .read(
+                    file_handle.file_id,
+                    file_handle.handle_id,
+                    0,
+                    expected_content.len() as u32,
+                )
+                .await;
             assert!(read_data.is_ok());
-            assert_eq!(read_data.unwrap(), "test".as_bytes());
+            assert_eq!(read_data.unwrap(), expected_content.as_bytes());
+        }
 
-            // test close file file1.txt
-            let close_file = fs.close_file(file.file_id, file_handle.handle_id).await;
+        async fn test_close_file(&self, file_handle: &FileHandle) {
+            let close_file = self
+                .fs
+                .close_file(file_handle.file_id, file_handle.handle_id)
+                .await;
             assert!(close_file.is_ok());
+        }
 
-            // test stat file file1.txt
-            let file_stat = fs.stat(file.file_id).await;
-            assert!(file_stat.is_ok());
-            let file_stat = file_stat.unwrap();
-            TestRawFileSystem::assert_file_stat(
-                &file_stat,
-                Path::new("/file1.txt"),
-                RegularFile,
-                write_size.unwrap() as u64,
-            );
-            root_dir_child_file_stats.insert(file_stat.path.clone(), file_stat);
-
-            // test create dir
-            let dir = fs.create_dir(ROOT_DIR_FILE_ID, "dir1".as_ref()).await;
+        async fn test_create_dir(&mut self, parent_file_id: u64, name: &OsStr) {
+            let dir = self.fs.create_dir(parent_file_id, name).await;
             assert!(dir.is_ok());
             let dir_file_id = dir.unwrap();
             assert!(dir_file_id >= INITIAL_FILE_ID);
+            let dir_stat = self.fs.stat(dir_file_id).await;
+            assert!(dir_stat.is_ok());
 
-            let dir = fs.stat(dir_file_id).await;
-            assert!(dir.is_ok());
-            let dir = dir.unwrap();
-            TestRawFileSystem::assert_file_stat(&dir, Path::new("/dir1"), Directory, 0);
-            root_dir_child_file_stats.insert(dir.path.clone(), dir);
+            self.test_stat_file(dir_file_id, &dir_stat.unwrap().path, Directory, 0)
+                .await;
+        }
 
-            // test list dir
-            let list_dir = fs.read_dir(ROOT_DIR_FILE_ID).await;
+        async fn test_list_dir(&self, root_file_id: u64) {
+            let list_dir = self.fs.read_dir(root_file_id).await;
             assert!(list_dir.is_ok());
             let list_dir = list_dir.unwrap();
-            assert_eq!(list_dir.len(), root_dir_child_file_stats.len());
+            assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
-                assert!(root_dir_child_file_stats.contains_key(&file_stat.path));
-                let actual_file_stat = root_dir_child_file_stats.get(&file_stat.path).unwrap();
-                TestRawFileSystem::assert_file_stat(
+                assert!(self.files.contains_key(&file_stat.file_id));
+                let actual_file_stat = self.files.get(&file_stat.file_id).unwrap();
+                self.assert_file_stat(
                     &file_stat,
                     &actual_file_stat.path,
                     actual_file_stat.kind,
                     actual_file_stat.size,
                 );
             }
+        }
 
-            // test remove file
-            let remove_file = fs.remove_file(ROOT_DIR_FILE_ID, "file1.txt".as_ref()).await;
+        async fn test_remove_file(&mut self, root_file_id: u64, name: &OsStr) {
+            let file_stat = self.fs.lookup(root_file_id, name).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+
+            let remove_file = self.fs.remove_file(root_file_id, name).await;
             assert!(remove_file.is_ok());
-            root_dir_child_file_stats.remove(Path::new("/file1.txt"));
+            self.files.remove(&file_stat.file_id);
 
-            // test remove dir
-            let remove_dir = fs.remove_dir(ROOT_DIR_FILE_ID, "dir1".as_ref()).await;
+            self.test_file_not_found(file_stat.file_id).await;
+        }
+
+        async fn test_remove_dir(&mut self, root_file_id: u64, name: &OsStr) {
+            let file_stat = self.fs.lookup(root_file_id, name).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+
+            let remove_dir = self.fs.remove_dir(root_file_id, name).await;
             assert!(remove_dir.is_ok());
-            root_dir_child_file_stats.remove(Path::new("/dir1"));
+            self.files.remove(&file_stat.file_id);
 
-            // test list dir
-            let list_dir = fs.read_dir(ROOT_DIR_FILE_ID).await;
-            assert!(list_dir.is_ok());
-            let list_dir = list_dir.unwrap();
-            assert_eq!(list_dir.len(), root_dir_child_file_stats.len());
-            for file_stat in list_dir {
-                assert!(root_dir_child_file_stats.contains_key(&file_stat.path));
-                let actual_file_stat = root_dir_child_file_stats.get(&file_stat.path).unwrap();
-                TestRawFileSystem::assert_file_stat(
-                    &file_stat,
-                    &actual_file_stat.path,
-                    actual_file_stat.kind,
-                    actual_file_stat.size,
-                );
-            }
+            self.test_file_not_found(file_stat.file_id).await;
+        }
 
-            // test file not found
-            let not_found_file = fs.stat(ROOT_DIR_FILE_ID + 1).await;
+        async fn test_file_not_found(&self, file_id: u64) {
+            let not_found_file = self.fs.stat(file_id).await;
             assert!(not_found_file.is_err());
         }
 
-        fn assert_file_stat(file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
+        fn assert_file_stat(&self, file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
             assert_eq!(file_stat.path, path);
             assert_eq!(file_stat.kind, kind);
             assert_eq!(file_stat.size, size);
