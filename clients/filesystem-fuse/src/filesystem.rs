@@ -16,9 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
+use crate::utils::{join_file_path, split_file_path};
 use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::{Errno, FileType, Timestamp};
+use std::time::SystemTime;
 
 pub(crate) type Result<T> = std::result::Result<T, Errno>;
 
@@ -35,15 +38,15 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn init(&self) -> Result<()>;
 
     /// Get the file path by file id, if the file id is valid, return the file path
-    async fn get_file_path(&self, file_id: u64) -> String;
+    async fn get_file_path(&self, file_id: u64) -> Result<String>;
 
     /// Validate the file id and file handle, if file id and file handle is valid and it associated, return Ok
-    async fn valid_file_id(&self, file_id: u64, fh: u64) -> Result<()>;
+    async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()>;
 
     /// Get the file stat by file id. if the file id is valid, return the file stat
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
 
-    /// Lookup the file by parent file id and file name, if the file is exist, return the file stat
+    /// Lookup the file by parent file id and file name, if the file exists, return the file stat
     async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat>;
 
     /// Read the directory by file id, if the file id is a valid directory, return the file stat list
@@ -87,22 +90,22 @@ pub(crate) trait PathFileSystem: Send + Sync {
     /// Init the file system
     async fn init(&self) -> Result<()>;
 
-    /// Get the file stat by file path, if the file is exist, return the file stat
-    async fn stat(&self, name: &str) -> Result<FileStat>;
+    /// Get the file stat by file path, if the file exists, return the file stat
+    async fn stat(&self, path: &str) -> Result<FileStat>;
 
-    /// Get the file stat by parent file path and file name, if the file is exist, return the file stat
+    /// Get the file stat by parent file path and file name, if the file exists, return the file stat
     async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat>;
 
-    /// Read the directory by file path, if the file is a valid directory, return the file stat list
-    async fn read_dir(&self, name: &str) -> Result<Vec<FileStat>>;
+    /// Read the directory by file path, if the directory exists, return the file stat list
+    async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>>;
 
-    /// Open the file by file path and flags, if the file is exist, return the opened file
-    async fn open_file(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    /// Open the file by file path and flags, if the file exists, return the opened file
+    async fn open_file(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
-    /// Open the directory by file path and flags, if the file is exist, return the opened file
-    async fn open_dir(&self, name: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    /// Open the directory by file path and flags, if the file exists, return the opened file
+    async fn open_dir(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
 
-    /// Create the file by parent file path and file name and flags, if successful, return the opened file
+    /// Create the file by parent file path and file name and flags, if successful return the opened file
     async fn create_file(
         &self,
         parent: &str,
@@ -114,7 +117,7 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat>;
 
     /// Set the file attribute by file path and file stat
-    async fn set_attr(&self, name: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
+    async fn set_attr(&self, path: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
 
     /// Remove the file by parent file path and file name
     async fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
@@ -174,9 +177,6 @@ pub struct FileStat {
     // file type like regular file or directory and so on
     pub(crate) kind: FileType,
 
-    // file permission
-    pub(crate) perm: u16,
-
     // file access time
     pub(crate) atime: Timestamp,
 
@@ -190,26 +190,47 @@ pub struct FileStat {
     pub(crate) nlink: u32,
 }
 
-/// Opened file for read or write, it is used to read or write the file content.
-pub(crate) struct OpenedFile {
-    pub(crate) file_stat: FileStat,
+impl FileStat {
+    pub fn new_file_filestat_with_path(path: &str, size: u64) -> Self {
+        let (parent, name) = split_file_path(path);
+        Self::new_file_filestat(parent, name, size)
+    }
 
-    pub(crate) handle_id: u64,
+    pub fn new_dir_filestat_with_path(path: &str) -> Self {
+        let (parent, name) = split_file_path(path);
+        Self::new_dir_filestat(parent, name)
+    }
 
-    pub reader: Option<Box<dyn FileReader>>,
+    pub fn new_file_filestat(parent: &str, name: &str, size: u64) -> Self {
+        Self::new_filestat(parent, name, size, FileType::RegularFile)
+    }
 
-    pub writer: Option<Box<dyn FileWriter>>,
+    pub fn new_dir_filestat(parent: &str, name: &str) -> Self {
+        Self::new_filestat(parent, name, 0, FileType::Directory)
+    }
+
+    pub fn new_filestat(parent: &str, name: &str, size: u64, kind: FileType) -> Self {
+        let atime = Timestamp::from(SystemTime::now());
+        Self {
+            file_id: 0,
+            parent_file_id: 0,
+            name: name.into(),
+            path: join_file_path(parent, name),
+            size: size,
+            kind: kind,
+            atime: atime,
+            mtime: atime,
+            ctime: atime,
+            nlink: 1,
+        }
+    }
+
+    pub(crate) fn set_file_id(&mut self, parent_file_id: u64, file_id: u64) {
+        debug_assert!(file_id != 0 && parent_file_id != 0);
+        self.parent_file_id = parent_file_id;
+        self.file_id = file_id;
+    }
 }
-
-// FileHandle is the file handle for the opened file.
-pub(crate) struct FileHandle {
-    pub(crate) file_id: u64,
-
-    pub(crate) handle_id: u64,
-}
-
-// OpenFileFlags is the open file flags for the file system.
-pub struct OpenFileFlags(u32);
 
 /// File reader interface  for read file content
 #[async_trait]
@@ -237,5 +258,56 @@ pub trait FileWriter: Sync + Send {
     /// flush the file
     async fn flush(&mut self) -> Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_file_stat() {
+        //test new file
+        let file_stat = FileStat::new_file_filestat("a", "b", 10);
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 10);
+        assert_eq!(file_stat.kind, FileType::RegularFile);
+
+        //test new dir
+        let file_stat = FileStat::new_dir_filestat("a", "b");
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 0);
+        assert_eq!(file_stat.kind, FileType::Directory);
+
+        //test new file with path
+        let file_stat = FileStat::new_file_filestat_with_path("a/b", 10);
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 10);
+        assert_eq!(file_stat.kind, FileType::RegularFile);
+
+        //test new dir with path
+        let file_stat = FileStat::new_dir_filestat_with_path("a/b");
+        assert_eq!(file_stat.name, "b");
+        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.size, 0);
+        assert_eq!(file_stat.kind, FileType::Directory);
+    }
+
+    #[test]
+    fn test_file_stat_set_file_id() {
+        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
+        file_stat.set_file_id(1, 2);
+        assert_eq!(file_stat.file_id, 2);
+        assert_eq!(file_stat.parent_file_id, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed: file_id != 0 && parent_file_id != 0")]
+    fn test_file_stat_set_file_id_panic() {
+        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
+        file_stat.set_file_id(1, 0);
     }
 }

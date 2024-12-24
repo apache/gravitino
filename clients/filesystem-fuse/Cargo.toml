@@ -30,13 +30,15 @@ name = "gvfs-fuse"
 path = "src/main.rs"
 
 [lib]
-name="gvfs_fuse"
+name = "gvfs_fuse"
 
 [dependencies]
 async-trait = "0.1"
 bytes = "1.6.0"
-futures-util = "0.3.30"
+dashmap = "6.1.0"
 fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }
+futures-util = "0.3.30"
+libc = "0.2.168"
 log = "0.4.22"
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
