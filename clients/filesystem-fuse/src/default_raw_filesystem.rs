@@ -148,8 +148,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn get_file_path(&self, file_id: u64) -> Result<String> {
-        let file_entry = self.get_file_entry(file_id).await;
-        Ok(file_entry?.path)
+        let file_entry = self.get_file_entry(file_id).await?;
+        Ok(file_entry.path)
     }
 
     async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()> {
@@ -186,8 +186,9 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn read_dir(&self, file_id: u64) -> Result<Vec<FileStat>> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
-        for file in child_filestats.iter_mut() {
-            self.resolve_file_id_to_filestat(file, file.file_id).await;
+        for file_stat in child_filestats.iter_mut() {
+            self.resolve_file_id_to_filestat(file_stat, file_stat.file_id)
+                .await;
         }
         Ok(child_filestats)
     }
