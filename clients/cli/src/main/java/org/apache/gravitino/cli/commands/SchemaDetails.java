@@ -38,13 +38,14 @@ public class SchemaDetails extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param outputFormat The output format.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    */
   public SchemaDetails(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-    super(url, ignoreVersions);
+      String url, boolean ignoreVersions, String outputFormat, String metalake, String catalog, String schema) {
+    super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -58,6 +59,7 @@ public class SchemaDetails extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
       result = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
+      output(result);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -66,10 +68,6 @@ public class SchemaDetails extends Command {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
-    }
-
-    if (result != null) {
-      System.out.println(result.name() + "," + result.comment());
     }
   }
 }

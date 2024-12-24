@@ -341,6 +341,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     Command.setAuthenticationMode(auth, userName);
     List<String> missingEntities = Lists.newArrayList();
@@ -372,7 +373,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (line.hasOption(GravitinoOptions.AUDIT)) {
           newSchemaAudit(url, ignore, metalake, catalog, schema).handle();
         } else {
-          newSchemaDetails(url, ignore, metalake, catalog, schema).handle();
+          newSchemaDetails(url, ignore, outputFormat, metalake, catalog, schema).handle();
         }
         break;
 
