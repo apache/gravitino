@@ -34,6 +34,7 @@ import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.JdbcAuthorizationProperties;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
@@ -65,7 +66,8 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   public JdbcAuthorizationPlugin(Map<String, String> config) {
     // Initialize the data source
     dataSource = new BasicDataSource();
-    JdbcAuthorizationProperties.validate(config);
+    JdbcAuthorizationProperties jdbcAuthProperties = new JdbcAuthorizationProperties(config);
+    jdbcAuthProperties.validate();
 
     String jdbcUrl = config.get(JdbcAuthorizationProperties.JDBC_URL);
     dataSource.setUrl(jdbcUrl);
