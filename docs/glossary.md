@@ -4,29 +4,9 @@ date: 2023-11-28
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Apache Hadoop
-
-- An open-source distributed storage and processing framework.
-
-## Apache Hive
-
-- An open-source data warehousing and SQL-like query language software project for managing and querying large datasets.
-
-## Apache Iceberg
-
-- An open-source, versioned table format for large-scale data processing.
-
-## Apache License version 2
-
-- A permissive, open-source software license written by The Apache Software Foundation.
-
 ## API
 
 - Application Programming Interface, defining the methods and protocols for interacting with a server.
-
-## Authentication mechanism
-
-- The method used to verify the identity of users and clients accessing a server.
 
 ## AWS
 
@@ -36,9 +16,168 @@ license: "This software is licensed under the Apache License version 2."
 
 - A compatible implementation of the Hive Metastore Service (HMS).
 
+## GPG/GnuPG
+
+- Gnu Privacy Guard or GnuPG is an open-source implementation of the OpenPGP standard.
+  It is usually used for encrypting and signing files and emails.
+
+## HDFS
+
+- **HDFS** (Hadoop Distributed File System) is an open-source distributed file system.
+  It is a key component of the Apache Hadoop ecosystem.
+  HDFS is designed as a distributed storage solution to store and process large-scale datasets.
+  It features high reliability, fault tolerance, and excellent performance.
+
+## HTTP port
+
+- The port number on which a server listens for incoming connections.
+
+## IP address
+
+- Internet Protocol address, a numerical label assigned to each device in a computer network.
+
+## JDBC
+
+- Java Database Connectivity, an API for connecting Java applications to relational databases.
+
+## JDBC URI
+
+- The JDBC connection address specified in the catalog configuration.
+  It usually includes components such as the database type, host, port, and database name.
+
+## JDK
+
+- The software development kit for the Java programming language.
+  A JDK provides tools for compiling, debugging, and running Java applications.
+
+## JMX 
+
+- Java Management Extensions provides tools for managing and monitoring Java applications.
+
+## JSON
+
+- JavaScript Object Notation, a lightweight data interchange format.
+
+## JSON Web Token
+
+- See [JWT](#jwt).
+
+## JVM
+
+- A virtual machine that enables a computer to run Java applications.
+  A JVM implements an abstract machine that is different from the underlying hardware.
+
+## JVM instrumentation 
+
+- The process of adding monitoring and management capabilities to the [JVM](#jvm).
+  The purpose of instrumentation is mostly for the collection of performance metrics.
+
+## JVM metrics 
+
+- Metrics related to the performance and behavior of the [Java Virtual Machine](#jvm).
+  Some useful metrics are memory usage, garbage collection, and buffer pool metrics.
+
+## JWT
+
+- A compact, URL-safe representation for claims between two parties.
+
+## KEYS file
+
+- A file containing public keys used to sign previous releases, necessary for verifying signatures.
+
+## PGP signature
+
+- A digital signature generated using the Pretty Good Privacy (PGP) algorithm.
+  The signature is typically used for validating the authenticity of a file.
+
+## REST
+
+- A set of architectural principles for designing networked applications.
+
+## REST API
+
+- Representational State Transfer (REST) Application Programming Interface.
+  A set of rules and conventions for building and interacting with Web services using standard HTTP methods.
+
+## SHA256 checksum
+
+- A cryptographic hash function used to verify the integrity of files.
+
+## SHA256 checksum file
+
+- A file containing the SHA256 hash value of another file, used for verification purposes.
+
+## SQL
+
+- A programming language used to manage and manipulate relational databases.
+
+## SSH
+
+- Secure Shell, a cryptographic network protocol used for secure communication over a computer network.
+
+## URI
+
+- Uniform Resource Identifier, a string that identifies the name or resource on the internet.
+
+## YAML
+
+- YAML Ain't Markup Language, a human-readable file format often used for structured data.
+
+## Amazon Elastic Block Store (EBS)
+
+- A scalable block storage service provided by Amazon Web Services (AWS).
+
+## Apache Gravitino
+
+- An open-source software platform originally created by Datastrato.
+  It is designed for high-performance, geo-distributed, and federated metadata lakes.
+  Gravitino can manage metadata directly in different sources, types, and regions,
+  providing unified metadata access for data and AI assets.
+
+## Apache Gravitino configuration file (gravitino.conf)
+
+- The configuration file for the Gravitino server, located in the `conf` directory.
+  It follows the standard properties file format and contains settings for the Gravitino server.
+
+## Apache Hadoop
+
+- An open-source distributed storage and processing framework.
+
+## Apache Hive
+
+- An open-source data warehousing software project.
+  It provides SQL-like query language for managing and querying large datasets.
+
+## Apache Iceberg
+
+- An open-source, versioned table format for large-scale data processing.
+
+## Apache Iceberg Hive catalog
+
+- The **Iceberg Hive catalog** is a metadata service designed for the Apache Iceberg table format.
+  It allows external systems to interact with Iceberg metadata using a Hive metastore thrift client.
+
+## Apache Iceberg JDBC catalog
+
+- The **Iceberg JDBC catalog** is a metadata service designed for the Apache Iceberg table format.
+  It enables external systems to interact with Iceberg metadata service using [JDBC](#jdbc).
+
+## Apache Iceberg REST catalog
+
+- The **Iceberg REST Catalog** is a metadata service designed for the Apache Iceberg table format.
+  It enables external systems to interact with Iceberg metadata service using a [REST API](#rest-api).
+
+## Apache License version 2
+
+- A permissive, open-source software license written by The Apache Software Foundation.
+
+## Authentication mechanism
+
+- The method used to verify the identity of users and clients accessing a server.
+
 ## Binary distribution package
 
-- A package containing the compiled and executable version of the software, ready for distribution and deployment.
+- A software package containing the compiled executables for distribution and deployment.
 
 ## Catalog
 
@@ -50,15 +189,17 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Columns
 
-- The individual fields or attributes of a table, specifying details such as name, data type, comment, and nullability.
+- The individual fields or attributes of a table.
+  Each column has some properties like name, data type, comment, and nullability.
 
 ## Continuous integration (CI)
 
-- The practice of automatically building, testing, and validating code changes when they are committed to version control.
+- The practice of automatically building and testing code changes when they are committed to version control.
 
 ## Contributor covenant
 
-- A widely-used and recognized code of conduct for open-source communities. It provides guidelines for creating a welcoming and inclusive environment for all contributors.
+- A widely-used and recognized code of conduct for open-source communities.
+  It provides guidelines for creating a welcoming and inclusive environment for all contributors.
 
 ## Dependencies
 
@@ -74,51 +215,56 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Docker container
 
-- A lightweight, standalone, executable package that includes everything needed to run a piece of software, including the code, runtime, libraries, and system tools.
+- A lightweight, standalone package that includes everything needed to run a software.
+  A container compiles an application with its dependencies and runtime for distribution.
 
 ## Docker Hub
 
-- A cloud-based registry service for Docker containers, allowing users to share and distribute containerized applications.
+- A cloud-based registry service for Docker containers.
+  Users can publish, browse and download containerized software using this service.
 
 ## Docker image
 
-- A lightweight, standalone, and executable package that includes everything needed to run a piece of software, including the code, runtime, libraries, and system tools.
+- A lightweight, standalone package that includes everything needed to run a software.
+  A Docker image typically comprises the code, runtime, libraries, and system tools.
 
-## Docker file
+## Dockerfile
 
-- A configuration file used to create a Docker image, specifying the base image, dependencies, and commands for building the image.
+- A configuration file for building a Docker image.
+  A Dockerfile contains instructions to build a standard image for distributing a software.
 
-## Dropwizard Metrics
+## Dropwizard metrics
 
 - A Java library for measuring the performance of applications and providing support for various metric types.
 
-## Amazon Elastic Block Store (EBS)
-
-- A scalable block storage service provided by Amazon Web Services.
-
 ## Environment variables
 
-- Variables used to pass information to running processes.
+- Variables used to customize the runtime configuration for a process.
 
 ## Geo-distributed
 
 - The distribution of data or services across multiple geographic locations.
 
+## Git
+
+- A distributed version control system used for tracking software artifacts.
+
 ## GitHub
 
-- A web-based platform for version control and collaboration using Git.
+- A web-based platform for version control and community collaboration using Git.
 
 ## GitHub Actions
 
-- A continuous integration and continuous deployment (CI/CD) service provided by GitHub, used for automating build, test, and deployment workflows.
+- A continuous integration and continuous deployment (CI/CD) service provided by GitHub.
+  GitHub Actions are used for automating the build, test, and deployment workflows.
 
 ## GitHub labels
 
-- Tags assigned to GitHub issues or pull requests for organization, categorization, or workflow automation.
+- Labels assigned to GitHub issues or pull requests for organization or workflow automation.
 
 ## GitHub pull request
 
-- A proposed change to a repository submitted by a user through the GitHub platform.
+- A proposed change to a GitHub repository submitted by a user.
 
 ## GitHub repository
 
@@ -126,127 +272,68 @@ license: "This software is licensed under the Apache License version 2."
 
 ## GitHub workflow
 
-- A series of automated steps defined in a YAML file that runs in response to events on a GitHub repository.
-
-## Git
-
-- A version control system used for tracking changes and collaborating on source code.
-
-## GPG/GnuPG
-
-- Gnu Privacy Guard or GnuPG, an open-source implementation of the OpenPGP standard, used for encrypting and signing files and emails.
+- A series of automated steps that are triggered by certain events on a GitHub repository.
 
 ## Gradle
 
-- A build automation tool for building, testing, and deploying projects.
+- A automation tool for building, testing, and deploying projects.
 
 ## Gradlew
 
-- A Gradle wrapper script, used for executing Gradle commands without installing Gradle separately.
-
-## Apache Gravitino
-
-- An open-source software platform originally created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
-
-## Apache Gravitino configuration file (gravitino.conf)
-
-- The configuration file for the Gravitino server, located in the `conf` directory. It follows the standard property file format and contains settings for the Gravitino server.
+- A Gradle wrapper script, used for executing Gradle commands.
 
 ## Hashes
 
-- Cryptographic hash values generated from the contents of a file, often used for integrity verification.
-
-## HDFS
-
-- **HDFS** (Hadoop Distributed File System) is an open-source, distributed file system and a key component of the Apache Hadoop ecosystem. It is designed to store and process large-scale datasets, providing high reliability, fault tolerance, and performance for distributed storage solutions.
+- Cryptographic hash values generated from some data.
+  A typical use case is to verify the integrity of a file.
 
 ## Headless
 
-- A system without a graphical user interface.
-
-## HTTP port
-
-- The port number on which a server listens for incoming connections.
-
-## Apache Iceberg Hive catalog
-
-- The **Iceberg Hive catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a Hive metastore thrift client.
-
-## Apache Iceberg REST catalog
-
-- The **Iceberg REST Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a RESTful API.
-
-## Apache Iceberg JDBC catalog
-
-- The **Iceberg JDBC Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata using JDBC (Java Database Connectivity).
+- A system without a local console.
 
 ## Identity fields
 
-- Fields in tables that define the identity of the table, specifying how rows in the table are uniquely identified.
+- Fields in tables that define the identity of the records.
+  In the scope of a table, the identity fields are used as the unique identifier of a row.
 
 ## Integration tests
 
-- Tests designed to ensure the correctness and compatibility of software when integrated into a unified system.
-
-## IP address
-
-- Internet Protocol address, a numerical label assigned to each device participating in a computer network.
+- Tests for the correctness and compatibility of a software.
+  It is typically conducted when integrating a component into a larger system.
 
 ## Java Database Connectivity (JDBC)
 
-- Java Database Connectivity, an API for connecting Java applications to relational databases.
+- See [JDBC](#jdbc)
 
 ## Java Development Kits (JDKs)
 
-- Software development kits for the Java programming language, including tools for compiling, debugging, and running Java applications.
+- See [JDK](#jdk)
+
+## Java Management Extensions
+
+- See [JMX](#jmx)
 
 ## Java Toolchain
 
-- A feature introduced in Gradle to detect and manage JDK versions. 
+- A Gradle feature for detecting and managing JDK versions. 
 
-## JDBC URI
+## Java Virtual Machine
 
-- The JDBC connection address specified in the catalog configuration, including details such as the database type, host, port, and database name.
-
-## JMX 
-
-- Java Management Extensions provides tools for managing and monitoring Java applications.
-
-## JSON
-
-- JavaScript Object Notation, a lightweight data interchange format.
-
-## JWT(JSON Web Token)
-
-- A compact, URL-safe means of representing claims between two parties.
-
-##  Java Virtual Machine (JVM)
-
-- A virtual machine that enables a computer to run Java applications, providing an abstraction layer between the application and the underlying hardware.
-
-## JVM metrics 
-
-- Metrics related to the performance and behavior of the Java Virtual Machine (JVM), including memory usage, garbage collection, and buffer pool metrics.
-
-## JVM instrumentation 
-
-- The process of adding monitoring and management capabilities to the Java Virtual Machine, allowing for the collection of performance metrics.
+- See [JVM](#jvm)
 
 ## Key pair
 
 - A pair of cryptographic keys, including a public key used for verification and a private key used for signing.
 
-## KEYS file
-
-- A file containing public keys used to sign previous releases, necessary for verifying signatures.
-
 ## Lakehouse
 
-- **Lakehouse** refers to a modern data management architecture that combines elements of data lakes and data warehouses. It aims to provide a unified platform for storing, managing, and analyzing both raw unstructured data (similar to data lakes) and curated structured data.
+- **Lakehouse** is a modern data management architecture that combines elements of data lakes and data warehouses.
+  It aims to provide a unified platform for storing, managing, and analyzing both raw unstructured data
+  (similar to data lakes) and curated structured data.
 
 ## Manifest
 
-- A list of files and associated metadata that collectively define the structure and content of a release or distribution.
+- A list of files and their associated metadata that collectively define the structure and content of a release or distribution.
 
 ## Merge operation
 
@@ -254,7 +341,9 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Metalake
 
-- The top-level container for metadata. Typically, a metalake is a tenant-like mapping to an organization or a company. All the catalogs, users, and roles are under one metalake. 
+- The top-level container for metadata. 
+  Typically, a metalake is a tenant-like mapping to an organization or a company.
+  All the catalogs, users, and roles are associated with one metalake. 
 
 ## Metastore
 
@@ -264,17 +353,14 @@ license: "This software is licensed under the Apache License version 2."
 
 - A distinct and separable part of a project.
 
+## Open authorization / OAuth
+
+- A standard protocol for authorization that allows third-party applications to authenticate a user.
+  The application doesn't need to access the user credentials.
+
 ## OrbStack
 
 - A tool mentioned as an alternative to Docker for macOS when running Gravitino integration tests.
-
-## Open authorization / OAuth
-
-- A standard protocol for authorization that allows third-party applications to access user data without exposing user credentials.
-
-## PGP Signature
-
-- A digital signature generated using the Pretty Good Privacy (PGP) algorithm, confirming the authenticity of a file.
 
 ## Private key
 
@@ -282,31 +368,33 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Properties
 
-- Configurable settings and attributes associated with catalogs, schemas, and tables, to influence their behavior and storage.
+- Configurable settings and attributes associated with catalogs, schemas, and tables.
+  The property settings influence the behavior and storage of the corresponding entities.
 
 ## Protocol buffers (protobuf)
 
-- A method developed by Google for serializing structured data, similar to XML or JSON. It is often used for efficient and extensible communication between systems.
+- A method developed by Google for serializing structured data, similar to XML or JSON.
+  It is often used for efficient and extensible communication between systems.
 
 ## Public key
 
 - An openly shared key used for verification, encryption, or other operations intended for public knowledge.
 
-## Representational State Transfer (REST)
+## Representational State Transfer
 
-- A set of architectural principles for designing networked applications.
+- See [REST](#rest)
 
-## REST API (Representational State Transfer Application Programming Interface)
+## RocksDB
 
-- A set of rules and conventions for building and interacting with web services using standard HTTP methods.
+- An open source key-value storage database.
 
 ## Schema
 
 - A logical container for organizing tables in a database.
 
-## Secure Shell (SSH)
+## Secure Shell
 
-- Secure Shell, a cryptographic network protocol used for secure communication over a computer network.
+- See [SSH](#ssh)
 
 ## Security group
 
@@ -314,15 +402,8 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Serde
 
-- A Serialization/Deserialization library responsible for transforming data between a tabular format and a format suitable for storage or transmission.
-
-## SHA256 checksum
-
-- A cryptographic hash function used to verify the integrity of files.
-
-## SHA256 checksum file
-
-- A file containing the SHA256 hash value of another file, used for verification purposes.
+- A serialization/deserialization library.
+  It can be used for transforming data between a tabular format and a format suitable for storage or transmission.
 
 ## Snapshot
 
@@ -336,21 +417,22 @@ license: "This software is licensed under the Apache License version 2."
 
 - A tool or process used to enforce code formatting standards and apply automatic formatting to code.
 
-## Structured Query Language (SQL)
+## Structured Query Language
 
-- A programming language used to manage and manipulate relational databases.
+- See [SQL](#sql)
 
 ## Table
 
 - A structured set of data elements stored in columns and rows.
 
+## Thrift
+
+- A network protocol used for communication with Hive Metastore Service (HMS).
+
 ## Token
 
-- A **token** in the context of computing and security commonly refers to a small, indivisible unit of data. Tokens play a crucial role in various domains, including authentication, authorization, and cryptographic systems.
-
-## Thrift protocol
-
-- The network protocol used for communication with Hive Metastore Service (HMS).
+- A **token** in the context of computing and security is a small, indivisible unit of data. 
+  Tokens play a crucial role in various domains, including authentication and authorization.
 
 ## Trino
 
@@ -360,30 +442,22 @@ license: "This software is licensed under the Apache License version 2."
 
 - A connector module for integrating Gravitino with Trino.
 
-## Trino Apache Gravitino connector documentation
-
--  Documentation providing information on using the Trino connector to access metadata in Gravitino.
-
 ## Ubuntu
 
 - A Linux distribution based on Debian, widely used for cloud computing and servers.
 
 ## Unit test
 
-- A type of testing where individual components or functions of a program are tested to ensure they work as expected in isolation.
-
-## URI
-
-- Uniform Resource Identifier, a string that identifies the name or resource on the internet.
+- A type of software testing where individual components or functions of a program are tested.
+  Unit tests help to ensure that the component or function works as expected in isolation.
 
 ## Verification
 
-- The process of confirming the authenticity and integrity of a release by checking its signature and associated hashes.
+- The process of confirming the authenticity and integrity of a release.
+  This is usually done by checking its signature and associated hash values.
 
-## WEB UI
+## Web UI
 
 - A graphical interface accessible through a web browser.
 
-## YAML
 
-- YAML Ain't Markup Language, a human-readable data serialization format often used for configuration files.
