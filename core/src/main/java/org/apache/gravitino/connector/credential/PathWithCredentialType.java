@@ -19,25 +19,46 @@
 
 package org.apache.gravitino.connector.credential;
 
-import java.util.List;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
 
-/** The catalog operation should implement this interface to generate the path based credentials. */
+/**
+ * The {@code PathWithCredentialType} class represents a combination of a path and its associated
+ * credential type.
+ */
 @Evolving
-public interface SupportsPathBasedCredentials {
+public class PathWithCredentialType {
+
+  private final String path;
+
+  private final String credentialType;
 
   /**
-   * Get {@link PathWithCredentialType} lists.
+   * Constructs a new {@code PathWithCredentialType} instance with the given path and credential
+   * type.
    *
-   * <p>In most cases there will be only one element in the list. For catalogs which support multi
-   * locations like fileset, there may be multiple elements.
-   *
-   * <p>The name identifier is the identifier of the resource like fileset, table, etc. not include
-   * metalake, catalog, schema.
-   *
-   * @param nameIdentifier, The identifier for fileset, table, etc.
-   * @return A map with credential provider type as the key, path as the value.
+   * @param path The path string.
+   * @param credentialType The type of the credential.
    */
-  List<PathWithCredentialType> getPathWithCredentialTypes(NameIdentifier nameIdentifier);
+  public PathWithCredentialType(String path, String credentialType) {
+    this.path = path;
+    this.credentialType = credentialType;
+  }
+
+  /**
+   * Gets the path string.
+   *
+   * @return The path associated with this instance.
+   */
+  public String path() {
+    return path;
+  }
+
+  /**
+   * Gets the credential type.
+   *
+   * @return The credential type associated with this instance.
+   */
+  public String credentialType() {
+    return credentialType;
+  }
 }

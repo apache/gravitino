@@ -17,24 +17,10 @@
  *  under the License.
  */
 
-package org.apache.gravitino.connector.credential;
+package org.apache.gravitino.credential;
 
-import java.util.List;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.credential.Credential;
-
-/**
- * This interface defines how to get credentials, the catalog operation must implement this
- * interface to support credential vending.
- */
-public interface SupportsCredentialOperations {
-  /**
-   * Obtains the corresponding list of credentials based on the name identifier and the credential
-   * privilege.
-   *
-   * @param nameIdentifier The name identifier for the catalog, fileset, table, etc.
-   * @param privilege The {@link CredentialPrivilege} object.
-   * @return A list of {@link Credential}.
-   */
-  List<Credential> getCredentials(NameIdentifier nameIdentifier, CredentialPrivilege privilege);
+/** Represents the privilege to get credential from credential providers. */
+public enum CredentialPrivilege {
+  READ,
+  WRITE,
 }

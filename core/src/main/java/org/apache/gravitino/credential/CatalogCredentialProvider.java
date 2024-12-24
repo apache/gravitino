@@ -17,28 +17,24 @@
  *  under the License.
  */
 
-package org.apache.gravitino.connector.credential;
+package org.apache.gravitino.credential;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.gravitino.catalog.CatalogManager;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.CredentialUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Manages credentials in one catalog. */
-public class CatalogCredentialManager implements Closeable {
+/** Generate credentials for the objects in the same catalog. */
+public class CatalogCredentialProvider implements Closeable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogCredentialProvider.class);
 
-  private Map<String, CredentialProvider> credentialProviders;
-  private String catalogName;
+  private final String catalogName;
+  private final Map<String, CredentialProvider> credentialProviders;
 
-  public CatalogCredentialManager(String catalogName, Map<String, String> catalogProperties) {
+  public CatalogCredentialProvider(String catalogName, Map<String, String> catalogProperties) {
     this.catalogName = catalogName;
     this.credentialProviders = CredentialUtils.loadCredentialProviders(catalogProperties);
   }

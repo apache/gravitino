@@ -20,12 +20,16 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.security.auth.Subject;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -39,7 +43,9 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.credential.PathWithCredentialType;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -52,6 +58,7 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,12 +75,28 @@ public class SecureHadoopCatalogOperations
 
   private UserContext catalogUserContext;
 
+  private Map<String, String> catalogProperties;
+
   public SecureHadoopCatalogOperations() {
     this.hadoopCatalogOperations = new HadoopCatalogOperations();
   }
 
   public SecureHadoopCatalogOperations(EntityStore store) {
     this.hadoopCatalogOperations = new HadoopCatalogOperations(store);
+  }
+
+  @Override
+  public void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
+    hadoopCatalogOperations.initialize(config, info, propertiesMetadata);
+    this.catalogUserContext =
+        UserContext.getUserContext(
+            NameIdentifier.of(info.namespace(), info.name()),
+            config,
+            hadoopCatalogOperations.getHadoopConf(),
+            info);
+    this.catalogProperties = info.properties();
   }
 
   @VisibleForTesting
@@ -166,19 +189,6 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public void initialize(
-      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
-      throws RuntimeException {
-    hadoopCatalogOperations.initialize(config, info, propertiesMetadata);
-    catalogUserContext =
-        UserContext.getUserContext(
-            NameIdentifier.of(info.namespace(), info.name()),
-            config,
-            hadoopCatalogOperations.getHadoopConf(),
-            info);
-  }
-
-  @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
     Fileset fileset = hadoopCatalogOperations.alterFileset(ident, changes);
@@ -248,16 +258,26 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public Map<String, String> schemaProperties(NameIdentifier schemaIdentifier) {
-    return loadSchema(schemaIdentifier).properties();
-  }
+  public List<PathWithCredentialType> getPathWithCredentialTypes(NameIdentifier filesetIdentifier) {
+    Fileset fileset = loadFileset(filesetIdentifier);
+    String path = fileset.storageLocation();
+    Preconditions.checkState(
+        StringUtils.isNotBlank(path), "The location of fileset should not be empty.");
 
-  @Override
-  public PathBasedCredentialContextInfo getPathBasedCredentialContextInfo(
-      NameIdentifier nameIdentifier) {
-    Fileset fileset = loadFileset(nameIdentifier);
-    return new PathBasedCredentialContextInfo(
-        Arrays.asList(fileset.storageLocation()), fileset.properties());
+    Set<String> providers =
+        CredentialUtils.getCredentialProviders(
+            () -> fileset.properties(),
+            () -> {
+              Namespace namespace = filesetIdentifier.namespace();
+              NameIdentifier schemaIdentifier =
+                  NameIdentifierUtil.ofSchema(
+                      namespace.level(0), namespace.level(1), namespace.level(2));
+              return loadSchema(schemaIdentifier).properties();
+            },
+            () -> catalogProperties);
+    return providers.stream()
+        .map(provider -> new PathWithCredentialType(path, provider))
+        .collect(Collectors.toList());
   }
 
   /**

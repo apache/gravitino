@@ -22,7 +22,6 @@ package org.apache.gravitino.credential;
 import java.io.Closeable;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.gravitino.connector.credential.CredentialContext;
 
 /**
  * Interface for credential providers.

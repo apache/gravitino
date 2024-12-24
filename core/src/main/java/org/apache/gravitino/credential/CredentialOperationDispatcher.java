@@ -25,7 +25,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.OperationDispatcher;
-import org.apache.gravitino.connector.credential.CredentialPrivilege;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
