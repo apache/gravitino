@@ -76,6 +76,7 @@ dependencies {
   }
 
   implementation(libs.slf4j.api)
+  implementation(libs.awaitility)
 
   compileOnly(libs.guava)
 

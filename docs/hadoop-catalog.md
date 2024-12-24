@@ -25,9 +25,10 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 
 Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
 
-| Property Name | Description                                     | Default Value | Required | Since Version |
-|---------------|-------------------------------------------------|---------------|----------|---------------|
-| `location`    | The storage location managed by Hadoop catalog. | (none)        | No       | 0.5.0         |
+| Property Name                    | Description                                                                | Default Value | Required | Since Version    |
+|----------------------------------|----------------------------------------------------------------------------|---------------|----------|------------------|
+| `location`                       | The storage location managed by Hadoop catalog.                            | (none)        | No       | 0.5.0            |
+| `get-filesystem-timeout-seconds` | The timeout of getting the file system client instance. Time unit: seconds.| 10            | No       | 0.7.0-incubating |
 
 Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or custom fileset, you need to configure the following extra properties.
 
