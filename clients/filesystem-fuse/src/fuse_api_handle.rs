@@ -95,8 +95,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         parent: Inode,
         name: &OsStr,
     ) -> fuse3::Result<ReplyEntry> {
-        let name = name.to_string_lossy();
-        let file_stat = self.fs.lookup(parent, &name).await?;
+        let file_stat = self.fs.lookup(parent, name).await?;
         Ok(ReplyEntry {
             ttl: self.default_ttl,
             attr: fstat_to_file_attr(&file_stat, &self.fs_context),
@@ -154,8 +153,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         _mode: u32,
         _umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
-        let name = name.to_string_lossy();
-        let handle_id = self.fs.create_dir(parent, &name).await?;
+        let handle_id = self.fs.create_dir(parent, name).await?;
         Ok(ReplyEntry {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
@@ -169,14 +167,12 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     async fn unlink(&self, _req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let name = name.to_string_lossy();
-        self.fs.remove_file(parent, &name).await?;
+        self.fs.remove_file(parent, name).await?;
         Ok(())
     }
 
     async fn rmdir(&self, _req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let name = name.to_string_lossy();
-        self.fs.remove_dir(parent, &name).await?;
+        self.fs.remove_dir(parent, name).await?;
         Ok(())
     }
 
@@ -267,7 +263,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
             stream::iter(files.into_iter().enumerate().map(|(index, file_stat)| {
                 Ok(DirectoryEntry {
                     inode: file_stat.file_id,
-                    name: file_stat.name.clone().into(),
+                    name: file_stat.name.clone(),
                     kind: file_stat.kind,
                     offset: (index + 3) as i64,
                 })
@@ -313,8 +309,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         _mode: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyCreated> {
-        let name = name.to_string_lossy();
-        let file_handle = self.fs.create_file(parent, &name, flags).await?;
+        let file_handle = self.fs.create_file(parent, name, flags).await?;
         Ok(ReplyCreated {
             ttl: self.default_ttl,
             attr: dummy_file_attr(
@@ -349,7 +344,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
             stream::iter(files.into_iter().enumerate().map(|(index, file_stat)| {
                 Ok(DirectoryEntryPlus {
                     inode: file_stat.file_id,
-                    name: file_stat.name.clone().into(),
+                    name: file_stat.name.clone(),
                     kind: file_stat.kind,
                     offset: (index + 3) as i64,
                     attr: fstat_to_file_attr(&file_stat, &self.fs_context),
@@ -465,8 +460,8 @@ mod test {
         let file_stat = FileStat {
             file_id: 1,
             parent_file_id: 3,
-            name: "test".to_string(),
-            path: "".to_string(),
+            name: "test".into(),
+            path: "".into(),
             size: 10032,
             kind: FileType::RegularFile,
             atime: Timestamp { sec: 10, nsec: 3 },
