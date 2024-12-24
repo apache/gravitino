@@ -24,54 +24,55 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.AuthorizationProperties;
-import org.apache.gravitino.authorization.ChainAuthorizationProperties;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.common.AuthorizationProperties;
+import org.apache.gravitino.authorization.common.ChainedAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 
 /** Chain authorization operations plugin class. <br> */
-public class ChainAuthorizationPlugin implements AuthorizationPlugin {
+public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
   private final String metalake;
 
-  public ChainAuthorizationPlugin(
+  public ChainedAuthorizationPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
     this.metalake = metalake;
     initPlugins(catalogProvider, config);
   }
 
   private void initPlugins(String catalogProvider, Map<String, String> properties) {
-    ChainAuthorizationProperties chainAuthorizationProperties =
-        new ChainAuthorizationProperties(properties);
-    chainAuthorizationProperties.validate();
+    ChainedAuthorizationProperties chainedAuthProperties =
+        new ChainedAuthorizationProperties(properties);
+    chainedAuthProperties.validate();
     // Validate the properties for each plugin
-    chainAuthorizationProperties
+    chainedAuthProperties
         .plugins()
         .forEach(
             pluginName -> {
               Map<String, String> pluginProperties =
-                  chainAuthorizationProperties.fetchAuthPluginProperties(pluginName);
-              String authProvider = chainAuthorizationProperties.getPluginProvider(pluginName);
+                  chainedAuthProperties.fetchAuthPluginProperties(pluginName);
+              String authProvider = chainedAuthProperties.getPluginProvider(pluginName);
               AuthorizationProperties.validate(authProvider, pluginProperties);
             });
     // Create the plugins
-    chainAuthorizationProperties
+    chainedAuthProperties
         .plugins()
         .forEach(
             pluginName -> {
-              String authProvider = chainAuthorizationProperties.getPluginProvider(pluginName);
+              String authProvider = chainedAuthProperties.getPluginProvider(pluginName);
               Map<String, String> pluginConfig =
-                  chainAuthorizationProperties.fetchAuthPluginProperties(pluginName);
+                  chainedAuthProperties.fetchAuthPluginProperties(pluginName);
 
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
               BaseAuthorization.buildAuthorizationPkgPath(
@@ -101,183 +102,96 @@ public class ChainAuthorizationPlugin implements AuthorizationPlugin {
   @Override
   public Boolean onMetadataUpdated(MetadataObjectChange... changes)
       throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onMetadataUpdated(changes);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onMetadataUpdated(changes));
   }
 
   @Override
   public Boolean onRoleCreated(Role role) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRoleCreated(role);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onRoleCreated(role));
   }
 
   @Override
   public Boolean onRoleAcquired(Role role) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRoleAcquired(role);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onRoleAcquired(role));
   }
 
   @Override
   public Boolean onRoleDeleted(Role role) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRoleDeleted(role);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onRoleDeleted(role));
   }
 
   @Override
   public Boolean onRoleUpdated(Role role, RoleChange... changes)
       throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRoleUpdated(role, changes);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onRoleUpdated(role, changes));
   }
 
   @Override
   public Boolean onGrantedRolesToUser(List<Role> roles, User user)
       throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onGrantedRolesToUser(roles, user);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onGrantedRolesToUser(roles, user));
   }
 
   @Override
   public Boolean onRevokedRolesFromUser(List<Role> roles, User user)
       throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRevokedRolesFromUser(roles, user);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onRevokedRolesFromUser(roles, user));
   }
 
   @Override
   public Boolean onGrantedRolesToGroup(List<Role> roles, Group group)
       throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onGrantedRolesToGroup(roles, group);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onGrantedRolesToGroup(roles, group));
   }
 
   @Override
   public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group)
       throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onRevokedRolesFromGroup(roles, group);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onRevokedRolesFromGroup(roles, group));
   }
 
   @Override
   public Boolean onUserAdded(User user) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onUserAdded(user);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onUserAdded(user));
   }
 
   @Override
   public Boolean onUserRemoved(User user) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onUserRemoved(user);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onUserRemoved(user));
   }
 
   @Override
   public Boolean onUserAcquired(User user) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onUserAcquired(user);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onUserAcquired(user));
   }
 
   @Override
   public Boolean onGroupAdded(Group group) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onGroupAdded(group);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onGroupAdded(group));
   }
 
   @Override
   public Boolean onGroupRemoved(Group group) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onGroupRemoved(group);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onGroupRemoved(group));
   }
 
   @Override
   public Boolean onGroupAcquired(Group group) throws AuthorizationPluginException {
-    for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onGroupAcquired(group);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
-      }
-    }
-    return Boolean.TRUE;
+    return chainedAction(plugin -> plugin.onGroupAcquired(group));
   }
 
   @Override
   public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
       throws AuthorizationPluginException {
+    return chainedAction(plugin -> plugin.onOwnerSet(metadataObject, preOwner, newOwner));
+  }
+
+  private Boolean chainedAction(Function<AuthorizationPlugin, Boolean> action) {
     for (AuthorizationPlugin plugin : plugins) {
-      Boolean result = plugin.onOwnerSet(metadataObject, preOwner, newOwner);
-      if (Boolean.FALSE.equals(result)) {
-        return Boolean.FALSE;
+      if (!action.apply(plugin)) {
+        return false;
       }
     }
-    return Boolean.TRUE;
+    return true;
   }
 }

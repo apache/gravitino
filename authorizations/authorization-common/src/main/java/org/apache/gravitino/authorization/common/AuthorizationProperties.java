@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.authorization.common;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,8 +43,8 @@ public abstract class AuthorizationProperties {
         rangerAuthorizationProperties.validate();
         break;
       case "chain":
-        ChainAuthorizationProperties chainAuthorizationProperties =
-            new ChainAuthorizationProperties(properties);
+        ChainedAuthorizationProperties chainAuthorizationProperties =
+            new ChainedAuthorizationProperties(properties);
         chainAuthorizationProperties.validate();
         break;
       default:

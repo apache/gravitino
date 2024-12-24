@@ -22,8 +22,8 @@ import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-/** Implementation of a Chain authorization in Gravitino. */
-public class ChainAuthorization extends BaseAuthorization<ChainAuthorization> {
+/** Implementation of a Chained authorization in Gravitino. */
+public class ChainedAuthorization extends BaseAuthorization<ChainedAuthorization> {
   @Override
   public String shortName() {
     return "chain";
@@ -34,7 +34,7 @@ public class ChainAuthorization extends BaseAuthorization<ChainAuthorization> {
       String metalake, String catalogProvider, Map<String, String> config) {
     switch (catalogProvider) {
       case "hive":
-        return new ChainAuthorizationPlugin(metalake, catalogProvider, config);
+        return new ChainedAuthorizationPlugin(metalake, catalogProvider, config);
       default:
         throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
     }

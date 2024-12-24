@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
  * "authorization.chain.hdfs1.ranger.username" = "admin"; <br>
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
  */
-public class ChainAuthorizationProperties extends AuthorizationProperties {
+public class ChainedAuthorizationProperties extends AuthorizationProperties {
   private static final String PLUGINS_SPLITTER = ",";
   /** Chain authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
@@ -56,7 +56,7 @@ public class ChainAuthorizationProperties extends AuthorizationProperties {
   /** Chain authorization plugin provider */
   public static final String CHAIN_PROVIDER = "authorization.chain.*.provider";
 
-  public ChainAuthorizationProperties(Map<String, String> properties) {
+  public ChainedAuthorizationProperties(Map<String, String> properties) {
     super(properties);
   }
 

@@ -28,7 +28,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
-import org.apache.gravitino.authorization.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.HiveContainer;

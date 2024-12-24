@@ -32,10 +32,10 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
-import org.apache.gravitino.authorization.ChainAuthorizationProperties;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.common.ChainedAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.integration.test.RangerBaseE2EIT;
 import org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv;
 import org.apache.gravitino.catalog.hive.HiveConstants;
@@ -57,8 +57,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TestChainAuthorizationIT extends RangerBaseE2EIT {
-  private static final Logger LOG = LoggerFactory.getLogger(TestChainAuthorizationIT.class);
+public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
+  private static final Logger LOG = LoggerFactory.getLogger(TestChainedAuthorizationIT.class);
   private static String DEFAULT_FS;
   private FileSystem fileSystem;
 
@@ -224,7 +224,7 @@ public class TestChainAuthorizationIT extends RangerBaseE2EIT {
     catalogConf.put(HiveConstants.METASTORE_URIS, HIVE_METASTORE_URIS);
     catalogConf.put(IMPERSONATION_ENABLE, "true");
     catalogConf.put(Catalog.AUTHORIZATION_PROVIDER, "chain");
-    catalogConf.put(ChainAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
+    catalogConf.put(ChainedAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
     catalogConf.put("authorization.chain.hive1.provider", "ranger");
     catalogConf.put("authorization.chain.hive1.ranger.auth.type", RangerContainer.authType);
     catalogConf.put("authorization.chain.hive1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);

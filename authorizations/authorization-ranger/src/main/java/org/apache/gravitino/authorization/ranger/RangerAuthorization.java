@@ -20,7 +20,7 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import org.apache.gravitino.authorization.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 

@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.authorization.chain.ChainAuthorization
+org.apache.gravitino.authorization.chain.ChainedAuthorization
