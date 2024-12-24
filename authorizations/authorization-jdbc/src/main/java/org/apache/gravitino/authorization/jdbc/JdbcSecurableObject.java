@@ -38,7 +38,7 @@ public class JdbcSecurableObject extends JdbcMetadataObject
   private JdbcSecurableObject(
       String parent,
       String name,
-      MetadataObject.Type type,
+      JdbcMetadataObject.Type type,
       List<AuthorizationPrivilege> privileges) {
     super(parent, name, type);
     this.privileges = privileges;
@@ -48,8 +48,10 @@ public class JdbcSecurableObject extends JdbcMetadataObject
       String schema, String table, List<AuthorizationPrivilege> privileges) {
     String parent = table == null ? null : schema;
     String name = table == null ? schema : table;
-    MetadataObject.Type type =
-        table == null ? MetadataObject.Type.SCHEMA : MetadataObject.Type.TABLE;
+    JdbcMetadataObject.Type type =
+        table == null
+            ? JdbcMetadataObject.Type.fromMetadataType(MetadataObject.Type.SCHEMA)
+            : JdbcMetadataObject.Type.fromMetadataType(MetadataObject.Type.TABLE);
 
     return new JdbcSecurableObject(parent, name, type, privileges);
   }

@@ -29,17 +29,16 @@ public class JdbcAuthorizationProperties {
   public static final String JDBC_DRIVER = CONFIG_PREFIX + "driver";
 
   public static void validate(Map<String, String> properties) {
-    if (!properties.containsKey(JDBC_URL)) {
-      throw new IllegalArgumentException("JDBC URL is required");
-    }
-    if (!properties.containsKey(JDBC_USERNAME)) {
-      throw new IllegalArgumentException("JDBC username is required");
-    }
-    if (!properties.containsKey(JDBC_PASSWORD)) {
-      throw new IllegalArgumentException("JDBC password is required");
-    }
-    if (!properties.containsKey(JDBC_DRIVER)) {
-      throw new IllegalArgumentException("JDBC driver is required");
+    String errorMsg = "%s is required";
+    check(properties, JDBC_URL, errorMsg);
+    check(properties, JDBC_USERNAME, errorMsg);
+    check(properties, JDBC_PASSWORD, errorMsg);
+    check(properties, JDBC_DRIVER, errorMsg);
+  }
+
+  private static void check(Map<String, String> properties, String key, String errorMsg) {
+    if (!properties.containsKey(key) && properties.get(key) != null) {
+      throw new IllegalArgumentException(String.format(errorMsg, key));
     }
   }
 }

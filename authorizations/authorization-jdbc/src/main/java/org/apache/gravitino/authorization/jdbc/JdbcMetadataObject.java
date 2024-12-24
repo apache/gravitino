@@ -28,9 +28,9 @@ public class JdbcMetadataObject implements AuthorizationMetadataObject {
 
   private final String parent;
   private final String name;
-  private final MetadataObject.Type type;
+  private final Type type;
 
-  public JdbcMetadataObject(String parent, String name, MetadataObject.Type type) {
+  public JdbcMetadataObject(String parent, String name, Type type) {
     this.parent = parent;
     this.name = name;
     this.type = type;
@@ -54,7 +54,7 @@ public class JdbcMetadataObject implements AuthorizationMetadataObject {
 
   @Override
   public Type type() {
-    return () -> type;
+    return type;
   }
 
   @Override
@@ -66,13 +66,38 @@ public class JdbcMetadataObject implements AuthorizationMetadataObject {
         names.size() <= 2, "The name of the object is not in the format of 'database.table'.");
     Preconditions.checkArgument(type != null, "The type of the object is null.");
     Preconditions.checkArgument(
-        names.size() == 1 || type == MetadataObject.Type.SCHEMA,
+        names.size() == 1 || type.metadataObjectType() == MetadataObject.Type.SCHEMA,
         "The type of the object is not SCHEMA.");
     Preconditions.checkArgument(
-        names.size() == 2 || type == MetadataObject.Type.TABLE,
+        names.size() == 2 || type.metadataObjectType() == MetadataObject.Type.TABLE,
         "The type of the object is not TABLE.");
     for (String name : names) {
       Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
+    }
+  }
+
+  public enum Type implements AuthorizationMetadataObject.Type {
+    SCHEMA(MetadataObject.Type.SCHEMA),
+    TABLE(MetadataObject.Type.TABLE);
+
+    private final MetadataObject.Type metadataType;
+
+    Type(MetadataObject.Type type) {
+      this.metadataType = type;
+    }
+
+    public MetadataObject.Type metadataObjectType() {
+      return metadataType;
+    }
+
+    public static Type fromMetadataType(MetadataObject.Type metadataType) {
+      for (Type type : Type.values()) {
+        if (type.metadataObjectType() == metadataType) {
+          return type;
+        }
+      }
+      throw new IllegalArgumentException(
+          "No matching RangerMetadataObject.Type for " + metadataType);
     }
   }
 }
