@@ -63,7 +63,11 @@ impl FuseServer {
         let handle = &mut mount_handle;
 
         select! {
-            res = handle => res?,
+            res = handle => {
+                if res.is_err() {
+                    error!("Failed to mount FUSE filesystem: {:?}", res.err());
+                }
+            },
             _ = self.close_notify.notified() => {
                if let Err(e) = mount_handle.unmount().await {
                     error!("Failed to unmount FUSE filesystem: {:?}", e);
@@ -72,6 +76,8 @@ impl FuseServer {
                 }
             }
         }
+
+        // notify that the filesystem is stopped
         self.close_notify.notify_one();
         Ok(())
     }
@@ -80,6 +86,8 @@ impl FuseServer {
     pub async fn stop(&self) {
         info!("Stopping FUSE filesystem...");
         self.close_notify.notify_one();
+
+        // wait for the filesystem to stop
         self.close_notify.notified().await;
     }
 }
