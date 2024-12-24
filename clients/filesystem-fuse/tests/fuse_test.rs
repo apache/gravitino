@@ -140,8 +140,6 @@ fn test_fuse_filesystem(mount_point: &str) {
     assert!(!file_exists(&test_dir));
 
     info!("Success test");
-
-    sleep(Duration::from_secs(15));
 }
 
 fn file_exists<P: AsRef<Path>>(path: P) -> bool {

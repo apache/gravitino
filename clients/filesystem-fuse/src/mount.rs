@@ -23,10 +23,11 @@ use crate::fuse_server::FuseServer;
 use crate::memory_filesystem::MemoryFileSystem;
 use fuse3::raw::Filesystem;
 use log::info;
-use std::sync::{Arc, LazyLock};
+use once_cell::sync::Lazy;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
-static SERVER: LazyLock<Mutex<Option<Arc<FuseServer>>>> = LazyLock::new(|| Mutex::new(None));
+static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(None));
 
 pub async fn mount(mount_point: &str) -> fuse3::Result<()> {
     info!("Starting gvfs-fuse server...");

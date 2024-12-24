@@ -73,7 +73,10 @@ impl PathFileSystem for MemoryFileSystem {
             data: Arc::new(Mutex::new(Vec::new())),
         };
         let meta_file_path = Path::new(Self::FS_META_FILE_NAME).to_path_buf();
-        self.file_map.write().unwrap().insert(meta_file_path, meta_file);
+        self.file_map
+            .write()
+            .unwrap()
+            .insert(meta_file_path, meta_file);
         Ok(())
     }
 
