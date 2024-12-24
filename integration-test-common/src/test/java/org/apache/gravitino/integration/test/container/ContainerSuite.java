@@ -86,22 +86,24 @@ public class ContainerSuite implements Closeable {
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static void initIfNecessary() {
-    if (initialized) {
-      return;
-    }
+    if (!initialized) {
+      synchronized (ContainerSuite.class) {
+        if (!initialized) {
+          try {
+            // Check if docker is available and you should never close the global DockerClient!
+            DockerClient dockerClient = DockerClientFactory.instance().client();
+            Info info = dockerClient.infoCmd().exec();
+            LOG.info("Docker info: {}", info);
 
-    try {
-      // Check if docker is available and you should never close the global DockerClient!
-      DockerClient dockerClient = DockerClientFactory.instance().client();
-      Info info = dockerClient.infoCmd().exec();
-      LOG.info("Docker info: {}", info);
-
-      if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
-        network = createDockerNetwork();
+            if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
+              network = createDockerNetwork();
+            }
+            initialized = true;
+          } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize ContainerSuite", e);
+          }
+        }
       }
-      initialized = true;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
   }
 
