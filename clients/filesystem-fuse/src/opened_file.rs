@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 use crate::filesystem::{FileReader, FileStat, FileWriter, Result};
 use bytes::Bytes;
 use fuse3::{Errno, Timestamp};

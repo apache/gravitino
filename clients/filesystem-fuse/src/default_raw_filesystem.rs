@@ -47,6 +47,7 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
+
     pub(crate) fn new(fs: T) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
@@ -177,7 +178,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         &self,
         parent_file_id: u64,
         name: &OsStr,
-    ) -> crate::filesystem::Result<FileStat> {
+    ) -> Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
 
         // assume the path is a regular file. Some filesystems may need to check whether it is a file or directory by lookup.
