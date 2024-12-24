@@ -267,8 +267,8 @@ public class TestableCommandLine {
   }
 
   protected SchemaDetails newSchemaDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new SchemaDetails(url, ignore, metalake, catalog, schema);
+      String url, boolean ignore, String outputFormat, String metalake, String catalog, String schema) {
+    return new SchemaDetails(url, ignore, outputFormat, metalake, catalog, schema);
   }
 
   protected ListSchema newListSchema(String url, boolean ignore, String metalake, String catalog) {

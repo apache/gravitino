@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.Schema;
 
 /** Table format to print a pretty table to standard out. */
 public class TableFormat {
@@ -37,6 +38,8 @@ public class TableFormat {
       new CatalogTableFormat().output((Catalog) object);
     } else if (object instanceof Catalog[]) {
       new CatalogsTableFormat().output((Catalog[]) object);
+    } else if (object instanceof Schema) {
+      new SchemaTableFormat().output((Schema) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -100,6 +103,20 @@ public class TableFormat {
         TableFormatImpl tableFormat = new TableFormatImpl();
         tableFormat.print(headers, rows);
       }
+    }
+  }
+
+  static final class SchemaTableFormat implements OutputFormat<Schema> {
+    @Override
+    public void output(Schema schema) {
+      List<String> headers = Arrays.asList("schema", "comment");
+      List<List<String>> rows = new ArrayList<>();
+      rows.add(
+              Arrays.asList(
+                      schema.name(),
+                      schema.comment()));
+      TableFormatImpl tableFormat = new TableFormatImpl();
+      tableFormat.print(headers, rows);
     }
   }
 
