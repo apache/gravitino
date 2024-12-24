@@ -101,7 +101,7 @@ public class JdbcMetadataObject implements AuthorizationMetadataObject {
         }
       }
       throw new IllegalArgumentException(
-          "No matching RangerMetadataObject.Type for " + metadataType);
+          "No matching JdbcMetadataObject.Type for " + metadataType);
     }
   }
 }
