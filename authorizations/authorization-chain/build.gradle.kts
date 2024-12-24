@@ -50,8 +50,8 @@ dependencies {
   }
   implementation(libs.javax.ws.rs.api)
   implementation(libs.jettison)
-  compileOnly(libs.lombok)
   implementation(libs.rome)
+  compileOnly(libs.lombok)
 
   testImplementation(project(":core"))
   testImplementation(project(":clients:client-java"))
