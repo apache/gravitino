@@ -111,10 +111,7 @@ public class TableFormat {
     public void output(Schema schema) {
       List<String> headers = Arrays.asList("schema", "comment");
       List<List<String>> rows = new ArrayList<>();
-      rows.add(
-              Arrays.asList(
-                      schema.name(),
-                      schema.comment()));
+      rows.add(Arrays.asList(schema.name(), schema.comment() + ""));
       TableFormatImpl tableFormat = new TableFormatImpl();
       tableFormat.print(headers, rows);
     }
