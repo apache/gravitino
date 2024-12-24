@@ -51,6 +51,8 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
+import org.apache.gravitino.dto.model.ModelDTO;
+import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -80,6 +82,8 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -626,6 +630,39 @@ public class DTOConverters {
         .withComment(topic.comment())
         .withProperties(topic.properties())
         .withAudit(toDTO(topic.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a Model to a ModelDTO.
+   *
+   * @param model The model to be converted.
+   * @return The model DTO.
+   */
+  public static ModelDTO toDTO(Model model) {
+    return ModelDTO.builder()
+        .withName(model.name())
+        .withComment(model.comment())
+        .withProperties(model.properties())
+        .withLatestVersion(model.latestVersion())
+        .withAudit(toDTO(model.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a ModelVersion to a ModelVersionDTO.
+   *
+   * @param modelVersion The model version to be converted.
+   * @return The model version DTO.
+   */
+  public static ModelVersionDTO toDTO(ModelVersion modelVersion) {
+    return ModelVersionDTO.builder()
+        .withVersion(modelVersion.version())
+        .withComment(modelVersion.comment())
+        .withAliases(modelVersion.aliases())
+        .withUri(modelVersion.uri())
+        .withProperties(modelVersion.properties())
+        .withAudit(toDTO(modelVersion.auditInfo()))
         .build();
   }
 

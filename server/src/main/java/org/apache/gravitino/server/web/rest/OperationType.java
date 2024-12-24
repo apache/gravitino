@@ -35,4 +35,7 @@ public enum OperationType {
   REVOKE,
   ASSOCIATE,
   SET,
+  REGISTER, // An operation to register a model
+  LIST_VERSIONS, // An operation to list versions of a model
+  LINK // An operation to link a version to a model
 }
