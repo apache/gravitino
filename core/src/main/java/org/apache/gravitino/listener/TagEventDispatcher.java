@@ -79,7 +79,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag[] listTagsInfo(String metalake) {
-    // TODO: listTagsInfoPreEvent
+    eventBus.dispatchEvent(new ListTagsInfoPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       // TODO: listTagsInfoEvent
       return dispatcher.listTagsInfo(metalake);
