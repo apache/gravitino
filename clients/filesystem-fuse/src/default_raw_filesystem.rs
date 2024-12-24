@@ -382,6 +382,8 @@ impl FileEntryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::filesystem::tests::TestRawFileSystem;
+    use crate::memory_filesystem::MemoryFileSystem;
 
     #[test]
     fn test_file_entry_manager() {
@@ -400,5 +402,13 @@ mod tests {
         manager.remove(Path::new("a/b"));
         assert!(manager.get_file_entry_by_id(2).is_none());
         assert!(manager.get_file_entry_by_path(Path::new("a/b")).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_default_raw_file_system() {
+        let memory_fs = MemoryFileSystem::new().await;
+        let raw_fs = DefaultRawFileSystem::new(memory_fs);
+        let _ = raw_fs.init().await;
+        TestRawFileSystem::test_raw_file_system(&raw_fs).await;
     }
 }

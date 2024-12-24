@@ -234,3 +234,16 @@ impl FileWriter for MemoryFileWriter {
 fn path_in_dir(dir: &Path, path: &Path) -> bool {
     path.starts_with(dir) && path != dir
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filesystem::tests::TestPathFileSystem;
+
+    #[tokio::test]
+    async fn test_memory_file_system() {
+        let fs = MemoryFileSystem::new().await;
+        let _ = fs.init().await;
+        TestPathFileSystem::test_path_file_system(&fs).await;
+    }
+}
