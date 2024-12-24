@@ -22,54 +22,67 @@ from gravitino.api.credential.credential import Credential
 from gravitino.utils.precondition import Precondition
 
 
-class GCSTokenCredential(Credential, ABC):
-    """Represents the GCS token credential."""
+class AzureAccountKeyCredential(Credential, ABC):
+    """Represents Azure account key credential."""
 
-    GCS_TOKEN_CREDENTIAL_TYPE: str = "gcs-token"
-    _GCS_TOKEN_NAME: str = "token"
-
-    _expire_time_in_ms: int = 0
+    AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE: str = "azure-account-key"
+    _STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
+    _STORAGE_ACCOUNT_KEY: str = "azure-storage-account-key"
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._token = credential_info.get(self._GCS_TOKEN_NAME, None)
-        self._expire_time_in_ms = expire_time_in_ms
+        self._account_name = credential_info.get(self._STORAGE_ACCOUNT_NAME, None)
+        self._account_key = credential_info.get(self._STORAGE_ACCOUNT_KEY, None)
         Precondition.check_string_not_empty(
-            self._token, "GCS token should not be empty"
+            self._account_name, "The Azure account name should not be empty"
+        )
+        Precondition.check_string_not_empty(
+            self._account_key, "The Azure account key should not be empty"
         )
         Precondition.check_argument(
-            self._expire_time_in_ms > 0,
-            "The expiration time of GCS token credential should be greater than 0",
+            expire_time_in_ms == 0,
+            "The expiration time of Azure account key credential should be 0",
         )
 
     def credential_type(self) -> str:
-        """The type of the credential.
+        """Returns the type of the credential.
 
         Returns:
-             the type of the credential.
+            The type of the credential.
         """
-        return self.GCS_TOKEN_CREDENTIAL_TYPE
+        return self.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since
         the epoch, 0 means it will never expire.
 
         Returns:
-             The expiration time of the credential.
+            The expiration time of the credential.
         """
-        return self._expire_time_in_ms
+        return 0
 
     def credential_info(self) -> Dict[str, str]:
         """The credential information.
 
         Returns:
-             The credential information.
+            The credential information.
         """
-        return {self._GCS_TOKEN_NAME: self._token}
+        return {
+            self._STORAGE_ACCOUNT_NAME: self._account_name,
+            self._STORAGE_ACCOUNT_KEY: self._account_key,
+        }
 
-    def token(self) -> str:
-        """The GCS token.
+    def account_name(self) -> str:
+        """The Azure account name.
 
         Returns:
-            The GCS token.
+            The Azure account name.
         """
-        return self._token
+        return self._account_name
+
+    def account_key(self) -> str:
+        """The Azure account key.
+
+        Returns:
+            The Azure account key.
+        """
+        return self._account_key
