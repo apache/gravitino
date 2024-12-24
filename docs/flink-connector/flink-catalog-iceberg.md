@@ -1,0 +1,83 @@
+---
+title: "Flink connector Iceberg catalog"
+slug: /flink-connector/flink-catalog-iceberg
+keyword: flink connector iceberg catalog
+license: "This software is licensed under the Apache License version 2."
+---
+
+The Apache Gravitino Flink connector offers the capability to read and write Iceberg tables, with the metadata managed by the Gravitino server. To enable the use of the Iceberg catalog within the Flink connector, you must download the Iceberg Flink runtime JAR to the Flink classpath.
+
+## Capabilities
+
+#### Supported DML and DDL operations:
+
+- `CREATE CATALOG`
+- `CREATE DATABASE`
+- `CREATE TABLE`
+- `DROP TABLE`
+- `ALTER TABLE`
+- `INSERT INTO & OVERWRITE`
+- `SELECT`
+
+#### Not supported operations:
+
+- Partition operations
+- View operations
+- Metadata tables, like:
+  - `{iceberg_catalog}.{iceberg_database}.{iceberg_table}&snapshots`
+- Querying UDF
+  - `UPDATE` clause
+  - `DELETE` clause
+  - `CREATE TABLE LIKE` clause
+
+## SQL example
+```sql
+
+-- Suppose iceberg_a is the Iceberg catalog name managed by Gravitino
+
+USE iceberg_a;
+
+CREATE DATABASE IF NOT EXISTS mydatabase;
+USE mydatabase;
+
+CREATE TABLE sample (
+    id BIGINT COMMENT 'unique id',
+    data STRING NOT NULL
+) PARTITIONED BY (data) 
+WITH ('format-version'='2');
+
+INSERT INTO sample
+VALUES (1, 'A'), (2, 'B');
+
+SELECT * FROM sample WHERE data = 'B';
+
+```
+
+## Catalog properties
+
+Gravitino Flink connector will transform the following property names defined in catalog properties to Flink Iceberg connector configuration.
+
+| Gravitino catalog property name | Flink Iceberg connector configuration | Description                                                                                                                                                                                                         | Since Version     |
+|---------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
+| `catalog-backend`               | `catalog-type`                        | Catalog backend type                                                                                                                                                                                                | 0.8.0-incubating  |
+| `uri`                           | `uri`                                 | Catalog backend URI                                                                                                                                                                                                 | 0.8.0-incubating  |
+| `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                                                                                                                           | 0.8.0-incubating  |
+| `io-impl`                       | `io-impl`                             | The IO implementation for `FileIO` in Iceberg.                                                                                                                                                                      | 0.8.0-incubating  |
+| `s3-endpoint`                   | `s3.endpoint`                         | An alternative endpoint of the S3 service, This could be used for S3FileIO with any S3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | 0.8.0-incubating  | 
+| `s3-region`                     | `client.region`                       | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | 0.8.0-incubating  |
+| `oss-endpoint`                  | `oss.endpoint`                        | The endpoint of Aliyun OSS service.                                                                                                                                                                                 | 0.8.0-incubating  |
+
+
+## Storage
+
+### S3
+
+You need to add s3 secret to the Flink configuration using `s3.access-key-id` and `s3.secret-access-key`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Flink.
+
+### OSS
+
+You need to add OSS secret key to the Flink configuration using `client.access-key-id` and `client.access-key-secret`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Flink.
+
+### GCS
+
+No extra configuration is needed. Please make sure the credential file is accessible by Flink, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, and download [Iceberg GCP bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Flink.
