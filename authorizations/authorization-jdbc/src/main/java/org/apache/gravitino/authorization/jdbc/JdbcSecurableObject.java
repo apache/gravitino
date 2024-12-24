@@ -53,7 +53,9 @@ public class JdbcSecurableObject extends JdbcMetadataObject
             ? JdbcMetadataObject.Type.fromMetadataType(MetadataObject.Type.SCHEMA)
             : JdbcMetadataObject.Type.fromMetadataType(MetadataObject.Type.TABLE);
 
-    return new JdbcSecurableObject(parent, name, type, privileges);
+    JdbcSecurableObject object = new JdbcSecurableObject(parent, name, type, privileges);
+    object.validateAuthorizationMetadataObject();
+    return object;
   }
 
   @Override

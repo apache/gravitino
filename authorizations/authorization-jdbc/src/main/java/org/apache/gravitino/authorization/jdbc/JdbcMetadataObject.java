@@ -65,12 +65,16 @@ public class JdbcMetadataObject implements AuthorizationMetadataObject {
     Preconditions.checkArgument(
         names.size() <= 2, "The name of the object is not in the format of 'database.table'.");
     Preconditions.checkArgument(type != null, "The type of the object is null.");
-    Preconditions.checkArgument(
-        names.size() == 1 || type.metadataObjectType() == MetadataObject.Type.SCHEMA,
-        "The type of the object is not SCHEMA.");
-    Preconditions.checkArgument(
-        names.size() == 2 || type.metadataObjectType() == MetadataObject.Type.TABLE,
-        "The type of the object is not TABLE.");
+    if (names.size() == 1) {
+      Preconditions.checkArgument(
+          type.metadataObjectType() == MetadataObject.Type.SCHEMA,
+          "The type of the object is not SCHEMA.");
+    } else {
+      Preconditions.checkArgument(
+          type.metadataObjectType() == MetadataObject.Type.TABLE,
+          "The type of the object is not TABLE.");
+    }
+
     for (String name : names) {
       Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     }
