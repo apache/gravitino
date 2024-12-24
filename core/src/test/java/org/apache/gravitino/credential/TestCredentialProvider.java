@@ -20,7 +20,6 @@
 package org.apache.gravitino.credential;
 
 import java.util.Map;
-import org.apache.gravitino.connector.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.DummyCredentialProvider.DummyCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

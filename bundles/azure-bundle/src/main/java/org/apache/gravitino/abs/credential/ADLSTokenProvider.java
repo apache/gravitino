@@ -32,12 +32,12 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.gravitino.connector.credential.CredentialContext;
-import org.apache.gravitino.connector.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.config.AzureCredentialConfig;
 
 /** Generates ADLS token to access ADLS data. */

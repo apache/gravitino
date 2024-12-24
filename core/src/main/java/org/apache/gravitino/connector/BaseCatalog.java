@@ -41,13 +41,13 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.AuthorizationProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.connector.credential.CatalogCredentialContext;
-import org.apache.gravitino.connector.credential.CatalogCredentialManager;
-import org.apache.gravitino.connector.credential.CredentialContext;
-import org.apache.gravitino.connector.credential.CredentialPrivilege;
-import org.apache.gravitino.connector.credential.SupportsCredentialOperations;
+import org.apache.gravitino.connector.credential.PathWithCredentialType;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.CatalogCredentialContext;
+import org.apache.gravitino.credential.CatalogCredentialProvider;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialContext;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -70,11 +70,7 @@ import org.slf4j.LoggerFactory;
  */
 @Evolving
 public abstract class BaseCatalog<T extends BaseCatalog>
-    implements Catalog,
-        CatalogProvider,
-        HasPropertyMetadata,
-        SupportsCredentialOperations,
-        Closeable {
+    implements Catalog, CatalogProvider, HasPropertyMetadata, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
@@ -97,7 +93,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile Map<String, String> properties;
 
-  private volatile CatalogCredentialManager catalogCredentialManager;
+  private volatile CatalogCredentialProvider catalogCredentialProvider;
 
   private static String ENTITY_IS_NOT_SET = "entity is not set";
 
@@ -279,9 +275,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       authorizationPlugin.close();
       authorizationPlugin = null;
     }
-    if (catalogCredentialManager != null) {
-      catalogCredentialManager.close();
-      catalogCredentialManager = null;
+    if (catalogCredentialProvider != null) {
+      catalogCredentialProvider.close();
+      catalogCredentialProvider = null;
     }
   }
 
@@ -297,30 +293,24 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return capability;
   }
 
-  public CatalogCredentialManager getCatalogCredentialManager() {
-    if (catalogCredentialManager == null) {
-      synchronized (this) {
-        if (catalogCredentialManager == null) {
-          this.catalogCredentialManager = new CatalogCredentialManager(name(), properties());
-        }
-      }
-    }
-    return catalogCredentialManager;
-  }
-
-  @Override
   public List<Credential> getCredentials(
       NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     Map<String, CredentialContext> contexts = getCredentialContexts(nameIdentifier, privilege);
     return contexts.entrySet().stream()
-        .map(
-            entry -> {
-              String credentialType = entry.getKey();
-              CredentialContext context = entry.getValue();
-              return getCatalogCredentialManager().getCredential(credentialType, context);
-            })
+        .map(entry -> getCatalogCredentialManager().getCredential(entry.getKey(), entry.getValue()))
         .filter(Objects::nonNull)
         .collect(Collectors.toList());
+  }
+
+  private CatalogCredentialProvider getCatalogCredentialManager() {
+    if (catalogCredentialProvider == null) {
+      synchronized (this) {
+        if (catalogCredentialProvider == null) {
+          this.catalogCredentialProvider = new CatalogCredentialProvider(name(), properties());
+        }
+      }
+    }
+    return catalogCredentialProvider;
   }
 
   private Map<String, CredentialContext> getCredentialContexts(
@@ -330,10 +320,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     if (ops() instanceof SupportsPathBasedCredentials) {
-      return ((SupportsPathBasedCredentials) ops())
-          .getPathBasedCredentialContexts(nameIdentifier, privilege, properties());
+      List<PathWithCredentialType> pathWithCredentialTypes =
+          ((SupportsPathBasedCredentials) ops()).getPathWithCredentialTypes(nameIdentifier);
+      return CredentialUtils.getPathBasedCredentialContexts(privilege, pathWithCredentialTypes);
     }
-    throw new NotSupportedException();
+    throw new NotSupportedException(
+        String.format("Catalog %s doesn't support generate credentials", name()));
   }
 
   private Map<String, CredentialContext> getCatalogCredentialContexts() {
