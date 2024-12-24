@@ -25,30 +25,19 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** This class use Apache Paimon FilesystemCatalog for backend catalog. */
+/** This class use Apache Paimon HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
-public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonCatalogIT {
+public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalogIT {
 
   @Override
   protected Map<String, String> getCatalogConfigs() {
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(
         PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_BACKEND,
-        PaimonPropertiesConstants.PAIMON_CATALOG_BACKEND_FILESYSTEM);
+        PaimonPropertiesConstants.PAIMON_CATALOG_BACKEND_HIVE);
+    catalogProperties.put(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_URI, hiveMetastoreUri);
     catalogProperties.put(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_WAREHOUSE, warehouse);
     return catalogProperties;
-  }
-
-  @Test
-  @Override
-  protected void testCreateAndLoadSchema() {
-    String testDatabaseName = "t_create1";
-    dropDatabaseIfExists(testDatabaseName);
-    sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
-    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
-    // The database of the Paimon filesystem backend do not store any properties.
-    Assertions.assertFalse(databaseMeta.containsKey("ID"));
-    Assertions.assertFalse(databaseMeta.containsKey("comment"));
   }
 
   @Test
@@ -61,9 +50,8 @@ public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonC
             + testDatabaseName
             + " COMMENT 'db comment' WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
-    // The database of the Paimon filesystem backend do not store any properties.
-    Assertions.assertFalse(databaseMeta.get("Properties").contains("(ID,001)"));
-    Assertions.assertFalse(databaseMeta.containsKey("Comment"));
+    Assertions.assertTrue(databaseMeta.get("Properties").contains("(ID,001)"));
+    Assertions.assertEquals("db comment", databaseMeta.get("Comment"));
 
     // The Paimon filesystem backend do not support alter database operation.
     Assertions.assertThrows(
