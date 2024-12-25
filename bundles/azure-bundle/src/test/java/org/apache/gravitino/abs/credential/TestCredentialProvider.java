@@ -29,11 +29,12 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     ADLSTokenProvider adlsTokenProvider = new ADLSTokenProvider();
-    Assertions.assertEquals(ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE,
-        adlsTokenProvider.credentialType());
+    Assertions.assertEquals(
+        ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE, adlsTokenProvider.credentialType());
 
     AzureAccountKeyProvider azureAccountKeyProvider = new AzureAccountKeyProvider();
-    Assertions.assertEquals(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
+    Assertions.assertEquals(
+        AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
         azureAccountKeyProvider.credentialType());
   }
 }

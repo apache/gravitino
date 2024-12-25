@@ -29,11 +29,12 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     OSSTokenProvider ossTokenProvider = new OSSTokenProvider();
-    Assertions.assertEquals(OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
-        ossTokenProvider.credentialType());
+    Assertions.assertEquals(
+        OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenProvider.credentialType());
 
     OSSSecretKeyProvider ossSecretKeyProvider = new OSSSecretKeyProvider();
-    Assertions.assertEquals(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+    Assertions.assertEquals(
+        OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
         ossSecretKeyProvider.credentialType());
   }
 }

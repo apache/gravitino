@@ -29,11 +29,11 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     S3TokenProvider s3TokenProvider = new S3TokenProvider();
-    Assertions.assertEquals(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
-        s3TokenProvider.credentialType());
+    Assertions.assertEquals(
+        S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, s3TokenProvider.credentialType());
 
     S3SecretKeyProvider s3SecretKeyProvider = new S3SecretKeyProvider();
-    Assertions.assertEquals(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE,
-        s3SecretKeyProvider.credentialType());
+    Assertions.assertEquals(
+        S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE, s3SecretKeyProvider.credentialType());
   }
 }

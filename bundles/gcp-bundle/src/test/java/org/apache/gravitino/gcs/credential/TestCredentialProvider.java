@@ -28,6 +28,7 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     GCSTokenProvider gcsTokenProvider = new GCSTokenProvider();
-    Assertions.assertEquals(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE, gcsTokenProvider.credentialType());
+    Assertions.assertEquals(
+        GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE, gcsTokenProvider.credentialType());
   }
 }
