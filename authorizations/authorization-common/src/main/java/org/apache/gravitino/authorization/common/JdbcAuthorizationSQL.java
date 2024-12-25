@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.jdbc;
+package org.apache.gravitino.authorization.common;
 
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
@@ -25,7 +25,7 @@ import org.apache.gravitino.authorization.Owner;
 
 /** Interface for SQL operations of the underlying access control system. */
 @Unstable
-interface JdbcAuthorizationSQL {
+public interface JdbcAuthorizationSQL {
 
   /**
    * Get SQL statements for creating a user.

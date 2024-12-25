@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.jdbc;
+package org.apache.gravitino.authorization.common;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -34,7 +34,6 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.common.JdbcAuthorizationProperties;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -42,7 +41,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class JdbcAuthorizationPluginTest {
+public class TestJdbcAuthorizationPlugin {
   private static List<String> expectSQLs = Lists.newArrayList();
   private static List<MetadataObject.Type> expectTypes = Lists.newArrayList();
   private static List<String> expectObjectNames = Lists.newArrayList();
