@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -51,5 +52,6 @@ public class ModelVersionListResponse extends BaseResponse {
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
+    Preconditions.checkArgument(versions != null, "versions cannot be null");
   }
 }

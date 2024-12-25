@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -422,15 +421,6 @@ public class TestResponses {
 
   @Test
   void testModelVersionListResponse() throws JsonProcessingException {
-    ModelVersionListResponse response = new ModelVersionListResponse();
-    assertDoesNotThrow(response::validate);
-
-    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
-    ModelVersionListResponse deserResponse =
-        JsonUtils.objectMapper().readValue(serJson, ModelVersionListResponse.class);
-    assertEquals(response, deserResponse);
-    assertNull(deserResponse.getVersions());
-
     ModelVersionListResponse response1 = new ModelVersionListResponse(new int[] {});
     assertDoesNotThrow(response1::validate);
 

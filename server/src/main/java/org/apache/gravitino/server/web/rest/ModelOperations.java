@@ -174,7 +174,7 @@ public class ModelOperations {
           () -> {
             boolean deleted = modelDispatcher.deleteModel(modelId);
             if (!deleted) {
-              LOG.warn("Failed to delete model {} under schema {}", model, schema);
+              LOG.warn("Cannot find to be deleted model {} under schema {}", model, schema);
             } else {
               LOG.info("Model deleted: {}", modelId);
             }
@@ -255,7 +255,7 @@ public class ModelOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-alias", absolute = true)
-  public Response getModelVersionAlias(
+  public Response getModelVersionByAlias(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
@@ -346,7 +346,7 @@ public class ModelOperations {
           () -> {
             boolean deleted = modelDispatcher.deleteModelVersion(modelId, version);
             if (!deleted) {
-              LOG.warn("Failed to delete version {} in model {}", version, model);
+              LOG.warn("Cannot find to be deleted version {} in model {}", version, model);
             } else {
               LOG.info("Model version deleted: {}.{}", modelId, version);
             }
@@ -365,7 +365,7 @@ public class ModelOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model-alias", absolute = true)
-  public Response deleteModelVersionAlias(
+  public Response deleteModelVersionByAlias(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
@@ -386,7 +386,8 @@ public class ModelOperations {
           () -> {
             boolean deleted = modelDispatcher.deleteModelVersion(modelId, alias);
             if (!deleted) {
-              LOG.warn("Failed to delete model version by alias {} in model {}", alias, model);
+              LOG.warn(
+                  "Cannot find to be deleted model version by alias {} in model {}", alias, model);
             } else {
               LOG.info("Model version by alias deleted: {}.{}", modelId, alias);
             }
