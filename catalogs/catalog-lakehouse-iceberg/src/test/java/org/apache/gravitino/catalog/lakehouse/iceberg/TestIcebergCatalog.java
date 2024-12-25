@@ -146,4 +146,51 @@ public class TestIcebergCatalog {
           throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
     }
   }
+
+  @Test
+  void testCatalogInstanciation() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
+      ops.initialize(conf, entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
+      Map<String, String> map1 = Maps.newHashMap();
+      map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "test");
+      PropertiesMetadata metadata = ICEBERG_PROPERTIES_METADATA.catalogPropertiesMetadata();
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> {
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map1);
+          });
+
+      Map<String, String> map2 = Maps.newHashMap();
+      map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest");
+      map2.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
+      Assertions.assertDoesNotThrow(
+          () -> {
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map2);
+          });
+
+      Map<String, String> map3 = Maps.newHashMap();
+      Throwable throwable =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map3));
+
+      Assertions.assertTrue(
+          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
+    }
+  }
 }

@@ -31,7 +31,7 @@ class GCSTokenCredential(Credential, ABC):
     _expire_time_in_ms: int = 0
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._token = credential_info[self._GCS_TOKEN_NAME]
+        self._token = credential_info.get(self._GCS_TOKEN_NAME, None)
         self._expire_time_in_ms = expire_time_in_ms
         Precondition.check_string_not_empty(
             self._token, "GCS token should not be empty"

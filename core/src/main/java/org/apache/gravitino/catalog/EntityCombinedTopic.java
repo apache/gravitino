@@ -60,7 +60,7 @@ public class EntityCombinedTopic implements Topic {
     return new EntityCombinedTopic(topic, null);
   }
 
-  public EntityCombinedTopic withHiddenPropertiesSet(Set<String> hiddenProperties) {
+  public EntityCombinedTopic withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;
   }

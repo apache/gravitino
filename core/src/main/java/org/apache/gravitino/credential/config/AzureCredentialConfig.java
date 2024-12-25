@@ -29,7 +29,7 @@ import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.storage.AzureProperties;
 
-public class ADLSCredentialConfig extends Config {
+public class AzureCredentialConfig extends Config {
 
   public static final ConfigEntry<String> AZURE_STORAGE_ACCOUNT_NAME =
       new ConfigBuilder(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)
@@ -79,7 +79,7 @@ public class ADLSCredentialConfig extends Config {
           .intConf()
           .createWithDefault(3600);
 
-  public ADLSCredentialConfig(Map<String, String> properties) {
+  public AzureCredentialConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
   }
@@ -110,7 +110,7 @@ public class ADLSCredentialConfig extends Config {
   }
 
   @NotNull
-  public Integer tokenExpireInSecs() {
+  public Integer adlsTokenExpireInSecs() {
     return this.get(ADLS_TOKEN_EXPIRE_IN_SECS);
   }
 }

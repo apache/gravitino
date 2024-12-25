@@ -66,7 +66,10 @@ public class ListTopics extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
+    String all =
+        topics.length == 0
+            ? "No topics exist."
+            : Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
     System.out.println(all);
   }
 }

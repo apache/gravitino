@@ -469,6 +469,7 @@ components:
       schema:
         type: string
         enum:
+          - "METALAKE"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
@@ -476,8 +477,6 @@ components:
           - "FILESET"
           - "TOPIC"
           - "ROLE"
-          - "METALAKE"
-
     metadataObjectFullName:
       name: metadataObjectFullName
       in: path

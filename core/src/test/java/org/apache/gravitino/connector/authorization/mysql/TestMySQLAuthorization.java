@@ -32,7 +32,7 @@ public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthoriza
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin(
+  public AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
     return new TestMySQLAuthorizationPlugin();
   }

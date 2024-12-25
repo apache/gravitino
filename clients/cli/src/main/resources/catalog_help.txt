@@ -48,3 +48,9 @@ gcli catalog set --name catalog_mysql --property test --value value
 
 Remove a catalog's property
 gcli catalog remove --name catalog_mysql --property test
+
+Enable a catalog
+gcli catalog update -m metalake_demo --name catalog --enable
+
+Disable a catalog
+gcli catalog update -m metalake_demo --name catalog --disable

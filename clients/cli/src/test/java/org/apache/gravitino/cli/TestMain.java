@@ -150,6 +150,7 @@ public class TestMain {
     assertEquals(CommandEntities.CATALOG, entity);
   }
 
+  @Test
   public void metalakeWithHelpOption() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();

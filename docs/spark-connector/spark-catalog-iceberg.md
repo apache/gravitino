@@ -111,7 +111,13 @@ Gravitino spark connector will transform below property names which are defined 
 | `io-impl`                       | `io-impl`                             | The io implementation for `FileIO` in Iceberg.                                                                                                                                                                      | 0.6.0-incubating |
 | `s3-endpoint`                   | `s3.endpoint`                         | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | 0.6.0-incubating | 
 | `s3-region`                     | `client.region`                       | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | 0.6.0-incubating |
+| `s3-access-key-id`              | `s3.access-key-id`                    | The static access key ID used to access S3 data.	                                                                                                                                                                   | 0.8.0-incubating |
+| `s3-secret-access-key`          | `s3.secret-access-key`                | The static secret access key used to access S3 data.                                                                                                                                                                | 0.8.0-incubating |
 | `oss-endpoint`                  | `oss.endpoint`                        | The endpoint of Aliyun OSS service.                                                                                                                                                                                 | 0.7.0-incubating |
+| `oss-access-key-id`             | `client.access-key-id`                | The static access key ID used to access OSS data.                                                                                                                                                                   | 0.8.0-incubating |
+| `oss-secret-access-key`         | `client.access-key-secret`            | The static secret access key used to access OSS data.                                                                                                                                                               | 0.8.0-incubating |
+| `azure-storage-account-name`    | `adls.auth.shared-key.account.name`   | The static storage account name used to access ADLS data.                                                                                                                                                           | 0.8.0-incubating |
+| `azure-storage-account-key`     | `adls.auth.shared-key.account.key`    | The static storage account key used to access ADLS data..                                                                                                                                                           | 0.8.0-incubating |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.clients` to pass the `clients` to the Spark Iceberg connector.
 
@@ -121,17 +127,23 @@ Iceberg catalog property `cache-enabled` is setting to `false` internally and no
 
 ## Storage
 
+Spark connector could convert storage properties in the Gravitino catalog to Spark Iceberg connector automatically, No extra configuration is needed for `S3`, `ADLS`, `OSS`, `GCS`.
+
 ### S3
 
-You need to add s3 secret to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.s3.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.s3.secret-access-key`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Spark.
+Please downloading the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Spark.
 
 ### OSS
 
-You need to add OSS secret key to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.client.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.client.access-key-secret`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Spark.
+Please downloading the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Spark.
 
 ### GCS
 
-No extra configuration is needed. Please make sure the credential file is accessible by Spark, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, and download [Iceberg GCP bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Spark.
+Please make sure the credential file is accessible by Spark, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, and download [Iceberg GCP bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Spark.
+
+### ADLS
+
+Please downloading the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it in the classpath of Spark.
 
 ### Other storage
 
