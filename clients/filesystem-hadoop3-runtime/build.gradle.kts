@@ -28,7 +28,6 @@ plugins {
 dependencies {
   implementation(project(":clients:filesystem-hadoop3"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-
   implementation(libs.commons.lang3)
 }
 

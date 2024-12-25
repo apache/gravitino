@@ -36,9 +36,9 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
-  relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
-  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
-  relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.aws.shaded.org.apache.commons.lang3")
+  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
 }
 
 tasks.jar {

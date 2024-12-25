@@ -26,12 +26,12 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
-  compileOnly(project(":core"))
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":core"))
+  compileOnly(libs.hadoop3.aws)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
-  compileOnly(libs.hadoop3.aws)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
@@ -39,8 +39,6 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
-
-  implementation(libs.guava)
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
@@ -53,9 +51,9 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
-  relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
-  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
-  relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.aws.shaded.org.apache.commons.lang3")
+  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
 }
 
 tasks.jar {

@@ -26,12 +26,11 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:aliyun-bundle"))
-  implementation(libs.hadoop3.oss)
+  implementation(libs.commons.collections3)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
-
+  implementation(libs.hadoop3.oss)
   implementation(libs.httpclient)
-  implementation(libs.commons.collections3)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -41,12 +40,12 @@ tasks.withType(ShadowJar::class.java) {
   mergeServiceFiles()
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.jdom", "org.apache.gravitino.shaded.org.jdom")
-  relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
-  relocate("com.fasterxml.jackson", "org.apache.gravitino.shaded.com.fasterxml.jackson")
-  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
-  relocate("org.apache.http", "org.apache.gravitino.shaded.org.apache.http")
-  relocate("org.apache.commons.collections", "org.apache.gravitino.shaded.org.apache.commons.collections")
+  relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.aliyun.shaded.org.apache.commons.lang3")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
+  relocate("com.google.common", "org.apache.gravitino.aliyun.shaded.com.google.common")
+  relocate("org.apache.http", "org.apache.gravitino.aliyun.shaded.org.apache.http")
+  relocate("org.apache.commons.collections", "org.apache.gravitino.aliyun.shaded.org.apache.commons.collections")
 }
 
 tasks.jar {
