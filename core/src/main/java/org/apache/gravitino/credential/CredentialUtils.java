@@ -21,51 +21,21 @@ package org.apache.gravitino.credential;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.connector.credential.PathWithCredentialType;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {
 
   private static final Splitter splitter = Splitter.on(",");
-  private static final Set<MetadataObject.Type> supportsCredentialMetadataTypes =
-      ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.FILESET);
 
   public static Credential vendCredential(CredentialProvider credentialProvider, String[] path) {
     PathBasedCredentialContext pathBasedCredentialContext =
         new PathBasedCredentialContext(
             PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), ImmutableSet.of());
     return credentialProvider.getCredential(pathBasedCredentialContext);
-  }
-
-  public static boolean supportsCredentialOperations(MetadataObject metadataObject) {
-    return supportsCredentialMetadataTypes.contains(metadataObject.type());
-  }
-
-  public static Map<String, CredentialContext> getPathBasedCredentialContexts(
-      CredentialPrivilege privilege, List<PathWithCredentialType> pathWithCredentialTypes) {
-    return pathWithCredentialTypes.stream()
-        .collect(
-            Collectors.toMap(
-                pathWithCredentialType -> pathWithCredentialType.credentialType(),
-                pathWithCredentialType -> {
-                  String path = pathWithCredentialType.path();
-                  Set<String> writePaths = new HashSet<>();
-                  Set<String> readPaths = new HashSet<>();
-                  if (CredentialPrivilege.WRITE.equals(privilege)) {
-                    writePaths.add(path);
-                  } else {
-                    readPaths.add(path);
-                  }
-                  return new PathBasedCredentialContext(
-                      PrincipalUtils.getCurrentUserName(), writePaths, readPaths);
-                }));
   }
 
   public static Map<String, CredentialProvider> loadCredentialProviders(

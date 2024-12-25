@@ -21,8 +21,10 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -33,11 +35,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObject.Type;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
-import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -52,6 +54,9 @@ public class MetadataObjectCredentialOperations {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MetadataObjectCredentialOperations.class);
+
+  private static final Set<Type> supportsCredentialMetadataTypes =
+      ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.FILESET);
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
@@ -85,7 +90,7 @@ public class MetadataObjectCredentialOperations {
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            if (!CredentialUtils.supportsCredentialOperations(object)) {
+            if (!supportsCredentialOperations(object)) {
               throw new NotSupportedException(
                   "Doesn't support credential operations for metadata object type");
             }
@@ -102,5 +107,9 @@ public class MetadataObjectCredentialOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleCredentialException(OperationType.GET, fullName, e);
     }
+  }
+
+  private static boolean supportsCredentialOperations(MetadataObject metadataObject) {
+    return supportsCredentialMetadataTypes.contains(metadataObject.type());
   }
 }

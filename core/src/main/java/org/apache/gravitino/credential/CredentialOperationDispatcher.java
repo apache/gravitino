@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -81,7 +82,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
       List<PathWithCredentialType> pathWithCredentialTypes =
           ((SupportsPathBasedCredentials) baseCatalog.ops())
               .getPathWithCredentialTypes(nameIdentifier);
-      return CredentialUtils.getPathBasedCredentialContexts(privilege, pathWithCredentialTypes);
+      return getPathBasedCredentialContexts(privilege, pathWithCredentialTypes);
     }
     throw new NotSupportedException(
         String.format("Catalog %s doesn't support generate credentials", baseCatalog.name()));
@@ -93,6 +94,26 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
     Set<String> providers = CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
     return providers.stream().collect(Collectors.toMap(provider -> provider, provider -> context));
+  }
+
+  public static Map<String, CredentialContext> getPathBasedCredentialContexts(
+      CredentialPrivilege privilege, List<PathWithCredentialType> pathWithCredentialTypes) {
+    return pathWithCredentialTypes.stream()
+        .collect(
+            Collectors.toMap(
+                pathWithCredentialType -> pathWithCredentialType.credentialType(),
+                pathWithCredentialType -> {
+                  String path = pathWithCredentialType.path();
+                  Set<String> writePaths = new HashSet<>();
+                  Set<String> readPaths = new HashSet<>();
+                  if (CredentialPrivilege.WRITE.equals(privilege)) {
+                    writePaths.add(path);
+                  } else {
+                    readPaths.add(path);
+                  }
+                  return new PathBasedCredentialContext(
+                      PrincipalUtils.getCurrentUserName(), writePaths, readPaths);
+                }));
   }
 
   @SuppressWarnings("UnusedVariable")
