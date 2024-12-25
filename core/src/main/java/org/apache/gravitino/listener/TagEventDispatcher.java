@@ -21,9 +21,13 @@ package org.apache.gravitino.listener;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.listener.api.event.CreateTagEvent;
+import org.apache.gravitino.listener.api.event.ListTagEvent;
+import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * {@code TagEventDispatcher} is a decorator for {@link TagDispatcher} that not only delegates tag
@@ -47,8 +51,9 @@ public class TagEventDispatcher implements TagDispatcher {
   public String[] listTags(String metalake) {
     // TODO: listTagsPreEvent
     try {
-      // TODO: listTagsEvent
-      return dispatcher.listTags(metalake);
+      String[] tags = dispatcher.listTags(metalake);
+      eventBus.dispatchEvent(new ListTagEvent(PrincipalUtils.getCurrentUserName(), metalake));
+      return tags;
     } catch (Exception e) {
       // TODO: listTagFailureEvent
       throw e;
@@ -84,8 +89,9 @@ public class TagEventDispatcher implements TagDispatcher {
       String metalake, String name, String comment, Map<String, String> properties) {
     // TODO: createTagPreEvent
     try {
-      // TODO: createTagEvent
-      return dispatcher.createTag(metalake, name, comment, properties);
+      Tag tag = dispatcher.createTag(metalake, name, comment, properties);
+      eventBus.dispatchEvent(new CreateTagEvent(PrincipalUtils.getCurrentUserName(), metalake, new TagInfo(tag.name(), tag.comment(), tag.properties())));
+      return tag;
     } catch (Exception e) {
       // TODO: createTagFailureEvent
       throw e;
