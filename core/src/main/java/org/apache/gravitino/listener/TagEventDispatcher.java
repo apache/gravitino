@@ -92,7 +92,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
-    // TODO: getTagPreEvent
+    eventBus.dispatchEvent(new GetTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
     try {
       // TODO: getTagEvent
       return dispatcher.getTag(metalake, name);
