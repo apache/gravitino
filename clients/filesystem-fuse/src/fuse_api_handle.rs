@@ -17,6 +17,7 @@
  * under the License.
  */
 
+use crate::config::Config;
 use crate::filesystem::{FileStat, FileSystemContext, RawFileSystem};
 use fuse3::path::prelude::{ReplyData, ReplyOpen, ReplyStatFs, ReplyWrite};
 use fuse3::path::Request;
@@ -44,7 +45,7 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
     const DEFAULT_ATTR_TTL: Duration = Duration::from_secs(1);
     const DEFAULT_MAX_WRITE_SIZE: u32 = 16 * 1024;
 
-    pub fn new(fs: T, context: FileSystemContext) -> Self {
+    pub fn new(fs: T, _config: &Config, context: FileSystemContext) -> Self {
         Self {
             fs: fs,
             default_ttl: Self::DEFAULT_ATTR_TTL,

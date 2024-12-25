@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::Config;
 use crate::filesystem::{
-    FileStat, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID, ROOT_DIR_FILE_ID,
-    ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
+    FileStat, FileSystemContext, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID,
+    ROOT_DIR_FILE_ID, ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
 };
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
@@ -47,7 +48,7 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
-    pub(crate) fn new(fs: T) -> Self {
+    pub(crate) fn new(fs: T, _config: &Config, _fs_context: &FileSystemContext) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
             opened_file_manager: OpenedFileManager::new(),
@@ -405,7 +406,8 @@ mod tests {
     #[tokio::test]
     async fn test_default_raw_file_system() {
         let memory_fs = MemoryFileSystem::new().await;
-        let raw_fs = DefaultRawFileSystem::new(memory_fs);
+        let raw_fs =
+            DefaultRawFileSystem::new(memory_fs, &Config::default(), &FileSystemContext::default());
         let _ = raw_fs.init().await;
         let mut tester = TestRawFileSystem::new(raw_fs);
         tester.test_raw_file_system().await;

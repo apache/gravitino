@@ -129,6 +129,8 @@ pub(crate) trait PathFileSystem: Send + Sync {
 
     /// Remove the directory by file path
     async fn remove_dir(&self, path: &Path) -> Result<()>;
+
+    fn get_capacity(&self) -> Result<FileSystemCapacity>;
 }
 
 // FileSystemContext is the system environment for the fuse file system.
@@ -159,7 +161,20 @@ impl FileSystemContext {
             block_size: 4 * 1024,
         }
     }
+
+    pub(crate) fn default() -> Self {
+        FileSystemContext {
+            uid: 0,
+            gid: 0,
+            default_file_perm: 0o644,
+            default_dir_perm: 0o755,
+            block_size: 4 * 1024,
+        }
+    }
 }
+
+// capacity of the file system
+pub struct FileSystemCapacity {}
 
 // FileStat is the file metadata of the file
 #[derive(Clone, Debug)]

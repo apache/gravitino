@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::Config;
 use crate::default_raw_filesystem::DefaultRawFileSystem;
 use crate::filesystem::FileSystemContext;
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::fuse_server::FuseServer;
+use crate::gvfs_fileset_fs::GvfsFilesetFs;
 use crate::memory_filesystem::MemoryFileSystem;
-use fuse3::raw::Filesystem;
+use crate::utils::GvfsResult;
 use log::info;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
@@ -29,31 +31,44 @@ use tokio::sync::Mutex;
 
 static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(None));
 
-pub async fn mount(mount_point: &str) -> fuse3::Result<()> {
+pub(crate) enum CreateFsResult {
+    Memory(MemoryFileSystem),
+    Gvfs(GvfsFilesetFs),
+    FuseMemoryFs(FuseApiHandle<DefaultRawFileSystem<MemoryFileSystem>>),
+    FuseGvfs(FuseApiHandle<DefaultRawFileSystem<GvfsFilesetFs>>),
+    None,
+}
+
+pub async fn mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
     info!("Starting gvfs-fuse server...");
-    let svr = Arc::new(FuseServer::new(mount_point));
+    let svr = Arc::new(FuseServer::new(mount_to));
     {
         let mut server = SERVER.lock().await;
         *server = Some(svr.clone());
     }
-    let fs = create_fuse_fs().await;
-    svr.start(fs).await
+    let fs = create_fuse_fs(mount_from, config).await;
+    match fs {
+        CreateFsResult::FuseMemoryFs(vfs) => svr.start(vfs).await?,
+        CreateFsResult::FuseGvfs(vfs) => svr.start(vfs).await?,
+        _ => {}
+    }
+    Ok(())
 }
 
-pub async fn unmount() {
+pub async fn unmount() -> GvfsResult<()> {
     info!("Stop gvfs-fuse server...");
     let svr = {
         let mut server = SERVER.lock().await;
         if server.is_none() {
             info!("Server is already stopped.");
-            return;
+            return Ok(());
         }
         server.take().unwrap()
     };
-    let _ = svr.stop().await;
+    svr.stop().await
 }
 
-pub async fn create_fuse_fs() -> impl Filesystem + Sync + 'static {
+pub(crate) async fn create_fuse_fs(mount_from: &str, config: &Config) -> CreateFsResult {
     let uid = unsafe { libc::getuid() };
     let gid = unsafe { libc::getgid() };
     let fs_context = FileSystemContext {
@@ -64,12 +79,45 @@ pub async fn create_fuse_fs() -> impl Filesystem + Sync + 'static {
         block_size: 4 * 1024,
     };
 
-    let gvfs = MemoryFileSystem::new().await;
-    let fs = DefaultRawFileSystem::new(gvfs);
-    FuseApiHandle::new(fs, fs_context)
+    let gvfs = create_gvfs_filesystem(mount_from, config, &fs_context).await;
+    match gvfs {
+        CreateFsResult::Memory(fs) => {
+            let fs = FuseApiHandle::new(
+                DefaultRawFileSystem::new(fs, config, &fs_context),
+                config,
+                fs_context,
+            );
+            CreateFsResult::FuseMemoryFs(fs)
+        }
+        CreateFsResult::Gvfs(fs) => {
+            let fs = FuseApiHandle::new(
+                DefaultRawFileSystem::new(fs, config, &fs_context),
+                config,
+                fs_context,
+            );
+            CreateFsResult::FuseGvfs(fs)
+        }
+        _ => CreateFsResult::None,
+    }
 }
 
-pub async fn create_gvfs_filesystem() {
+pub async fn create_path_fs(
+    mount_from: &str,
+    config: &Config,
+    fs_context: &FileSystemContext,
+) -> CreateFsResult {
+    if config.fuse.fs_type == "memory" {
+        CreateFsResult::Memory(MemoryFileSystem::new().await)
+    } else {
+        create_gvfs_filesystem(mount_from, config, fs_context).await
+    }
+}
+
+pub async fn create_gvfs_filesystem(
+    mount_from: &str,
+    config: &Config,
+    fs_context: &FileSystemContext,
+) -> CreateFsResult {
     // Gvfs-fuse filesystem structure:
     // FuseApiHandle
     // ├─ DefaultRawFileSystem (RawFileSystem)
@@ -114,5 +162,24 @@ pub async fn create_gvfs_filesystem() {
     //
     // `XXXFileSystem is a filesystem that allows you to implement file access through your own extensions.
 
-    todo!("Implement the createGvfsFuseFileSystem function");
+    let fs = GvfsFilesetFs::new(mount_from, config, fs_context).await;
+    CreateFsResult::Gvfs(fs)
+}
+
+
+struct FsBuilder {
+}
+
+impl FsBuilder {
+    pub fn new() -> Self {
+        FsBuilder {}
+    }
+
+    pub fn with_memory_fs() -> Self {
+        MemoryFileSystem::new().await?
+    }
+
+    pub async fn build(&self, mount_from: &str, config: &Config, fs_context: &FileSystemContext) -> CreateFsResult {
+        create_path_fs(mount_from, config, fs_context).await
+    }
 }

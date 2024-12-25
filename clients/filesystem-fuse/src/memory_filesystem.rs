@@ -16,7 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{FileReader, FileStat, FileWriter, PathFileSystem, Result};
+use crate::filesystem::{
+    FileReader, FileStat, FileSystemCapacity, FileWriter, PathFileSystem, Result,
+};
 use crate::opened_file::{OpenFileFlags, OpenedFile};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -192,6 +194,10 @@ impl PathFileSystem for MemoryFileSystem {
             return Err(Errno::from(libc::ENOENT));
         }
         Ok(())
+    }
+
+    fn get_capacity(&self) -> Result<FileSystemCapacity> {
+        Ok(FileSystemCapacity {})
     }
 }
 
