@@ -16,9 +16,10 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import Optional
-from .partition import Partition
-from .literal import Literal
+from typing import Any
+
+from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.expressions.partitions.partition import Partition
 
 class RangePartition(Partition):
     """
@@ -29,24 +30,20 @@ class RangePartition(Partition):
     ```
 
     its upper bound is "2020-03-22" and its lower bound is null.
-
-    This class is evolving and may change in future versions.
     """
 
     @abstractmethod
-    def upper(self) -> Optional[Literal]:
+    def upper(self) -> Literal[Any]:
         """
         Returns:
-            Optional[Literal]: The upper bound of the partition, or None if there is no upper bound.
+            Literal[Any]: The upper bound of the partition.
         """
         pass
 
     @abstractmethod
-    def lower(self) -> Optional[Literal]:
+    def lower(self) -> Literal[Any]:
         """
-        Returns the lower bound of the partition.
-
         Returns:
-            Optional[Literal]: The lower bound of the partition, or None if there is no lower bound.
+            Literal[Any]: The lower bound of the partition.
         """
         pass
