@@ -25,39 +25,39 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event that is generated after a tag is successfully deleted. */
 @DeveloperApi
 public final class DeleteTagEvent extends TagEvent {
-    private final boolean isExists;
+  private final boolean isExists;
 
-    /**
-     * Constructs a new {@code DeleteTagEvent} instance, encapsulating information about the outcome
-     * of a tag delete operation.
-     *
-     * @param user The user who initiated the delete tag operation.
-     * @param metalake The metalake from which the tag was deleted.
-     * @param isExists A boolean flag indicating whether the tag existed at the time of the delete
-     *     operation.
-     */
-    public DeleteTagEvent(String user, String metalake, boolean isExists) {
-        super(user, NameIdentifier.of(metalake));
-        this.isExists = isExists;
-    }
+  /**
+   * Constructs a new {@code DeleteTagEvent} instance, encapsulating information about the outcome
+   * of a tag delete operation.
+   *
+   * @param user The user who initiated the delete tag operation.
+   * @param metalake The metalake from which the tag was deleted.
+   * @param isExists A boolean flag indicating whether the tag existed at the time of the delete
+   *     operation.
+   */
+  public DeleteTagEvent(String user, String metalake, boolean isExists) {
+    super(user, NameIdentifier.of(metalake));
+    this.isExists = isExists;
+  }
 
-    /**
-     * Retrieves the existence status of the tag at the time of the delete operation.
-     *
-     * @return A boolean value indicating whether the tag existed. {@code true} if the tag
-     *     existed, otherwise {@code false}.
-     */
-    public boolean isExists() {
-        return isExists;
-    }
+  /**
+   * Retrieves the existence status of the tag at the time of the delete operation.
+   *
+   * @return A boolean value indicating whether the tag existed. {@code true} if the tag existed,
+   *     otherwise {@code false}.
+   */
+  public boolean isExists() {
+    return isExists;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.DELETE_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DELETE_TAG;
+  }
 }

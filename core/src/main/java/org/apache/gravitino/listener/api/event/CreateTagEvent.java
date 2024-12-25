@@ -23,45 +23,42 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
 
-/**
- * Represents an event that is activated upon the successful creation of a tag.
- */
+/** Represents an event that is activated upon the successful creation of a tag. */
 @DeveloperApi
 public final class CreateTagEvent extends TagEvent {
-    private final TagInfo createdTagInfo;
+  private final TagInfo createdTagInfo;
 
-    /**
-     * Constructs an instance of {@code CreateTagEvent}, capturing essential details about the
-     * successful creation of a tag.
-     *
-     * @param user The username of the individual who initiated the tag creation.
-     * @param metalake The metalake from which the tag was created.
-     * @param createdTagInfo The final state of the tag post-creation.
-     */
-    public CreateTagEvent(String user, String metalake, TagInfo createdTagInfo) {
-        super(user, NameIdentifier.of(metalake));
-        this.createdTagInfo = createdTagInfo;
-    }
+  /**
+   * Constructs an instance of {@code CreateTagEvent}, capturing essential details about the
+   * successful creation of a tag.
+   *
+   * @param user The username of the individual who initiated the tag creation.
+   * @param metalake The metalake from which the tag was created.
+   * @param createdTagInfo The final state of the tag post-creation.
+   */
+  public CreateTagEvent(String user, String metalake, TagInfo createdTagInfo) {
+    super(user, NameIdentifier.of(metalake));
+    this.createdTagInfo = createdTagInfo;
+  }
 
-    /**
-     * Provides the final state of the tag as it is presented to the user following the successful
-     * creation.
-     *
-     * @return A {@link TagInfo} object that encapsulates the detailed characteristics of the
-     *     newly created tag.
-     */
-    public TagInfo createdTagInfo() {
-        return createdTagInfo;
-    }
+  /**
+   * Provides the final state of the tag as it is presented to the user following the successful
+   * creation.
+   *
+   * @return A {@link TagInfo} object that encapsulates the detailed characteristics of the newly
+   *     created tag.
+   */
+  public TagInfo createdTagInfo() {
+    return createdTagInfo;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return The operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.CREATE_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return The operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TAG;
+  }
 }
-
