@@ -16,52 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::RawFileSystem;
-
-// join the parent and name to a path
-pub fn join_file_path(parent: &str, name: &str) -> String {
-    //TODO handle corner cases
-    if parent.is_empty() {
-        name.to_string()
-    } else {
-        format!("{}/{}", parent, name)
-    }
-}
-
-// split the path to parent and name
-pub fn split_file_path(path: &str) -> (&str, &str) {
-    match path.rfind('/') {
-        Some(pos) => (&path[..pos], &path[pos + 1..]),
-        None => ("", path),
-    }
-}
-
-// convert file id to file path string if file id is invalid return "Unknown"
-pub async fn file_id_to_file_path_string(file_id: u64, fs: &impl RawFileSystem) -> String {
-    fs.get_file_path(file_id)
-        .await
-        .unwrap_or("Unknown".to_string())
-}
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_join_file_path() {
-        assert_eq!(join_file_path("", "a"), "a");
-        assert_eq!(join_file_path("", "a.txt"), "a.txt");
-        assert_eq!(join_file_path("a", "b"), "a/b");
-        assert_eq!(join_file_path("a/b", "c"), "a/b/c");
-        assert_eq!(join_file_path("a/b", "c.txt"), "a/b/c.txt");
-    }
-
-    #[test]
-    fn test_split_file_path() {
-        assert_eq!(split_file_path("a"), ("", "a"));
-        assert_eq!(split_file_path("a.txt"), ("", "a.txt"));
-        assert_eq!(split_file_path("a/b"), ("a", "b"));
-        assert_eq!(split_file_path("a/b/c"), ("a/b", "c"));
-        assert_eq!(split_file_path("a/b/c.txt"), ("a/b", "c.txt"));
-    }
-}
+mod tests {}
