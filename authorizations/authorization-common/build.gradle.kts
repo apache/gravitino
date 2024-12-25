@@ -42,24 +42,13 @@ dependencies {
   }
   implementation(libs.javax.ws.rs.api)
   implementation(libs.jettison)
-  compileOnly(libs.lombok)
   implementation(libs.rome)
+  compileOnly(libs.lombok)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
   testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-tasks {
-  val runtimeJars by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-
-  jar {
-    dependsOn(runtimeJars)
-  }
 }
 
 tasks.test {

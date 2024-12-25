@@ -53,7 +53,7 @@ public class RangerHadoopSQLMetadataObject implements AuthorizationMetadataObjec
         }
       }
       throw new IllegalArgumentException(
-          "No matching RangerMetadataObject.Type for " + metadataType);
+          "No matching RangerHadoopSQLMetadataObject.Type for " + metadataType);
     }
   }
 
