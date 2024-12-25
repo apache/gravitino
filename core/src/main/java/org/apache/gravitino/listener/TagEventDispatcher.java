@@ -123,7 +123,10 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag alterTag(String metalake, String name, TagChange... changes) {
-    // TODO: alterTagPreEvent
+    AlterTagPreEvent preEvent =
+        new AlterTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name, changes);
+
+    eventBus.dispatchEvent(preEvent);
     try {
       // TODO: alterTagEvent
       return dispatcher.alterTag(metalake, name, changes);
