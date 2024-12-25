@@ -16,10 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{
-    FileStat, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID, ROOT_DIR_FILE_ID,
-    ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
-};
+use crate::filesystem::{FileStat, FileSystemContext, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID, ROOT_DIR_FILE_ID, ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH};
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
 use async_trait::async_trait;
@@ -30,6 +27,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 use tokio::sync::RwLock;
+use crate::config::Config;
 
 /// DefaultRawFileSystem is a simple implementation for the file system.
 /// it is used to manage the file metadata and file handle.
@@ -47,7 +45,7 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
-    pub(crate) fn new(fs: T) -> Self {
+    pub(crate) fn new(fs: T, _config: &Config, _fs_context: &FileSystemContext) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
             opened_file_manager: OpenedFileManager::new(),

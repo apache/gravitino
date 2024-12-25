@@ -33,6 +33,7 @@ use futures_util::StreamExt;
 use std::ffi::{OsStr, OsString};
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
+use crate::config::Config;
 
 pub(crate) struct FuseApiHandle<T: RawFileSystem> {
     fs: T,
@@ -44,7 +45,7 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
     const DEFAULT_ATTR_TTL: Duration = Duration::from_secs(1);
     const DEFAULT_MAX_WRITE_SIZE: u32 = 16 * 1024;
 
-    pub fn new(fs: T, context: FileSystemContext) -> Self {
+    pub fn new(fs: T, _config: &Config, context: FileSystemContext) -> Self {
         Self {
             fs: fs,
             default_ttl: Self::DEFAULT_ATTR_TTL,

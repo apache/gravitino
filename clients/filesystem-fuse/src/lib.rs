@@ -16,6 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::Config;
+use crate::utils::GvfsResult;
+
 mod default_raw_filesystem;
 mod filesystem;
 mod fuse_api_handle;
@@ -25,11 +28,17 @@ mod mount;
 mod opened_file;
 mod opened_file_manager;
 mod utils;
+pub mod config;
+mod error;
+mod gvfs_fileset_fs;
+mod gvfs_mutiple_fileset_fs;
+mod gravitino_client;
+mod storage_filesystem;
 
-pub async fn gvfs_mount(mount_point: &str) -> fuse3::Result<()> {
-    mount::mount(mount_point).await
+pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
+    mount::mount(mount_to, mount_from, &config).await
 }
 
-pub async fn gvfs_unmount() {
-    mount::unmount().await;
+pub async fn gvfs_unmount() -> GvfsResult<()>{
+    mount::unmount().await
 }

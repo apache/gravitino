@@ -19,15 +19,18 @@
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
 use log::info;
 use tokio::signal;
+use gvfs_fuse::config::Config;
 
 #[tokio::main]
 async fn main() -> fuse3::Result<()> {
     tracing_subscriber::fmt().init();
-    tokio::spawn(async { gvfs_mount("gvfs").await });
+
+    let config = Config::default();
+    tokio::spawn(async move { gvfs_mount("gvfs", "", &config).await });
 
     let _ = signal::ctrl_c().await;
     info!("Received Ctrl+C, Unmounting gvfs...");
-    gvfs_unmount().await;
+    let _= gvfs_unmount().await;
 
     Ok(())
 }

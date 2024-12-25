@@ -121,6 +121,7 @@ pub(crate) trait PathFileSystem: Send + Sync {
     /// Create the directory by file path , if successful, return the file stat
     async fn create_dir(&self, path: &Path) -> Result<FileStat>;
 
+
     /// Set the file attribute by file path and file stat
     async fn set_attr(&self, path: &Path, file_stat: &FileStat, flush: bool) -> Result<()>;
 
@@ -129,6 +130,8 @@ pub(crate) trait PathFileSystem: Send + Sync {
 
     /// Remove the directory by file path
     async fn remove_dir(&self, path: &Path) -> Result<()>;
+
+    fn get_capacity(&self) -> Result<FileSystemCapacity>;
 }
 
 // FileSystemContext is the system environment for the fuse file system.
@@ -160,6 +163,9 @@ impl FileSystemContext {
         }
     }
 }
+
+// capacity of the file system
+pub struct FileSystemCapacity {}
 
 // FileStat is the file metadata of the file
 #[derive(Clone, Debug)]
