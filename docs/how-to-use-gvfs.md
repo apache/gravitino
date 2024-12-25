@@ -508,8 +508,7 @@ from gravitino import gvfs
 options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
-    "auth_type": "simple"
-    
+    "auth_type": "simple",
     # Optional, the following properties are required if you want to access the S3 fileset via GVFS python client, for GCS and OSS fileset, you should set the corresponding properties.
     "s3_endpoint": "http://localhost:9000",
     "s3_access_key_id": "minio",
