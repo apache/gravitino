@@ -17,6 +17,7 @@
  * under the License.
  */
 
+use gvfs_fuse::config::Config;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
 use log::info;
 use std::fs;
@@ -38,15 +39,17 @@ impl FuseTest {
     pub fn setup(&mut self) {
         info!("Start gvfs fuse server");
         let mount_point = self.mount_point.clone();
+
+        let config = Config::from_file("tests/conf/gvfs_fuse_memory.toml");
         self.runtime
-            .spawn(async move { gvfs_mount(&mount_point).await });
+            .spawn(async move { gvfs_mount(&mount_point, "", &config).await });
         let success = Self::wait_for_fuse_server_ready(&self.mount_point, Duration::from_secs(15));
         assert!(success, "Fuse server cannot start up at 15 seconds");
     }
 
     pub fn shutdown(&mut self) {
         self.runtime.block_on(async {
-            gvfs_unmount().await;
+            let _ = gvfs_unmount().await;
         });
     }
 

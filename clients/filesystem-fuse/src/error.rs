@@ -18,21 +18,26 @@
  */
 use fuse3::Errno;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum ErrorCode {
     UnSupportedFilesystem,
     GravitinoClientError,
+    InvalidConfig,
 }
 
 impl ErrorCode {
-    pub fn to_string(&self) -> String {
-        match self {
-            ErrorCode::UnSupportedFilesystem => "The filesystem is not supported".to_string(),
-            _ => "".to_string(),
-        }
-    }
     pub fn to_error(self, message: impl Into<String>) -> GvfsError {
         GvfsError::Error(self, message.into())
+    }
+}
+
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ErrorCode::UnSupportedFilesystem => write!(f, "Unsupported filesystem"),
+            ErrorCode::GravitinoClientError => write!(f, "Gravitino client error"),
+            ErrorCode::InvalidConfig => write!(f, "Invalid config"),
+        }
     }
 }
 

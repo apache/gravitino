@@ -31,11 +31,10 @@ mod memory_filesystem;
 mod mount;
 mod opened_file;
 mod opened_file_manager;
-mod storage_filesystem;
 mod utils;
 
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
-    mount::mount(mount_to, mount_from, &config).await
+    mount::mount(mount_to, mount_from, config).await
 }
 
 pub async fn gvfs_unmount() -> GvfsResult<()> {

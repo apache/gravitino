@@ -20,21 +20,30 @@ use crate::config::Config;
 use crate::filesystem::{FileStat, FileSystemCapacity, FileSystemContext, PathFileSystem, Result};
 use crate::gravitino_client::GravitinoClient;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
-use crate::storage_filesystem::StorageFileSystem;
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct GravitinoFileSystemConfig {}
 
 pub(crate) struct GvfsFilesetFs {
-    fs: StorageFileSystem,
+    fs: Box<dyn PathFileSystem>,
     client: GravitinoClient,
     fileset_location: PathBuf,
 }
 
 impl GvfsFilesetFs {
-    pub async fn new(mount_from: &str, config: &Config, _context: &FileSystemContext) -> Self {
-        todo!("GravitinoFileSystem::new")
+    pub async fn new(
+        fs: Box<dyn PathFileSystem>,
+        location: &Path,
+        client: GravitinoClient,
+        _config: &Config,
+        _context: &FileSystemContext,
+    ) -> Self {
+        Self {
+            fs: fs,
+            client: client,
+            fileset_location: location.into(),
+        }
     }
 
     fn map_to_raw_path(&self, path: &Path) -> PathBuf {

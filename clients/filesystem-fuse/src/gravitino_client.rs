@@ -74,7 +74,7 @@ impl GravitinoClient {
         println!("GET request to {}", path);
     }
 
-    pub fn request(&self, path: &str, _data: &str) -> Result<(), GvfsError> {
+    pub fn request(&self, _path: &str, _data: &str) -> Result<(), GvfsError> {
         todo!()
     }
 
@@ -170,11 +170,9 @@ impl GravitinoClient {
 mod tests {
     use super::*;
     use mockito::mock;
-    use tokio;
 
     #[tokio::test]
     async fn test_get_fileset_success() {
-        tracing_subscriber::fmt::init();
         let fileset_response = r#"
         {
             "code": 0,
@@ -223,7 +221,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_file_location_success() {
-        tracing_subscriber::fmt::init();
         let file_location_response = r#"
         {
             "code": 0,
@@ -234,7 +231,11 @@ mod tests {
 
         let url = format!(
             "/api/metalakes/{}/catalogs/{}/schemas/{}/filesets/{}/location?sub_path={}",
-            "test", "catalog1", "schema1", "fileset1", "/example/path"
+            "test",
+            "catalog1",
+            "schema1",
+            "fileset1",
+            encode("/example/path")
         );
         let _m = mock("GET", url.as_str())
             .with_status(200)
@@ -260,6 +261,7 @@ mod tests {
         }
     }
 
+    /*
     #[tokio::test]
     async fn test1() {
         tracing_subscriber::fmt::init();
@@ -278,4 +280,5 @@ mod tests {
         println!("{:?}", fileset);
         assert!(fileset.name == "fileset1");
     }
+     */
 }

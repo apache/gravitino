@@ -30,11 +30,12 @@ pub struct Config {
 impl Config {
     pub fn from_file(file: &str) -> Config {
         let config_content = std::fs::read_to_string(file).unwrap();
-        let config = toml::from_str::<Config>(&config_content).unwrap();
-        config
+        toml::from_str::<Config>(&config_content).unwrap()
     }
+}
 
-    pub fn default() -> Config {
+impl Default for Config {
+    fn default() -> Self {
         Config {
             fuse: FuseConfig {
                 default_mask: 0o600,

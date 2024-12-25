@@ -18,14 +18,17 @@
  */
 use crate::config::Config;
 use crate::default_raw_filesystem::DefaultRawFileSystem;
+use crate::error::ErrorCode::{InvalidConfig, UnSupportedFilesystem};
 use crate::filesystem::FileSystemContext;
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::fuse_server::FuseServer;
+use crate::gravitino_client::GravitinoClient;
 use crate::gvfs_fileset_fs::GvfsFilesetFs;
 use crate::memory_filesystem::MemoryFileSystem;
 use crate::utils::GvfsResult;
 use log::info;
 use once_cell::sync::Lazy;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -39,6 +42,10 @@ pub(crate) enum CreateFsResult {
     None,
 }
 
+pub enum FileSystemScheam {
+    S3,
+}
+
 pub async fn mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
     info!("Starting gvfs-fuse server...");
     let svr = Arc::new(FuseServer::new(mount_to));
@@ -46,7 +53,7 @@ pub async fn mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsRes
         let mut server = SERVER.lock().await;
         *server = Some(svr.clone());
     }
-    let fs = create_fuse_fs(mount_from, config).await;
+    let fs = create_fuse_fs(mount_from, config).await?;
     match fs {
         CreateFsResult::FuseMemoryFs(vfs) => svr.start(vfs).await?,
         CreateFsResult::FuseGvfs(vfs) => svr.start(vfs).await?,
@@ -68,7 +75,10 @@ pub async fn unmount() -> GvfsResult<()> {
     svr.stop().await
 }
 
-pub(crate) async fn create_fuse_fs(mount_from: &str, config: &Config) -> CreateFsResult {
+pub(crate) async fn create_fuse_fs(
+    mount_from: &str,
+    config: &Config,
+) -> GvfsResult<CreateFsResult> {
     let uid = unsafe { libc::getuid() };
     let gid = unsafe { libc::getgid() };
     let fs_context = FileSystemContext {
@@ -78,16 +88,23 @@ pub(crate) async fn create_fuse_fs(mount_from: &str, config: &Config) -> CreateF
         default_dir_perm: 0o755,
         block_size: 4 * 1024,
     };
+    let fs = create_path_fs(mount_from, config, &fs_context).await?;
+    create_raw_fs(fs, config, fs_context).await
+}
 
-    let gvfs = create_gvfs_filesystem(mount_from, config, &fs_context).await;
-    match gvfs {
+pub async fn create_raw_fs(
+    path_fs: CreateFsResult,
+    config: &Config,
+    fs_context: FileSystemContext,
+) -> GvfsResult<CreateFsResult> {
+    match path_fs {
         CreateFsResult::Memory(fs) => {
             let fs = FuseApiHandle::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
                 fs_context,
             );
-            CreateFsResult::FuseMemoryFs(fs)
+            Ok(CreateFsResult::FuseMemoryFs(fs))
         }
         CreateFsResult::Gvfs(fs) => {
             let fs = FuseApiHandle::new(
@@ -95,9 +112,9 @@ pub(crate) async fn create_fuse_fs(mount_from: &str, config: &Config) -> CreateF
                 config,
                 fs_context,
             );
-            CreateFsResult::FuseGvfs(fs)
+            Ok(CreateFsResult::FuseGvfs(fs))
         }
-        _ => CreateFsResult::None,
+        _ => Err(UnSupportedFilesystem.to_error("Unsupported filesystem type".to_string())),
     }
 }
 
@@ -105,9 +122,9 @@ pub async fn create_path_fs(
     mount_from: &str,
     config: &Config,
     fs_context: &FileSystemContext,
-) -> CreateFsResult {
+) -> GvfsResult<CreateFsResult> {
     if config.fuse.fs_type == "memory" {
-        CreateFsResult::Memory(MemoryFileSystem::new().await)
+        Ok(CreateFsResult::Memory(MemoryFileSystem::new().await))
     } else {
         create_gvfs_filesystem(mount_from, config, fs_context).await
     }
@@ -117,7 +134,7 @@ pub async fn create_gvfs_filesystem(
     mount_from: &str,
     config: &Config,
     fs_context: &FileSystemContext,
-) -> CreateFsResult {
+) -> GvfsResult<CreateFsResult> {
     // Gvfs-fuse filesystem structure:
     // FuseApiHandle
     // ├─ DefaultRawFileSystem (RawFileSystem)
@@ -162,24 +179,67 @@ pub async fn create_gvfs_filesystem(
     //
     // `XXXFileSystem is a filesystem that allows you to implement file access through your own extensions.
 
-    let fs = GvfsFilesetFs::new(mount_from, config, fs_context).await;
-    CreateFsResult::Gvfs(fs)
+    let client = GravitinoClient::new(&config.gravitino);
+    let (catalog, schema, fileset) = extract_fileset(mount_from)?;
+    let location = client
+        .get_fileset(&catalog, &schema, &fileset)
+        .await?
+        .storage_location;
+    let (_schema, location) = extract_storage_filesystem(&location).unwrap();
+
+    let inner_fs = MemoryFileSystem::new().await;
+
+    let fs = GvfsFilesetFs::new(
+        Box::new(inner_fs),
+        Path::new(&location),
+        client,
+        config,
+        fs_context,
+    )
+    .await;
+    Ok(CreateFsResult::Gvfs(fs))
 }
 
+pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
+    let prefix = "gvfs://fileset/";
+    if !path.starts_with(prefix) {
+        return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
+    }
 
-struct FsBuilder {
+    let path_without_prefix = &path[prefix.len()..];
+
+    let parts: Vec<&str> = path_without_prefix.split('/').collect();
+
+    if parts.len() < 3 {
+        return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
+    }
+
+    let catalog = parts[1].to_string();
+    let schema = parts[2].to_string();
+    let fileset = parts[3].to_string();
+
+    Ok((catalog, schema, fileset))
 }
 
-impl FsBuilder {
-    pub fn new() -> Self {
-        FsBuilder {}
-    }
+pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemScheam, String)> {
+    if let Some(pos) = path.find("://") {
+        let protocol = &path[..pos];
+        let location = &path[pos + 3..];
+        let location = match location.find('/') {
+            Some(index) => &location[index + 1..],
+            None => "",
+        };
+        let location = match location.ends_with('/') {
+            true => location.to_string(),
+            false => format!("{}/", location),
+        };
 
-    pub fn with_memory_fs() -> Self {
-        MemoryFileSystem::new().await?
-    }
-
-    pub async fn build(&self, mount_from: &str, config: &Config, fs_context: &FileSystemContext) -> CreateFsResult {
-        create_path_fs(mount_from, config, fs_context).await
+        match protocol {
+            "s3" => Some((FileSystemScheam::S3, location.to_string())),
+            "s3a" => Some((FileSystemScheam::S3, location.to_string())),
+            _ => None,
+        }
+    } else {
+        None
     }
 }
