@@ -43,9 +43,9 @@ public abstract class AuthorizationProperties {
         rangerAuthorizationProperties.validate();
         break;
       case "chain":
-        ChainedAuthorizationProperties chainAuthorizationProperties =
+        ChainedAuthorizationProperties chainedAuthzProperties =
             new ChainedAuthorizationProperties(properties);
-        chainAuthorizationProperties.validate();
+        chainedAuthzProperties.validate();
         break;
       default:
         throw new IllegalArgumentException("Unsupported authorization properties type: " + type);

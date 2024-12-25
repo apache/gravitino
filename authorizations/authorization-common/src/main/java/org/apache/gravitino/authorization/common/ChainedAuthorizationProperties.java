@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * The properties for Chain authorization plugin. <br>
+ * The properties for Chained authorization plugin. <br>
  * <br>
  * Configuration Example: <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
@@ -50,10 +50,10 @@ import java.util.stream.Collectors;
  */
 public class ChainedAuthorizationProperties extends AuthorizationProperties {
   private static final String PLUGINS_SPLITTER = ",";
-  /** Chain authorization plugin names */
+  /** Chained authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
 
-  /** Chain authorization plugin provider */
+  /** Chained authorization plugin provider */
   public static final String CHAIN_PROVIDER = "authorization.chain.*.provider";
 
   public ChainedAuthorizationProperties(Map<String, String> properties) {

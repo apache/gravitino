@@ -40,7 +40,7 @@ import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 
-/** Chain authorization operations plugin class. <br> */
+/** Chained authorization operations plugin class. <br> */
 public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
   private final String metalake;
@@ -52,37 +52,37 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   private void initPlugins(String catalogProvider, Map<String, String> properties) {
-    ChainedAuthorizationProperties chainedAuthProperties =
+    ChainedAuthorizationProperties chainedAuthzProperties =
         new ChainedAuthorizationProperties(properties);
-    chainedAuthProperties.validate();
+    chainedAuthzProperties.validate();
     // Validate the properties for each plugin
-    chainedAuthProperties
+    chainedAuthzProperties
         .plugins()
         .forEach(
             pluginName -> {
               Map<String, String> pluginProperties =
-                  chainedAuthProperties.fetchAuthPluginProperties(pluginName);
-              String authProvider = chainedAuthProperties.getPluginProvider(pluginName);
-              AuthorizationProperties.validate(authProvider, pluginProperties);
+                  chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
+              String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
+              AuthorizationProperties.validate(authzProvider, pluginProperties);
             });
     // Create the plugins
-    chainedAuthProperties
+    chainedAuthzProperties
         .plugins()
         .forEach(
             pluginName -> {
-              String authProvider = chainedAuthProperties.getPluginProvider(pluginName);
+              String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
               Map<String, String> pluginConfig =
-                  chainedAuthProperties.fetchAuthPluginProperties(pluginName);
+                  chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
 
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
               BaseAuthorization.buildAuthorizationPkgPath(
-                      ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, authProvider))
+                      ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, authzProvider))
                   .ifPresent(libAndResourcesPaths::add);
               IsolatedClassLoader classLoader =
                   IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
               try {
                 BaseAuthorization<?> authorization =
-                    BaseAuthorization.createAuthorization(classLoader, authProvider);
+                    BaseAuthorization.createAuthorization(classLoader, authzProvider);
                 AuthorizationPlugin authorizationPlugin =
                     authorization.newPlugin(metalake, catalogProvider, pluginConfig);
                 plugins.add(authorizationPlugin);

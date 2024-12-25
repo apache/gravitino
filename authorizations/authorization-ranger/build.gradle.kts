@@ -52,7 +52,6 @@ dependencies {
   }
   implementation(libs.javax.ws.rs.api)
   implementation(libs.jettison)
-  compileOnly(libs.lombok)
   implementation(libs.mail)
   implementation(libs.ranger.intg) {
     exclude("org.apache.hive", "hive-storage-api")
@@ -70,16 +69,15 @@ dependencies {
     exclude("org.eclipse.jetty")
   }
   implementation(libs.rome)
-
+  compileOnly(libs.lombok)
+  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
-
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.postgresql.driver)
