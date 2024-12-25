@@ -35,9 +35,9 @@ class TestCredentialFactory(unittest.TestCase):
 
     def test_s3_token_credential(self):
         s3_credential_info = {
-            S3TokenCredential._SESSION_ACCESS_KEY_ID: "access_key",
-            S3TokenCredential._SESSION_SECRET_ACCESS_KEY: "secret_key",
-            S3TokenCredential._SESSION_TOKEN: "session_token",
+            S3TokenCredential.SESSION_ACCESS_KEY_ID: "access_key",
+            S3TokenCredential.SESSION_SECRET_ACCESS_KEY: "secret_key",
+            S3TokenCredential.SESSION_TOKEN: "session_token",
         }
         s3_credential = S3TokenCredential(s3_credential_info, 1000)
         credential_info = s3_credential.credential_info()
@@ -59,8 +59,8 @@ class TestCredentialFactory(unittest.TestCase):
 
     def test_s3_secret_key_credential(self):
         s3_credential_info = {
-            S3SecretKeyCredential._STATIC_ACCESS_KEY_ID: "access_key",
-            S3SecretKeyCredential._STATIC_SECRET_ACCESS_KEY: "secret_key",
+            S3SecretKeyCredential.STATIC_ACCESS_KEY_ID: "access_key",
+            S3SecretKeyCredential.STATIC_SECRET_ACCESS_KEY: "secret_key",
         }
         s3_credential = S3SecretKeyCredential(s3_credential_info, 0)
         credential_info = s3_credential.credential_info()
@@ -99,9 +99,9 @@ class TestCredentialFactory(unittest.TestCase):
 
     def test_oss_token_credential(self):
         oss_credential_info = {
-            OSSTokenCredential._STATIC_ACCESS_KEY_ID: "access_id",
-            OSSTokenCredential._STATIC_SECRET_ACCESS_KEY: "secret_key",
-            OSSTokenCredential._OSS_TOKEN: "token",
+            OSSTokenCredential.STATIC_ACCESS_KEY_ID: "access_id",
+            OSSTokenCredential.STATIC_SECRET_ACCESS_KEY: "secret_key",
+            OSSTokenCredential.OSS_TOKEN: "token",
         }
         oss_credential = OSSTokenCredential(oss_credential_info, 1000)
         credential_info = oss_credential.credential_info()
@@ -123,8 +123,8 @@ class TestCredentialFactory(unittest.TestCase):
 
     def test_oss_secret_key_credential(self):
         oss_credential_info = {
-            OSSSecretKeyCredential._STATIC_ACCESS_KEY_ID: "access_key",
-            OSSSecretKeyCredential._STATIC_SECRET_ACCESS_KEY: "secret_key",
+            OSSSecretKeyCredential.STATIC_ACCESS_KEY_ID: "access_key",
+            OSSSecretKeyCredential.STATIC_SECRET_ACCESS_KEY: "secret_key",
         }
         oss_credential = OSSSecretKeyCredential(oss_credential_info, 0)
         credential_info = oss_credential.credential_info()
@@ -145,8 +145,8 @@ class TestCredentialFactory(unittest.TestCase):
 
     def test_adls_token_credential(self):
         adls_credential_info = {
-            ADLSTokenCredential._STORAGE_ACCOUNT_NAME: "account_name",
-            ADLSTokenCredential._SAS_TOKEN: "sas_token",
+            ADLSTokenCredential.STORAGE_ACCOUNT_NAME: "account_name",
+            ADLSTokenCredential.SAS_TOKEN: "sas_token",
         }
         adls_credential = ADLSTokenCredential(adls_credential_info, 1000)
         credential_info = adls_credential.credential_info()
@@ -167,8 +167,8 @@ class TestCredentialFactory(unittest.TestCase):
 
     def test_azure_account_key_credential(self):
         azure_credential_info = {
-            AzureAccountKeyCredential._STORAGE_ACCOUNT_NAME: "account_name",
-            AzureAccountKeyCredential._STORAGE_ACCOUNT_KEY: "account_key",
+            AzureAccountKeyCredential.STORAGE_ACCOUNT_NAME: "account_name",
+            AzureAccountKeyCredential.STORAGE_ACCOUNT_KEY: "account_key",
         }
         azure_credential = AzureAccountKeyCredential(azure_credential_info, 0)
         credential_info = azure_credential.credential_info()

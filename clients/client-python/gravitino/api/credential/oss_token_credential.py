@@ -26,16 +26,16 @@ class OSSTokenCredential(Credential, ABC):
     """Represents OSS token credential."""
 
     OSS_TOKEN_CREDENTIAL_TYPE: str = "oss-token"
-    _STATIC_ACCESS_KEY_ID: str = "oss-access-key-id"
-    _STATIC_SECRET_ACCESS_KEY: str = "oss-secret-access-key"
-    _OSS_TOKEN: str = "oss-security-token"
+    STATIC_ACCESS_KEY_ID: str = "oss-access-key-id"
+    STATIC_SECRET_ACCESS_KEY: str = "oss-secret-access-key"
+    OSS_TOKEN: str = "oss-security-token"
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._access_key_id = credential_info.get(self._STATIC_ACCESS_KEY_ID, None)
+        self._access_key_id = credential_info.get(self.STATIC_ACCESS_KEY_ID, None)
         self._secret_access_key = credential_info.get(
-            self._STATIC_SECRET_ACCESS_KEY, None
+            self.STATIC_SECRET_ACCESS_KEY, None
         )
-        self._security_token = credential_info.get(self._OSS_TOKEN, None)
+        self._security_token = credential_info.get(self.OSS_TOKEN, None)
         self._expire_time_in_ms = expire_time_in_ms
         Precondition.check_string_not_empty(
             self._access_key_id, "The OSS access key ID should not be empty"
@@ -75,9 +75,9 @@ class OSSTokenCredential(Credential, ABC):
              The credential information.
         """
         return {
-            self._STATIC_ACCESS_KEY_ID: self._access_key_id,
-            self._STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
-            self._OSS_TOKEN: self._security_token,
+            self.STATIC_ACCESS_KEY_ID: self._access_key_id,
+            self.STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
+            self.OSS_TOKEN: self._security_token,
         }
 
     def access_key_id(self) -> str:
