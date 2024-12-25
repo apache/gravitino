@@ -171,7 +171,10 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
-    // TODO: listTagsForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new ListTagsForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
+
     try {
       // TODO: listTagsForMetadataObjectEvent
       return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
