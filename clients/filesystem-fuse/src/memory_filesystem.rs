@@ -232,13 +232,44 @@ impl FileWriter for MemoryFileWriter {
 }
 
 fn path_in_dir(dir: &Path, path: &Path) -> bool {
-    path.starts_with(dir) && path != dir
+    if let Ok(relative_path) = path.strip_prefix(dir) {
+        relative_path.components().count() == 1
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::filesystem::tests::TestPathFileSystem;
+
+    #[test]
+    fn test_path_in_dir() {
+        let dir = Path::new("/parent");
+
+        let path1 = Path::new("/parent/child1");
+        let path2 = Path::new("/parent/a.txt");
+        let path3 = Path::new("/parent/child1/grandchild");
+        let path4 = Path::new("/other");
+
+        assert!(!path_in_dir(dir, dir));
+        assert!(path_in_dir(dir, path1));
+        assert!(path_in_dir(dir, path2));
+        assert!(!path_in_dir(dir, path3));
+        assert!(!path_in_dir(dir, path4));
+
+        let dir = Path::new("/");
+
+        let path1 = Path::new("/child1");
+        let path2 = Path::new("/a.txt");
+        let path3 = Path::new("/child1/grandchild");
+
+        assert!(!path_in_dir(dir, dir));
+        assert!(path_in_dir(dir, path1));
+        assert!(path_in_dir(dir, path2));
+        assert!(!path_in_dir(dir, path3));
+    }
 
     #[tokio::test]
     async fn test_memory_file_system() {
