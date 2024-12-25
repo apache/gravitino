@@ -205,7 +205,14 @@ public class TagEventDispatcher implements TagDispatcher {
   @Override
   public String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
-    // TODO: associateTagsForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new AssociateTagsForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(),
+            metalake,
+            metadataObject,
+            tagsToAdd,
+            tagsToRemove));
+
     try {
       // TODO: associateTagsForMetadataObjectEvent
       return dispatcher.associateTagsForMetadataObject(
