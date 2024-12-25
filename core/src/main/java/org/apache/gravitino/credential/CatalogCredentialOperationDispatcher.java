@@ -26,15 +26,20 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Generate credentials for the objects in the same catalog. */
-public class CatalogCredentialProvider implements Closeable {
+/**
+ * Manage lifetime of the credential provider in one catalog, dispatch credential request to the
+ * corresponding credential provider.
+ */
+public class CatalogCredentialOperationDispatcher implements Closeable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogCredentialProvider.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CatalogCredentialOperationDispatcher.class);
 
   private final String catalogName;
   private final Map<String, CredentialProvider> credentialProviders;
 
-  public CatalogCredentialProvider(String catalogName, Map<String, String> catalogProperties) {
+  public CatalogCredentialOperationDispatcher(
+      String catalogName, Map<String, String> catalogProperties) {
     this.catalogName = catalogName;
     this.credentialProviders = CredentialUtils.loadCredentialProviders(catalogProperties);
   }

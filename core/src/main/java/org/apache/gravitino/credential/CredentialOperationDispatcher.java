@@ -65,7 +65,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         .map(
             entry ->
                 baseCatalog
-                    .getCatalogCredentialManager()
+                    .catalogCredentialOperationDispatcher()
                     .getCredential(entry.getKey(), entry.getValue()))
         .filter(Objects::nonNull)
         .collect(Collectors.toList());
