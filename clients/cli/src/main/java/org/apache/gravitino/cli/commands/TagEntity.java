@@ -98,7 +98,7 @@ public class TagEntity extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", tagsToAdd);
+    String all = tagsToAdd.length == 0 ? "nothing" : String.join(",", tagsToAdd);
 
     System.out.println(entity + " now tagged with " + all);
   }
