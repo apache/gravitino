@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -28,7 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 public class DeleteRole extends Command {
 
   protected String metalake;
-  protected String role;
+  protected String[] roles;
   protected boolean force;
 
   /**
@@ -38,20 +39,20 @@ public class DeleteRole extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param role The name of the role.
+   * @param roles The name of the role.
    */
   public DeleteRole(
-      String url, boolean ignoreVersions, boolean force, String metalake, String role) {
+      String url, boolean ignoreVersions, boolean force, String metalake, String[] roles) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.force = force;
-    this.role = role;
+    this.roles = roles;
   }
 
   /** Delete a role. */
   @Override
   public void handle() {
-    boolean deleted = false;
+    boolean deleted = true;
 
     if (!AreYouSure.really(force)) {
       return;
@@ -59,7 +60,9 @@ public class DeleteRole extends Command {
 
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.deleteRole(role);
+      for (String role : roles) {
+        deleted &= client.deleteRole(role);
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
@@ -69,9 +72,9 @@ public class DeleteRole extends Command {
     }
 
     if (deleted) {
-      System.out.println(role + " deleted.");
+      System.out.println(Joiner.on(", ").join(roles) + " deleted.");
     } else {
-      System.out.println(role + " not deleted.");
+      System.out.println(Joiner.on(", ").join(roles) + " not deleted.");
     }
   }
 }

@@ -32,6 +32,7 @@ public class ErrorMessages {
   public static final String MISSING_NAME = "Missing --name option.";
   public static final String MISSING_GROUP = "Missing --group option.";
   public static final String MISSING_USER = "Missing --user option.";
+  public static final String MISSING_ROLE = "Missing --role option.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String SCHEMA_EXISTS = "Schema already exists.";
@@ -42,6 +43,8 @@ public class ErrorMessages {
   public static final String UNKNOWN_TAG = "Unknown tag.";
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
       "Error: The current command only supports one --tag option.";
+  public static final String MULTIPLE_ROLE_COMMAND_ERROR =
+      "Error: The current command only supports one --role option.";
   public static final String TAG_EXISTS = "Tag already exists.";
   public static final String UNKNOWN_COLUMN = "Unknown column.";
   public static final String COLUMN_EXISTS = "Column already exists.";
