@@ -108,6 +108,9 @@ public class TagEventDispatcher implements TagDispatcher {
       String metalake, String name, String comment, Map<String, String> properties) {
     TagInfo tagInfo = new TagInfo(name, comment, properties);
     // TODO: createTagPreEvent
+
+    eventBus.dispatchEvent(
+        new CreateTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo));
     try {
       // TODO: createTagEvent
       return dispatcher.createTag(metalake, name, comment, properties);
