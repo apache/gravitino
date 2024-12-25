@@ -28,28 +28,22 @@ dependencies {
   implementation(project(":api")) {
     exclude(group = "*")
   }
-
-  implementation(project(":core")) {
-    exclude(group = "*")
-  }
-
-  implementation(project(":common")) {
-    exclude(group = "*")
-  }
-
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
-
   implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
-
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
-
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
@@ -59,23 +53,18 @@ dependencies {
     exclude("io.netty")
     exclude("org.fusesource.leveldbjni")
   }
-
   implementation(libs.slf4j.api)
 
   compileOnly(libs.guava)
 
   testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
   testImplementation(project(":bundles:aws-hadoop-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:gcp-hadoop-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:aliyun-hadoop-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-hadoop-bundle", configuration = "shadow"))
-
-  testImplementation(libs.minikdc)
-  testImplementation(libs.hadoop3.minicluster)
-
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.gcs)
   testImplementation(libs.hadoop3.minicluster)
