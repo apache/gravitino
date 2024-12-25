@@ -27,48 +27,50 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class ListMetadataObjectsForTagFailureEvent extends TagFailureEvent {
-    private final String metalake;
-    private final String name;
+  private final String metalake;
+  private final String name;
 
-    /**
-     * Constructs a new {@code ListMetadataObjectsForTagFailureEvent} instance.
-     *
-     * @param user The user who initiated the operation.
-     * @param metalake The metalake name where the tag resides.
-     * @param name The name of the tag.
-     * @param exception The exception encountered during the operation, providing insights into the reasons behind the failure.
-     */
-    public ListMetadataObjectsForTagFailureEvent(String user, String metalake, String name, Exception exception) {
-        super(user, NameIdentifier.of(metalake), exception);
-        this.metalake = metalake;
-        this.name = name;
-    }
+  /**
+   * Constructs a new {@code ListMetadataObjectsForTagFailureEvent} instance.
+   *
+   * @param user The user who initiated the operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param name The name of the tag.
+   * @param exception The exception encountered during the operation, providing insights into the
+   *     reasons behind the failure.
+   */
+  public ListMetadataObjectsForTagFailureEvent(
+      String user, String metalake, String name, Exception exception) {
+    super(user, NameIdentifier.of(metalake), exception);
+    this.metalake = metalake;
+    this.name = name;
+  }
 
-    /**
-     * Returns the metalake name where the tag resides.
-     *
-     * @return The metalake name.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Returns the metalake name where the tag resides.
+   *
+   * @return The metalake name.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the name of the tag.
-     *
-     * @return The name of the tag.
-     */
-    public String name() {
-        return name;
-    }
+  /**
+   * Returns the name of the tag.
+   *
+   * @return The name of the tag.
+   */
+  public String name() {
+    return name;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LIST_METADATA_OBJECTS_FOR_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_METADATA_OBJECTS_FOR_TAG;
+  }
 }

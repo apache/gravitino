@@ -21,54 +21,54 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.tag.TagManager;
+
 /**
  * Represents an event triggered when an attempt to get a tag from the database fails due to an
  * exception.
  */
 @DeveloperApi
 public class GetTagFailureEvent extends TagFailureEvent {
-    private final String metalake;
-    private final String name;
-    /**
-     * Constructs a new {@code GetTagFailureEvent} instance.
-     *
-     * @param user The user who initiated the get tag operation.
-     * @param metalake The metalake name where the tag resides.
-     * @param name The name of the tag to get.
-     * @param exception The exception encountered during the get tag operation, providing insights
-     *     into the reasons behind the operation's failure.
-     */
-    public GetTagFailureEvent(String user, String metalake, String name, Exception exception) {
-        super(user, TagManager.ofTagIdent(metalake, name), exception);
-        this.name = name;
-        this.metalake = metalake;
-    }
-    /**
-     * Returns the metalake name where the tag resides.
-     *
-     * @return the metalake name.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  private final String metalake;
+  private final String name;
+  /**
+   * Constructs a new {@code GetTagFailureEvent} instance.
+   *
+   * @param user The user who initiated the get tag operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param name The name of the tag to get.
+   * @param exception The exception encountered during the get tag operation, providing insights
+   *     into the reasons behind the operation's failure.
+   */
+  public GetTagFailureEvent(String user, String metalake, String name, Exception exception) {
+    super(user, TagManager.ofTagIdent(metalake, name), exception);
+    this.name = name;
+    this.metalake = metalake;
+  }
+  /**
+   * Returns the metalake name where the tag resides.
+   *
+   * @return the metalake name.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the name of the tag.
-     *
-     * @return the name of the tag.
-     */
-    public String name() {
-        return name;
-    }
+  /**
+   * Returns the name of the tag.
+   *
+   * @return the name of the tag.
+   */
+  public String name() {
+    return name;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.GET_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_TAG;
+  }
 }
-

@@ -21,54 +21,55 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.tag.TagManager;
+
 /**
  * Represents an event triggered when an attempt to delete a tag in the database fails due to an
  * exception.
  */
 @DeveloperApi
 public class DeleteTagFailureEvent extends TagFailureEvent {
-    private final String metalake;
-    private final String name;
-    /**
-     * Constructs a new {@code DeleteTagFailureEvent} instance.
-     *
-     * @param user The user who initiated the tag deletion operation.
-     * @param metalake The metalake name where the tag resides.
-     * @param name The name of the tag to delete.
-     * @param exception The exception encountered during the tag deletion operation, providing insights
-     *     into the reasons behind the operation's failure.
-     */
-    public DeleteTagFailureEvent(String user, String metalake, String name, Exception exception) {
-        super(user, TagManager.ofTagIdent(metalake, name), exception);
-        this.metalake = metalake;
-        this.name = name;
-    }
+  private final String metalake;
+  private final String name;
+  /**
+   * Constructs a new {@code DeleteTagFailureEvent} instance.
+   *
+   * @param user The user who initiated the tag deletion operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param name The name of the tag to delete.
+   * @param exception The exception encountered during the tag deletion operation, providing
+   *     insights into the reasons behind the operation's failure.
+   */
+  public DeleteTagFailureEvent(String user, String metalake, String name, Exception exception) {
+    super(user, TagManager.ofTagIdent(metalake, name), exception);
+    this.metalake = metalake;
+    this.name = name;
+  }
 
-    /**
-     * Returns the metalake name where the tag resides.
-     *
-     * @return The metalake name.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Returns the metalake name where the tag resides.
+   *
+   * @return The metalake name.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the name of the tag.
-     *
-     * @return The name of the tag.
-     */
-    public String name() {
-        return name;
-    }
+  /**
+   * Returns the name of the tag.
+   *
+   * @return The name of the tag.
+   */
+  public String name() {
+    return name;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.DELETE_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DELETE_TAG;
+  }
 }

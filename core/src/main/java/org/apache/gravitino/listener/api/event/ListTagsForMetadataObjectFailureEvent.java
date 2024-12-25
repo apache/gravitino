@@ -28,48 +28,50 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public class ListTagsForMetadataObjectFailureEvent extends TagFailureEvent {
-    private final String metalake;
-    private final MetadataObject metadataObject;
+  private final String metalake;
+  private final MetadataObject metadataObject;
 
-    /**
-     * Constructs a new {@code ListTagsForMetadataObjectFailureEvent} instance.
-     *
-     * @param user The user who initiated the operation.
-     * @param metalake The metalake name where the metadata object resides.
-     * @param metadataObject The metadata object for which tags are being listed.
-     * @param exception The exception encountered during the operation, providing insights into the reasons behind the failure.
-     */
-    public ListTagsForMetadataObjectFailureEvent(String user, String metalake, MetadataObject metadataObject, Exception exception) {
-        super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
-        this.metalake = metalake;
-        this.metadataObject = metadataObject;
-    }
+  /**
+   * Constructs a new {@code ListTagsForMetadataObjectFailureEvent} instance.
+   *
+   * @param user The user who initiated the operation.
+   * @param metalake The metalake name where the metadata object resides.
+   * @param metadataObject The metadata object for which tags are being listed.
+   * @param exception The exception encountered during the operation, providing insights into the
+   *     reasons behind the failure.
+   */
+  public ListTagsForMetadataObjectFailureEvent(
+      String user, String metalake, MetadataObject metadataObject, Exception exception) {
+    super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
+    this.metalake = metalake;
+    this.metadataObject = metadataObject;
+  }
 
-    /**
-     * Returns the metalake name where the metadata object resides.
-     *
-     * @return The metalake name.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Returns the metalake name where the metadata object resides.
+   *
+   * @return The metalake name.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the metadata object for which tags are being listed.
-     *
-     * @return The metadata object.
-     */
-    public MetadataObject metadataObject() {
-        return metadataObject;
-    }
+  /**
+   * Returns the metadata object for which tags are being listed.
+   *
+   * @return The metadata object.
+   */
+  public MetadataObject metadataObject() {
+    return metadataObject;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LIST_TAGS_FOR_METADATA_OBJECT;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TAGS_FOR_METADATA_OBJECT;
+  }
 }

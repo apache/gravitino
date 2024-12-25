@@ -6,16 +6,15 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Provides access to metadata about a Tag instance, designed for use by event listeners. This
- * class encapsulates the essential attributes of a Tag, including its name, optional
- * description, properties, and audit information.
+ * Provides access to metadata about a Tag instance, designed for use by event listeners. This class
+ * encapsulates the essential attributes of a Tag, including its name, optional description,
+ * properties, and audit information.
  */
 @DeveloperApi
 public final class TagInfo {
   private final String name;
   @Nullable private final String comment;
   private final Map<String, String> properties;
-
 
   /**
    * Directly constructs TagInfo with specified details.
@@ -29,7 +28,6 @@ public final class TagInfo {
     this.comment = comment;
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
   }
-
 
   /**
    * Returns the name of the Tag.

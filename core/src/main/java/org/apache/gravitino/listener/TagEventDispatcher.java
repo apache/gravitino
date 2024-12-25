@@ -19,7 +19,6 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
-
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.listener.api.event.AlterTagFailureEvent;
@@ -61,7 +60,8 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsEvent
       return dispatcher.listTags(metalake);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, e));
+      eventBus.dispatchEvent(
+          new ListTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, e));
       throw e;
     }
   }
@@ -73,7 +73,8 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsInfoEvent
       return dispatcher.listTagsInfo(metalake);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListTagsInfoFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, e));
+      eventBus.dispatchEvent(
+          new ListTagsInfoFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, e));
       throw e;
     }
   }
@@ -85,7 +86,8 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: getTagEvent
       return dispatcher.getTag(metalake, name);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GetTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, name, e));
+      eventBus.dispatchEvent(
+          new GetTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, name, e));
       throw e;
     }
   }
@@ -93,13 +95,14 @@ public class TagEventDispatcher implements TagDispatcher {
   @Override
   public Tag createTag(
       String metalake, String name, String comment, Map<String, String> properties) {
-      TagInfo tagInfo = new TagInfo(name, comment, properties);
-      // TODO: createTagPreEvent
+    TagInfo tagInfo = new TagInfo(name, comment, properties);
+    // TODO: createTagPreEvent
     try {
       // TODO: createTagEvent
       return dispatcher.createTag(metalake, name, comment, properties);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new CreateTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo, e));
+      eventBus.dispatchEvent(
+          new CreateTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo, e));
       throw e;
     }
   }
@@ -111,7 +114,9 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: alterTagEvent
       return dispatcher.alterTag(metalake, name, changes);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new AlterTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, name, changes, e));
+      eventBus.dispatchEvent(
+          new AlterTagFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, name, changes, e));
       throw e;
     }
   }
@@ -123,7 +128,8 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: deleteTagEvent
       return dispatcher.deleteTag(metalake, name);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new DeleteTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, name, e));
+      eventBus.dispatchEvent(
+          new DeleteTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, name, e));
       throw e;
     }
   }
@@ -135,7 +141,9 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listMetadataObjectsForTagEvent
       return dispatcher.listMetadataObjectsForTag(metalake, name);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListMetadataObjectsForTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, name, e));
+      eventBus.dispatchEvent(
+          new ListMetadataObjectsForTagFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, name, e));
       throw e;
     }
   }
@@ -147,7 +155,9 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsForMetadataObjectEvent
       return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListTagsForMetadataObjectFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
+      eventBus.dispatchEvent(
+          new ListTagsForMetadataObjectFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
       throw e;
     }
   }
@@ -159,7 +169,9 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: listTagsInfoForMetadataObjectEvent
       return dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListTagsInfoForMetadataObjectFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
+      eventBus.dispatchEvent(
+          new ListTagsInfoForMetadataObjectFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
       throw e;
     }
   }
@@ -173,7 +185,14 @@ public class TagEventDispatcher implements TagDispatcher {
       return dispatcher.associateTagsForMetadataObject(
           metalake, metadataObject, tagsToAdd, tagsToRemove);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new AssociateTagsForMetadataObjectFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, metadataObject, tagsToAdd, tagsToRemove, e));
+      eventBus.dispatchEvent(
+          new AssociateTagsForMetadataObjectFailureEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              metadataObject,
+              tagsToAdd,
+              tagsToRemove,
+              e));
       throw e;
     }
   }
@@ -185,7 +204,9 @@ public class TagEventDispatcher implements TagDispatcher {
       // TODO: getTagForMetadataObjectEvent
       return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GetTagForMetadataObjectFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name, e));
+      eventBus.dispatchEvent(
+          new GetTagForMetadataObjectFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name, e));
       throw e;
     }
   }

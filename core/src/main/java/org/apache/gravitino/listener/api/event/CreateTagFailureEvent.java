@@ -29,48 +29,48 @@ import org.apache.gravitino.tag.TagManager;
  */
 @DeveloperApi
 public class CreateTagFailureEvent extends TagFailureEvent {
-    private final String metalake;
-    private final TagInfo tagInfo;
-    /**
-     * Constructs a new {@code CreateTagFailureEvent} instance.
-     *
-     * @param user The user who initiated the tag creation operation.
-     * @param metalake The metalake name where the tag resides.
-     * @param tagInfo The information about the tag to be created.
-     * @param exception The exception encountered during the tag creation operation, providing insights
-     *     into the reasons behind the operation's failure.
-     */
-    public CreateTagFailureEvent(String user, String metalake, TagInfo tagInfo, Exception exception) {
-        super(user, TagManager.ofTagIdent(metalake, tagInfo.name()), exception);
-        this.metalake = metalake;
-        this.tagInfo = tagInfo;
-    }
+  private final String metalake;
+  private final TagInfo tagInfo;
+  /**
+   * Constructs a new {@code CreateTagFailureEvent} instance.
+   *
+   * @param user The user who initiated the tag creation operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param tagInfo The information about the tag to be created.
+   * @param exception The exception encountered during the tag creation operation, providing
+   *     insights into the reasons behind the operation's failure.
+   */
+  public CreateTagFailureEvent(String user, String metalake, TagInfo tagInfo, Exception exception) {
+    super(user, TagManager.ofTagIdent(metalake, tagInfo.name()), exception);
+    this.metalake = metalake;
+    this.tagInfo = tagInfo;
+  }
 
-    /**
-     * Returns the information about the tag.
-     *
-     * @return the tag information
-     */
-    public TagInfo tagInfo() {
-        return tagInfo;
-    }
+  /**
+   * Returns the information about the tag.
+   *
+   * @return the tag information
+   */
+  public TagInfo tagInfo() {
+    return tagInfo;
+  }
 
-    /**
-     * Returns the metalake identifier.
-     *
-     * @return the metalake identifier
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Returns the metalake identifier.
+   *
+   * @return the metalake identifier
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.CREATE_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TAG;
+  }
 }

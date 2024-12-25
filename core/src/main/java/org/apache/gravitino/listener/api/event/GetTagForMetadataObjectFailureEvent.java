@@ -22,66 +22,73 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+
 /**
  * Represents an event triggered when an attempt to get a tag for a metadata object fails due to an
  * exception.
  */
 @DeveloperApi
 public class GetTagForMetadataObjectFailureEvent extends TagFailureEvent {
-    private final String metalake;
-    private final MetadataObject metadataObject;
-    private final String name;
+  private final String metalake;
+  private final MetadataObject metadataObject;
+  private final String name;
 
-    /**
-     * Constructs a new {@code GetTagForMetadataObjectFailureEvent} instance.
-     *
-     * @param user The user who initiated the operation.
-     * @param metalake The metalake name where the metadata object resides.
-     * @param metadataObject The metadata object for which the tag is being retrieved.
-     * @param name The name of the tag to retrieve.
-     * @param exception The exception encountered during the operation, providing insights into the reasons behind the failure.
-     */
-    public GetTagForMetadataObjectFailureEvent(String user, String metalake, MetadataObject metadataObject, String name, Exception exception) {
-        super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
-        this.metalake = metalake;
-        this.metadataObject = metadataObject;
-        this.name = name;
-    }
+  /**
+   * Constructs a new {@code GetTagForMetadataObjectFailureEvent} instance.
+   *
+   * @param user The user who initiated the operation.
+   * @param metalake The metalake name where the metadata object resides.
+   * @param metadataObject The metadata object for which the tag is being retrieved.
+   * @param name The name of the tag to retrieve.
+   * @param exception The exception encountered during the operation, providing insights into the
+   *     reasons behind the failure.
+   */
+  public GetTagForMetadataObjectFailureEvent(
+      String user,
+      String metalake,
+      MetadataObject metadataObject,
+      String name,
+      Exception exception) {
+    super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
+    this.metalake = metalake;
+    this.metadataObject = metadataObject;
+    this.name = name;
+  }
 
-    /**
-     * Returns the metalake name where the metadata object resides.
-     *
-     * @return The metalake name.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Returns the metalake name where the metadata object resides.
+   *
+   * @return The metalake name.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the metadata object for which the tag is being retrieved.
-     *
-     * @return The metadata object.
-     */
-    public MetadataObject metadataObject() {
-        return metadataObject;
-    }
+  /**
+   * Returns the metadata object for which the tag is being retrieved.
+   *
+   * @return The metadata object.
+   */
+  public MetadataObject metadataObject() {
+    return metadataObject;
+  }
 
-    /**
-     * Returns the name of the tag being retrieved.
-     *
-     * @return The tag name.
-     */
-    public String name() {
-        return name;
-    }
+  /**
+   * Returns the name of the tag being retrieved.
+   *
+   * @return The tag name.
+   */
+  public String name() {
+    return name;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.GET_TAG_FOR_METADATA_OBJECT;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_TAG_FOR_METADATA_OBJECT;
+  }
 }
