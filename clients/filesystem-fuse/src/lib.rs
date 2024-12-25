@@ -27,16 +27,16 @@ mod fuse_api_handle;
 mod fuse_server;
 mod gravitino_client;
 mod gvfs_fileset_fs;
+mod gvfs_fuse;
 mod memory_filesystem;
-mod mount;
 mod opened_file;
 mod opened_file_manager;
 mod utils;
 
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
-    mount::mount(mount_to, mount_from, config).await
+    gvfs_fuse::mount(mount_to, mount_from, config).await
 }
 
 pub async fn gvfs_unmount() -> GvfsResult<()> {
-    mount::unmount().await
+    gvfs_fuse::unmount().await
 }
