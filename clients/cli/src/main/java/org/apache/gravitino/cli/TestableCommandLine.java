@@ -26,6 +26,8 @@ import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
+import org.apache.gravitino.cli.commands.CatalogDisable;
+import org.apache.gravitino.cli.commands.CatalogEnable;
 import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.ColumnAudit;
 import org.apache.gravitino.cli.commands.CreateCatalog;
@@ -50,6 +52,7 @@ import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.FilesetDetails;
+import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListAllTags;
@@ -74,6 +77,8 @@ import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
+import org.apache.gravitino.cli.commands.MetalakeDisable;
+import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
@@ -85,6 +90,7 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
 import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
@@ -441,13 +447,13 @@ public class TestableCommandLine {
   }
 
   protected RemoveRoleFromGroup newRemoveRoleFromGroup(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new RemoveRoleFromGroup(url, ignore, metalake, user, role);
+      String url, boolean ignore, String metalake, String group, String role) {
+    return new RemoveRoleFromGroup(url, ignore, metalake, group, role);
   }
 
   protected AddRoleToGroup newAddRoleToGroup(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new AddRoleToGroup(url, ignore, metalake, user, role);
+      String url, boolean ignore, String metalake, String group, String role) {
+    return new AddRoleToGroup(url, ignore, metalake, group, role);
   }
 
   protected RoleDetails newRoleDetails(String url, boolean ignore, String metalake, String role) {
@@ -861,5 +867,44 @@ public class TestableCommandLine {
       String columnFile,
       String comment) {
     return new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment);
+  }
+
+  protected GrantPrivilegesToRole newGrantPrivilegesToRole(
+      String url,
+      boolean ignore,
+      String metalake,
+      String role,
+      FullName entity,
+      String[] privileges) {
+    return new GrantPrivilegesToRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected RevokePrivilegesFromRole newRevokePrivilegesFromRole(
+      String url,
+      boolean ignore,
+      String metalake,
+      String role,
+      FullName entity,
+      String[] privileges) {
+    return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected MetalakeEnable newMetalakeEnable(
+      String url, boolean ignore, String metalake, boolean enableAllCatalogs) {
+    return new MetalakeEnable(url, ignore, metalake, enableAllCatalogs);
+  }
+
+  protected MetalakeDisable newMetalakeDisable(String url, boolean ignore, String metalake) {
+    return new MetalakeDisable(url, ignore, metalake);
+  }
+
+  protected CatalogEnable newCatalogEnable(
+      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
+    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
+  }
+
+  protected CatalogDisable newCatalogDisable(
+      String url, boolean ignore, String metalake, String catalog) {
+    return new CatalogDisable(url, ignore, metalake, catalog);
   }
 }

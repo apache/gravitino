@@ -48,6 +48,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
@@ -87,7 +88,9 @@ public abstract class RangerAuthorizationPlugin
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
-    RangerAuthorizationProperties.validate(config);
+    RangerAuthorizationProperties rangerAuthorizationProperties =
+        new RangerAuthorizationProperties(config);
+    rangerAuthorizationProperties.validate();
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
@@ -226,7 +229,7 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject securableObject =
             ((RoleChange.AddSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
@@ -243,7 +246,7 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject securableObject =
             ((RoleChange.RemoveSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
@@ -260,12 +263,12 @@ public abstract class RangerAuthorizationPlugin
         SecurableObject oldSecurableObject =
             ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(oldSecurableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
         SecurableObject newSecurableObject =
             ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
-          return false;
+          return Boolean.FALSE;
         }
 
         Preconditions.checkArgument(
@@ -394,8 +397,7 @@ public abstract class RangerAuthorizationPlugin
       onGroupAdded(groupEntity);
     }
 
-    List<AuthorizationSecurableObject> AuthorizationSecurableObjects =
-        translateOwner(metadataObject);
+    List<AuthorizationSecurableObject> rangerSecurableObjects = translateOwner(metadataObject);
     String ownerRoleName;
     switch (metadataObject.type()) {
       case METALAKE:
@@ -426,14 +428,13 @@ public abstract class RangerAuthorizationPlugin
           LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
         }
 
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
-                AuthorizationSecurableObject -> {
-                  RangerPolicy policy =
-                      rangerHelper.findManagedPolicy(AuthorizationSecurableObject);
+                rangerSecurableObject -> {
+                  RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
                   try {
                     if (policy == null) {
-                      policy = addOwnerRoleToNewPolicy(AuthorizationSecurableObject, ownerRoleName);
+                      policy = addOwnerRoleToNewPolicy(rangerSecurableObject, ownerRoleName);
                       rangerClient.createPolicy(policy);
                     } else {
                       rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
@@ -449,7 +450,7 @@ public abstract class RangerAuthorizationPlugin
       case TABLE:
       case FILESET:
         // The schema and table use user/group to manage the owner
-        AuthorizationSecurableObjects.stream()
+        rangerSecurableObjects.stream()
             .forEach(
                 AuthorizationSecurableObject -> {
                   RangerPolicy policy =
@@ -483,7 +484,7 @@ public abstract class RangerAuthorizationPlugin
    * 2. Create a role in the Ranger if the role does not exist. <br>
    * 3. Add this user to the role. <br>
    *
-   * @param roles The roles to grant to the group.
+   * @param roles The roles to grant to the user.
    * @param user The user to grant the roles.
    */
   @Override

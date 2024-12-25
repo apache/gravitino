@@ -126,7 +126,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -208,7 +208,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Case 1: The table is not created by Gravitino.
     if (stringId == null) {
       return EntityCombinedTable.of(alteredTable)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   getCatalogIdentifier(ident),
                   HasPropertyMetadata::tablePropertiesMetadata,
@@ -252,7 +252,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             stringId.id());
 
     return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -406,7 +406,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(identifier),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -426,7 +426,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // string identifier.
     if (stringId == null) {
       return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
@@ -445,7 +445,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             stringId.id());
 
     return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdentifier,
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -524,13 +524,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
 
     return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
   }

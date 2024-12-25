@@ -45,7 +45,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -95,7 +95,7 @@ public class RangerFilesetIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(false);
+    RangerITEnv.init(metalakeName, false);
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =

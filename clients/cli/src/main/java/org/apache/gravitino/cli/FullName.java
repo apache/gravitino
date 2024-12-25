@@ -29,6 +29,8 @@ public class FullName {
   private final CommandLine line;
   private String metalakeEnv;
   private boolean matalakeSet = false;
+  private boolean hasDisplayedMissingNameInfo = true;
+  private boolean hasDisplayedMalformedInfo = true;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -134,6 +136,19 @@ public class FullName {
   }
 
   /**
+   * Retrieves the name from the command line options.
+   *
+   * @return The name, or null if not found.
+   */
+  public String getName() {
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      return line.getOptionValue(GravitinoOptions.NAME);
+    }
+
+    return null;
+  }
+
+  /**
    * Helper method to retrieve a specific part of the full name based on the position of the part.
    *
    * @param position The position of the name part in the full name string.
@@ -146,14 +161,14 @@ public class FullName {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
       if (names.length <= position) {
-        System.err.println(ErrorMessages.MALFORMED_NAME);
+        showMalformedInfo();
         return null;
       }
 
       return names[position];
     }
 
-    System.err.println(ErrorMessages.MISSING_NAME);
+    showMissingNameInfo();
     return null;
   }
 
@@ -210,5 +225,19 @@ public class FullName {
    */
   public boolean hasColumnName() {
     return hasNamePart(4);
+  }
+
+  private void showMissingNameInfo() {
+    if (hasDisplayedMissingNameInfo) {
+      System.err.println(ErrorMessages.MISSING_NAME);
+      hasDisplayedMissingNameInfo = false;
+    }
+  }
+
+  private void showMalformedInfo() {
+    if (hasDisplayedMalformedInfo) {
+      System.err.println(ErrorMessages.MALFORMED_NAME);
+      hasDisplayedMalformedInfo = false;
+    }
   }
 }

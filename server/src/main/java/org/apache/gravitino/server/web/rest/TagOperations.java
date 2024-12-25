@@ -53,7 +53,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
-import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,13 +62,13 @@ public class TagOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TagOperations.class);
 
-  private final TagManager tagManager;
+  private final TagDispatcher tagDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TagOperations(TagManager tagManager) {
-    this.tagManager = tagManager;
+  public TagOperations(TagDispatcher tagDispatcher) {
+    this.tagDispatcher = tagDispatcher;
   }
 
   @GET
@@ -86,7 +86,7 @@ public class TagOperations {
           httpRequest,
           () -> {
             if (verbose) {
-              Tag[] tags = tagManager.listTagsInfo(metalake);
+              Tag[] tags = tagDispatcher.listTagsInfo(metalake);
               TagDTO[] tagDTOs;
               if (ArrayUtils.isEmpty(tags)) {
                 tagDTOs = new TagDTO[0];
@@ -101,7 +101,7 @@ public class TagOperations {
               return Utils.ok(new TagListResponse(tagDTOs));
 
             } else {
-              String[] tagNames = tagManager.listTags(metalake);
+              String[] tagNames = tagDispatcher.listTags(metalake);
               tagNames = tagNames == null ? new String[0] : tagNames;
 
               LOG.info("List {} tags under metalake: {}", tagNames.length, metalake);
@@ -126,7 +126,7 @@ public class TagOperations {
           () -> {
             request.validate();
             Tag tag =
-                tagManager.createTag(
+                tagDispatcher.createTag(
                     metalake, request.getName(), request.getComment(), request.getProperties());
 
             LOG.info("Created tag: {} under metalake: {}", tag.name(), metalake);
@@ -150,7 +150,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Tag tag = tagManager.getTag(metalake, name);
+            Tag tag = tagDispatcher.getTag(metalake, name);
             LOG.info("Get tag: {} under metalake: {}", name, metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
@@ -180,7 +180,7 @@ public class TagOperations {
                 request.getUpdates().stream()
                     .map(TagUpdateRequest::tagChange)
                     .toArray(TagChange[]::new);
-            Tag tag = tagManager.alterTag(metalake, name, changes);
+            Tag tag = tagDispatcher.alterTag(metalake, name, changes);
 
             LOG.info("Altered tag: {} under metalake: {}", name, metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
@@ -202,7 +202,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean deleted = tagManager.deleteTag(metalake, name);
+            boolean deleted = tagDispatcher.deleteTag(metalake, name);
             if (!deleted) {
               LOG.warn("Failed to delete tag {} under metalake {}", name, metalake);
             } else {
@@ -229,7 +229,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject[] objects = tagManager.listMetadataObjectsForTag(metalake, tagName);
+            MetadataObject[] objects = tagDispatcher.listMetadataObjectsForTag(metalake, tagName);
             objects = objects == null ? new MetadataObject[0] : objects;
 
             LOG.info(
@@ -260,7 +260,7 @@ public class TagOperations {
       @PathParam("fullName") String fullName,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     MetadataObjectTagOperations metadataObjectTagOperations =
-        new MetadataObjectTagOperations(tagManager);
+        new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.listTagsForMetadataObject(metalake, type, fullName, verbose);
   }
@@ -277,7 +277,7 @@ public class TagOperations {
       @PathParam("fullName") String fullName,
       @PathParam("tag") String tagName) {
     MetadataObjectTagOperations metadataObjectTagOperations =
-        new MetadataObjectTagOperations(tagManager);
+        new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.getTagForObject(metalake, type, fullName, tagName);
   }
@@ -294,7 +294,7 @@ public class TagOperations {
       @PathParam("fullName") String fullName,
       TagsAssociateRequest request) {
     MetadataObjectTagOperations metadataObjectTagOperations =
-        new MetadataObjectTagOperations(tagManager);
+        new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
   }

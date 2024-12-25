@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -29,8 +28,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -63,13 +63,8 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(true);
+    RangerITEnv.init(RangerBaseE2EIT.metalakeName, true);
     RangerITEnv.startHiveRangerContainer();
-
-    RANGER_ADMIN_URL =
-        String.format(
-            "http://%s:%d",
-            containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
 
     HIVE_METASTORE_URIS =
         String.format(
@@ -77,7 +72,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             containerSuite.getHiveRangerContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
 
-    generateRangerSparkSecurityXML();
+    generateRangerSparkSecurityXML("authorization-ranger");
 
     sparkSession =
         SparkSession.builder()
@@ -102,7 +97,11 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     createCatalog();
 
     RangerITEnv.cleanup();
-    metalake.addUser(System.getenv(HADOOP_USER_NAME));
+    try {
+      metalake.addUser(System.getenv(HADOOP_USER_NAME));
+    } catch (UserAlreadyExistsException e) {
+      LOG.error("Failed to add user: {}", System.getenv(HADOOP_USER_NAME), e);
+    }
   }
 
   @AfterAll
@@ -166,7 +165,8 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     sparkSession.sql(SQL_ALTER_TABLE);
   }
 
-  private static void createCatalog() {
+  @Override
+  public void createCatalog() {
     Map<String, String> properties =
         ImmutableMap.of(
             HiveConstants.METASTORE_URIS,
@@ -180,7 +180,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             RangerAuthorizationProperties.RANGER_SERVICE_NAME,
             RangerITEnv.RANGER_HIVE_REPO_NAME,
             RangerAuthorizationProperties.RANGER_ADMIN_URL,
-            RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
             RangerAuthorizationProperties.RANGER_AUTH_TYPE,
             RangerContainer.authType,
             RangerAuthorizationProperties.RANGER_USERNAME,

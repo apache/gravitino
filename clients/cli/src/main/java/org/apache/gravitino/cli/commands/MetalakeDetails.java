@@ -49,9 +49,9 @@ public class MetalakeDetails extends Command {
       Metalake metalakeEntity = client.loadMetalake(metalake);
       output(metalakeEntity);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
+      exitWithError(exp.getMessage());
     }
   }
 }

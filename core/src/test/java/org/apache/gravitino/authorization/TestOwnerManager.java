@@ -31,6 +31,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -40,13 +41,13 @@ import java.util.Collections;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
@@ -145,8 +146,9 @@ public class TestOwnerManager {
 
     ownerManager = new OwnerManager(entityStore);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(catalogManager.listCatalogsInfo(Mockito.any()))
-        .thenReturn(new Catalog[] {catalog});
+    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    Mockito.when(catalogManager.listCatalogs(Mockito.any()))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "catalog")});
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
 

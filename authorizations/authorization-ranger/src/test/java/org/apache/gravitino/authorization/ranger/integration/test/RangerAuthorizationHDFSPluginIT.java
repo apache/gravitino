@@ -27,8 +27,8 @@ import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.ranger.RangerPathBaseMetadataObject;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -42,7 +42,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init(true);
+    RangerITEnv.init(RangerITEnv.currentFunName(), true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHDFSPlugin;
   }
 
@@ -56,20 +56,19 @@ public class RangerAuthorizationHDFSPluginIT {
     MetadataObject metalake =
         MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        RangerPathBaseMetadataObject.Type.PATH,
+        PathBasedMetadataObject.Type.PATH,
         rangerAuthPlugin.translateMetadataObject(metalake).type());
 
     MetadataObject catalog =
         MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
     Assertions.assertEquals(
-        RangerPathBaseMetadataObject.Type.PATH,
+        PathBasedMetadataObject.Type.PATH,
         rangerAuthPlugin.translateMetadataObject(catalog).type());
 
     MetadataObject schema =
         MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
-        RangerPathBaseMetadataObject.Type.PATH,
-        rangerAuthPlugin.translateMetadataObject(schema).type());
+        PathBasedMetadataObject.Type.PATH, rangerAuthPlugin.translateMetadataObject(schema).type());
 
     MetadataObject table =
         MetadataObjects.parse(String.format("catalog1.schema1.tab1"), MetadataObject.Type.TABLE);
@@ -82,7 +81,7 @@ public class RangerAuthorizationHDFSPluginIT {
     AuthorizationMetadataObject rangerFileset = rangerAuthPlugin.translateMetadataObject(fileset);
     Assertions.assertEquals(1, rangerFileset.names().size());
     Assertions.assertEquals("/test", rangerFileset.fullName());
-    Assertions.assertEquals(RangerPathBaseMetadataObject.Type.PATH, rangerFileset.type());
+    Assertions.assertEquals(PathBasedMetadataObject.Type.PATH, rangerFileset.type());
   }
 
   @Test
@@ -137,7 +136,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
     filesetInFileset1.forEach(
         securableObject -> {
-          Assertions.assertEquals(RangerPathBaseMetadataObject.Type.PATH, securableObject.type());
+          Assertions.assertEquals(PathBasedMetadataObject.Type.PATH, securableObject.type());
           Assertions.assertEquals("/test", securableObject.fullName());
           Assertions.assertEquals(2, securableObject.privileges().size());
         });
@@ -166,7 +165,7 @@ public class RangerAuthorizationHDFSPluginIT {
     List<AuthorizationSecurableObject> filesetOwner = rangerAuthPlugin.translateOwner(fileset);
     Assertions.assertEquals(1, filesetOwner.size());
     Assertions.assertEquals("/test", filesetOwner.get(0).fullName());
-    Assertions.assertEquals(RangerPathBaseMetadataObject.Type.PATH, filesetOwner.get(0).type());
+    Assertions.assertEquals(PathBasedMetadataObject.Type.PATH, filesetOwner.get(0).type());
     Assertions.assertEquals(3, filesetOwner.get(0).privileges().size());
   }
 }

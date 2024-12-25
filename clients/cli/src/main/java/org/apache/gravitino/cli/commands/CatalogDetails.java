@@ -57,11 +57,11 @@ public class CatalogDetails extends Command {
       result = client.loadCatalog(catalog);
       output(result);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
+      exitWithError(exp.getMessage());
     }
   }
 }

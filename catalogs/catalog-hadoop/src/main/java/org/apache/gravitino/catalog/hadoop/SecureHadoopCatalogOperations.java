@@ -107,7 +107,7 @@ public class SecureHadoopCatalogOperations
     try {
       filesetEntity =
           hadoopCatalogOperations
-              .getStore()
+              .store()
               .get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Fileset {} does not exist", ident);
@@ -143,9 +143,7 @@ public class SecureHadoopCatalogOperations
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
       SchemaEntity schemaEntity =
-          hadoopCatalogOperations
-              .getStore()
-              .get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
+          hadoopCatalogOperations.store().get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
