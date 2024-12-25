@@ -140,7 +140,10 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public boolean deleteTag(String metalake, String name) {
-    // TODO: deleteTagPreEvent
+    DeleteTagPreEvent preEvent =
+        new DeleteTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name);
+
+    eventBus.dispatchEvent(preEvent);
     try {
       // TODO: deleteTagEvent
       return dispatcher.deleteTag(metalake, name);
