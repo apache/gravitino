@@ -30,15 +30,11 @@ class IdentityPartition(Partition):
 
     its partition name is "dt=2008-08-08/country=us", field names are [["dt"], ["country"]] and
     values are ["2008-08-08", "us"].
-
-    This class is evolving and may change in future versions.
     """
 
     @abstractmethod
     def field_names(self) -> List[List[str]]:
         """
-        Returns the field names of the identity partition.
-
         Returns:
             List[List[str]]: A list of lists representing the field names of the identity partition.
         """
@@ -47,10 +43,7 @@ class IdentityPartition(Partition):
     @abstractmethod
     def values(self) -> List[Any]:
         """
-        Returns the values of the identity partition. The values are in the same order as the field
-        names.
-
         Returns:
-            List[Any]: A list representing the values of the identity partition.
+            List[Any]: The values of the identity partition.
         """
         pass

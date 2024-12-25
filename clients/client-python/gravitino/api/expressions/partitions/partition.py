@@ -22,15 +22,11 @@ class Partition(ABC):
     """
     A partition represents a result of partitioning a table. The partition can be either a
     `IdentityPartition`, `ListPartition`, or `RangePartition`. It depends on the `Table.partitioning()`.
-
-    This class is evolving and may change in future versions.
     """
 
     @abstractmethod
     def name(self) -> str:
         """
-        Returns the name of the partition.
-
         Returns:
             str: The name of the partition.
         """
@@ -39,9 +35,7 @@ class Partition(ABC):
     @abstractmethod
     def properties(self) -> Dict[str, str]:
         """
-        Returns the properties of the partition, such as statistics, location, etc.
-
         Returns:
-            Dict[str, str]: A dictionary containing the properties of the partition.
+            Dict[str, str]: The properties of the partition, such as statistics, location, etc.
         """
         pass

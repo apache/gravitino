@@ -17,7 +17,8 @@
 
 from abc import abstractmethod
 from typing import List, Any
-from .partition import Partition
+
+from gravitino.api.expressions.partitions.partition import Partition
 
 class ListPartition(Partition):
     """
@@ -31,16 +32,12 @@ class ListPartition(Partition):
     ```
 
     its name is "p202204_California" and lists are [["2022-04-01","Los Angeles"], ["2022-04-01", "San Francisco"]].
-
-    This class is evolving and may change in future versions.
     """
 
     @abstractmethod
     def lists(self) -> List[List[Any]]:
         """
-        Returns the values of the list partition.
-
         Returns:
-            List[List[Any]]: A list of lists representing the values of the list partition.
+            List[List[Any]]: The values of the list partition.
         """
         pass
