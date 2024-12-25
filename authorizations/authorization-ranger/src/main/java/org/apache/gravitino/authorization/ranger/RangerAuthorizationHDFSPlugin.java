@@ -189,12 +189,12 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       {
                         String locationPath = getLocationPath(securableObject);
                         if (locationPath != null && !locationPath.isEmpty()) {
-                          RangerPathBaseMetadataObject rangerHDFSMetadataObject =
+                          RangerPathBaseMetadataObject rangerPathBaseMetadataObject =
                               new RangerPathBaseMetadataObject(
                                   locationPath, RangerPathBaseMetadataObject.Type.PATH);
                           rangerSecurableObjects.add(
                               generateAuthorizationSecurableObject(
-                                  rangerHDFSMetadataObject.names(),
+                                  rangerPathBaseMetadataObject.names(),
                                   RangerPathBaseMetadataObject.Type.PATH,
                                   rangerPrivileges));
                         }
@@ -287,20 +287,20 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
 
-    RangerPathBaseMetadataObject rangerHDFSMetadataObject;
+    RangerPathBaseMetadataObject rangerPathBaseMetadataObject;
     switch (metadataObject.type()) {
       case METALAKE:
       case CATALOG:
-        rangerHDFSMetadataObject =
+        rangerPathBaseMetadataObject =
             new RangerPathBaseMetadataObject("", RangerPathBaseMetadataObject.Type.PATH);
         break;
       case SCHEMA:
-        rangerHDFSMetadataObject =
+        rangerPathBaseMetadataObject =
             new RangerPathBaseMetadataObject(
                 metadataObject.fullName(), RangerPathBaseMetadataObject.Type.PATH);
         break;
       case FILESET:
-        rangerHDFSMetadataObject =
+        rangerPathBaseMetadataObject =
             new RangerPathBaseMetadataObject(
                 getLocationPath(metadataObject), RangerPathBaseMetadataObject.Type.PATH);
         break;
@@ -309,8 +309,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             "The metadata object type %s is not supported in the RangerAuthorizationHDFSPlugin",
             metadataObject.type());
     }
-    rangerHDFSMetadataObject.validateAuthorizationMetadataObject();
-    return rangerHDFSMetadataObject;
+    rangerPathBaseMetadataObject.validateAuthorizationMetadataObject();
+    return rangerPathBaseMetadataObject;
   }
 
   private NameIdentifier getObjectNameIdentifier(MetadataObject metadataObject) {

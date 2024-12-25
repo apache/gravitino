@@ -117,18 +117,18 @@ public class RangerPrivileges {
   }
 
   public static class RangerHDFSPrivilegeImpl implements AuthorizationPrivilege {
-    private AuthorizationPrivilege rangerHivePrivilege;
+    private AuthorizationPrivilege rangerHDFSPrivilege;
     private Privilege.Condition condition;
 
     public RangerHDFSPrivilegeImpl(
         AuthorizationPrivilege rangerHivePrivilege, Privilege.Condition condition) {
-      this.rangerHivePrivilege = rangerHivePrivilege;
+      this.rangerHDFSPrivilege = rangerHivePrivilege;
       this.condition = condition;
     }
 
     @Override
     public String getName() {
-      return rangerHivePrivilege.getName();
+      return rangerHDFSPrivilege.getName();
     }
 
     @Override
@@ -138,7 +138,7 @@ public class RangerPrivileges {
 
     @Override
     public boolean equalsTo(String value) {
-      return rangerHivePrivilege.equalsTo(value);
+      return rangerHDFSPrivilege.equalsTo(value);
     }
   }
 
