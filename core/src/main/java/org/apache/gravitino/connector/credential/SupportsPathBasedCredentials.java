@@ -21,10 +21,10 @@ package org.apache.gravitino.connector.credential;
 
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** The catalog operation should implement this interface to generate the path based credentials. */
-@Evolving
+@DeveloperApi
 public interface SupportsPathBasedCredentials {
 
   /**

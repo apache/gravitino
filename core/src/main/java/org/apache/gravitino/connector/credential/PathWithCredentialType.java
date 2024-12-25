@@ -19,13 +19,13 @@
 
 package org.apache.gravitino.connector.credential;
 
-import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * The {@code PathWithCredentialType} class represents a combination of a path and its associated
  * credential type.
  */
-@Evolving
+@DeveloperApi
 public class PathWithCredentialType {
 
   private final String path;
