@@ -82,7 +82,6 @@ public class ModelOperations {
           () -> {
             NameIdentifier[] modelIds = modelDispatcher.listModels(modelNs);
             modelIds = modelIds == null ? new NameIdentifier[0] : modelIds;
-
             LOG.info("List {} models under schema {}", modelIds.length, modelNs);
             return Utils.ok(new EntityListResponse(modelIds));
           });
@@ -110,9 +109,8 @@ public class ModelOperations {
           httpRequest,
           () -> {
             Model m = modelDispatcher.getModel(modelId);
-            Response response = Utils.ok(new ModelResponse(DTOConverters.toDTO(m)));
             LOG.info("Model got: {}", modelId);
-            return response;
+            return Utils.ok(new ModelResponse(DTOConverters.toDTO(m)));
           });
 
     } catch (Exception e) {
@@ -147,9 +145,8 @@ public class ModelOperations {
             Model m =
                 modelDispatcher.registerModel(
                     modelId, request.getComment(), request.getProperties());
-            Response response = Utils.ok(new ModelResponse(DTOConverters.toDTO(m)));
             LOG.info("Model registered: {}", modelId);
-            return response;
+            return Utils.ok(new ModelResponse(DTOConverters.toDTO(m)));
           });
 
     } catch (Exception e) {
@@ -178,11 +175,11 @@ public class ModelOperations {
             boolean deleted = modelDispatcher.deleteModel(modelId);
             if (!deleted) {
               LOG.warn("Failed to delete model {} under schema {}", model, schema);
+            } else {
+              LOG.info("Model deleted: {}", modelId);
             }
 
-            Response response = Utils.ok(new DropResponse(deleted));
-            LOG.info("Model deleted: {}", modelId);
-            return response;
+            return Utils.ok(new DropResponse(deleted));
           });
 
     } catch (Exception e) {
@@ -209,10 +206,8 @@ public class ModelOperations {
           () -> {
             int[] versions = modelDispatcher.listModelVersions(modelId);
             versions = versions == null ? new int[0] : versions;
-
-            Response response = Utils.ok(new ModelVersionListResponse(versions));
             LOG.info("List {} versions of model {}", versions.length, modelId);
-            return response;
+            return Utils.ok(new ModelVersionListResponse(versions));
           });
 
     } catch (Exception e) {
@@ -245,9 +240,8 @@ public class ModelOperations {
           httpRequest,
           () -> {
             ModelVersion mv = modelDispatcher.getModelVersion(modelId, version);
-            Response response = Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(mv)));
             LOG.info("Model version got: {}.{}", modelId, version);
-            return response;
+            return Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(mv)));
           });
 
     } catch (Exception e) {
@@ -268,7 +262,7 @@ public class ModelOperations {
       @PathParam("model") String model,
       @PathParam("alias") String alias) {
     LOG.info(
-        "Received get model alias request: {}.{}.{}.{}.{}",
+        "Received get model version alias request: {}.{}.{}.{}.{}",
         metalake,
         catalog,
         schema,
@@ -281,9 +275,8 @@ public class ModelOperations {
           httpRequest,
           () -> {
             ModelVersion mv = modelDispatcher.getModelVersion(modelId, alias);
-            Response response = Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(mv)));
-            LOG.info("Model alias got: {}.{}", modelId, alias);
-            return response;
+            LOG.info("Model version alias got: {}.{}", modelId, alias);
+            return Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(mv)));
           });
 
     } catch (Exception e) {
@@ -318,9 +311,8 @@ public class ModelOperations {
                 request.getAliases(),
                 request.getComment(),
                 request.getProperties());
-            Response response = Utils.ok(new BaseResponse());
             LOG.info("Model version linked: {}", modelId);
-            return response;
+            return Utils.ok(new BaseResponse());
           });
 
     } catch (Exception e) {
@@ -354,12 +346,12 @@ public class ModelOperations {
           () -> {
             boolean deleted = modelDispatcher.deleteModelVersion(modelId, version);
             if (!deleted) {
-              LOG.warn("Failed to delete model version {} under schema {}", version, schema);
+              LOG.warn("Failed to delete version {} in model {}", version, model);
+            } else {
+              LOG.info("Model version deleted: {}.{}", modelId, version);
             }
 
-            Response response = Utils.ok(new DropResponse(deleted));
-            LOG.info("Model version deleted: {}.{}", modelId, version);
-            return response;
+            return Utils.ok(new DropResponse(deleted));
           });
 
     } catch (Exception e) {
@@ -380,7 +372,7 @@ public class ModelOperations {
       @PathParam("model") String model,
       @PathParam("alias") String alias) {
     LOG.info(
-        "Received delete model alias request: {}.{}.{}.{}.{}",
+        "Received delete model version by alias request: {}.{}.{}.{}.{}",
         metalake,
         catalog,
         schema,
@@ -394,12 +386,12 @@ public class ModelOperations {
           () -> {
             boolean deleted = modelDispatcher.deleteModelVersion(modelId, alias);
             if (!deleted) {
-              LOG.warn("Failed to delete model alias {} under schema {}", alias, schema);
+              LOG.warn("Failed to delete model version by alias {} in model {}", alias, model);
+            } else {
+              LOG.info("Model version by alias deleted: {}.{}", modelId, alias);
             }
 
-            Response response = Utils.ok(new DropResponse(deleted));
-            LOG.info("Model version by alias deleted: {}.{}", modelId, alias);
-            return response;
+            return Utils.ok(new DropResponse(deleted));
           });
 
     } catch (Exception e) {
