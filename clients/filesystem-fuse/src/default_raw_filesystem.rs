@@ -16,14 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::filesystem::{FileStat, PathFileSystem, RawFileSystem, Result};
+use crate::filesystem::{
+    FileStat, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID, ROOT_DIR_FILE_ID,
+    ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
+};
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
-use crate::utils::join_file_path;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::{Errno, FileType};
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 use tokio::sync::RwLock;
 
@@ -43,16 +47,11 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
-    const INITIAL_FILE_ID: u64 = 10000;
-    const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
-    const ROOT_DIR_FILE_ID: u64 = 1;
-    const ROOT_DIR_NAME: &'static str = "";
-
     pub(crate) fn new(fs: T) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
             opened_file_manager: OpenedFileManager::new(),
-            file_id_generator: AtomicU64::new(Self::INITIAL_FILE_ID),
+            file_id_generator: AtomicU64::new(INITIAL_FILE_ID),
             fs,
         }
     }
@@ -70,7 +69,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
             .ok_or(Errno::from(libc::ENOENT))
     }
 
-    async fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
+    async fn get_file_entry_by_path(&self, path: &Path) -> Option<FileEntry> {
         self.file_entry_manager
             .read()
             .await
@@ -123,12 +122,12 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         Ok(file.file_handle())
     }
 
-    async fn remove_file_entry_locked(&self, path: &str) {
+    async fn remove_file_entry_locked(&self, path: &Path) {
         let mut file_manager = self.file_entry_manager.write().await;
         file_manager.remove(path);
     }
 
-    async fn insert_file_entry_locked(&self, parent_file_id: u64, file_id: u64, path: &str) {
+    async fn insert_file_entry_locked(&self, parent_file_id: u64, file_id: u64, path: &Path) {
         let mut file_manager = self.file_entry_manager.write().await;
         file_manager.insert(parent_file_id, file_id, path);
     }
@@ -139,9 +138,9 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     async fn init(&self) -> Result<()> {
         // init root directory
         self.insert_file_entry_locked(
-            Self::ROOT_DIR_PARENT_FILE_ID,
-            Self::ROOT_DIR_FILE_ID,
-            Self::ROOT_DIR_NAME,
+            ROOT_DIR_PARENT_FILE_ID,
+            ROOT_DIR_FILE_ID,
+            Path::new(ROOT_DIR_PATH),
         )
         .await;
         self.fs.init().await
@@ -149,7 +148,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 
     async fn get_file_path(&self, file_id: u64) -> Result<String> {
         let file_entry = self.get_file_entry(file_id).await?;
-        Ok(file_entry.path)
+        Ok(file_entry.path.to_string_lossy().to_string())
     }
 
     async fn valid_file_handle_id(&self, file_id: u64, fh: u64) -> Result<()> {
@@ -174,12 +173,15 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(file_stat)
     }
 
-    async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat> {
+    async fn lookup(&self, parent_file_id: u64, name: &OsStr) -> Result<FileStat> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut file_stat = self.fs.lookup(&parent_file_entry.path, name).await?;
+
+        let path = parent_file_entry.path.join(name);
+        let mut file_stat = self.fs.stat(&path).await?;
         // fill the file id to file stat
         self.resolve_file_id_to_filestat(&mut file_stat, parent_file_id)
             .await;
+
         Ok(file_stat)
     }
 
@@ -203,11 +205,16 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             .await
     }
 
-    async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle> {
+    async fn create_file(
+        &self,
+        parent_file_id: u64,
+        name: &OsStr,
+        flags: u32,
+    ) -> Result<FileHandle> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let mut file_without_id = self
             .fs
-            .create_file(&parent_file_entry.path, name, OpenFileFlags(flags))
+            .create_file(&parent_file_entry.path.join(name), OpenFileFlags(flags))
             .await?;
 
         file_without_id.set_file_id(parent_file_id, self.next_file_id());
@@ -226,9 +233,10 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(opened_file_with_file_handle_id.file_handle())
     }
 
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64> {
+    async fn create_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<u64> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        let mut filestat = self.fs.create_dir(&parent_file_entry.path, name).await?;
+        let path = parent_file_entry.path.join(name);
+        let mut filestat = self.fs.create_dir(&path).await?;
 
         filestat.set_file_id(parent_file_id, self.next_file_id());
 
@@ -243,23 +251,23 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         self.fs.set_attr(&file_entry.path, file_stat, true).await
     }
 
-    async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()> {
+    async fn remove_file(&self, parent_file_id: u64, name: &OsStr) -> Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        self.fs.remove_file(&parent_file_entry.path, name).await?;
+        let path = parent_file_entry.path.join(name);
+        self.fs.remove_file(&path).await?;
 
         // remove the file from file entry manager
-        self.remove_file_entry_locked(&join_file_path(&parent_file_entry.path, name))
-            .await;
+        self.remove_file_entry_locked(&path).await;
         Ok(())
     }
 
-    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()> {
+    async fn remove_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<()> {
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
-        self.fs.remove_dir(&parent_file_entry.path, name).await?;
+        let path = parent_file_entry.path.join(name);
+        self.fs.remove_dir(&path).await?;
 
         // remove the dir from file entry manager
-        self.remove_file_entry_locked(&join_file_path(&parent_file_entry.path, name))
-            .await;
+        self.remove_file_entry_locked(&path).await;
         Ok(())
     }
 
@@ -324,7 +332,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
 struct FileEntry {
     file_id: u64,
     parent_file_id: u64,
-    path: String,
+    path: PathBuf,
 }
 
 /// FileEntryManager is manage all the file entries in memory. it is used manger the file relationship and name mapping.
@@ -333,7 +341,7 @@ struct FileEntryManager {
     file_id_map: HashMap<u64, FileEntry>,
 
     // file_path_map is a map of file path to file entry.
-    file_path_map: HashMap<String, FileEntry>,
+    file_path_map: HashMap<PathBuf, FileEntry>,
 }
 
 impl FileEntryManager {
@@ -348,21 +356,21 @@ impl FileEntryManager {
         self.file_id_map.get(&file_id).cloned()
     }
 
-    fn get_file_entry_by_path(&self, path: &str) -> Option<FileEntry> {
+    fn get_file_entry_by_path(&self, path: &Path) -> Option<FileEntry> {
         self.file_path_map.get(path).cloned()
     }
 
-    fn insert(&mut self, parent_file_id: u64, file_id: u64, path: &str) {
+    fn insert(&mut self, parent_file_id: u64, file_id: u64, path: &Path) {
         let file_entry = FileEntry {
             file_id,
             parent_file_id,
-            path: path.to_string(),
+            path: path.into(),
         };
         self.file_id_map.insert(file_id, file_entry.clone());
-        self.file_path_map.insert(path.to_string(), file_entry);
+        self.file_path_map.insert(path.into(), file_entry);
     }
 
-    fn remove(&mut self, path: &str) {
+    fn remove(&mut self, path: &Path) {
         if let Some(file) = self.file_path_map.remove(path) {
             self.file_id_map.remove(&file.file_id);
         }
@@ -372,23 +380,34 @@ impl FileEntryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::filesystem::tests::TestRawFileSystem;
+    use crate::memory_filesystem::MemoryFileSystem;
 
     #[test]
     fn test_file_entry_manager() {
         let mut manager = FileEntryManager::new();
-        manager.insert(1, 2, "a/b");
+        manager.insert(1, 2, Path::new("a/b"));
         let file = manager.get_file_entry_by_id(2).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.path, "a/b");
+        assert_eq!(file.path, Path::new("a/b"));
 
-        let file = manager.get_file_entry_by_path("a/b").unwrap();
+        let file = manager.get_file_entry_by_path(Path::new("a/b")).unwrap();
         assert_eq!(file.file_id, 2);
         assert_eq!(file.parent_file_id, 1);
-        assert_eq!(file.path, "a/b");
+        assert_eq!(file.path, Path::new("a/b"));
 
-        manager.remove("a/b");
+        manager.remove(Path::new("a/b"));
         assert!(manager.get_file_entry_by_id(2).is_none());
-        assert!(manager.get_file_entry_by_path("a/b").is_none());
+        assert!(manager.get_file_entry_by_path(Path::new("a/b")).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_default_raw_file_system() {
+        let memory_fs = MemoryFileSystem::new().await;
+        let raw_fs = DefaultRawFileSystem::new(memory_fs);
+        let _ = raw_fs.init().await;
+        let mut tester = TestRawFileSystem::new(raw_fs);
+        tester.test_raw_file_system().await;
     }
 }

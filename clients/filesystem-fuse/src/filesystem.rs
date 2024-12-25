@@ -17,13 +17,21 @@
  * under the License.
  */
 use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
-use crate::utils::{join_file_path, split_file_path};
 use async_trait::async_trait;
 use bytes::Bytes;
+use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub(crate) type Result<T> = std::result::Result<T, Errno>;
+
+pub(crate) const ROOT_DIR_PARENT_FILE_ID: u64 = 1;
+pub(crate) const ROOT_DIR_FILE_ID: u64 = 1;
+pub(crate) const ROOT_DIR_NAME: &str = "";
+pub(crate) const ROOT_DIR_PATH: &str = "/";
+pub(crate) const INITIAL_FILE_ID: u64 = 10000;
 
 /// RawFileSystem interface for the file system implementation. it use by FuseApiHandle,
 /// it ues the file id to operate the file system apis
@@ -47,7 +55,7 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn stat(&self, file_id: u64) -> Result<FileStat>;
 
     /// Lookup the file by parent file id and file name, if the file exists, return the file stat
-    async fn lookup(&self, parent_file_id: u64, name: &str) -> Result<FileStat>;
+    async fn lookup(&self, parent_file_id: u64, name: &OsStr) -> Result<FileStat>;
 
     /// Read the directory by file id, if the file id is a valid directory, return the file stat list
     async fn read_dir(&self, dir_file_id: u64) -> Result<Vec<FileStat>>;
@@ -59,19 +67,24 @@ pub(crate) trait RawFileSystem: Send + Sync {
     async fn open_dir(&self, file_id: u64, flags: u32) -> Result<FileHandle>;
 
     /// Create the file by parent file id and file name and flags, if successful, return the file handle
-    async fn create_file(&self, parent_file_id: u64, name: &str, flags: u32) -> Result<FileHandle>;
+    async fn create_file(
+        &self,
+        parent_file_id: u64,
+        name: &OsStr,
+        flags: u32,
+    ) -> Result<FileHandle>;
 
     /// Create the directory by parent file id and file name, if successful, return the file id
-    async fn create_dir(&self, parent_file_id: u64, name: &str) -> Result<u64>;
+    async fn create_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<u64>;
 
     /// Set the file attribute by file id and file stat
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()>;
 
     /// Remove the file by parent file id and file name
-    async fn remove_file(&self, parent_file_id: u64, name: &str) -> Result<()>;
+    async fn remove_file(&self, parent_file_id: u64, name: &OsStr) -> Result<()>;
 
     /// Remove the directory by parent file id and file name
-    async fn remove_dir(&self, parent_file_id: u64, name: &str) -> Result<()>;
+    async fn remove_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<()>;
 
     /// Close the file by file id and file handle, if successful
     async fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
@@ -91,39 +104,31 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn init(&self) -> Result<()>;
 
     /// Get the file stat by file path, if the file exists, return the file stat
-    async fn stat(&self, path: &str) -> Result<FileStat>;
-
-    /// Get the file stat by parent file path and file name, if the file exists, return the file stat
-    async fn lookup(&self, parent: &str, name: &str) -> Result<FileStat>;
+    async fn stat(&self, path: &Path) -> Result<FileStat>;
 
     /// Read the directory by file path, if the directory exists, return the file stat list
-    async fn read_dir(&self, path: &str) -> Result<Vec<FileStat>>;
+    async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>>;
 
     /// Open the file by file path and flags, if the file exists, return the opened file
-    async fn open_file(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile>;
 
     /// Open the directory by file path and flags, if the file exists, return the opened file
-    async fn open_dir(&self, path: &str, flags: OpenFileFlags) -> Result<OpenedFile>;
+    async fn open_dir(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile>;
 
-    /// Create the file by parent file path and file name and flags, if successful return the opened file
-    async fn create_file(
-        &self,
-        parent: &str,
-        name: &str,
-        flags: OpenFileFlags,
-    ) -> Result<OpenedFile>;
+    /// Create the file by file path and flags, if successful, return the opened file
+    async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile>;
 
-    /// Create the directory by parent file path and file name, if successful, return the file stat
-    async fn create_dir(&self, parent: &str, name: &str) -> Result<FileStat>;
+    /// Create the directory by file path , if successful, return the file stat
+    async fn create_dir(&self, path: &Path) -> Result<FileStat>;
 
     /// Set the file attribute by file path and file stat
-    async fn set_attr(&self, path: &str, file_stat: &FileStat, flush: bool) -> Result<()>;
+    async fn set_attr(&self, path: &Path, file_stat: &FileStat, flush: bool) -> Result<()>;
 
-    /// Remove the file by parent file path and file name
-    async fn remove_file(&self, parent: &str, name: &str) -> Result<()>;
+    /// Remove the file by file path
+    async fn remove_file(&self, path: &Path) -> Result<()>;
 
-    /// Remove the directory by parent file path and file name
-    async fn remove_dir(&self, parent: &str, name: &str) -> Result<()>;
+    /// Remove the directory by file path
+    async fn remove_dir(&self, path: &Path) -> Result<()>;
 }
 
 // FileSystemContext is the system environment for the fuse file system.
@@ -166,10 +171,10 @@ pub struct FileStat {
     pub(crate) parent_file_id: u64,
 
     // file name
-    pub(crate) name: String,
+    pub(crate) name: OsString,
 
     // file path of the fuse file system root
-    pub(crate) path: String,
+    pub(crate) path: PathBuf,
 
     // file size
     pub(crate) size: u64,
@@ -191,31 +196,33 @@ pub struct FileStat {
 }
 
 impl FileStat {
-    pub fn new_file_filestat_with_path(path: &str, size: u64) -> Self {
-        let (parent, name) = split_file_path(path);
-        Self::new_file_filestat(parent, name, size)
+    pub fn new_file_filestat_with_path(path: &Path, size: u64) -> Self {
+        Self::new_filestat(path, size, RegularFile)
     }
 
-    pub fn new_dir_filestat_with_path(path: &str) -> Self {
-        let (parent, name) = split_file_path(path);
-        Self::new_dir_filestat(parent, name)
+    pub fn new_dir_filestat_with_path(path: &Path) -> Self {
+        Self::new_filestat(path, 0, Directory)
     }
 
-    pub fn new_file_filestat(parent: &str, name: &str, size: u64) -> Self {
-        Self::new_filestat(parent, name, size, FileType::RegularFile)
+    pub fn new_file_filestat(parent: &Path, name: &OsStr, size: u64) -> Self {
+        let path = parent.join(name);
+        Self::new_filestat(&path, size, RegularFile)
     }
 
-    pub fn new_dir_filestat(parent: &str, name: &str) -> Self {
-        Self::new_filestat(parent, name, 0, FileType::Directory)
+    pub fn new_dir_filestat(parent: &Path, name: &OsStr) -> Self {
+        let path = parent.join(name);
+        Self::new_filestat(&path, 0, Directory)
     }
 
-    pub fn new_filestat(parent: &str, name: &str, size: u64, kind: FileType) -> Self {
+    pub fn new_filestat(path: &Path, size: u64, kind: FileType) -> Self {
         let atime = Timestamp::from(SystemTime::now());
+        // root directory name is ""
+        let name = path.file_name().unwrap_or(OsStr::new(ROOT_DIR_NAME));
         Self {
             file_id: 0,
             parent_file_id: 0,
-            name: name.into(),
-            path: join_file_path(parent, name),
+            name: name.to_os_string(),
+            path: path.into(),
             size: size,
             kind: kind,
             atime: atime,
@@ -262,43 +269,414 @@ pub trait FileWriter: Sync + Send {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    pub(crate) struct TestPathFileSystem<F: PathFileSystem> {
+        files: HashMap<PathBuf, FileStat>,
+        fs: F,
+    }
+
+    impl<F: PathFileSystem> TestPathFileSystem<F> {
+        pub(crate) fn new(fs: F) -> Self {
+            Self {
+                files: HashMap::new(),
+                fs,
+            }
+        }
+
+        pub(crate) async fn test_path_file_system(&mut self) {
+            // Test root dir
+            self.test_root_dir().await;
+
+            // Test stat file
+            self.test_stat_file(Path::new("/.gvfs_meta"), RegularFile, 0)
+                .await;
+
+            // Test create file
+            self.test_create_file(Path::new("/file1.txt")).await;
+
+            // Test create dir
+            self.test_create_dir(Path::new("/dir1")).await;
+
+            // Test list dir
+            self.test_list_dir(Path::new("/")).await;
+
+            // Test remove file
+            self.test_remove_file(Path::new("/file1.txt")).await;
+
+            // Test remove dir
+            self.test_remove_dir(Path::new("/dir1")).await;
+
+            // Test file not found
+            self.test_file_not_found(Path::new("unknown")).await;
+
+            // Test list dir
+            self.test_list_dir(Path::new("/")).await;
+        }
+
+        async fn test_root_dir(&mut self) {
+            let root_dir_path = Path::new("/");
+            let root_file_stat = self.fs.stat(root_dir_path).await;
+            assert!(root_file_stat.is_ok());
+            let root_file_stat = root_file_stat.unwrap();
+            self.assert_file_stat(&root_file_stat, root_dir_path, Directory, 0);
+        }
+
+        async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
+            let file_stat = self.fs.stat(path).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+            self.assert_file_stat(&file_stat, path, expect_kind, expect_size);
+            self.files.insert(file_stat.path.clone(), file_stat);
+        }
+
+        async fn test_create_file(&mut self, path: &Path) {
+            let opened_file = self.fs.create_file(path, OpenFileFlags(0)).await;
+            assert!(opened_file.is_ok());
+            let file = opened_file.unwrap();
+            self.assert_file_stat(&file.file_stat, path, FileType::RegularFile, 0);
+            self.test_stat_file(path, RegularFile, 0).await;
+        }
+
+        async fn test_create_dir(&mut self, path: &Path) {
+            let dir_stat = self.fs.create_dir(path).await;
+            assert!(dir_stat.is_ok());
+            let dir_stat = dir_stat.unwrap();
+            self.assert_file_stat(&dir_stat, path, Directory, 0);
+            self.test_stat_file(path, Directory, 0).await;
+        }
+
+        async fn test_list_dir(&self, path: &Path) {
+            let list_dir = self.fs.read_dir(path).await;
+            assert!(list_dir.is_ok());
+            let list_dir = list_dir.unwrap();
+            assert_eq!(list_dir.len(), self.files.len());
+            for file_stat in list_dir {
+                assert!(self.files.contains_key(&file_stat.path));
+                let actual_file_stat = self.files.get(&file_stat.path).unwrap();
+                self.assert_file_stat(
+                    &file_stat,
+                    &actual_file_stat.path,
+                    actual_file_stat.kind,
+                    actual_file_stat.size,
+                );
+            }
+        }
+
+        async fn test_remove_file(&mut self, path: &Path) {
+            let remove_file = self.fs.remove_file(path).await;
+            assert!(remove_file.is_ok());
+            self.files.remove(path);
+
+            self.test_file_not_found(path).await;
+        }
+
+        async fn test_remove_dir(&mut self, path: &Path) {
+            let remove_dir = self.fs.remove_dir(path).await;
+            assert!(remove_dir.is_ok());
+            self.files.remove(path);
+
+            self.test_file_not_found(path).await;
+        }
+
+        async fn test_file_not_found(&self, path: &Path) {
+            let not_found_file = self.fs.stat(path).await;
+            assert!(not_found_file.is_err());
+        }
+
+        fn assert_file_stat(&self, file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
+            assert_eq!(file_stat.path, path);
+            assert_eq!(file_stat.kind, kind);
+            assert_eq!(file_stat.size, size);
+        }
+    }
+
+    pub(crate) struct TestRawFileSystem<F: RawFileSystem> {
+        fs: F,
+        files: HashMap<u64, FileStat>,
+    }
+
+    impl<F: RawFileSystem> TestRawFileSystem<F> {
+        pub(crate) fn new(fs: F) -> Self {
+            Self {
+                fs,
+                files: HashMap::new(),
+            }
+        }
+
+        pub(crate) async fn test_raw_file_system(&mut self) {
+            // Test root dir
+            self.test_root_dir().await;
+
+            let parent_file_id = ROOT_DIR_FILE_ID;
+            // Test lookup file
+            let file_id = self
+                .test_lookup_file(parent_file_id, ".gvfs_meta".as_ref(), RegularFile, 0)
+                .await;
+
+            // Test get file stat
+            self.test_stat_file(file_id, Path::new("/.gvfs_meta"), RegularFile, 0)
+                .await;
+
+            // Test get file path
+            self.test_get_file_path(file_id, "/.gvfs_meta").await;
+
+            // Test create file
+            self.test_create_file(parent_file_id, "file1.txt".as_ref())
+                .await;
+
+            // Test open file
+            let file_handle = self
+                .test_open_file(parent_file_id, "file1.txt".as_ref())
+                .await;
+
+            // Test write file
+            self.test_write_file(&file_handle, "test").await;
+
+            // Test read file
+            self.test_read_file(&file_handle, "test").await;
+
+            // Test close file
+            self.test_close_file(&file_handle).await;
+
+            // Test create dir
+            self.test_create_dir(parent_file_id, "dir1".as_ref()).await;
+
+            // Test list dir
+            self.test_list_dir(parent_file_id).await;
+
+            // Test remove file
+            self.test_remove_file(parent_file_id, "file1.txt".as_ref())
+                .await;
+
+            // Test remove dir
+            self.test_remove_dir(parent_file_id, "dir1".as_ref()).await;
+
+            // Test list dir again
+            self.test_list_dir(parent_file_id).await;
+
+            // Test file not found
+            self.test_file_not_found(23).await;
+        }
+
+        async fn test_root_dir(&self) {
+            let root_file_stat = self.fs.stat(ROOT_DIR_FILE_ID).await;
+            assert!(root_file_stat.is_ok());
+            let root_file_stat = root_file_stat.unwrap();
+            self.assert_file_stat(
+                &root_file_stat,
+                Path::new(ROOT_DIR_PATH),
+                FileType::Directory,
+                0,
+            );
+        }
+
+        async fn test_lookup_file(
+            &mut self,
+            parent_file_id: u64,
+            expect_name: &OsStr,
+            expect_kind: FileType,
+            expect_size: u64,
+        ) -> u64 {
+            let file_stat = self.fs.lookup(parent_file_id, expect_name).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+            self.assert_file_stat(&file_stat, &file_stat.path, expect_kind, expect_size);
+            assert_eq!(file_stat.name, expect_name);
+            let file_id = file_stat.file_id;
+            self.files.insert(file_stat.file_id, file_stat);
+            file_id
+        }
+
+        async fn test_get_file_path(&mut self, file_id: u64, expect_path: &str) {
+            let file_path = self.fs.get_file_path(file_id).await;
+            assert!(file_path.is_ok());
+            assert_eq!(file_path.unwrap(), expect_path);
+        }
+
+        async fn test_stat_file(
+            &mut self,
+            file_id: u64,
+            expect_path: &Path,
+            expect_kind: FileType,
+            expect_size: u64,
+        ) {
+            let file_stat = self.fs.stat(file_id).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+            self.assert_file_stat(&file_stat, expect_path, expect_kind, expect_size);
+            self.files.insert(file_stat.file_id, file_stat);
+        }
+
+        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) {
+            let file = self.fs.create_file(root_file_id, name, 0).await;
+            assert!(file.is_ok());
+            let file = file.unwrap();
+            assert!(file.handle_id > 0);
+            assert!(file.file_id >= INITIAL_FILE_ID);
+            let file_stat = self.fs.stat(file.file_id).await;
+            assert!(file_stat.is_ok());
+
+            self.test_stat_file(file.file_id, &file_stat.unwrap().path, RegularFile, 0)
+                .await;
+        }
+
+        async fn test_open_file(&self, root_file_id: u64, name: &OsStr) -> FileHandle {
+            let file = self.fs.lookup(root_file_id, name).await.unwrap();
+            let file_handle = self.fs.open_file(file.file_id, 0).await;
+            assert!(file_handle.is_ok());
+            let file_handle = file_handle.unwrap();
+            assert_eq!(file_handle.file_id, file.file_id);
+            file_handle
+        }
+
+        async fn test_write_file(&mut self, file_handle: &FileHandle, content: &str) {
+            let write_size = self
+                .fs
+                .write(
+                    file_handle.file_id,
+                    file_handle.handle_id,
+                    0,
+                    content.as_bytes(),
+                )
+                .await;
+            assert!(write_size.is_ok());
+            assert_eq!(write_size.unwrap(), content.len() as u32);
+
+            self.files.get_mut(&file_handle.file_id).unwrap().size = content.len() as u64;
+        }
+
+        async fn test_read_file(&self, file_handle: &FileHandle, expected_content: &str) {
+            let read_data = self
+                .fs
+                .read(
+                    file_handle.file_id,
+                    file_handle.handle_id,
+                    0,
+                    expected_content.len() as u32,
+                )
+                .await;
+            assert!(read_data.is_ok());
+            assert_eq!(read_data.unwrap(), expected_content.as_bytes());
+        }
+
+        async fn test_close_file(&self, file_handle: &FileHandle) {
+            let close_file = self
+                .fs
+                .close_file(file_handle.file_id, file_handle.handle_id)
+                .await;
+            assert!(close_file.is_ok());
+        }
+
+        async fn test_create_dir(&mut self, parent_file_id: u64, name: &OsStr) {
+            let dir = self.fs.create_dir(parent_file_id, name).await;
+            assert!(dir.is_ok());
+            let dir_file_id = dir.unwrap();
+            assert!(dir_file_id >= INITIAL_FILE_ID);
+            let dir_stat = self.fs.stat(dir_file_id).await;
+            assert!(dir_stat.is_ok());
+
+            self.test_stat_file(dir_file_id, &dir_stat.unwrap().path, Directory, 0)
+                .await;
+        }
+
+        async fn test_list_dir(&self, root_file_id: u64) {
+            let list_dir = self.fs.read_dir(root_file_id).await;
+            assert!(list_dir.is_ok());
+            let list_dir = list_dir.unwrap();
+            assert_eq!(list_dir.len(), self.files.len());
+            for file_stat in list_dir {
+                assert!(self.files.contains_key(&file_stat.file_id));
+                let actual_file_stat = self.files.get(&file_stat.file_id).unwrap();
+                self.assert_file_stat(
+                    &file_stat,
+                    &actual_file_stat.path,
+                    actual_file_stat.kind,
+                    actual_file_stat.size,
+                );
+            }
+        }
+
+        async fn test_remove_file(&mut self, root_file_id: u64, name: &OsStr) {
+            let file_stat = self.fs.lookup(root_file_id, name).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+
+            let remove_file = self.fs.remove_file(root_file_id, name).await;
+            assert!(remove_file.is_ok());
+            self.files.remove(&file_stat.file_id);
+
+            self.test_file_not_found(file_stat.file_id).await;
+        }
+
+        async fn test_remove_dir(&mut self, root_file_id: u64, name: &OsStr) {
+            let file_stat = self.fs.lookup(root_file_id, name).await;
+            assert!(file_stat.is_ok());
+            let file_stat = file_stat.unwrap();
+
+            let remove_dir = self.fs.remove_dir(root_file_id, name).await;
+            assert!(remove_dir.is_ok());
+            self.files.remove(&file_stat.file_id);
+
+            self.test_file_not_found(file_stat.file_id).await;
+        }
+
+        async fn test_file_not_found(&self, file_id: u64) {
+            let not_found_file = self.fs.stat(file_id).await;
+            assert!(not_found_file.is_err());
+        }
+
+        fn assert_file_stat(&self, file_stat: &FileStat, path: &Path, kind: FileType, size: u64) {
+            assert_eq!(file_stat.path, path);
+            assert_eq!(file_stat.kind, kind);
+            assert_eq!(file_stat.size, size);
+            if file_stat.file_id == 1 {
+                assert_eq!(file_stat.parent_file_id, 1);
+            } else {
+                assert!(file_stat.file_id >= INITIAL_FILE_ID);
+                assert!(
+                    file_stat.parent_file_id == 1 || file_stat.parent_file_id >= INITIAL_FILE_ID
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_create_file_stat() {
         //test new file
-        let file_stat = FileStat::new_file_filestat("a", "b", 10);
+        let file_stat = FileStat::new_file_filestat(Path::new("a"), "b".as_ref(), 10);
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
         //test new dir
-        let file_stat = FileStat::new_dir_filestat("a", "b");
+        let file_stat = FileStat::new_dir_filestat("a".as_ref(), "b".as_ref());
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
         assert_eq!(file_stat.kind, FileType::Directory);
 
         //test new file with path
-        let file_stat = FileStat::new_file_filestat_with_path("a/b", 10);
+        let file_stat = FileStat::new_file_filestat_with_path("a/b".as_ref(), 10);
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
         assert_eq!(file_stat.kind, FileType::RegularFile);
 
         //test new dir with path
-        let file_stat = FileStat::new_dir_filestat_with_path("a/b");
+        let file_stat = FileStat::new_dir_filestat_with_path("a/b".as_ref());
         assert_eq!(file_stat.name, "b");
-        assert_eq!(file_stat.path, "a/b");
+        assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
         assert_eq!(file_stat.kind, FileType::Directory);
     }
 
     #[test]
     fn test_file_stat_set_file_id() {
-        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
+        let mut file_stat = FileStat::new_file_filestat("a".as_ref(), "b".as_ref(), 10);
         file_stat.set_file_id(1, 2);
         assert_eq!(file_stat.file_id, 2);
         assert_eq!(file_stat.parent_file_id, 1);
@@ -307,7 +685,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "assertion failed: file_id != 0 && parent_file_id != 0")]
     fn test_file_stat_set_file_id_panic() {
-        let mut file_stat = FileStat::new_file_filestat("a", "b", 10);
+        let mut file_stat = FileStat::new_file_filestat("a".as_ref(), "b".as_ref(), 10);
         file_stat.set_file_id(1, 0);
     }
 }

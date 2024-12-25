@@ -126,10 +126,15 @@ pub(crate) struct OpenFileFlags(pub(crate) u32);
 mod tests {
     use super::*;
     use crate::filesystem::FileStat;
+    use std::path::Path;
 
     #[test]
     fn test_open_file() {
-        let mut open_file = OpenedFile::new(FileStat::new_file_filestat("a", "b", 10));
+        let mut open_file = OpenedFile::new(FileStat::new_file_filestat(
+            Path::new("a"),
+            "b".as_ref(),
+            10,
+        ));
         assert_eq!(open_file.file_stat.name, "b");
         assert_eq!(open_file.file_stat.size, 10);
 
