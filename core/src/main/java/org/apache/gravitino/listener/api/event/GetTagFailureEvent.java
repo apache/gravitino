@@ -1,10 +1,12 @@
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.gravitino.NameIdentifier;
+
 public class GetTagFailureEvent extends TagFailureEvent {
     private final String metalake;
     private final String name;
     public GetTagFailureEvent(String user, String metalake, String name, Exception exception) {
-        super(user, null, exception);
+        super(user, NameIdentifier.of(metalake), exception);
         this.name = name;
         this.metalake = metalake;
     }

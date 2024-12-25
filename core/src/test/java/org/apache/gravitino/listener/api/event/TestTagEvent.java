@@ -18,6 +18,10 @@ import static org.mockito.Mockito.when;
 import org.apache.gravitino.tag.TagChange;
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestTagEvent {
     private TagEventDispatcher failureDispatcher;
@@ -71,8 +75,10 @@ public class TestTagEvent {
 
     @Test
     void testGetTagForMetadataObjectFailureEvent() {
-        MetadataObject metadataObject = mock(MetadataObject.class);
-        when(metadataObject.name()).thenReturn("name");
+        MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG
+        );
 
         Assertions.assertThrowsExactly(
             GravitinoRuntimeException.class,
@@ -88,8 +94,6 @@ public class TestTagEvent {
         Assertions.assertEquals(metadataObject, ((GetTagForMetadataObjectFailureEvent) event).metadataObject());
         Assertions.assertEquals(OperationType.GET_TAG_FOR_METADATA_OBJECT, event.operationType());
         Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
-
-
     }
 
     @Test
@@ -150,8 +154,10 @@ public class TestTagEvent {
 
     @Test
     void testListTagsForMetadataObjectFailureEvent() {
-        MetadataObject metadataObject = mock(MetadataObject.class);
-        when(metadataObject.name()).thenReturn("name");
+        MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG
+        );
 
         Assertions.assertThrowsExactly(
             GravitinoRuntimeException.class,
@@ -186,12 +192,15 @@ public class TestTagEvent {
 
     @Test
     void testListTagsInfoForMetadataObjectFailureEvent() {
-        MetadataObject metadataObject = mock(MetadataObject.class);
-        when(metadataObject.name()).thenReturn("name");
+        MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG
+        );
+
         Assertions.assertThrowsExactly(
             GravitinoRuntimeException.class,
             () -> failureDispatcher.listTagsInfoForMetadataObject("metalake", metadataObject)
-        );  
+        );
         Event event = dummyEventListener.popPostEvent();
         Assertions.assertEquals(ListTagsInfoForMetadataObjectFailureEvent.class, event.getClass());
         Assertions.assertEquals(
@@ -205,10 +214,14 @@ public class TestTagEvent {
 
     @Test
     void testAssociateTagsForMetadataObjectFailureEvent() {
-        MetadataObject metadataObject = mock(MetadataObject.class);
-        when(metadataObject.name()).thenReturn("name");
+        MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG
+        );
+
         String[] tagsToAssociate = new String[]{"tag1", "tag2"};
         String[] tagsToDisassociate = new String[]{"tag3", "tag4"};
+
         Assertions.assertThrowsExactly(
             GravitinoRuntimeException.class,
             () -> failureDispatcher.associateTagsForMetadataObject("metalake", metadataObject, tagsToAssociate, tagsToDisassociate)
@@ -235,13 +248,12 @@ public class TestTagEvent {
     }
 
     private TagDispatcher mockExceptionTagDispatcher() {
-        TagDispatcher dispatcher =
-            mock(
-                TagDispatcher.class,
-                invocation -> {
-                    throw new GravitinoRuntimeException("Exception for all methods");
-                });
-        return dispatcher;
+        return mock(
+            TagDispatcher.class,
+            invocation -> {
+                throw new GravitinoRuntimeException("Exception for all methods");
+            }
+        );
     }
 
 }

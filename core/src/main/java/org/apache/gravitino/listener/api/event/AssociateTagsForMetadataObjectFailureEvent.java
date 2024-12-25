@@ -1,14 +1,14 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.MetadataObject;
-
+import org.apache.gravitino.utils.MetadataObjectUtil;
 public class AssociateTagsForMetadataObjectFailureEvent extends TagFailureEvent {
     private final String metalake;
     private final MetadataObject metadataObject;
     private final String[] tagsToAdd;
     private final String[] tagsToRemove;
     public AssociateTagsForMetadataObjectFailureEvent(String user, String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove, Exception exception) {
-        super(user, null, exception);
+        super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
         this.metalake = metalake;
         this.metadataObject = metadataObject;
         this.tagsToAdd = tagsToAdd;

@@ -1,5 +1,6 @@
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.tag.TagChange;
 
 public class AlterTagFailureEvent extends TagFailureEvent {
@@ -7,7 +8,7 @@ public class AlterTagFailureEvent extends TagFailureEvent {
     private final String name;
     private final TagChange[] changes;
     public AlterTagFailureEvent(String user, String metalake, String name, TagChange[] changes, Exception exception) {
-        super(user, null, exception);
+        super(user, NameIdentifier.of(metalake), exception);
         this.name = name;
         this.metalake = metalake;
         this.changes = changes;
