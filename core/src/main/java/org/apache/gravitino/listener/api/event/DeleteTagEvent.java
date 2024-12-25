@@ -32,12 +32,12 @@ public final class DeleteTagEvent extends TagEvent {
      * of a tag delete operation.
      *
      * @param user The user who initiated the delete tag operation.
-     * @param identifier The identifier of the tag that was attempted to be deleted.
+     * @param metalake The metalake from which the tag was deleted.
      * @param isExists A boolean flag indicating whether the tag existed at the time of the delete
      *     operation.
      */
-    public DeleteTagEvent(String user, NameIdentifier identifier, boolean isExists) {
-        super(user, identifier);
+    public DeleteTagEvent(String user, String metalake, boolean isExists) {
+        super(user, NameIdentifier.of(metalake));
         this.isExists = isExists;
     }
 
