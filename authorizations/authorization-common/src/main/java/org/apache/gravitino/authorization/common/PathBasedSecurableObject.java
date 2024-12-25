@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.common;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
@@ -25,12 +25,12 @@ import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 
-public class RangerPathBaseSecurableObject extends RangerPathBaseMetadataObject
+public class PathBasedSecurableObject extends PathBasedMetadataObject
     implements AuthorizationSecurableObject {
 
   private final List<AuthorizationPrivilege> privileges;
 
-  public RangerPathBaseSecurableObject(
+  public PathBasedSecurableObject(
       String path, AuthorizationMetadataObject.Type type, Set<AuthorizationPrivilege> privileges) {
     super(path, type);
     this.privileges = ImmutableList.copyOf(privileges);

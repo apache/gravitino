@@ -63,7 +63,6 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   protected static GravitinoMetalake metalake;
   protected static Catalog catalog;
   protected static String HIVE_METASTORE_URIS;
-  protected static String RANGER_ADMIN_URL = null;
 
   protected static SparkSession sparkSession = null;
   protected static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
@@ -104,13 +103,13 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   protected static final String SQL_DROP_TABLE = String.format("DROP TABLE %s", tableName);
 
-  protected static void generateRangerSparkSecurityXML() throws IOException {
+  protected static void generateRangerSparkSecurityXML(String modeName) throws IOException {
     String templatePath =
         String.join(
             File.separator,
             System.getenv("GRAVITINO_ROOT_DIR"),
             "authorizations",
-            "authorization-ranger",
+            modeName,
             "src",
             "test",
             "resources",
@@ -120,7 +119,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
             File.separator,
             System.getenv("GRAVITINO_ROOT_DIR"),
             "authorizations",
-            "authorization-ranger",
+            modeName,
             "build",
             "resources",
             "test",
@@ -130,7 +129,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         FileUtils.readFileToString(new File(templatePath), StandardCharsets.UTF_8);
     templateContext =
         templateContext
-            .replace("__REPLACE__RANGER_ADMIN_URL", RANGER_ADMIN_URL)
+            .replace("__REPLACE__RANGER_ADMIN_URL", RangerITEnv.RANGER_ADMIN_URL)
             .replace("__REPLACE__RANGER_HIVE_REPO_NAME", RangerITEnv.RANGER_HIVE_REPO_NAME);
     FileUtils.writeStringToFile(new File(xmlPath), templateContext, StandardCharsets.UTF_8);
   }
@@ -220,7 +219,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  protected void testCreateSchema() throws InterruptedException {
+  protected void testCreateSchema() throws InterruptedException, IOException {
     // Choose a catalog
     useCatalog();
 

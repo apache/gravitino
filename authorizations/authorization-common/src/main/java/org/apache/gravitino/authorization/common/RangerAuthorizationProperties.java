@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
 
 /** The properties for Ranger authorization plugin. */
-public class RangerAuthorizationProperties {
+public class RangerAuthorizationProperties extends AuthorizationProperties {
   /** Ranger admin web URIs */
   public static final String RANGER_ADMIN_URL = "authorization.ranger.admin.url";
 
@@ -46,7 +46,17 @@ public class RangerAuthorizationProperties {
    */
   public static final String RANGER_PASSWORD = "authorization.ranger.password";
 
-  public static void validate(Map<String, String> properties) {
+  public RangerAuthorizationProperties(Map<String, String> properties) {
+    super(properties);
+  }
+
+  @Override
+  public String getPropertiesPrefix() {
+    return "authorization.ranger";
+  }
+
+  @Override
+  public void validate() {
     Preconditions.checkArgument(
         properties.containsKey(RANGER_ADMIN_URL),
         String.format("%s is required", RANGER_ADMIN_URL));
