@@ -28,7 +28,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 public interface SupportsPathBasedCredentials {
 
   /**
-   * Get {@link PathWithCredentialType} lists.
+   * Get {@link PathBasedContext} lists.
    *
    * <p>In most cases there will be only one element in the list. For catalogs which support multi
    * locations like fileset, there may be multiple elements.
@@ -37,7 +37,7 @@ public interface SupportsPathBasedCredentials {
    * metalake, catalog, schema.
    *
    * @param nameIdentifier, The identifier for fileset, table, etc.
-   * @return A map with credential provider type as the key, path as the value.
+   * @return A list of {@link PathBasedContext}
    */
-  List<PathWithCredentialType> getPathWithCredentialTypes(NameIdentifier nameIdentifier);
+  List<PathBasedContext> getPathBasedContext(NameIdentifier nameIdentifier);
 }

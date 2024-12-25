@@ -32,7 +32,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.OperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.credential.PathWithCredentialType;
+import org.apache.gravitino.connector.credential.PathBasedContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.IdGenerator;
@@ -66,7 +66,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         .map(
             entry ->
                 baseCatalog
-                    .catalogCredentialOperationDispatcher()
+                    .catalogCredentialManager()
                     .getCredential(entry.getKey(), entry.getValue()))
         .filter(Objects::nonNull)
         .collect(Collectors.toList());
@@ -79,10 +79,9 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
     }
 
     if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {
-      List<PathWithCredentialType> pathWithCredentialTypes =
-          ((SupportsPathBasedCredentials) baseCatalog.ops())
-              .getPathWithCredentialTypes(nameIdentifier);
-      return getPathBasedCredentialContexts(privilege, pathWithCredentialTypes);
+      List<PathBasedContext> pathBasedContexts =
+          ((SupportsPathBasedCredentials) baseCatalog.ops()).getPathBasedContext(nameIdentifier);
+      return getPathBasedCredentialContexts(privilege, pathBasedContexts);
     }
     throw new NotSupportedException(
         String.format("Catalog %s doesn't support generate credentials", baseCatalog.name()));
@@ -97,13 +96,13 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   }
 
   public static Map<String, CredentialContext> getPathBasedCredentialContexts(
-      CredentialPrivilege privilege, List<PathWithCredentialType> pathWithCredentialTypes) {
-    return pathWithCredentialTypes.stream()
+      CredentialPrivilege privilege, List<PathBasedContext> pathBasedContexts) {
+    return pathBasedContexts.stream()
         .collect(
             Collectors.toMap(
-                pathWithCredentialType -> pathWithCredentialType.credentialType(),
-                pathWithCredentialType -> {
-                  String path = pathWithCredentialType.path();
+                pathBasedContext -> pathBasedContext.credentialType(),
+                pathBasedContext -> {
+                  String path = pathBasedContext.path();
                   Set<String> writePaths = new HashSet<>();
                   Set<String> readPaths = new HashSet<>();
                   if (CredentialPrivilege.WRITE.equals(privilege)) {

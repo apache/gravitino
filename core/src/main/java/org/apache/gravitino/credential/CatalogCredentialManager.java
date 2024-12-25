@@ -30,16 +30,14 @@ import org.slf4j.LoggerFactory;
  * Manage lifetime of the credential provider in one catalog, dispatch credential request to the
  * corresponding credential provider.
  */
-public class CatalogCredentialOperationDispatcher implements Closeable {
+public class CatalogCredentialManager implements Closeable {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CatalogCredentialOperationDispatcher.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogCredentialManager.class);
 
   private final String catalogName;
   private final Map<String, CredentialProvider> credentialProviders;
 
-  public CatalogCredentialOperationDispatcher(
-      String catalogName, Map<String, String> catalogProperties) {
+  public CatalogCredentialManager(String catalogName, Map<String, String> catalogProperties) {
     this.catalogName = catalogName;
     this.credentialProviders = CredentialUtils.loadCredentialProviders(catalogProperties);
   }

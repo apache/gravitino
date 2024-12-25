@@ -43,7 +43,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
-import org.apache.gravitino.connector.credential.PathWithCredentialType;
+import org.apache.gravitino.connector.credential.PathBasedContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -258,7 +258,7 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public List<PathWithCredentialType> getPathWithCredentialTypes(NameIdentifier filesetIdentifier) {
+  public List<PathBasedContext> getPathBasedContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
     String path = fileset.storageLocation();
     Preconditions.checkState(
@@ -276,7 +276,7 @@ public class SecureHadoopCatalogOperations
             },
             () -> catalogProperties);
     return providers.stream()
-        .map(provider -> new PathWithCredentialType(path, provider))
+        .map(provider -> new PathBasedContext(path, provider))
         .collect(Collectors.toList());
   }
 

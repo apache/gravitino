@@ -37,7 +37,7 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.AuthorizationProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.CatalogCredentialOperationDispatcher;
+import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
@@ -80,7 +80,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile Map<String, String> properties;
 
-  private volatile CatalogCredentialOperationDispatcher catalogCredentialOperationDispatcher;
+  private volatile CatalogCredentialManager catalogCredentialManager;
 
   private static String ENTITY_IS_NOT_SET = "entity is not set";
 
@@ -262,9 +262,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       authorizationPlugin.close();
       authorizationPlugin = null;
     }
-    if (catalogCredentialOperationDispatcher != null) {
-      catalogCredentialOperationDispatcher.close();
-      catalogCredentialOperationDispatcher = null;
+    if (catalogCredentialManager != null) {
+      catalogCredentialManager.close();
+      catalogCredentialManager = null;
     }
   }
 
@@ -280,16 +280,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return capability;
   }
 
-  public CatalogCredentialOperationDispatcher catalogCredentialOperationDispatcher() {
-    if (catalogCredentialOperationDispatcher == null) {
+  public CatalogCredentialManager catalogCredentialManager() {
+    if (catalogCredentialManager == null) {
       synchronized (this) {
-        if (catalogCredentialOperationDispatcher == null) {
-          this.catalogCredentialOperationDispatcher =
-              new CatalogCredentialOperationDispatcher(name(), properties());
+        if (catalogCredentialManager == null) {
+          this.catalogCredentialManager = new CatalogCredentialManager(name(), properties());
         }
       }
     }
-    return catalogCredentialOperationDispatcher;
+    return catalogCredentialManager;
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {

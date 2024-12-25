@@ -35,7 +35,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObject.Type;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
@@ -55,7 +54,7 @@ public class MetadataObjectCredentialOperations {
   private static final Logger LOG =
       LoggerFactory.getLogger(MetadataObjectCredentialOperations.class);
 
-  private static final Set<Type> supportsCredentialMetadataTypes =
+  private static final Set<MetadataObject.Type> supportsCredentialMetadataTypes =
       ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.FILESET);
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
