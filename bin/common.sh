@@ -18,13 +18,6 @@
 # Referred from Apache Submarine's common.sh implementation
 # bin/common.sh
 
-GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
-if [[ "$GRAVITINO_VERSION" == *_VERSION_PLACEHOLDER ]]; then
-  echo "GRAVITINO_VERSION is not set. Please make sure you are running the script from the distribution/package/bin and before running the script, run './gradle clean build -x test compileDistribution'"
-  exit 1
-fi
-
-
 if [ -L "${BASH_SOURCE-$0}" ]; then
   FWDIR=$(dirname "$(readlink "${BASH_SOURCE-$0}")")
 else
@@ -47,6 +40,11 @@ fi
 
 if [[ -f "${GRAVITINO_CONF_DIR}/gravitino-env.sh" ]]; then
   . "${GRAVITINO_CONF_DIR}/gravitino-env.sh"
+fi
+
+if [[ -z "${GRAVITINO_VERSION}" ]]; then
+  echo -e "No GRAVITINO_VERSION was found, you may need to:\n1. Run the gravitino.sh script on the compiled Gravitino.\n2. Run the gravitino.sh script in the release package."
+  exit 1
 fi
 
 GRAVITINO_CLASSPATH+=":${GRAVITINO_CONF_DIR}"

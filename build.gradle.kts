@@ -598,7 +598,7 @@ tasks {
           fileName.replace(".template", "")
         }
         eachFile {
-          if (name == "gravitino-env.sh" || name == "common.sh") {
+          if (name == "gravitino-env.sh") {
             filter { line ->
               line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
             }
@@ -643,7 +643,7 @@ tasks {
           fileName.replace(".template", "")
         }
         eachFile {
-          if (name == "gravitino-env.sh" || name == "common.sh") {
+          if (name == "gravitino-env.sh") {
             filter { line ->
               line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
             }
