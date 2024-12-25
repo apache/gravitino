@@ -91,7 +91,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
       Map<String, String> catalogProperties) {
     CatalogCredentialContext context =
         new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
-    Set<String> providers = CredentialUtils.getCredentialProviders(() -> catalogProperties);
+    Set<String> providers = CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
     return providers.stream().collect(Collectors.toMap(provider -> provider, provider -> context));
   }
 

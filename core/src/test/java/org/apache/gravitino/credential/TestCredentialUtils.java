@@ -59,7 +59,7 @@ public class TestCredentialUtils {
         ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "a,b,c");
 
     Set<String> credentialProviders =
-        CredentialUtils.getCredentialProviders(
+        CredentialUtils.getCredentialProvidersByOrder(
             () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
     Assertions.assertEquals(credentialProviders, ImmutableSet.of("a", "b"));
   }

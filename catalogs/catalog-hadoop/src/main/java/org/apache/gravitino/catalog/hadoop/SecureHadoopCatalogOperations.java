@@ -265,7 +265,7 @@ public class SecureHadoopCatalogOperations
         StringUtils.isNotBlank(path), "The location of fileset should not be empty.");
 
     Set<String> providers =
-        CredentialUtils.getCredentialProviders(
+        CredentialUtils.getCredentialProvidersByOrder(
             () -> fileset.properties(),
             () -> {
               Namespace namespace = filesetIdentifier.namespace();

@@ -71,7 +71,7 @@ public class CredentialUtils {
   public static Map<String, CredentialProvider> loadCredentialProviders(
       Map<String, String> catalogProperties) {
     Set<String> credentialProviders =
-        CredentialUtils.getCredentialProviders(() -> catalogProperties);
+        CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
 
     return credentialProviders.stream()
         .collect(
@@ -90,7 +90,7 @@ public class CredentialUtils {
    * @param propertiesSuppliers The properties suppliers.
    * @return A set of credential providers.
    */
-  public static Set<String> getCredentialProviders(
+  public static Set<String> getCredentialProvidersByOrder(
       Supplier<Map<String, String>>... propertiesSuppliers) {
 
     for (Supplier<Map<String, String>> supplier : propertiesSuppliers) {
