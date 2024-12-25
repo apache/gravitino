@@ -35,18 +35,17 @@ public final class AlterTagEvent extends TagEvent {
      * successful alteration of a tag.
      *
      * @param user The username of the individual responsible for initiating the tag alteration.
-     * @param identifier The unique identifier of the altered tag, serving as a clear reference
-     *     point for the tag in question.
+     * @param metalake The metalake from which the tag is being altered.
      * @param tagChanges An array of {@link TagChange} objects representing the specific
      *     changes applied to the tag during the alteration process.
      * @param updatedTagInfo The post-alteration state of the tag.
      */
     public AlterTagEvent(
             String user,
-            NameIdentifier identifier,
+            String metalake,
             TagChange[] tagChanges,
             TagInfo updatedTagInfo) {
-        super(user, identifier);
+        super(user, NameIdentifier.of(metalake));
         this.tagChanges = tagChanges.clone();
         this.updatedTagInfo = updatedTagInfo;
     }
