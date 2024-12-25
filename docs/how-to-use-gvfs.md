@@ -145,9 +145,9 @@ For example, if you want to access the S3 fileset,  you need to place:
 1. The S3 hadoop bundle jar [`gravitino-aws-hadoop-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-hadoop-bundle/)
 2. or [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/), and hadoop-aws jar and other necessary dependencies
 
-in the classpath, it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`). 
+In the classpath, it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`). 
 
-for more, please refer to [bundle jars](./cloud-storage-fileset-example.md#bundle-jars)
+For more, please refer to [bundle jars](./cloud-storage-fileset-example.md#bundle-jars)
 :::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
