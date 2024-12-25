@@ -48,6 +48,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
@@ -87,7 +88,9 @@ public abstract class RangerAuthorizationPlugin
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
-    RangerAuthorizationProperties.validate(config);
+    RangerAuthorizationProperties rangerAuthorizationProperties =
+        new RangerAuthorizationProperties(config);
+    rangerAuthorizationProperties.validate();
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);

@@ -31,7 +31,9 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
-
+  implementation(project(":authorizations:authorization-common")) {
+    exclude(group = "*")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)

@@ -16,29 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.jdbc;
+package org.apache.gravitino.authorization.common;
 
 import java.util.Map;
 
 /** The properties for JDBC authorization plugin. */
-public class JdbcAuthorizationProperties {
+public class JdbcAuthorizationProperties extends AuthorizationProperties {
   private static final String CONFIG_PREFIX = "authorization.jdbc.";
   public static final String JDBC_PASSWORD = CONFIG_PREFIX + "password";
   public static final String JDBC_USERNAME = CONFIG_PREFIX + "username";
   public static final String JDBC_URL = CONFIG_PREFIX + "url";
   public static final String JDBC_DRIVER = CONFIG_PREFIX + "driver";
 
-  public static void validate(Map<String, String> properties) {
-    String errorMsg = "%s is required";
-    check(properties, JDBC_URL, errorMsg);
-    check(properties, JDBC_USERNAME, errorMsg);
-    check(properties, JDBC_PASSWORD, errorMsg);
-    check(properties, JDBC_DRIVER, errorMsg);
+  public JdbcAuthorizationProperties(Map<String, String> properties) {
+    super(properties);
   }
 
-  private static void check(Map<String, String> properties, String key, String errorMsg) {
+  private void check(String key, String errorMsg) {
     if (!properties.containsKey(key) && properties.get(key) != null) {
       throw new IllegalArgumentException(String.format(errorMsg, key));
     }
+  }
+
+  @Override
+  String getPropertiesPrefix() {
+    return CONFIG_PREFIX;
+  }
+
+  @Override
+  public void validate() {
+    String errorMsg = "%s is required";
+    check(JDBC_URL, errorMsg);
+    check(JDBC_USERNAME, errorMsg);
+    check(JDBC_PASSWORD, errorMsg);
+    check(JDBC_DRIVER, errorMsg);
   }
 }
