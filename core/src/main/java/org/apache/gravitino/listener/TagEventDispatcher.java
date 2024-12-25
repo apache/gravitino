@@ -33,12 +33,11 @@ import org.apache.gravitino.listener.api.event.ListTagFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.info.MetalakeInfo;
+import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.gravitino.listener.api.info.TagInfo;
 
 /**
  * {@code TagEventDispatcher} is a decorator for {@link TagDispatcher} that not only delegates tag
