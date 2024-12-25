@@ -44,7 +44,7 @@ public class AzureAccountKeyProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE;
+    return AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE;
   }
 
   @Override

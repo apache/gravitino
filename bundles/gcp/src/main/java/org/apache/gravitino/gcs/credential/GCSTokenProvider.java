@@ -68,7 +68,7 @@ public class GCSTokenProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE;
+    return GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override

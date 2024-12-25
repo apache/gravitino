@@ -66,7 +66,7 @@ public class ADLSTokenProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.ADLS_TOKEN_CREDENTIAL_PROVIDER_TYPE;
+    return ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override
