@@ -57,7 +57,7 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
 
   @BeforeAll
   public void setup() throws IOException {
-    copyBundleJarsToHadoop("aliyun-bundle");
+    copyBundleJarsToHadoop("aliyun-hadoop-bundle");
 
     try {
       super.startIntegrationTest();

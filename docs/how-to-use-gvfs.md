@@ -140,10 +140,14 @@ You can configure these properties in two ways:
     ```
    
 :::note
-[If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle/core jar in the Hadoop environment. 
-For example, if you want to access the S3 fileset, you need to place the S3 bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) or
-[`gravitino-aws-core-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-mino/), and hadoop-aws jar and other necessary dependencies of the hadoop version in the classpath.
-it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`).
+If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle/core jar in the Hadoop environment. 
+For example, if you want to access the S3 fileset,  you need to place:
+1. The S3 hadoop bundle jar [`gravitino-aws-hadoop-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-hadoop-bundle/)
+2. or [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/), and hadoop-aws jar and other necessary dependencies
+
+in the classpath, it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`). 
+
+for more, please refer to [bundle jars](./cloud-storage-fileset-example.md#bundle-jars)
 :::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
@@ -219,7 +223,7 @@ kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
 
 # 4. Copy other dependencies to the Hadoop environment if you want to access the S3 fileset via GVFS
-cp bundles/aws-core/build/libs/gravitino-aws-core-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/ 
+cp bundles/aws-bundle/build/libs/gravitino-aws-bundle-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/ 
 cp clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-{version}-SNAPSHOT.jar ${HADOOP_HOME}/share/hadoop/common/lib/ 
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/* ${HADOOP_HOME}/share/hadoop/common/lib/ 
 
@@ -244,14 +248,14 @@ has the `gravitino-filesystem-hadoop3-runtime-{version}.jar` dependency.
 <!--  Use the following one if there is not hadoop environment -->
 <dependency>
   <groupId>org.apache.gravitino</groupId>
-  <artifactId>gravitino-aws-bundle</artifactId>
+  <artifactId>gravitino-aws-hadoop-bundle</artifactId>
   <version>{gravitino-version}</version>
 </dependency>
   
 <!-- Use the following one if there already have hadoop environment -->
 <dependency>
   <groupId>org.apache.gravitino</groupId>
-  <artifactId>gravitino-aws-core</artifactId>
+  <artifactId>gravitino-aws-bundle</artifactId>
   <version>{gravitino-version}</version>
 </dependency>
 

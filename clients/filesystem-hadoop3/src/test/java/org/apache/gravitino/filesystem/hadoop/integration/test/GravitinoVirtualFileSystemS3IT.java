@@ -107,7 +107,7 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
 
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("aws-bundle");
+    copyBundleJarsToHadoop("aws-hadoop-bundle");
 
     // Start s3 simulator
     startS3Mocker();

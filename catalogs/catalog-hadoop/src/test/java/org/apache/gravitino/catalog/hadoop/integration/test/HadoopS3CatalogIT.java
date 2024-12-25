@@ -112,7 +112,7 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
 
   @BeforeAll
   public void setup() throws IOException {
-    copyBundleJarsToHadoop("aws-bundle");
+    copyBundleJarsToHadoop("aws-hadoop-bundle");
 
     try {
       super.startIntegrationTest();

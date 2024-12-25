@@ -25,27 +25,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.client.api)
-  compileOnly(libs.hadoop3.client.runtime)
-  compileOnly(libs.hadoop3.aws)
-
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
-
-  implementation(libs.guava)
-  implementation(libs.aws.iam)
-  implementation(libs.aws.policy)
-  implementation(libs.aws.sts)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
+  implementation(project(":bundles:aws-bundle"))
+  implementation(libs.hadoop3.aws)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 }
 
 tasks.withType(ShadowJar::class.java) {

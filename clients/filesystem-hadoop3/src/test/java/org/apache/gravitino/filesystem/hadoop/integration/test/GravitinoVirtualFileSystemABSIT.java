@@ -57,7 +57,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
   @BeforeAll
   public void startUp() throws Exception {
     // Copy the Azure jars to the gravitino server if in deploy mode.
-    copyBundleJarsToHadoop("azure-bundle");
+    copyBundleJarsToHadoop("azure-hadoop-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 

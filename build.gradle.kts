@@ -780,7 +780,7 @@ tasks {
         it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
         it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "aws-core" && it.name != "gcp-core" && it.name != "azure-core" && it.name != "aliyun-core" &&
+        it.name != "aws-hadoop-bundle" && it.name != "gcp-hadoop-bundle" && it.name != "azure-hadoop-bundle" && it.name != "aliyun-hadoop-bundle" &&
         it.name != "hadoop-common"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -804,7 +804,7 @@ tasks {
         it.name != "bundled-catalog" &&
         it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
         it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "docs" && it.name != "aws-core" && it.name != "gcp-core" && it.name != "azure-core" && it.name != "aliyun-core" &&
+        it.name != "docs" && it.name != "aws-hadoop-bundle" && it.name != "gcp-hadoop-bundle" && it.name != "azure-hadoop-bundle" && it.name != "aliyun-hadoop-bundle" &&
         it.name != "hadoop-common"
       ) {
         dependsOn("${it.name}:build")

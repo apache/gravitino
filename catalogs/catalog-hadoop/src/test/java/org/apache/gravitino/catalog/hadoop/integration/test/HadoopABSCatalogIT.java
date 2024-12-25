@@ -55,7 +55,7 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
 
   @BeforeAll
   public void setup() throws IOException {
-    copyBundleJarsToHadoop("azure-bundle");
+    copyBundleJarsToHadoop("azure-hadoop-bundle");
 
     try {
       super.startIntegrationTest();

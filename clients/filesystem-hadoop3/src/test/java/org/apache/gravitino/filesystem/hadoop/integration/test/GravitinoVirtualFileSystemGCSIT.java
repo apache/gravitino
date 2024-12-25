@@ -55,7 +55,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
   @BeforeAll
   public void startUp() throws Exception {
     // Copy the GCP jars to the gravitino server if in deploy mode.
-    copyBundleJarsToHadoop("gcp-bundle");
+    copyBundleJarsToHadoop("gcp-hadoop-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 

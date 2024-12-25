@@ -25,26 +25,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.client.api)
-  compileOnly(libs.hadoop3.client.runtime)
-  compileOnly(libs.hadoop3.abs)
-
-  implementation(libs.azure.identity)
-  implementation(libs.azure.storage.file.datalake)
-
-  implementation(libs.guava)
-  implementation(libs.commons.lang3)
-  // runtime used
-  implementation(libs.commons.logging)
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
+  implementation(project(":bundles:gcp-bundle"))
+  implementation(libs.hadoop3.gcs)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -53,11 +37,11 @@ tasks.withType(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
-  relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
-  relocate("com.google.common", "org.apache.gravitino.azure.shaded.com.google.common")
-  relocate("org.eclipse.jetty", "org.apache.gravitino.azure.shaded.org.eclipse.jetty")
+  relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
+  relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
+  relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
+  relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
+  relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
 }
 
 tasks.jar {

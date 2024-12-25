@@ -56,7 +56,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
 
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("aliyun-bundle");
+    copyBundleJarsToHadoop("aliyun-hadoop-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 
