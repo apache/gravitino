@@ -18,13 +18,13 @@
  *
  */
 
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.authorization.common;
 
 import java.util.Map;
 
 /**
  * The AuthorizationUserGroupMappingProvider interface defines the public API for mapping Gravitino
- * users and groups to the underlying data source.
+ * users and groups to the that in underlying data source system.
  *
  * <p>Typically, the users and group names in Gravitino are the same as the underlying data source.
  * However, in some cases, the user and group names in Gravitino may be different from the
@@ -42,14 +42,23 @@ public interface AuthorizationUserGroupMappingProvider {
   default void initialize(Map<String, String> config) {}
 
   /**
-   * Get the username or group name from the underlying data source based on the Gravitino username
-   * or group name. For instance, in GCP IAM, the username is the email address or the service
-   * account.
+   * Get the username from the underlying data source based on the Gravitino username For instance,
+   * in GCP IAM, the username is the email address or the service account.
    *
-   * @param gravitinoUserGroup The Gravitino username.
+   * @param gravitinoUserName The Gravitino username.
    * @return The username from the underlying data source.
    */
-  default String getUserGroupMapping(String gravitinoUserGroup) {
-    return gravitinoUserGroup;
+  default String getUserName(String gravitinoUserName) {
+    return gravitinoUserName;
+  }
+
+  /**
+   * Get the group name from the underlying data source based on the Gravitino group name.
+   *
+   * @param gravitinoGroupName The Gravitino group name.
+   * @return The group name from the underlying data source.
+   */
+  default String getGroupName(String gravitinoGroupName) {
+    return gravitinoGroupName;
   }
 }
