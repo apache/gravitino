@@ -26,36 +26,36 @@ import org.apache.gravitino.tag.Tag;
 /** Represents an event that is triggered upon the successful listing of tags. */
 @DeveloperApi
 public final class ListTagInfoEvent extends TagEvent {
-    private final Tag[] tags;
+  private final Tag[] tags;
 
-    /**
-     * Constructs an instance of {@code ListTagsEvent}.
-     *
-     * @param user The username of the individual who initiated the tag listing.
-     * @param metalake The namespace from which tags were listed.
-     * @param tags An array of {@link Tag} objects representing the tags.
-     */
-    public ListTagInfoEvent(String user, String metalake, Tag[] tags) {
-        super(user, NameIdentifier.of(metalake));
-        this.tags = tags;
-    }
+  /**
+   * Constructs an instance of {@code ListTagsEvent}.
+   *
+   * @param user The username of the individual who initiated the tag listing.
+   * @param metalake The namespace from which tags were listed.
+   * @param tags An array of {@link Tag} objects representing the tags.
+   */
+  public ListTagInfoEvent(String user, String metalake, Tag[] tags) {
+    super(user, NameIdentifier.of(metalake));
+    this.tags = tags;
+  }
 
-    /**
-     * Provides the tags associated with this event.
-     *
-     * @return An array of {@link Tag} objects.
-     */
-    public Tag[] tags() {
-        return tags;
-    }
+  /**
+   * Provides the tags associated with this event.
+   *
+   * @return An array of {@link Tag} objects.
+   */
+  public Tag[] tags() {
+    return tags;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LISTINFO_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LISTINFO_TAG;
+  }
 }

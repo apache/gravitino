@@ -25,35 +25,35 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event that is triggered upon the successful listing of tags. */
 @DeveloperApi
 public final class ListTagEvent extends TagEvent {
-    private final String metalake;
+  private final String metalake;
 
-    /**
-     * Constructs an instance of {@code ListTagEvent}.
-     *
-     * @param user The username of the individual who initiated the tag listing.
-     * @param metalake The namespace from which tags were listed.
-     */
-    public ListTagEvent(String user, String metalake) {
-        super(user, NameIdentifier.of(metalake));
-        this.metalake = metalake;
-    }
+  /**
+   * Constructs an instance of {@code ListTagEvent}.
+   *
+   * @param user The username of the individual who initiated the tag listing.
+   * @param metalake The namespace from which tags were listed.
+   */
+  public ListTagEvent(String user, String metalake) {
+    super(user, NameIdentifier.of(metalake));
+    this.metalake = metalake;
+  }
 
-    /**
-     * Provides the metalake associated with this event.
-     *
-     * @return The metalake from which tags were listed.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Provides the metalake associated with this event.
+   *
+   * @return The metalake from which tags were listed.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LIST_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TAG;
+  }
 }

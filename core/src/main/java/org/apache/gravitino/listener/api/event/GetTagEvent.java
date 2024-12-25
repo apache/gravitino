@@ -26,59 +26,59 @@ import org.apache.gravitino.tag.Tag;
 /** Represents an event that is triggered upon successfully retrieving a tag. */
 @DeveloperApi
 public final class GetTagEvent extends TagEvent {
-    private final String metalake;
-    private final String tagName;
-    private final Tag tag;
+  private final String metalake;
+  private final String tagName;
+  private final Tag tag;
 
-    /**
-     * Constructs an instance of {@code GetTagEvent}.
-     *
-     * @param user The username of the individual who initiated the tag retrieval.
-     * @param metalake The metalake from which the tag was retrieved.
-     * @param tagName The name of the tag being retrieved.
-     * @param tag The {@link Tag} object representing the retrieved tag.
-     */
-    public GetTagEvent(String user, String metalake, String tagName, Tag tag) {
-        super(user, NameIdentifier.of(metalake));
-        this.metalake = metalake;
-        this.tagName = tagName;
-        this.tag = tag;
-    }
+  /**
+   * Constructs an instance of {@code GetTagEvent}.
+   *
+   * @param user The username of the individual who initiated the tag retrieval.
+   * @param metalake The metalake from which the tag was retrieved.
+   * @param tagName The name of the tag being retrieved.
+   * @param tag The {@link Tag} object representing the retrieved tag.
+   */
+  public GetTagEvent(String user, String metalake, String tagName, Tag tag) {
+    super(user, NameIdentifier.of(metalake));
+    this.metalake = metalake;
+    this.tagName = tagName;
+    this.tag = tag;
+  }
 
-    /**
-     * Provides the metalake associated with this event.
-     *
-     * @return The metalake from which the tag was retrieved.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Provides the metalake associated with this event.
+   *
+   * @return The metalake from which the tag was retrieved.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Provides the name of the retrieved tag.
-     *
-     * @return The name of the tag.
-     */
-    public String tagName() {
-        return tagName;
-    }
+  /**
+   * Provides the name of the retrieved tag.
+   *
+   * @return The name of the tag.
+   */
+  public String tagName() {
+    return tagName;
+  }
 
-    /**
-     * Provides the retrieved tag object.
-     *
-     * @return The {@link Tag} object.
-     */
-    public Tag tag() {
-        return tag;
-    }
+  /**
+   * Provides the retrieved tag object.
+   *
+   * @return The {@link Tag} object.
+   */
+  public Tag tag() {
+    return tag;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return The operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.GET_TAG;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return The operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_TAG;
+  }
 }

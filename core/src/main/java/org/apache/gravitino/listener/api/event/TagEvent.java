@@ -23,24 +23,24 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Represents an abstract base class for events related to tag operations.
- * This class extends {@link Event} to provide a more specific context
- * involving operations on tags, such as creation, deletion, or modification.
+ * Represents an abstract base class for events related to tag operations. This class extends {@link
+ * Event} to provide a more specific context involving operations on tags, such as creation,
+ * deletion, or modification.
  */
 @DeveloperApi
 public abstract class TagEvent extends Event {
-    /**
-     * Constructs a new {@code TagEvent} with the specified user and tag identifier.
-     *
-     * @param user The user responsible for triggering the tag operation.
-     * @param identifier The identifier of the tag involved in the operation.
-     */
-    protected TagEvent(String user, NameIdentifier identifier) {
-        super(user, identifier);
-    }
+  /**
+   * Constructs a new {@code TagEvent} with the specified user and tag identifier.
+   *
+   * @param user The user responsible for triggering the tag operation.
+   * @param identifier The identifier of the tag involved in the operation.
+   */
+  protected TagEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
 
-    @Override
-    public OperationStatus operationStatus() {
-        return OperationStatus.SUCCESS;
-    }
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

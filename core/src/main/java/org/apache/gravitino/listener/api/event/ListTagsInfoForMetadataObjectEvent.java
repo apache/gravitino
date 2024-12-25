@@ -19,67 +19,71 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.tag.Tag;
 
-/** Represents an event that is triggered upon successfully listing detailed tag information for a metadata object. */
+/**
+ * Represents an event that is triggered upon successfully listing detailed tag information for a
+ * metadata object.
+ */
 @DeveloperApi
 public final class ListTagsInfoForMetadataObjectEvent extends TagEvent {
-    private final String metalake;
-    private final MetadataObject metadataObject;
-    private final Tag[] tags;
+  private final String metalake;
+  private final MetadataObject metadataObject;
+  private final Tag[] tags;
 
-    /**
-     * Constructs an instance of {@code ListTagsInfoForMetadataObjectEvent}.
-     *
-     * @param user The username of the individual who initiated the tag information listing.
-     * @param metalake The metalake from which tag information was listed.
-     * @param metadataObject The metadata object for which tag information was listed.
-     * @param tags An array of {@link Tag} objects representing the detailed tag information.
-     */
-    public ListTagsInfoForMetadataObjectEvent(String user, String metalake, MetadataObject metadataObject, Tag[] tags) {
-        super(user, NameIdentifier.of(metalake));
-        this.metalake = metalake;
-        this.metadataObject = metadataObject;
-        this.tags = tags;
-    }
+  /**
+   * Constructs an instance of {@code ListTagsInfoForMetadataObjectEvent}.
+   *
+   * @param user The username of the individual who initiated the tag information listing.
+   * @param metalake The metalake from which tag information was listed.
+   * @param metadataObject The metadata object for which tag information was listed.
+   * @param tags An array of {@link Tag} objects representing the detailed tag information.
+   */
+  public ListTagsInfoForMetadataObjectEvent(
+      String user, String metalake, MetadataObject metadataObject, Tag[] tags) {
+    super(user, NameIdentifier.of(metalake));
+    this.metalake = metalake;
+    this.metadataObject = metadataObject;
+    this.tags = tags;
+  }
 
-    /**
-     * Provides the metalake associated with this event.
-     *
-     * @return The metalake from which tag information was listed.
-     */
-    public String metalake() {
-        return metalake;
-    }
+  /**
+   * Provides the metalake associated with this event.
+   *
+   * @return The metalake from which tag information was listed.
+   */
+  public String metalake() {
+    return metalake;
+  }
 
-    /**
-     * Provides the metadata object associated with this event.
-     *
-     * @return The {@link MetadataObject} for which tag information was listed.
-     */
-    public MetadataObject metadataObject() {
-        return metadataObject;
-    }
+  /**
+   * Provides the metadata object associated with this event.
+   *
+   * @return The {@link MetadataObject} for which tag information was listed.
+   */
+  public MetadataObject metadataObject() {
+    return metadataObject;
+  }
 
-    /**
-     * Provides the detailed tag information associated with this event.
-     *
-     * @return An array of {@link Tag} objects.
-     */
-    public Tag[] tags() {
-        return tags;
-    }
+  /**
+   * Provides the detailed tag information associated with this event.
+   *
+   * @return An array of {@link Tag} objects.
+   */
+  public Tag[] tags() {
+    return tags;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return The operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return The operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT;
+  }
 }

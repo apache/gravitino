@@ -99,7 +99,7 @@ public enum OperationType {
   RENAME_VIEW,
   LIST_VIEW,
 
-  //Tag event
+  // Tag event
   CREATE_TAG,
   ALTER_TAG,
   LIST_TAG,
