@@ -232,7 +232,9 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name) {
-    // TODO: getTagForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new GetTagForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name));
     try {
       // TODO: getTagForMetadataObjectEvent
       return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
