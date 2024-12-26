@@ -261,9 +261,7 @@ mod tests {
         }
     }
 
-    /*
-    #[tokio::test]
-    async fn test1() {
+    async fn get_fileset_example() {
         tracing_subscriber::fmt::init();
         let config = GravitinoConfig {
             gravitino_url: "http://localhost:8090".to_string(),
@@ -280,5 +278,4 @@ mod tests {
         println!("{:?}", fileset);
         assert!(fileset.name == "fileset1");
     }
-     */
 }
