@@ -44,7 +44,7 @@ public class JdbcSecurableObject extends JdbcMetadataObject
     this.privileges = privileges;
   }
 
-  static JdbcSecurableObject create(
+  public static JdbcSecurableObject create(
       String schema, String table, List<AuthorizationPrivilege> privileges) {
     String parent = table == null ? null : schema;
     String name = table == null ? schema : table;

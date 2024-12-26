@@ -350,11 +350,11 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
   }
 
   @VisibleForTesting
-  Connection getConnection() throws SQLException {
+  public Connection getConnection() throws SQLException {
     return dataSource.getConnection();
   }
 
-  protected void executeUpdateSQL(String sql) {
+  public void executeUpdateSQL(String sql) {
     executeUpdateSQL(sql, null);
   }
 
@@ -381,7 +381,7 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
         "JDBC authorization plugin fail to execute SQL, error code: %d", se.getErrorCode());
   }
 
-  void executeUpdateSQL(String sql, String ignoreErrorMsg) {
+  public void executeUpdateSQL(String sql, String ignoreErrorMsg) {
     try (final Connection connection = getConnection()) {
       try (final Statement statement = connection.createStatement()) {
         statement.executeUpdate(sql);
