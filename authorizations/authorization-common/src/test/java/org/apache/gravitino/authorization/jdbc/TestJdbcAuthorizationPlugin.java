@@ -74,7 +74,7 @@ public class TestJdbcAuthorizationPlugin {
           return Collections.emptyList();
         }
 
-        void executeUpdateSQL(String sql, String ignoreErrorMsg) {
+        public void executeUpdateSQL(String sql, String ignoreErrorMsg) {
           Assertions.assertEquals(expectSQLs.get(currentSQLIndex), sql);
           currentSQLIndex++;
         }
