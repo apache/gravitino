@@ -12,7 +12,6 @@ Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HC
 the storage location of the fileset. Currently, it supports local filesystem and HDFS. For
 object storage like S3, GCS, Azure Blob Storage and OSS, you can put the hadoop object store jar like
 `gravitino-aws-hadoop-bundle-{gravitino-version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory to enable the support.
-Full example can be found in the [cloud storage example](./cloud-storage-fileset-example.md) section.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Hadoop catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
