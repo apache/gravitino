@@ -13,6 +13,7 @@ import org.apache.gravitino.listener.TagEventDispatcher;
 
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,83 @@ public class TestTagEvent {
         Assertions.assertEquals(OperationType.LIST_TAG, event.operationType());
         Assertions.assertArrayEquals(tagNames, result);
     }
+
+    @Test
+    void testAlterTagEvent() {
+        String metalake = "metalake";
+        String tagName = "testTag";
+        NameIdentifier identifier = NameIdentifier.of(metalake);
+        TagChange[] changes = new TagChange[] {TagChange.setProperty("key", "value")};
+
+        when(dispatcher.alterTag(metalake, tagName, changes)).thenReturn(tag);
+
+        Tag result = dispatcher.alterTag(metalake, tagName, changes);
+        Event event = dummyEventListener.popPostEvent();
+
+        Assertions.assertEquals(identifier, event.identifier());
+        Assertions.assertEquals(AlterTagEvent.class, event.getClass());
+        Assertions.assertEquals(tag.name(), ((AlterTagEvent) event).updatedTagInfo().name());
+        Assertions.assertEquals(tag.comment(), ((AlterTagEvent) event).updatedTagInfo().comment());
+        Assertions.assertEquals(tag.properties(), ((AlterTagEvent) event).updatedTagInfo().properties());
+        Assertions.assertEquals(OperationType.ALTER_TAG, event.operationType());
+    }
+
+
+    @Test
+    void testListTagsInfoEvent() {
+        String metalake = "metalake";
+        NameIdentifier identifier = NameIdentifier.of(metalake);
+        Tag[] tags = new Tag[] {tag, tag};
+
+        when(dispatcher.listTagsInfo(metalake)).thenReturn(tags);
+
+        Tag[] result = dispatcher.listTagsInfo(metalake);
+        Event event = dummyEventListener.popPostEvent();
+
+        Assertions.assertEquals(identifier, event.identifier());
+        Assertions.assertEquals(ListTagInfoEvent.class, event.getClass());
+        Assertions.assertEquals(OperationType.LISTINFO_TAG, event.operationType());
+        Assertions.assertArrayEquals(tags, result);
+    }
+
+    @Test
+    void testGetTagEvent() {
+        String metalake = "metalake";
+        String tagName = "testTag";
+        NameIdentifier identifier = NameIdentifier.of(metalake, tagName);
+
+        when(dispatcher.getTag(metalake, tagName)).thenReturn(tag);
+
+        Tag result = dispatcher.getTag(metalake, tagName);
+        Event event = dummyEventListener.popPostEvent();
+
+        Assertions.assertEquals(identifier, event.identifier());
+        Assertions.assertEquals(GetTagEvent.class, event.getClass());
+        Assertions.assertEquals(metalake, ((GetTagEvent) event).metalake());
+        Assertions.assertEquals(tagName, ((GetTagEvent) event).tagName());
+        Assertions.assertEquals(tag, ((GetTagEvent) event).tag());
+        Assertions.assertEquals(OperationType.GET_TAG, event.operationType());
+    }
+
+    @Test
+    void testDeleteTagEvent() {
+        String metalake = "metalake";
+        String tagName = "testTag";
+        NameIdentifier identifier = NameIdentifier.of(metalake, tagName);
+
+        when(dispatcher.deleteTag(metalake, tagName)).thenReturn(true);
+
+        boolean result = dispatcher.deleteTag(metalake, tagName);
+        Event event = dummyEventListener.popPostEvent();
+
+        Assertions.assertEquals(identifier, event.identifier());
+        Assertions.assertEquals(DeleteTagEvent.class, event.getClass());
+        Assertions.assertTrue(((DeleteTagEvent) event).isExists());
+        Assertions.assertEquals(OperationType.DELETE_TAG, event.operationType());
+        Assertions.assertTrue(result);
+    }
+
+
 
 
 
