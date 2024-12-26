@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::config::Config;
+use crate::config::AppConfig;
 use crate::utils::GvfsResult;
 
 pub mod config;
@@ -33,7 +33,7 @@ mod opened_file;
 mod opened_file_manager;
 mod utils;
 
-pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
+pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {
     gvfs_fuse::mount(mount_to, mount_from, config).await
 }
 

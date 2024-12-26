@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::config::Config;
+use crate::config::AppConfig;
 use crate::default_raw_filesystem::DefaultRawFileSystem;
 use crate::error::ErrorCode::{InvalidConfig, UnSupportedFilesystem};
 use crate::filesystem::FileSystemContext;
@@ -46,7 +46,7 @@ pub enum FileSystemScheam {
     S3,
 }
 
-pub async fn mount(mount_to: &str, mount_from: &str, config: &Config) -> GvfsResult<()> {
+pub async fn mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {
     info!("Starting gvfs-fuse server...");
     let svr = Arc::new(FuseServer::new(mount_to));
     {
@@ -77,7 +77,7 @@ pub async fn unmount() -> GvfsResult<()> {
 
 pub(crate) async fn create_fuse_fs(
     mount_from: &str,
-    config: &Config,
+    config: &AppConfig,
 ) -> GvfsResult<CreateFsResult> {
     let uid = unsafe { libc::getuid() };
     let gid = unsafe { libc::getgid() };
@@ -94,7 +94,7 @@ pub(crate) async fn create_fuse_fs(
 
 pub async fn create_raw_fs(
     path_fs: CreateFsResult,
-    config: &Config,
+    config: &AppConfig,
     fs_context: FileSystemContext,
 ) -> GvfsResult<CreateFsResult> {
     match path_fs {
@@ -120,7 +120,7 @@ pub async fn create_raw_fs(
 
 pub async fn create_path_fs(
     mount_from: &str,
-    config: &Config,
+    config: &AppConfig,
     fs_context: &FileSystemContext,
 ) -> GvfsResult<CreateFsResult> {
     if config.fuse.fs_type == "memory" {
@@ -132,7 +132,7 @@ pub async fn create_path_fs(
 
 pub async fn create_gvfs_filesystem(
     mount_from: &str,
-    config: &Config,
+    config: &AppConfig,
     fs_context: &FileSystemContext,
 ) -> GvfsResult<CreateFsResult> {
     // Gvfs-fuse filesystem structure:

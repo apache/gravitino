@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use crate::config::Config;
+use crate::config::AppConfig;
 use crate::filesystem::{FileStat, FileSystemCapacity, FileSystemContext, PathFileSystem, Result};
 use crate::gravitino_client::GravitinoClient;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
@@ -36,7 +36,7 @@ impl GvfsFilesetFs {
         fs: Box<dyn PathFileSystem>,
         location: &Path,
         client: GravitinoClient,
-        _config: &Config,
+        _config: &AppConfig,
         _context: &FileSystemContext,
     ) -> Self {
         Self {

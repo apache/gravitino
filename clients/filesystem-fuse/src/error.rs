@@ -23,6 +23,7 @@ pub enum ErrorCode {
     UnSupportedFilesystem,
     GravitinoClientError,
     InvalidConfig,
+    ConfigNotFound,
 }
 
 impl ErrorCode {
@@ -37,6 +38,7 @@ impl std::fmt::Display for ErrorCode {
             ErrorCode::UnSupportedFilesystem => write!(f, "Unsupported filesystem"),
             ErrorCode::GravitinoClientError => write!(f, "Gravitino client error"),
             ErrorCode::InvalidConfig => write!(f, "Invalid config"),
+            ErrorCode::ConfigNotFound => write!(f, "Config not found"),
         }
     }
 }

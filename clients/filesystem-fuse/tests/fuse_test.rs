@@ -17,7 +17,7 @@
  * under the License.
  */
 
-use gvfs_fuse::config::Config;
+use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
 use log::info;
 use std::fs;
@@ -40,7 +40,8 @@ impl FuseTest {
         info!("Start gvfs fuse server");
         let mount_point = self.mount_point.clone();
 
-        let config = Config::from_file("tests/conf/gvfs_fuse_memory.toml");
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_memory.toml"))
+            .expect("Failed to load config");
         self.runtime
             .spawn(async move { gvfs_mount(&mount_point, "", &config).await });
         let success = Self::wait_for_fuse_server_ready(&self.mount_point, Duration::from_secs(15));
