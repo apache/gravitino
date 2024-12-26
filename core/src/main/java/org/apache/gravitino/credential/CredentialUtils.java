@@ -35,7 +35,7 @@ public class CredentialUtils {
   public static Credential vendCredential(CredentialProvider credentialProvider, String[] path) {
     PathBasedCredentialContext pathBasedCredentialContext =
         new PathBasedCredentialContext(
-            PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), ImmutableSet.of());
+            PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), Collections.emptySet());
     return credentialProvider.getCredential(pathBasedCredentialContext);
   }
 
