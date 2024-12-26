@@ -138,6 +138,7 @@ public class OSSTokenProvider implements CredentialProvider {
             .effect(Effect.ALLOW)
             .addAction("oss:GetObject")
             .addAction("oss:GetObjectVersion");
+
     // Add support for bucket-level policies
     Map<String, Statement.Builder> bucketListStatementBuilder = new HashMap<>();
     Map<String, Statement.Builder> bucketGetLocationStatementBuilder = new HashMap<>();
@@ -149,6 +150,7 @@ public class OSSTokenProvider implements CredentialProvider {
             location -> {
               URI uri = URI.create(location);
               allowGetObjectStatementBuilder.addResource(getOssUriWithArn(arnPrefix, uri));
+
               String bucketArn = arnPrefix + getBucketName(uri);
               // ListBucket
               bucketListStatementBuilder.computeIfAbsent(
@@ -156,7 +158,7 @@ public class OSSTokenProvider implements CredentialProvider {
                   key ->
                       Statement.builder()
                           .effect(Effect.ALLOW)
-                          .addAction("oss:ListBucket")
+                          .addAction("oss:ListObjects")
                           .addResource(key)
                           .condition(getCondition(uri)));
               // GetBucketLocation
@@ -166,6 +168,7 @@ public class OSSTokenProvider implements CredentialProvider {
                       Statement.builder()
                           .effect(Effect.ALLOW)
                           .addAction("oss:GetBucketLocation")
+                          .addAction("oss:GetBucketInfo")
                           .addResource(key));
             });
 
