@@ -19,23 +19,19 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.IsolatedClassLoader;
-import org.apache.gravitino.utils.MapUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.Transaction;
@@ -62,6 +58,10 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A wrapper for Iceberg catalog backend, provides the common interface for Iceberg REST server and
+ * Gravitino Iceberg catalog.
+ */
 public class IcebergCatalogWrapper implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
@@ -70,14 +70,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
-  private Map<String, String> catalogConfigToClients;
   private Map<String, String> catalogPropertiesMap;
-  private static final Set<String> catalogPropertiesToClientKeys =
-      ImmutableSet.of(
-          IcebergConstants.IO_IMPL,
-          IcebergConstants.AWS_S3_REGION,
-          IcebergConstants.ICEBERG_S3_ENDPOINT,
-          IcebergConstants.ICEBERG_OSS_ENDPOINT);
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
     this.catalogBackend =
@@ -97,10 +90,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (catalog instanceof SupportsNamespaces) {
       this.asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
-    this.catalogConfigToClients =
-        MapUtils.getFilteredMap(
-            icebergConfig.getIcebergCatalogProperties(),
-            key -> catalogPropertiesToClientKeys.contains(key));
 
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
@@ -307,14 +296,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   // Some io and security configuration should pass to Iceberg REST client
   private LoadTableResponse injectTableConfig(Supplier<LoadTableResponse> supplier) {
     LoadTableResponse loadTableResponse = supplier.get();
-    return LoadTableResponse.builder()
-        .withTableMetadata(loadTableResponse.tableMetadata())
-        .addAllConfig(getCatalogConfigToClient())
-        .build();
-  }
-
-  private Map<String, String> getCatalogConfigToClient() {
-    return catalogConfigToClients;
+    return LoadTableResponse.builder().withTableMetadata(loadTableResponse.tableMetadata()).build();
   }
 
   @Getter

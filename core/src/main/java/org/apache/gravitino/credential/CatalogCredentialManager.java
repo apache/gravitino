@@ -51,6 +51,16 @@ public class CatalogCredentialManager implements Closeable {
     return credentialCache.getCredential(credentialCacheKey, cacheKey -> doGetCredential(cacheKey));
   }
 
+  // Get credential with only one credential provider.
+  public Credential getCredential(CredentialContext context) {
+    if (credentialProviders.size() == 0) {
+      throw new RuntimeException("There are not any credential provider for the catalog.");
+    } else if (credentialProviders.size() > 1) {
+      throw new RuntimeException("There are multiple credential providers for the catalog.");
+    }
+    return getCredential(credentialProviders.keySet().iterator().next(), context);
+  }
+
   @Override
   public void close() {
     credentialProviders
@@ -67,6 +77,11 @@ public class CatalogCredentialManager implements Closeable {
                     e);
               }
             });
+    try {
+      credentialCache.close();
+    } catch (IOException e) {
+      LOG.warn("Close credential cache failed, catalog: {}", catalogName, e);
+    }
   }
 
   private Credential doGetCredential(CredentialCacheKey credentialCacheKey) {

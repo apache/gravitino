@@ -67,6 +67,13 @@ public class CredentialConfig extends Config {
                   false /* reserved */))
           .build();
 
+  public static final ConfigEntry<String> CREDENTIAL_PROVIDERS =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_PROVIDERS)
+          .doc("Credential providers, separated by comma.")
+          .version(ConfigConstants.VERSION_0_8_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<Double> CREDENTIAL_CACHE_EXPIRE_RATIO =
       new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_EXPIRE_RATIO)
           .doc(
@@ -90,5 +97,9 @@ public class CredentialConfig extends Config {
   public CredentialConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  public CredentialConfig(boolean loadDefaults) {
+    super(loadDefaults);
   }
 }

@@ -27,10 +27,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.CredentialProviderFactory;
-import org.apache.gravitino.credential.CredentialProviderManager;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -38,17 +34,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IcebergCatalogWrapperManager implements AutoCloseable {
+
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
-  private final Cache<String, IcebergCatalogWrapper> icebergCatalogWrapperCache;
+  private final Cache<String, CatalogWrapperForREST> icebergCatalogWrapperCache;
 
   private final IcebergConfigProvider configProvider;
 
-  private CredentialProviderManager credentialProviderManager;
-
   public IcebergCatalogWrapperManager(
       Map<String, String> properties, IcebergConfigProvider configProvider) {
-    this.credentialProviderManager = new CredentialProviderManager();
     this.configProvider = configProvider;
     this.icebergCatalogWrapperCache =
         Caffeine.newBuilder()
@@ -61,7 +55,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
                   String catalogName = (String) k;
                   LOG.info("Remove IcebergCatalogWrapper cache {}.", catalogName);
                   closeIcebergCatalogWrapper((IcebergCatalogWrapper) v);
-                  credentialProviderManager.unregisterCredentialProvider(catalogName);
                 })
             .scheduler(
                 Scheduler.forScheduledExecutorService(
@@ -79,44 +72,33 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
    *     ([^/]*\/), end with /
    * @return the instance of IcebergCatalogWrapper.
    */
-  public IcebergCatalogWrapper getOps(String rawPrefix) {
+  public CatalogWrapperForREST getOps(String rawPrefix) {
     String catalogName = IcebergRestUtils.getCatalogName(rawPrefix);
     return getCatalogWrapper(catalogName);
   }
 
-  public IcebergCatalogWrapper getCatalogWrapper(String catalogName) {
-    IcebergCatalogWrapper catalogWrapper =
+  public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
+    CatalogWrapperForREST catalogWrapperForREST =
         icebergCatalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
-    catalogWrapper.reloadHadoopConf();
-    return catalogWrapper;
+    catalogWrapperForREST.reloadHadoopConf();
+    return catalogWrapperForREST;
   }
 
-  public CredentialProvider getCredentialProvider(String catalogName) {
-    return credentialProviderManager.getCredentialProvider(catalogName);
-  }
-
-  @VisibleForTesting
-  protected IcebergCatalogWrapper createIcebergCatalogWrapper(IcebergConfig icebergConfig) {
-    return new IcebergCatalogWrapper(icebergConfig);
-  }
-
-  private IcebergCatalogWrapper createCatalogWrapper(String catalogName) {
+  private CatalogWrapperForREST createCatalogWrapper(String catalogName) {
     Optional<IcebergConfig> icebergConfig = configProvider.getIcebergCatalogConfig(catalogName);
     if (!icebergConfig.isPresent()) {
       throw new RuntimeException("Couldn't find Iceberg configuration for " + catalogName);
     }
+    return createCatalogWrapper(catalogName, icebergConfig.get());
+  }
 
-    IcebergConfig config = icebergConfig.get();
-    String credentialProviderType = config.get(IcebergConfig.CREDENTIAL_PROVIDER_TYPE);
-    if (StringUtils.isNotBlank(credentialProviderType)) {
-      CredentialProvider credentialProvider =
-          CredentialProviderFactory.create(credentialProviderType, config.getAllConfig());
-      credentialProviderManager.registerCredentialProvider(catalogName, credentialProvider);
-    }
-
-    return createIcebergCatalogWrapper(icebergConfig.get());
+  // Overriding this method to create a new CatalogWrapperForREST for test;
+  @VisibleForTesting
+  protected CatalogWrapperForREST createCatalogWrapper(
+      String catalogName, IcebergConfig icebergConfig) {
+    return new CatalogWrapperForREST(catalogName, icebergConfig);
   }
 
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {
