@@ -29,28 +29,28 @@ public class TestCredentialCacheKey {
   @Test
   void testCredentialCacheKey() {
 
-    PathBasedCredentialContext context1 =
+    PathBasedCredentialContext context =
         new PathBasedCredentialContext("user1", ImmutableSet.of("path1"), ImmutableSet.of("path2"));
-    PathBasedCredentialContext context2 =
+    PathBasedCredentialContext contextWithDiffUser =
         new PathBasedCredentialContext("user2", ImmutableSet.of("path1"), ImmutableSet.of("path2"));
-    PathBasedCredentialContext context3 =
-        new PathBasedCredentialContext("user3", ImmutableSet.of("path3"), ImmutableSet.of("path4"));
+    PathBasedCredentialContext contextWithDiffPath =
+        new PathBasedCredentialContext("user1", ImmutableSet.of("path3"), ImmutableSet.of("path4"));
 
-    CredentialCacheKey key1 = new CredentialCacheKey("s3-token", context1);
+    CredentialCacheKey key1 = new CredentialCacheKey("s3-token", context);
 
     Set<CredentialCacheKey> cache = ImmutableSet.of(key1);
     Assertions.assertTrue(cache.contains(key1));
 
     // different user
-    CredentialCacheKey key2 = new CredentialCacheKey("s3-token", context2);
+    CredentialCacheKey key2 = new CredentialCacheKey("s3-token", contextWithDiffUser);
     Assertions.assertFalse(cache.contains(key2));
 
     // different path
-    CredentialCacheKey key3 = new CredentialCacheKey("s3-token", context3);
+    CredentialCacheKey key3 = new CredentialCacheKey("s3-token", contextWithDiffPath);
     Assertions.assertFalse(cache.contains(key3));
 
     // different credential type
-    CredentialCacheKey key4 = new CredentialCacheKey("s3-token1", context1);
+    CredentialCacheKey key4 = new CredentialCacheKey("s3-token1", context);
     Assertions.assertFalse(cache.contains(key4));
   }
 }

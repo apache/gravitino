@@ -72,7 +72,7 @@ public class CatalogCredentialManager implements Closeable {
   private Credential doGetCredential(CredentialCacheKey credentialCacheKey) {
     String credentialType = credentialCacheKey.getCredentialType();
     CredentialContext context = credentialCacheKey.getCredentialContext();
-    LOG.debug("try get credential, credential type: {}, context: {}", credentialType, context);
+    LOG.debug("Try get credential, credential type: {}, context: {}.", credentialType, context);
     Preconditions.checkState(
         credentialProviders.containsKey(credentialType),
         String.format("Credential %s not found", credentialType));

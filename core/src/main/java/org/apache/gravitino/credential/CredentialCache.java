@@ -82,7 +82,8 @@ public class CredentialCache<T> implements Closeable {
             .expireAfter(new CredentialExpireTimeCalculator(cacheExpireRatio))
             .maximumSize(cacheSize)
             .removalListener(
-                (cacheKey, credential, c) -> LOG.debug("credential expire {}.", cacheKey))
+                (cacheKey, credential, c) ->
+                    LOG.debug("Credential expire, cache key: {}.", cacheKey))
             .build();
   }
 

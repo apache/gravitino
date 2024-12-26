@@ -70,12 +70,14 @@ public class CredentialConfig extends Config {
   public static final ConfigEntry<Double> CREDENTIAL_CACHE_EXPIRE_RATIO =
       new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_EXPIRE_RATIO)
           .doc(
-              "Ratio of the credential's expiration time when Gravitino remove credential from the cache.")
+              "Ratio of the credential's expiration time when Gravitino remove credential from the "
+                  + "cache.")
           .version(ConfigConstants.VERSION_0_8_0)
           .doubleConf()
           .checkValue(
               ratio -> ratio >= 0 && ratio < 1,
-              "Ratio of the credential's expiration time should great than or equal to 0 and less than 1.")
+              "Ratio of the credential's expiration time should greater than or equal to 0 "
+                  + "and less than 1.")
           .createWithDefault(DEFAULT_CREDENTIAL_CACHE_EXPIRE_RATIO);
 
   public static final ConfigEntry<Long> CREDENTIAL_CACHE_MAX_SIZE =
