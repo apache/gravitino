@@ -26,7 +26,7 @@ use tokio::signal;
 async fn main() -> fuse3::Result<()> {
     tracing_subscriber::fmt().init();
 
-    let config = AppConfig::from_file(Some("conf/gvfs.toml)"));
+    let config = AppConfig::from_file(Some("conf/gvfs_fuse.toml)"));
     if let Err(e) = &config {
         error!("Failed to load config: {:?}", e);
         return Err(Errno::from(libc::EINVAL));

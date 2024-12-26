@@ -298,7 +298,7 @@ mod test {
 
     #[test]
     fn test_config_from_file() {
-        let config = AppConfig::from_file(Some("conf/gvfs_test.toml")).unwrap();
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_test.toml")).unwrap();
         assert_eq!(config.fuse.default_file_mask, 0o600);
         assert_eq!(config.filesystem.block_size, 8192);
         assert_eq!(config.gravitino.gravitino_url, "http://localhost:8090");
