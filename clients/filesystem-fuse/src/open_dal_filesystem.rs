@@ -223,7 +223,7 @@ impl FileWriter for FileWriterImpl {
     }
 }
 
-fn opendal_error_to_errno(err: opendal::Error) -> fuse3::Errno {
+fn opendal_error_to_errno(err: opendal::Error) -> Errno {
     error!("opendal operator error {:?}", err);
     match err.kind() {
         ErrorKind::Unsupported => Errno::from(libc::EOPNOTSUPP),
