@@ -44,7 +44,7 @@ pub(crate) enum CreateFsResult {
     None,
 }
 
-pub enum FileSystemScheam {
+pub enum FileSystemSchema {
     S3,
 }
 
@@ -225,7 +225,7 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
     Ok((catalog, schema, fileset))
 }
 
-pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemScheam, String)> {
+pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemSchema, String)> {
     // todo need to improve the logic
     if let Some(pos) = path.find("://") {
         let protocol = &path[..pos];
@@ -240,8 +240,8 @@ pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemScheam, Strin
         };
 
         match protocol {
-            "s3" => Some((FileSystemScheam::S3, location.to_string())),
-            "s3a" => Some((FileSystemScheam::S3, location.to_string())),
+            "s3" => Some((FileSystemSchema::S3, location.to_string())),
+            "s3a" => Some((FileSystemSchema::S3, location.to_string())),
             _ => None,
         }
     } else {

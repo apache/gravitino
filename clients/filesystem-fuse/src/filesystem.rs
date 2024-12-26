@@ -351,7 +351,7 @@ pub(crate) mod tests {
             let opened_file = self.fs.create_file(path, OpenFileFlags(0)).await;
             assert!(opened_file.is_ok());
             let file = opened_file.unwrap();
-            self.assert_file_stat(&file.file_stat, path, FileType::RegularFile, 0);
+            self.assert_file_stat(&file.file_stat, path, RegularFile, 0);
             self.test_stat_file(path, RegularFile, 0).await;
         }
 
@@ -480,12 +480,7 @@ pub(crate) mod tests {
             let root_file_stat = self.fs.stat(ROOT_DIR_FILE_ID).await;
             assert!(root_file_stat.is_ok());
             let root_file_stat = root_file_stat.unwrap();
-            self.assert_file_stat(
-                &root_file_stat,
-                Path::new(ROOT_DIR_PATH),
-                FileType::Directory,
-                0,
-            );
+            self.assert_file_stat(&root_file_stat, Path::new(ROOT_DIR_PATH), Directory, 0);
         }
 
         async fn test_lookup_file(
@@ -665,28 +660,28 @@ pub(crate) mod tests {
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
-        assert_eq!(file_stat.kind, FileType::RegularFile);
+        assert_eq!(file_stat.kind, RegularFile);
 
         //test new dir
         let file_stat = FileStat::new_dir_filestat("a".as_ref(), "b".as_ref());
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
-        assert_eq!(file_stat.kind, FileType::Directory);
+        assert_eq!(file_stat.kind, Directory);
 
         //test new file with path
         let file_stat = FileStat::new_file_filestat_with_path("a/b".as_ref(), 10);
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
-        assert_eq!(file_stat.kind, FileType::RegularFile);
+        assert_eq!(file_stat.kind, RegularFile);
 
         //test new dir with path
         let file_stat = FileStat::new_dir_filestat_with_path("a/b".as_ref());
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
-        assert_eq!(file_stat.kind, FileType::Directory);
+        assert_eq!(file_stat.kind, Directory);
     }
 
     #[test]

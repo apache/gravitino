@@ -272,6 +272,6 @@ mod tests {
 
         let fileset = result.unwrap();
         println!("{:?}", fileset);
-        assert!(fileset.name == "fileset1");
+        assert_eq!(fileset.name, "fileset1");
     }
 }

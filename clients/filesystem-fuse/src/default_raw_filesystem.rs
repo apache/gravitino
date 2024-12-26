@@ -281,13 +281,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         file.close().await
     }
 
-    async fn read(
-        &self,
-        _file_id: u64,
-        fh: u64,
-        offset: u64,
-        size: u32,
-    ) -> crate::filesystem::Result<Bytes> {
+    async fn read(&self, _file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
         let (data, file_stat) = {
             let opened_file = self
                 .opened_file_manager
@@ -304,13 +298,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         data
     }
 
-    async fn write(
-        &self,
-        _file_id: u64,
-        fh: u64,
-        offset: u64,
-        data: &[u8],
-    ) -> crate::filesystem::Result<u32> {
+    async fn write(&self, _file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
         let (len, file_stat) = {
             let opened_file = self
                 .opened_file_manager
