@@ -16,21 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
-use log::info;
+use log::{error, info};
 use tokio::signal;
 
 #[tokio::main]
 async fn main() -> fuse3::Result<()> {
     tracing_subscriber::fmt().init();
 
-    let config = AppConfig::default();
-    tokio::spawn(async move { gvfs_mount("gvfs", "", &config).await });
+    let config = AppConfig::from_file(Some("conf/gvfs.toml)"));
+    if let Err(e) = &config {
+        error!("Failed to load config: {:?}", e);
+        return Err(Errno::from(libc::EINVAL));
+    }
+    let config = config.unwrap();
+    let handle = tokio::spawn(async move { gvfs_mount("gvfs", "", &config).await });
 
     let _ = signal::ctrl_c().await;
     info!("Received Ctrl+C, Unmounting gvfs...");
-    let _ = gvfs_unmount().await;
 
+    if let Err(e) = handle.await {
+        error!("Failed to mount gvfs: {:?}", e);
+        return Err(Errno::from(libc::EINVAL));
+    }
+
+    let _ = gvfs_unmount().await;
     Ok(())
 }

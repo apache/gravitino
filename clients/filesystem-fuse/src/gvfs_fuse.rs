@@ -215,6 +215,7 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
     if parts.len() != 3 {
         return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
     }
+    // todo handle mount catalog or schema
 
     let catalog = parts[1].to_string();
     let schema = parts[2].to_string();
@@ -224,6 +225,7 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
 }
 
 pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemScheam, String)> {
+    // todo need to improve the logic
     if let Some(pos) = path.find("://") {
         let protocol = &path[..pos];
         let location = &path[pos + 3..];
