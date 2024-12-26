@@ -39,5 +39,5 @@ public interface SupportsPathBasedCredentials {
    * @param nameIdentifier, The identifier for fileset, table, etc.
    * @return A list of {@link PathContext}
    */
-  List<PathContext> getPathBasedContext(NameIdentifier nameIdentifier);
+  List<PathContext> getPathContext(NameIdentifier nameIdentifier);
 }

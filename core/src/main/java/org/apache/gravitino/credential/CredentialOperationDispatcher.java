@@ -80,7 +80,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
 
     if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {
       List<PathContext> pathContexts =
-          ((SupportsPathBasedCredentials) baseCatalog.ops()).getPathBasedContext(nameIdentifier);
+          ((SupportsPathBasedCredentials) baseCatalog.ops()).getPathContext(nameIdentifier);
       return getPathBasedCredentialContexts(privilege, pathContexts);
     }
     throw new NotSupportedException(

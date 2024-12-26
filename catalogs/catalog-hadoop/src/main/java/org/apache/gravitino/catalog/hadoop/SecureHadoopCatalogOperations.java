@@ -258,7 +258,7 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public List<PathContext> getPathBasedContext(NameIdentifier filesetIdentifier) {
+  public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
     String path = fileset.storageLocation();
     Preconditions.checkState(
