@@ -35,7 +35,7 @@ class Types:
     class NullType(Type):
         """The data type representing `NULL` values."""
 
-        _instance: "NullType" = None
+        _instance: Types.NullType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -43,7 +43,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "NullType":
+        def get(cls) -> Types.NullType:
             return cls()
 
         def name(self) -> Name:
@@ -55,7 +55,7 @@ class Types:
     class BooleanType(PrimitiveType):
         """The boolean type in Gravitino."""
 
-        _instance: "BooleanType" = None
+        _instance: Types.BooleanType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -63,7 +63,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "BooleanType":
+        def get(cls) -> Types.BooleanType:
             return cls()
 
         def name(self) -> Name:
@@ -75,8 +75,8 @@ class Types:
     class ByteType(IntegralType):
         """The byte type in Gravitino."""
 
-        _instance: "ByteType" = None
-        _unsigned_instance: "ByteType" = None
+        _instance: Types.ByteType = None
+        _unsigned_instance: Types.ByteType = None
 
         def __new__(cls, signed: bool = True):
             if signed:
@@ -90,11 +90,11 @@ class Types:
             return cls._unsigned_instance
 
         @classmethod
-        def get(cls) -> "ByteType":
+        def get(cls) -> Types.ByteType:
             return cls(True)
 
         @classmethod
-        def unsigned(cls) -> "ByteType":
+        def unsigned(cls) -> Types.ByteType:
             return cls(False)
 
         def name(self) -> Name:
@@ -104,8 +104,8 @@ class Types:
             return "byte" if self.signed() else "byte unsigned"
 
     class ShortType(IntegralType):
-        _instance: "ShortType" = None
-        _unsigned_instance: "ShortType" = None
+        _instance: Types.ShortType = None
+        _unsigned_instance: Types.ShortType = None
 
         def __new__(cls, signed=True):
             if signed:
@@ -119,11 +119,11 @@ class Types:
             return cls._unsigned_instance
 
         @classmethod
-        def get(cls) -> "ShortType":
+        def get(cls) -> Types.ShortType:
             return cls(True)
 
         @classmethod
-        def unsigned(cls) -> "ShortType":
+        def unsigned(cls) -> Types.ShortType:
             return cls(False)
 
         def name(self) -> Name:
@@ -133,8 +133,8 @@ class Types:
             return "short" if self.signed() else "short unsigned"
 
     class IntegerType(IntegralType):
-        _instance: "IntegerType" = None
-        _unsigned_instance: "IntegerType" = None
+        _instance: Types.IntegerType = None
+        _unsigned_instance: Types.IntegerType = None
 
         def __new__(cls, signed=True):
             if signed:
@@ -148,7 +148,7 @@ class Types:
             return cls._unsigned_instance
 
         @classmethod
-        def get(cls) -> "IntegerType":
+        def get(cls) -> Types.IntegerType:
             return cls(True)
 
         @classmethod
@@ -162,8 +162,8 @@ class Types:
             return "integer" if self.signed() else "integer unsigned"
 
     class LongType(IntegralType):
-        _instance: "LongType" = None
-        _unsigned_instance: "LongType" = None
+        _instance: Types.LongType = None
+        _unsigned_instance: Types.LongType = None
 
         def __new__(cls, signed=True):
             if signed:
@@ -177,7 +177,7 @@ class Types:
             return cls._unsigned_instance
 
         @classmethod
-        def get(cls) -> "LongType":
+        def get(cls) -> Types.LongType:
             return cls(True)
 
         @classmethod
@@ -191,7 +191,7 @@ class Types:
             return "long" if self.signed() else "long unsigned"
 
     class FloatType(FractionType):
-        _instance: "FloatType" = None
+        _instance: Types.FloatType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -200,7 +200,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "FloatType":
+        def get(cls) -> Types.FloatType:
             return cls()
 
         def name(self) -> Name:
@@ -210,7 +210,7 @@ class Types:
             return "float"
 
     class DoubleType(FractionType):
-        _instance: "DoubleType" = None
+        _instance: Types.DoubleType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -219,7 +219,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "DoubleType":
+        def get(cls) -> Types.DoubleType:
             return cls()
 
         def name(self) -> Name:
@@ -265,7 +265,7 @@ class Types:
                 )
 
         @classmethod
-        def of(cls, precision: int, scale: int) -> "DecimalType":
+        def of(cls, precision: int, scale: int) -> Types.DecimalType:
             return cls(precision, scale)
 
         def name(self) -> Name:
@@ -300,7 +300,7 @@ class Types:
     class DateType(DateTimeType):
         """The date time type in Gravitino."""
 
-        _instance: "DateType" = None
+        _instance: Types.DateType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -309,7 +309,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "DateType":
+        def get(cls) -> Types.DateType:
             return cls()
 
         def name(self) -> Name:
@@ -319,7 +319,7 @@ class Types:
             return "date"
 
     class TimeType(DateTimeType):
-        _instance: "TimeType" = None
+        _instance: Types.TimeType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -328,7 +328,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "TimeType":
+        def get(cls) -> Types.TimeType:
             return cls()
 
         def name(self) -> Name:
@@ -338,8 +338,8 @@ class Types:
             return "time"
 
     class TimestampType(DateTimeType):
-        _instance_with_tz: "TimestampType" = None
-        _instance_without_tz: "TimestampType" = None
+        _instance_with_tz: Types.TimestampType = None
+        _instance_without_tz: Types.TimestampType = None
         _with_time_zone: bool
 
         def __new__(cls, with_time_zone: bool):
@@ -354,11 +354,11 @@ class Types:
             return cls._instance_without_tz
 
         @classmethod
-        def with_time_zone(cls) -> "TimestampType":
+        def with_time_zone(cls) -> Types.TimestampType:
             return cls(True)
 
         @classmethod
-        def without_time_zone(cls) -> "TimestampType":
+        def without_time_zone(cls) -> Types.TimestampType:
             return cls(False)
 
         def __init__(self, with_time_zone: bool):
@@ -377,7 +377,7 @@ class Types:
     class IntervalYearType(IntervalType):
         """The interval year type in Gravitino."""
 
-        _instance: "IntervalYearType" = None
+        _instance: Types.IntervalYearType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -386,7 +386,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "IntervalYearType":
+        def get(cls) -> Types.IntervalYearType:
             return cls()
 
         def name(self) -> Name:
@@ -398,7 +398,7 @@ class Types:
     class IntervalDayType(IntervalType):
         """The interval day type in Gravitino."""
 
-        _instance: "IntervalDayType" = None
+        _instance: Types.IntervalDayType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -407,7 +407,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "IntervalDayType":
+        def get(cls) -> Types.IntervalDayType:
             return cls()
 
         def name(self) -> Name:
@@ -420,7 +420,7 @@ class Types:
         """The string type in Gravitino, equivalent to varchar(MAX),
         which the MAX is determined by the underlying catalog."""
 
-        _instance: "StringType" = None
+        _instance: Types.StringType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -429,7 +429,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "StringType":
+        def get(cls) -> Types.StringType:
             return cls()
 
         def name(self) -> Name:
@@ -441,7 +441,7 @@ class Types:
     class UUIDType(PrimitiveType):
         """The uuid type in Gravitino."""
 
-        _instance: "UUIDType" = None
+        _instance: Types.UUIDType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -450,7 +450,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "UUIDType":
+        def get(cls) -> Types.UUIDType:
             return cls()
 
         def name(self) -> Name:
@@ -475,7 +475,7 @@ class Types:
             self._length = length
 
         @classmethod
-        def of(cls, length: int) -> "FixedType":
+        def of(cls, length: int) -> Types.FixedType:
             """
             Args:
                 length: The length of the fixed type.
@@ -520,7 +520,7 @@ class Types:
             self._length = length
 
         @classmethod
-        def of(cls, length: int) -> "VarCharType":
+        def of(cls, length: int) -> Types.VarCharType:
             return cls(length)
 
         def name(self) -> Name:
@@ -558,7 +558,7 @@ class Types:
             self._length = length
 
         @classmethod
-        def of(cls, length: int) -> "FixedCharType":
+        def of(cls, length: int) -> Types.FixedCharType:
             return cls(length)
 
         def name(self) -> Name:
@@ -579,7 +579,7 @@ class Types:
             return hash(self._length)
 
     class BinaryType(PrimitiveType):
-        _instance: "BinaryType" = None
+        _instance: Types.BinaryType = None
 
         def __new__(cls):
             if cls._instance is None:
@@ -588,7 +588,7 @@ class Types:
             return cls._instance
 
         @classmethod
-        def get(cls) -> "BinaryType":
+        def get(cls) -> Types.BinaryType:
             return cls()
 
         def name(self) -> Name:
@@ -601,15 +601,15 @@ class Types:
         """The struct type in Gravitino.
         Note, this type is not supported in the current version of Gravitino."""
 
-        _fields: List["Field"]
+        _fields: List[Field]
 
-        def __init__(self, fields: List["Field"]):
+        def __init__(self, fields: List[Field]):
             if not fields or len(fields) == 0:
                 raise ValueError("fields cannot be null or empty")
             self._fields = fields
 
         @classmethod
-        def of(cls, *fields) -> "StructType":
+        def of(cls, *fields) -> Types.StructType:
             """
             Args:
                 fields: The fields of the struct type.
@@ -617,9 +617,9 @@ class Types:
             Returns:
                 A StructType instance with the given fields.
             """
-            return cls(fields)
+            return cls(list(fields))
 
-        def fields(self) -> List["Field"]:
+        def fields(self) -> List[Field]:
             return self._fields
 
         def name(self) -> Name:
@@ -677,7 +677,7 @@ class Types:
             @classmethod
             def not_null_field(
                 cls, name: str, field_type: Type, comment: str = None
-            ) -> "Field":
+            ) -> Types.StructType.Field:
                 """
                 Args:
                     name: The name of the field.
@@ -689,7 +689,7 @@ class Types:
             @classmethod
             def nullable_field(
                 cls, name: str, field_type: Type, comment: str = None
-            ) -> "Field":
+            ) -> Types.StructType.Field:
                 """
                 Args:
                     name: The name of the field.
@@ -760,7 +760,7 @@ class Types:
             self._element_nullable = element_nullable
 
         @classmethod
-        def nullable(cls, element_type: Type) -> "ListType":
+        def nullable(cls, element_type: Type) -> Types.ListType:
             """
             Create a new ListType with the given element type and the type is nullable.
 
@@ -773,7 +773,7 @@ class Types:
             return cls.of(element_type, True)
 
         @classmethod
-        def not_null(cls, element_type: Type) -> "ListType":
+        def not_null(cls, element_type: Type) -> Types.ListType:
             """
             Create a new ListType with the given element type.
 
@@ -786,7 +786,7 @@ class Types:
             return cls.of(element_type, False)
 
         @classmethod
-        def of(cls, element_type: Type, element_nullable: bool) -> "ListType":
+        def of(cls, element_type: Type, element_nullable: bool) -> Types.ListType:
             """
             Create a new ListType with the given element type and whether the element is nullable.
 
@@ -847,7 +847,7 @@ class Types:
             self._value_nullable = value_nullable
 
         @classmethod
-        def value_nullable(cls, key_type: Type, value_type: Type) -> "MapType":
+        def value_nullable(cls, key_type: Type, value_type: Type) -> Types.MapType:
             """
             Create a new MapType with the given key type, value type, and the value is nullable.
 
@@ -861,7 +861,7 @@ class Types:
             return cls.of(key_type, value_type, True)
 
         @classmethod
-        def value_not_null(cls, key_type: Type, value_type: Type) -> "MapType":
+        def value_not_null(cls, key_type: Type, value_type: Type) -> Types.MapType:
             """
             Create a new MapType with the given key type, value type, and the value is not nullable.
 
@@ -877,7 +877,7 @@ class Types:
         @classmethod
         def of(
             cls, key_type: Type, value_type: Type, value_nullable: bool
-        ) -> "MapType":
+        ) -> Types.MapType:
             """
             Create a new MapType with the given key type, value type, and whether the value is nullable.
 
@@ -942,7 +942,7 @@ class Types:
             self._types = types
 
         @classmethod
-        def of(cls, *types: Type) -> "UnionType":
+        def of(cls, *types: Type) -> Types.UnionType:
             """
             Create a new UnionType with the given types.
 
@@ -995,7 +995,7 @@ class Types:
             self._unparsed_type = unparsed_type
 
         @classmethod
-        def of(cls, unparsed_type: str) -> "UnparsedType":
+        def of(cls, unparsed_type: str) -> Types.UnparsedType:
             """
             Creates a new unparsed_type with the given unparsed type.
 
@@ -1051,7 +1051,7 @@ class Types:
             self._catalog_string = catalog_string
 
         @classmethod
-        def of(cls, catalog_string: str) -> "ExternalType":
+        def of(cls, catalog_string: str) -> Types.ExternalType:
             """
             Creates a new ExternalType with the given catalog string.
 
