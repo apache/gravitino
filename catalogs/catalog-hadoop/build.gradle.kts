@@ -58,10 +58,10 @@ dependencies {
   compileOnly(libs.guava)
 
   testImplementation(project(":clients:client-java"))
-  testImplementation(project(":bundles:aws-hadoop-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:gcp-hadoop-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:aliyun-hadoop-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:azure-hadoop-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
@@ -142,9 +142,9 @@ tasks.test {
   }
 
   // this task depends on :bundles:aws-bundle:jar
-  dependsOn(":bundles:aws-hadoop-bundle:jar")
-  dependsOn(":bundles:aliyun-hadoop-bundle:jar")
-  dependsOn(":bundles:gcp-hadoop-bundle:jar")
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

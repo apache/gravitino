@@ -53,7 +53,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   @BeforeAll
   public void setup() throws IOException {
-    copyBundleJarsToHadoop("gcp-hadoop-bundle");
+    copyBundleJarsToHadoop("gcp-bundle");
 
     try {
       super.startIntegrationTest();

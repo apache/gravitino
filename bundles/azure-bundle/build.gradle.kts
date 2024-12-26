@@ -25,28 +25,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(project(":core"))
-
-  compileOnly(libs.hadoop3.abs)
-  compileOnly(libs.hadoop3.client.api)
-  compileOnly(libs.hadoop3.client.runtime)
-
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
-
-  implementation(libs.azure.identity)
-  implementation(libs.azure.storage.file.datalake)
-
-  implementation(libs.commons.lang3)
-  // runtime used
-  implementation(libs.commons.logging)
-  implementation(libs.guava)
+  implementation(project(":bundles:azure"))
+  implementation(libs.hadoop3.abs)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 }
 
 tasks.withType(ShadowJar::class.java) {
