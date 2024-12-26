@@ -750,9 +750,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newRoleAudit(url, ignore, metalake, getOneRole(roles)).handle();
+          newRoleAudit(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
         } else {
-          newRoleDetails(url, ignore, metalake, getOneRole(roles)).handle();
+          newRoleDetails(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
         }
         break;
 
@@ -770,12 +770,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.GRANT:
-        newGrantPrivilegesToRole(url, ignore, metalake, getOneRole(roles), name, privileges)
+        newGrantPrivilegesToRole(
+                url, ignore, metalake, getOneRole(roles, CommandActions.GRANT), name, privileges)
             .handle();
         break;
 
       case CommandActions.REVOKE:
-        newRevokePrivilegesFromRole(url, ignore, metalake, getOneRole(roles), name, privileges)
+        newRevokePrivilegesFromRole(
+                url, ignore, metalake, getOneRole(roles, CommandActions.REMOVE), name, privileges)
             .handle();
         break;
 
@@ -786,8 +788,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
-  private String getOneRole(String[] roles) {
-    Preconditions.checkArgument(roles.length <= 1, ErrorMessages.MULTIPLE_ROLE_COMMAND_ERROR);
+  private String getOneRole(String[] roles, String command) {
+    Preconditions.checkArgument(
+        roles.length == 1, command + " requires only one role, but multiple are currently passed.");
     return roles[0];
   }
 

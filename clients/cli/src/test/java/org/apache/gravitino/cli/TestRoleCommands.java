@@ -63,11 +63,6 @@ class TestRoleCommands {
   }
 
   @AfterEach
-  void restoreExitFlg() {
-    Main.useExit = true;
-  }
-
-  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -105,6 +100,24 @@ class TestRoleCommands {
         .newRoleDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
+  }
+
+  @Test
+  void testRoleDetailsCommandWithMultipleRoles() {
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE))
+        .thenReturn(new String[] {"admin", "roleA", "roleB"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DETAILS));
+
+    assertThrows(IllegalArgumentException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newRoleDetails(
+            eq(GravitinoCommandLine.DEFAULT_URL), eq(false), eq("metalake_demo"), any());
   }
 
   @Test

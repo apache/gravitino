@@ -20,6 +20,8 @@
 package org.apache.gravitino.cli.commands;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import java.util.List;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -27,7 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
 public class DeleteRole extends Command {
-
+  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
   protected String metalake;
   protected String[] roles;
   protected boolean force;
@@ -52,16 +54,16 @@ public class DeleteRole extends Command {
   /** Delete a role. */
   @Override
   public void handle() {
-    boolean deleted = true;
-
     if (!AreYouSure.really(force)) {
       return;
     }
+    List<String> failedRoles = Lists.newArrayList();
+    List<String> successRoles = Lists.newArrayList();
 
     try {
       GravitinoClient client = buildClient(metalake);
       for (String role : roles) {
-        deleted &= client.deleteRole(role);
+        (client.deleteRole(role) ? successRoles : failedRoles).add(role);
       }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -71,10 +73,15 @@ public class DeleteRole extends Command {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(Joiner.on(", ").join(roles) + " deleted.");
+    if (failedRoles.isEmpty()) {
+      System.out.println(COMMA_JOINER.join(successRoles) + " deleted.");
     } else {
-      System.out.println(Joiner.on(", ").join(roles) + " not deleted.");
+      System.err.println(
+          COMMA_JOINER.join(successRoles)
+              + " deleted, "
+              + "but "
+              + COMMA_JOINER.join(failedRoles)
+              + " is not deleted.");
     }
   }
 }
