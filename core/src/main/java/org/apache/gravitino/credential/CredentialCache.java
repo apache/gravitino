@@ -38,10 +38,10 @@ public class CredentialCache<T> implements Closeable {
   // Calculates the credential expire time in the cache.
   static class CredentialExpireTimeCalculator<T> implements Expiry<T, Credential> {
 
-    private long credentialCacheExpireTimeInMs;
+    private double credentialCacheExpireRatio;
 
-    public CredentialExpireTimeCalculator(long credentialCacheExpireTimeInSecs) {
-      this.credentialCacheExpireTimeInMs = credentialCacheExpireTimeInSecs * 1000;
+    public CredentialExpireTimeCalculator(double credentialCacheExpireRatio) {
+      this.credentialCacheExpireRatio = credentialCacheExpireRatio;
     }
 
     // Set expire time after add a credential in the cache.
@@ -53,8 +53,8 @@ public class CredentialCache<T> implements Closeable {
         return 0;
       }
 
-      long idealExpireTime = Math.min(timeToExpire / 2, credentialCacheExpireTimeInMs);
-      return TimeUnit.MILLISECONDS.toNanos(idealExpireTime);
+      timeToExpire = (long) (timeToExpire * credentialCacheExpireRatio);
+      return TimeUnit.MILLISECONDS.toNanos(timeToExpire);
     }
 
     // Not change expire time after update credential, this should not happen.
@@ -74,13 +74,13 @@ public class CredentialCache<T> implements Closeable {
 
   public void initialize(Map<String, String> catalogProperties) {
     CredentialConfig credentialConfig = new CredentialConfig(catalogProperties);
-    long cache_size = credentialConfig.get(CredentialConfig.CREDENTIAL_CACHE_MAZ_SIZE);
-    long cache_expire_time = credentialConfig.get(CredentialConfig.CREDENTIAL_CACHE_EXPIRE_IN_SECS);
+    long cacheSize = credentialConfig.get(CredentialConfig.CREDENTIAL_CACHE_MAX_SIZE);
+    double cacheExpireRatio = credentialConfig.get(CredentialConfig.CREDENTIAL_CACHE_EXPIRE_RATIO);
 
     this.credentialCache =
         Caffeine.newBuilder()
-            .expireAfter(new CredentialExpireTimeCalculator(cache_expire_time))
-            .maximumSize(cache_size)
+            .expireAfter(new CredentialExpireTimeCalculator(cacheExpireRatio))
+            .maximumSize(cacheSize)
             .removalListener(
                 (cacheKey, credential, c) -> LOG.debug("credential expire {}.", cacheKey))
             .build();

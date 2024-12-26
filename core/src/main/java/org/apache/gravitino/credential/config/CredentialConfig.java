@@ -31,7 +31,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 public class CredentialConfig extends Config {
 
   private static final long DEFAULT_CREDENTIAL_CACHE_MAX_SIZE = 10_000L;
-  private static final long DEFAULT_CREDENTIAL_CACHE_EXPIRE_IN_SECS = 300;
+  private static final double DEFAULT_CREDENTIAL_CACHE_EXPIRE_RATIO = 0.15d;
 
   public static final Map<String, PropertyEntry<?>> CREDENTIAL_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
@@ -46,13 +46,13 @@ public class CredentialConfig extends Config {
                   false /* hidden */,
                   false /* reserved */))
           .put(
-              CredentialConstants.CREDENTIAL_CACHE_EXPIRE_IN_SECS,
-              PropertyEntry.longPropertyEntry(
-                  CredentialConstants.CREDENTIAL_CACHE_EXPIRE_IN_SECS,
-                  "Max cache time for the credential.",
+              CredentialConstants.CREDENTIAL_CACHE_EXPIRE_RATIO,
+              PropertyEntry.doublePropertyEntry(
+                  CredentialConstants.CREDENTIAL_CACHE_EXPIRE_RATIO,
+                  "Ratio of the credential's expiration time when Gravitino remove credential from the cache.",
                   false /* required */,
                   false /* immutable */,
-                  DEFAULT_CREDENTIAL_CACHE_EXPIRE_IN_SECS /* default value */,
+                  DEFAULT_CREDENTIAL_CACHE_EXPIRE_RATIO /* default value */,
                   false /* hidden */,
                   false /* reserved */))
           .put(
@@ -67,14 +67,18 @@ public class CredentialConfig extends Config {
                   false /* reserved */))
           .build();
 
-  public static final ConfigEntry<Long> CREDENTIAL_CACHE_EXPIRE_IN_SECS =
-      new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_EXPIRE_IN_SECS)
-          .doc("Max expire time for the credential cache.")
+  public static final ConfigEntry<Double> CREDENTIAL_CACHE_EXPIRE_RATIO =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_EXPIRE_RATIO)
+          .doc(
+              "Ratio of the credential's expiration time when Gravitino remove credential from the cache.")
           .version(ConfigConstants.VERSION_0_8_0)
-          .longConf()
-          .createWithDefault(DEFAULT_CREDENTIAL_CACHE_EXPIRE_IN_SECS);
+          .doubleConf()
+          .checkValue(
+              ratio -> ratio >= 0 && ratio < 1,
+              "Ratio of the credential's expiration time should great than or equal to 0 and less than 1.")
+          .createWithDefault(DEFAULT_CREDENTIAL_CACHE_EXPIRE_RATIO);
 
-  public static final ConfigEntry<Long> CREDENTIAL_CACHE_MAZ_SIZE =
+  public static final ConfigEntry<Long> CREDENTIAL_CACHE_MAX_SIZE =
       new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_MAX_SIZE)
           .doc("Max cache size for the credential.")
           .version(ConfigConstants.VERSION_0_8_0)
