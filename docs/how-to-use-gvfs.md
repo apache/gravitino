@@ -140,7 +140,7 @@ You can configure these properties in two ways:
 If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jars in the Hadoop environment. 
 For example, if you want to access the S3 fileset,  you need to place
 1. The S3 hadoop bundle jar [`gravitino-aws-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/)
-2. or [`gravitino-aws-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/), and hadoop-aws jar and other necessary dependencies
+2. or [`gravitino-aws-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws/), and hadoop-aws jar and other necessary dependencies
 
 to the classpath, it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`). 
 
