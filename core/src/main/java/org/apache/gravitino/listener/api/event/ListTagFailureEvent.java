@@ -21,9 +21,8 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-/**
- * Represents an event triggered when an attempt to list tags fails due to an exception.
- */
+
+/** Represents an event triggered when an attempt to list tags fails due to an exception. */
 @DeveloperApi
 public class ListTagFailureEvent extends TagFailureEvent {
   private final String metalake;
@@ -33,7 +32,8 @@ public class ListTagFailureEvent extends TagFailureEvent {
    *
    * @param user The user who initiated the tag listing operation.
    * @param metalake The metalake name where the tags are being listed.
-   * @param exception The exception encountered during the tag listing operation, providing insights into the reasons behind the failure.
+   * @param exception The exception encountered during the tag listing operation, providing insights
+   *     into the reasons behind the failure.
    */
   public ListTagFailureEvent(String user, String metalake, Exception exception) {
     super(user, NameIdentifier.of(metalake), exception);

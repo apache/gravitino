@@ -23,17 +23,19 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Represents an event triggered when an attempt to perform a tag operation fails due to an exception.
+ * Represents an event triggered when an attempt to perform a tag operation fails due to an
+ * exception.
  */
 @DeveloperApi
 public class TagFailureEvent extends FailureEvent {
-  
+
   /**
    * Constructs a new {@code TagFailureEvent} instance.
    *
    * @param user The user who initiated the tag operation.
    * @param identifier The identifier of the tag involved in the operation.
-   * @param exception The exception encountered during the tag operation, providing insights into the reasons behind the failure.
+   * @param exception The exception encountered during the tag operation, providing insights into
+   *     the reasons behind the failure.
    */
   public TagFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);

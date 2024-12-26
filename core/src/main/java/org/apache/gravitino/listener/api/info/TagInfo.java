@@ -19,13 +19,10 @@
 
 package org.apache.gravitino.listener.api.info;
 
-import java.util.Map;
-
-import javax.annotation.Nullable;
-
-import org.apache.gravitino.annotation.DeveloperApi;
-
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Provides access to metadata about a Tag instance, designed for use by event listeners. This class

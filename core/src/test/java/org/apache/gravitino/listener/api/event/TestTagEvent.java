@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import java.util.Arrays;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -36,10 +39,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import com.google.common.collect.ImmutableMap;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestTagEvent {
