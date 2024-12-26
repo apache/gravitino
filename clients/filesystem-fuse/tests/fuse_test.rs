@@ -80,7 +80,7 @@ impl Drop for FuseTest {
 fn test_fuse_system_with_auto() {
     tracing_subscriber::fmt().init();
 
-    let mount_point = "build/gvfs";
+    let mount_point = "target/gvfs";
     let _ = fs::create_dir_all(mount_point);
 
     let mut test = FuseTest {
