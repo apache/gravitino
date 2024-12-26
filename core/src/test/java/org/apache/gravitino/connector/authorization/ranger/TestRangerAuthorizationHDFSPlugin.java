@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.connector.authorization.ranger;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,7 +29,7 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 
-public class TestMySQLAuthorizationPlugin implements AuthorizationPlugin {
+public class TestRangerAuthorizationHDFSPlugin implements AuthorizationPlugin {
   public boolean callOnCreateRole2 = false;
 
   @Override

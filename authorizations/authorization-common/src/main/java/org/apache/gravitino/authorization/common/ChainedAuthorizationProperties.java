@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * The properties for Chain authorization plugin. <br>
+ * The properties for Chained authorization plugin. <br>
  * <br>
  * Configuration Example: <br>
  * "authorization.chain.plugins" = "hive1,hdfs1" <br>
@@ -48,16 +48,32 @@ import java.util.stream.Collectors;
  * "authorization.chain.hdfs1.ranger.username" = "admin"; <br>
  * "authorization.chain.hdfs1.ranger.password" = "admin"; <br>
  */
-public class ChainAuthorizationProperties {
-  public static final String PLUGINS_SPLITTER = ",";
-  /** Chain authorization plugin names */
+public class ChainedAuthorizationProperties extends AuthorizationProperties {
+  private static final String PLUGINS_SPLITTER = ",";
+  /** Chained authorization plugin names */
   public static final String CHAIN_PLUGINS_PROPERTIES_KEY = "authorization.chain.plugins";
 
-  /** Chain authorization plugin provider */
+  /** Chained authorization plugin provider */
   public static final String CHAIN_PROVIDER = "authorization.chain.*.provider";
 
-  static Map<String, String> fetchAuthPluginProperties(
-      String pluginName, Map<String, String> properties) {
+  public ChainedAuthorizationProperties(Map<String, String> properties) {
+    super(properties);
+  }
+
+  @Override
+  public String getPropertiesPrefix() {
+    return "authorization.chain";
+  }
+
+  public String getPluginProvider(String pluginName) {
+    return properties.get(getPropertiesPrefix() + "." + pluginName + ".provider");
+  }
+
+  public List<String> plugins() {
+    return Arrays.asList(properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER));
+  }
+
+  public Map<String, String> fetchAuthPluginProperties(String pluginName) {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY)
             && properties.get(CHAIN_PLUGINS_PROPERTIES_KEY) != null,
@@ -93,13 +109,15 @@ public class ChainAuthorizationProperties {
     return resultProperties;
   }
 
-  public static void validate(Map<String, String> properties) {
+  @Override
+  public void validate() {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY),
         String.format("%s is required", CHAIN_PLUGINS_PROPERTIES_KEY));
     List<String> pluginNames =
         Arrays.stream(properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER))
             .map(String::trim)
+            .filter(v -> !v.isEmpty())
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         !pluginNames.isEmpty(),
