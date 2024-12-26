@@ -32,6 +32,8 @@ use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+const FILESET_PREFIX: &str = "gvfs://fileset/";
+
 static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(None));
 
 pub(crate) enum CreateFsResult {
@@ -57,7 +59,7 @@ pub async fn mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> Gvfs
     match fs {
         CreateFsResult::FuseMemoryFs(vfs) => svr.start(vfs).await?,
         CreateFsResult::FuseGvfs(vfs) => svr.start(vfs).await?,
-        _ => {}
+        _ => return Err(UnSupportedFilesystem.to_error("Unsupported filesystem type".to_string())),
     }
     Ok(())
 }
@@ -180,6 +182,7 @@ pub async fn create_gvfs_filesystem(
     // `XXXFileSystem is a filesystem that allows you to implement file access through your own extensions.
 
     let client = GravitinoClient::new(&config.gravitino);
+
     let (catalog, schema, fileset) = extract_fileset(mount_from)?;
     let location = client
         .get_fileset(&catalog, &schema, &fileset)
@@ -201,16 +204,15 @@ pub async fn create_gvfs_filesystem(
 }
 
 pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
-    let prefix = "gvfs://fileset/";
-    if !path.starts_with(prefix) {
+    if !path.starts_with(FILESET_PREFIX) {
         return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
     }
 
-    let path_without_prefix = &path[prefix.len()..];
+    let path_without_prefix = &path[FILESET_PREFIX.len()..];
 
     let parts: Vec<&str> = path_without_prefix.split('/').collect();
 
-    if parts.len() < 3 {
+    if parts.len() != 3 {
         return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
     }
 
