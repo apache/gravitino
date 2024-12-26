@@ -29,6 +29,7 @@ mod gravitino_client;
 mod gvfs_fileset_fs;
 mod gvfs_fuse;
 mod memory_filesystem;
+mod open_dal_filesystem;
 mod opened_file;
 mod opened_file_manager;
 mod utils;

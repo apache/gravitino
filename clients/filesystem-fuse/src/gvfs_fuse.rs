@@ -19,12 +19,13 @@
 use crate::config::AppConfig;
 use crate::default_raw_filesystem::DefaultRawFileSystem;
 use crate::error::ErrorCode::{InvalidConfig, UnSupportedFilesystem};
-use crate::filesystem::FileSystemContext;
+use crate::filesystem::{FileSystemContext, PathFileSystem};
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::fuse_server::FuseServer;
 use crate::gravitino_client::GravitinoClient;
 use crate::gvfs_fileset_fs::GvfsFilesetFs;
 use crate::memory_filesystem::MemoryFileSystem;
+use crate::open_dal_filesystem::OpenDalFileSystem;
 use crate::utils::GvfsResult;
 use log::info;
 use once_cell::sync::Lazy;
@@ -188,20 +189,22 @@ pub async fn create_gvfs_filesystem(
         .get_fileset(&catalog, &schema, &fileset)
         .await?
         .storage_location;
-    let (_schema, location) = extract_storage_filesystem(&location).unwrap();
+    let (schema, location) = extract_storage_filesystem(&location).unwrap();
 
-    // todo need to replace the inner filesystem with the real storage filesystem
-    let inner_fs = MemoryFileSystem::new().await;
+    let inner_fs = create_fs_by_schema(&schema, config, fs_context)?;
 
-    let fs = GvfsFilesetFs::new(
-        Box::new(inner_fs),
-        Path::new(&location),
-        client,
-        config,
-        fs_context,
-    )
-    .await;
+    let fs = GvfsFilesetFs::new(inner_fs, Path::new(&location), client, config, fs_context).await;
     Ok(CreateFsResult::Gvfs(fs))
+}
+
+fn create_fs_by_schema(
+    schema: &FileSystemSchema,
+    config: &AppConfig,
+    fs_context: &FileSystemContext,
+) -> GvfsResult<Box<dyn PathFileSystem>> {
+    match schema {
+        FileSystemSchema::S3 => OpenDalFileSystem::create_file_system(schema, config, fs_context),
+    }
 }
 
 pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
