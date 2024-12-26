@@ -42,17 +42,37 @@ public class TestTagEvent {
     @Test
     void testCreateTagEvent() {
         String metalake = "metalake";
+        NameIdentifier identifier = NameIdentifier.of(metalake);
         TagInfo tagInfo = new TagInfo("tagName", "test comment", ImmutableMap.of("key", "value"));
 
         dispatcher.createTag(metalake, tagInfo.name(), tagInfo.comment(), tagInfo.properties());
         Event event = dummyEventListener.popPostEvent();
 
-        Assertions.assertTrue(event instanceof CreateTagEvent);
-        CreateTagEvent createTagEvent = (CreateTagEvent) event;
-        Assertions.assertEquals(OperationType.CREATE_TAG, createTagEvent.operationType());
-        Assertions.assertEquals(tagInfo.name(), createTagEvent.createdTagInfo().name());
-        Assertions.assertEquals(tagInfo.comment(), createTagEvent.createdTagInfo().comment());
-        Assertions.assertEquals(tagInfo.properties(), createTagEvent.createdTagInfo().properties());
+        Assertions.assertEquals(identifier, event.identifier());
+        Assertions.assertEquals(CreateTagEvent.class, event.getClass());
+        Assertions.assertEquals(tagInfo.name(), ((CreateTagEvent) event).createdTagInfo().name());
+        Assertions.assertEquals(tagInfo.comment(), ((CreateTagEvent) event).createdTagInfo().comment());
+        Assertions.assertEquals(tagInfo.properties(), ((CreateTagEvent) event).createdTagInfo().properties());
+        Assertions.assertEquals(OperationType.CREATE_TAG, event.operationType());
+        Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    }
+
+    @Test
+    void testListTagsEvent() {
+        String metalake = "metalake";
+        NameIdentifier identifier = NameIdentifier.of(metalake);
+        String[] tagNames = new String[] {"tag1", "tag2"};
+
+        when(dispatcher.listTags(metalake)).thenReturn(tagNames);
+
+        String[] result = dispatcher.listTags(metalake);
+        Event event = dummyEventListener.popPostEvent();
+
+        Assertions.assertEquals(identifier, event.identifier());
+        Assertions.assertEquals(ListTagEvent.class, event.getClass());
+        Assertions.assertEquals(metalake, ((ListTagEvent)event).metalake());
+        Assertions.assertEquals(OperationType.LIST_TAG, event.operationType());
+        Assertions.assertArrayEquals(tagNames, result);
     }
 
 
