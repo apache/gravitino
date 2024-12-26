@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.common;
+package org.apache.gravitino.authorization.jdbc;
 
 import java.util.Map;
+import org.apache.gravitino.authorization.common.AuthorizationProperties;
 
 /** The properties for JDBC authorization plugin. */
 public class JdbcAuthorizationProperties extends AuthorizationProperties {
@@ -39,7 +40,7 @@ public class JdbcAuthorizationProperties extends AuthorizationProperties {
   }
 
   @Override
-  String getPropertiesPrefix() {
+  public String getPropertiesPrefix() {
     return CONFIG_PREFIX;
   }
 

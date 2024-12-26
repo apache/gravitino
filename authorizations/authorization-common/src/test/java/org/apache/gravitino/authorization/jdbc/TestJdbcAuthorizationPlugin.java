@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.common;
+package org.apache.gravitino.authorization.jdbc;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
