@@ -70,10 +70,6 @@ impl GravitinoClient {
         println!("POST request to {} with data: {}", path, data);
     }
 
-    pub fn do_get(&self, path: &str) {
-        println!("GET request to {}", path);
-    }
-
     pub fn request(&self, _path: &str, _data: &str) -> Result<(), GvfsError> {
         todo!()
     }
@@ -93,7 +89,7 @@ impl GravitinoClient {
         )
     }
 
-    async fn send_and_parse<T>(&self, url: &str) -> Result<T, GvfsError>
+    async fn do_get<T>(&self, url: &str) -> Result<T, GvfsError>
     where
         T: for<'de> Deserialize<'de>,
     {
@@ -116,7 +112,7 @@ impl GravitinoClient {
         fileset_name: &str,
     ) -> Result<Fileset, GvfsError> {
         let url = self.get_fileset_url(catalog_name, schema_name, fileset_name);
-        let res = self.send_and_parse::<FilesetResponse>(&url).await?;
+        let res = self.do_get::<FilesetResponse>(&url).await?;
 
         if res.code != 0 {
             return Err(GvfsError::Error(
@@ -154,7 +150,7 @@ impl GravitinoClient {
         path: &str,
     ) -> Result<String, GvfsError> {
         let url = self.get_file_location_url(catalog_name, schema_name, fileset_name, path);
-        let res = self.send_and_parse::<FileLocationResponse>(&url).await?;
+        let res = self.do_get::<FileLocationResponse>(&url).await?;
 
         if res.code != 0 {
             return Err(GvfsError::Error(
