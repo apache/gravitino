@@ -31,9 +31,9 @@ public abstract class AuthorizationProperties {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  abstract String getPropertiesPrefix();
+  public abstract String getPropertiesPrefix();
 
-  abstract void validate();
+  public abstract void validate();
 
   public static void validate(String type, Map<String, String> properties) {
     switch (type) {

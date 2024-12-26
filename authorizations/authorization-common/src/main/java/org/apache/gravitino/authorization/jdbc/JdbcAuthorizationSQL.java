@@ -25,7 +25,7 @@ import org.apache.gravitino.authorization.Owner;
 
 /** Interface for SQL operations of the underlying access control system. */
 @Unstable
-interface JdbcAuthorizationSQL {
+public interface JdbcAuthorizationSQL {
 
   /**
    * Get SQL statements for creating a user.

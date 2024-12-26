@@ -40,7 +40,6 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.common.JdbcAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -55,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * JDBC-based authorization plugins can inherit this class and implement their own SQL statements.
  */
 @Unstable
-abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAuthorizationSQL {
+public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAuthorizationSQL {
 
   private static final String GROUP_PREFIX = "GRAVITINO_GROUP_";
   private static final Logger LOG = LoggerFactory.getLogger(JdbcAuthorizationPlugin.class);
@@ -351,11 +350,11 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
   }
 
   @VisibleForTesting
-  Connection getConnection() throws SQLException {
+  public Connection getConnection() throws SQLException {
     return dataSource.getConnection();
   }
 
-  protected void executeUpdateSQL(String sql) {
+  public void executeUpdateSQL(String sql) {
     executeUpdateSQL(sql, null);
   }
 
@@ -382,7 +381,7 @@ abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, JdbcAutho
         "JDBC authorization plugin fail to execute SQL, error code: %d", se.getErrorCode());
   }
 
-  void executeUpdateSQL(String sql, String ignoreErrorMsg) {
+  public void executeUpdateSQL(String sql, String ignoreErrorMsg) {
     try (final Connection connection = getConnection()) {
       try (final Statement statement = connection.createStatement()) {
         statement.executeUpdate(sql);
