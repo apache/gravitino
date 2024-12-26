@@ -84,7 +84,6 @@ public class TagEventDispatcher implements TagDispatcher {
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
     // TODO: getTagPreEvent
     try {
-      // TODO: getTagEvent
       Tag tag = dispatcher.getTag(metalake, name);
       eventBus.dispatchEvent(
           new GetTagEvent(PrincipalUtils.getCurrentUserName(), metalake, name, tag));
@@ -149,7 +148,6 @@ public class TagEventDispatcher implements TagDispatcher {
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name) {
     // TODO: listMetadataObjectsForTagPreEvent
     try {
-      // TODO: listMetadataObjectsForTagEvent
       MetadataObject[] metadataObjects = dispatcher.listMetadataObjectsForTag(metalake, name);
       eventBus.dispatchEvent(
           new ListMetadataObjectsForTagEvent(
