@@ -37,6 +37,7 @@ dependencies {
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
+  implementation(libs.commons.lang3)
   implementation(libs.hadoop3.aws)
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
@@ -46,6 +47,7 @@ dependencies {
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
+  relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
   archiveClassifier.set("")
 }
 

@@ -32,6 +32,8 @@ import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
@@ -124,6 +126,11 @@ public class ExceptionHandlers {
   public static Response handleCredentialException(
       OperationType op, String metadataObjectName, Exception e) {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
+  }
+
+  public static Response handleModelException(
+      OperationType op, String model, String schema, Exception e) {
+    return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
   }
 
   public static Response handleTestConnectionException(Exception e) {
@@ -725,6 +732,44 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, name, parent, e);
+      }
+    }
+  }
+
+  private static class ModelExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new ModelExceptionHandler();
+
+    private static String getModelErrorMsg(
+        String model, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate model(s)%s operation [%s] under schema [%s], reason [%s]",
+          model, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String model, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(model) ? "" : " [" + model + "]";
+      String errorMsg = getModelErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof ModelAlreadyExistsException
+          || e instanceof ModelVersionAliasesAlreadyExistException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, model, schema, e);
       }
     }
   }

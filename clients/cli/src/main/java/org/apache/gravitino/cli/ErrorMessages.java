@@ -33,6 +33,7 @@ public class ErrorMessages {
   public static final String MISSING_GROUP = "Missing --group option.";
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_ROLE = "Missing --role option.";
+  public static final String MISSING_TAG = "Missing --tag option.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String SCHEMA_EXISTS = "Schema already exists.";
