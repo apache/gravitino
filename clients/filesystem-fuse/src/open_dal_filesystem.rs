@@ -17,6 +17,7 @@
  * under the License.
  */
 use crate::config::AppConfig;
+use crate::error::ErrorCode::OpenDalError;
 use crate::filesystem::{
     FileReader, FileStat, FileSystemCapacity, FileSystemContext, FileWriter, PathFileSystem, Result,
 };
@@ -27,7 +28,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
-use log::debug;
+use log::{debug, error};
 use opendal::layers::LoggingLayer;
 use opendal::services::S3;
 use opendal::{Builder, EntryMode, ErrorKind, Metadata, Operator};
@@ -53,10 +54,13 @@ impl OpenDalFileSystem {
         match schema {
             FileSystemSchema::S3 => {
                 let builder = S3::from_map(config.extent_config.clone());
-                let op = Operator::new(builder)
-                    .expect("opendal create failed")
-                    .layer(LoggingLayer::default())
-                    .finish();
+
+                let op = Operator::new(builder);
+                if let Err(e) = op {
+                    error!("opendal create failed: {:?}", e);
+                    return Err(OpenDalError.to_error(format!("opendal create failed: {:?}", e)));
+                }
+                let op = op.unwrap().layer(LoggingLayer::default()).finish();
                 Ok(Box::new(OpenDalFileSystem::new(op, config, fs_context)))
             }
         }
