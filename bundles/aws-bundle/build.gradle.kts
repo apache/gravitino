@@ -39,10 +39,12 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
+
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
   implementation(libs.commons.lang3)
+  implementation(libs.hadoop3.aws)
   implementation(libs.guava)
 }
 
