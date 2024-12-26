@@ -25,6 +25,7 @@ import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_TOK
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
 import java.util.Map;
@@ -34,30 +35,32 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.s3a.Constants;
 
 public class S3SessionCredentialProvider implements AWSCredentialsProvider {
 
   private final GravitinoClient client;
   private final String filesetIdentifier;
+  private final Configuration configuration;
 
-  private BasicSessionCredentials basicSessionCredentials;
+  private AWSCredentials basicSessionCredentials;
   private long expirationTime;
 
   public S3SessionCredentialProvider(final URI uri, final Configuration conf) {
-    // extra value and init Gravitino client here
-    this.filesetIdentifier = conf.get("gravitino.fileset.identifier");
-    String metalake = conf.get("fs.gravitino.client.metalake");
-    String gravitinoServer = conf.get("fs.gravitino.server.uri");
+    this.filesetIdentifier =
+        conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
+    this.configuration = conf;
 
-    // TODO, support auth between client and server.
-    this.client =
-        GravitinoClient.builder(gravitinoServer).withMetalake(metalake).withSimpleAuth().build();
+    // extra value and init Gravitino client here
+    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
+    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
   }
 
   @Override
   public AWSCredentials getCredentials() {
-
     // Refresh credentials if they are null or about to expire in 5 minutes
     if (basicSessionCredentials == null
         || System.currentTimeMillis() > expirationTime - 5 * 60 * 1000) {
@@ -77,20 +80,36 @@ public class S3SessionCredentialProvider implements AWSCredentialsProvider {
 
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
-    @SuppressWarnings("unused")
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    // Should mock
-    // Credential credentials = fileset.supportsCredentials().getCredential("s3-token");
+    Credential[] credentials = fileset.supportsCredentials().getCredentials();
 
-    Credential credentials = new S3TokenCredential("ASIAZ6", "NFzd", "xx", 1735033800000L);
+    // Can't find any credential, use the default one.
+    if (credentials.length == 0) {
+      expirationTime = Long.MAX_VALUE;
+      this.basicSessionCredentials =
+          new BasicAWSCredentials(
+              configuration.get(Constants.ACCESS_KEY), configuration.get(Constants.SECRET_KEY));
+      return;
+    }
 
-    Map<String, String> credentialMap = credentials.credentialInfo();
+    Credential credential = credentials[0];
+    Map<String, String> credentialMap = credential.toProperties();
+
     String accessKeyId = credentialMap.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
     String secretAccessKey = credentialMap.get(GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY);
-    String sessionToken = credentialMap.get(GRAVITINO_S3_TOKEN);
 
-    this.basicSessionCredentials =
-        new BasicSessionCredentials(accessKeyId, secretAccessKey, sessionToken);
-    this.expirationTime = credentials.expireTimeInMs();
+    if (S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE.equals(
+        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
+      String sessionToken = credentialMap.get(GRAVITINO_S3_TOKEN);
+      this.basicSessionCredentials =
+          new BasicSessionCredentials(accessKeyId, secretAccessKey, sessionToken);
+    } else {
+      this.basicSessionCredentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+    }
+
+    this.expirationTime = credential.expireTimeInMs();
+    if (expirationTime <= 0) {
+      expirationTime = Long.MAX_VALUE;
+    }
   }
 }

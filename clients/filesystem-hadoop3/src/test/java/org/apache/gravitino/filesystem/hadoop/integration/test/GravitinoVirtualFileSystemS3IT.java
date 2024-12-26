@@ -156,8 +156,6 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, accessKey);
     conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, secretKey);
     conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
-
-    conf.set("fs.gravitino.client.useCloudStoreCredential", "true");
   }
 
   @AfterAll

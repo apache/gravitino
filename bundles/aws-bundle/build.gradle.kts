@@ -43,6 +43,7 @@ dependencies {
     exclude("*")
   }
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":clients:filesystem-hadoop3-runtime", configuration = "shadow"))
 }
 
 tasks.withType(ShadowJar::class.java) {

@@ -28,27 +28,31 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.s3.fs.S3FileSystemProvider;
-import org.apache.gravitino.storage.S3Properties;
+import org.apache.gravitino.oss.fs.OSSFileSystemProvider;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSystemIT {
+@EnabledIf(value = "ossIsConfigured", disabledReason = "OSS is not prepared")
+public class GravitinoVirtualFileSystemOSSCredentialIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoVirtualFileSystemRealS3IT.class);
+      LoggerFactory.getLogger(GravitinoVirtualFileSystemOSSCredentialIT.class);
 
-  public static final String BUCKET_NAME = System.getenv("S3_STS_BUCKET_NAME");
-  public static final String S3_ACCESS_KEY = System.getenv("S3_STS_ACCESS_KEY_ID");
-  public static final String S3_SECRET_KEY = System.getenv("S3_STS_SECRET_ACCESS_KEY");
-  public static final String S3_REGION = System.getenv("S3_STS_REGION");
-  public static final String S3_ROLE_ARN = System.getenv("S3_STS_ROLE_ARN");
+  public static final String BUCKET_NAME = System.getenv("OSS_STS_BUCKET_NAME");
+  public static final String OSS_ACCESS_KEY = System.getenv("OSS_STS_ACCESS_KEY_ID");
+  public static final String OSS_SECRET_KEY = System.getenv("OSS_STS_SECRET_ACCESS_KEY");
+  public static final String OSS_ENDPOINT = System.getenv("OSS_STS_ENDPOINT");
+  public static final String OSS_REGION = System.getenv("OSS_STS_REGION");
+  public static final String OSS_ROLE_ARN = System.getenv("OSS_STS_ROLE_ARN");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -57,15 +61,14 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
 
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("aws-bundle");
-
+    copyBundleJarsToHadoop("aliyun-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 32 * 1024 * 1024;
+    defaultBockSize = 64 * 1024 * 1024;
 
-    // The value is 1 for S3
+    // The default replication factor is 1.
     defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
@@ -77,17 +80,14 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
+    properties.put(FILESYSTEM_PROVIDERS, "oss");
+    properties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    properties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    properties.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
+    properties.put(OSSProperties.GRAVITINO_OSS_REGION, OSS_REGION);
+    properties.put(OSSProperties.GRAVITINO_OSS_ROLE_ARN, OSS_ROLE_ARN);
     properties.put(
-        "gravitino.bypass.fs.s3a.aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-    properties.put(FILESYSTEM_PROVIDERS, "s3");
-
-    properties.put(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
-    properties.put(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
-    properties.put(
-        CredentialConstants.CREDENTIAL_PROVIDERS, S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
+        CredentialConstants.CREDENTIAL_PROVIDERS, OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE);
 
     Catalog catalog =
         metalake.createCatalog(
@@ -104,10 +104,10 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    conf.set(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
-    conf.set(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
+    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    conf.set(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
+    conf.set("fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
   }
 
   @AfterAll
@@ -135,24 +135,32 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
    * .GravitinoVirtualFileSystem#getConfigMap(Configuration) in the original code.
    */
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration s3Conf = new Configuration();
+    Configuration ossConf = new Configuration();
     Map<String, String> map = Maps.newHashMap();
 
     gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
 
     Map<String, String> hadoopConfMap =
-        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
+        FileSystemUtils.toHadoopConfigMap(
+            map, OSSFileSystemProvider.GRAVITINO_KEY_TO_OSS_HADOOP_KEY);
 
-    hadoopConfMap.forEach(s3Conf::set);
+    hadoopConfMap.forEach(ossConf::set);
 
-    return s3Conf;
+    return ossConf;
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("s3a://%s/%s", BUCKET_NAME, fileset);
+    return String.format("oss://%s/%s", BUCKET_NAME, fileset);
   }
 
   @Disabled(
-      "GCS does not support append, java.io.IOException: The append operation is not supported")
+      "OSS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
+
+  protected static boolean ossIsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("OSS_STS_ACCESS_KEY_ID"))
+        && StringUtils.isNotBlank(System.getenv("OSS_STS_SECRET_ACCESS_KEY"))
+        && StringUtils.isNotBlank(System.getenv("OSS_STS_ENDPOINT"))
+        && StringUtils.isNotBlank(System.getenv("OSS_STS_BUCKET_NAME"));
+  }
 }

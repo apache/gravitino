@@ -21,34 +21,38 @@ package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.abs.fs.AzureFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.s3.fs.S3FileSystemProvider;
-import org.apache.gravitino.storage.S3Properties;
+import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSystemIT {
+@EnabledIf("absIsConfigured")
+public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoVirtualFileSystemRealS3IT.class);
+      LoggerFactory.getLogger(GravitinoVirtualFileSystemABSCredentialIT.class);
 
-  public static final String BUCKET_NAME = System.getenv("S3_STS_BUCKET_NAME");
-  public static final String S3_ACCESS_KEY = System.getenv("S3_STS_ACCESS_KEY_ID");
-  public static final String S3_SECRET_KEY = System.getenv("S3_STS_SECRET_ACCESS_KEY");
-  public static final String S3_REGION = System.getenv("S3_STS_REGION");
-  public static final String S3_ROLE_ARN = System.getenv("S3_STS_ROLE_ARN");
+  public static final String ABS_ACCOUNT_NAME = System.getenv("ABS_STS_ACCOUNT_NAME");
+  public static final String ABS_ACCOUNT_KEY = System.getenv("ABS_STS_ACCOUNT_KEY");
+  public static final String ABS_CONTAINER_NAME = System.getenv("ABS_STS_CONTAINER_NAME");
+  public static final String ABS_TENANT_ID = System.getenv("ABS_STS_TENANT_ID");
+  public static final String ABS_CLIENT_ID = System.getenv("ABS_STS_CLIENT_ID");
+  public static final String ABS_CLIENT_SECRET = System.getenv("ABS_STS_CLIENT_SECRET");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -57,15 +61,15 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
 
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("aws-bundle");
-
+    // Copy the Azure jars to the gravitino server if in deploy mode.
+    copyBundleJarsToHadoop("azure-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
     defaultBockSize = 32 * 1024 * 1024;
 
-    // The value is 1 for S3
+    // This value is 1 for ABS, 3 for GCS, and 1 for S3A.
     defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
@@ -77,17 +81,15 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    properties.put(
-        "gravitino.bypass.fs.s3a.aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-    properties.put(FILESYSTEM_PROVIDERS, "s3");
 
-    properties.put(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
-    properties.put(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
-    properties.put(
-        CredentialConstants.CREDENTIAL_PROVIDERS, S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
+    properties.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    properties.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    properties.put(AzureProperties.GRAVITINO_AZURE_CLIENT_ID, ABS_CLIENT_ID);
+    properties.put(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, ABS_CLIENT_SECRET);
+    properties.put(AzureProperties.GRAVITINO_AZURE_TENANT_ID, ABS_TENANT_ID);
+    properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, "adls-token");
+
+    properties.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog catalog =
         metalake.createCatalog(
@@ -104,10 +106,11 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    conf.set(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
-    conf.set(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
+    conf.set(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    conf.set(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    conf.set("fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem");
+
+    conf.set("fs.gravitino.client.useCloudStoreCredential", "true");
   }
 
   @AfterAll
@@ -135,24 +138,39 @@ public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSyst
    * .GravitinoVirtualFileSystem#getConfigMap(Configuration) in the original code.
    */
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration s3Conf = new Configuration();
+    Configuration absConf = new Configuration();
     Map<String, String> map = Maps.newHashMap();
 
     gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
 
-    Map<String, String> hadoopConfMap =
-        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
+    Map<String, String> hadoopConfMap = FileSystemUtils.toHadoopConfigMap(map, ImmutableMap.of());
 
-    hadoopConfMap.forEach(s3Conf::set);
+    if (gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME) != null
+        && gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY) != null) {
+      hadoopConfMap.put(
+          String.format(
+              "fs.azure.account.key.%s.dfs.core.windows.net",
+              gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)),
+          gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
+    }
 
-    return s3Conf;
+    hadoopConfMap.forEach(absConf::set);
+
+    return absConf;
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("s3a://%s/%s", BUCKET_NAME, fileset);
+    return String.format(
+        "%s://%s@%s.dfs.core.windows.net/%s",
+        AzureFileSystemProvider.ABS_PROVIDER_SCHEME, ABS_CONTAINER_NAME, ABS_ACCOUNT_NAME, fileset);
   }
 
-  @Disabled(
-      "GCS does not support append, java.io.IOException: The append operation is not supported")
+  @Disabled("java.lang.UnsupportedOperationException: Append Support not enabled")
   public void testAppend() throws IOException {}
+
+  private static boolean absIsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("ABS_STS_ACCOUNT_NAME"))
+        && StringUtils.isNotBlank(System.getenv("ABS_STS_ACCOUNT_KEY"))
+        && StringUtils.isNotBlank(System.getenv("ABS_STS_CONTAINER_NAME"));
+  }
 }

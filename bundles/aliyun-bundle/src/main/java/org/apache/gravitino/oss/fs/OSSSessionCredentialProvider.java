@@ -26,32 +26,35 @@ import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_T
 import com.aliyun.oss.common.auth.BasicCredentials;
 import com.aliyun.oss.common.auth.Credentials;
 import com.aliyun.oss.common.auth.CredentialsProvider;
+import com.aliyun.oss.common.auth.DefaultCredentials;
 import java.net.URI;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.aliyun.oss.Constants;
 
 public class OSSSessionCredentialProvider implements CredentialsProvider {
 
-  private BasicCredentials basicCredentials;
-  private String filesetIdentifier;
+  private Credentials basicCredentials;
+  private final String filesetIdentifier;
   private long expirationTime;
-  private GravitinoClient client;
+  private final GravitinoClient client;
+  private final Configuration configuration;
 
   public OSSSessionCredentialProvider(URI uri, Configuration conf) {
-
+    this.filesetIdentifier =
+        conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
     // extra value and init Gravitino client here
-    this.filesetIdentifier = conf.get("gravitino.fileset.identifier");
-    String metalake = conf.get("fs.gravitino.client.metalake");
-    String gravitinoServer = conf.get("fs.gravitino.server.uri");
-
-    this.client =
-        GravitinoClient.builder(gravitinoServer).withMetalake(metalake).withSimpleAuth().build();
+    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
+    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
+    this.configuration = conf;
   }
 
   @Override
@@ -70,26 +73,42 @@ public class OSSSessionCredentialProvider implements CredentialsProvider {
   }
 
   private void refresh() {
-    // Refresh the credentials
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
-    @SuppressWarnings("unused")
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    // Should mock
-    // Credential credentials = fileset.supportsCredentials().getCredential("s3-token");
+    // Use dynamic credential by default.
 
-    Credential credentials =
-        new S3TokenCredential("AS", "NF", "FwoGZXIvYXdzEDMaDBf3ltl7HG6K7Ne7QS", 1735033800000L);
+    Credential[] credentials = fileset.supportsCredentials().getCredentials();
+    if (credentials.length == 0) {
+      expirationTime = Long.MAX_VALUE;
+      this.basicCredentials =
+          new DefaultCredentials(
+              configuration.get(Constants.ACCESS_KEY_ID),
+              configuration.get(Constants.ACCESS_KEY_SECRET));
+      return;
+    }
 
-    Map<String, String> credentialMap = credentials.credentialInfo();
+    // Use the first one.
+    Credential credential = credentials[0];
+    Map<String, String> credentialMap = credential.toProperties();
+
     String accessKeyId = credentialMap.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
     String secretAccessKey = credentialMap.get(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY);
-    String sessionToken = credentialMap.get(GRAVITINO_OSS_TOKEN);
 
-    this.basicCredentials = new BasicCredentials(accessKeyId, secretAccessKey, sessionToken);
-    this.expirationTime = credentials.expireTimeInMs();
+    if (OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE.equals(
+        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
+      String sessionToken = credentialMap.get(GRAVITINO_OSS_TOKEN);
+      this.basicCredentials = new BasicCredentials(accessKeyId, secretAccessKey, sessionToken);
+    } else {
+      this.basicCredentials = new DefaultCredentials(accessKeyId, secretAccessKey);
+    }
+
+    this.expirationTime = credential.expireTimeInMs();
+    if (expirationTime <= 0) {
+      expirationTime = Long.MAX_VALUE;
+    }
   }
 }

@@ -98,5 +98,7 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
 
+  public static final String GVFS_FILESET_IDENTIFIER = "fs.gvfs.fileset.identifier";
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }

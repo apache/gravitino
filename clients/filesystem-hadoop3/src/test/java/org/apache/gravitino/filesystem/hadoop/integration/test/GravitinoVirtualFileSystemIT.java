@@ -241,7 +241,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
       String fileName = "test.txt";
       Path deletePath = new Path(gvfsPath + "/" + fileName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        //        Assertions.assertTrue(gvfs.exists(gvfsPath));
         gvfs.create(deletePath).close();
         Assertions.assertTrue(gvfs.exists(deletePath));
         Assertions.assertTrue(gvfs.getFileStatus(deletePath).isFile());

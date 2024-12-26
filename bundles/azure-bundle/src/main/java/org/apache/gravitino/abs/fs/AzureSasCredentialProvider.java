@@ -20,6 +20,8 @@
 package org.apache.gravitino.abs.fs;
 
 import static org.apache.gravitino.credential.ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN;
+import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY;
+import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME;
 
 import java.io.IOException;
 import java.util.Map;
@@ -29,23 +31,42 @@ import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azurebfs.extensions.SASTokenProvider;
-import org.apache.hadoop.security.AccessControlException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AzureSasCredentialProvider implements SASTokenProvider, Configurable {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(AzureSasCredentialProvider.class);
+
   private Configuration configuration;
 
-  @SuppressWarnings("unused")
   private String filesetIdentifier;
 
-  @SuppressWarnings("unused")
   private GravitinoClient client;
 
   private String sasToken;
+
+  private String azureStorageAccountName;
+  private String azureStorageAccountKey;
+
   private long expirationTime;
+
+  public String getSasToken() {
+    return sasToken;
+  }
+
+  public String getAzureStorageAccountName() {
+    return azureStorageAccountName;
+  }
+
+  public String getAzureStorageAccountKey() {
+    return azureStorageAccountKey;
+  }
 
   @Override
   public void setConf(Configuration configuration) {
@@ -59,21 +80,16 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
 
   @Override
   public void initialize(Configuration conf, String accountName) throws IOException {
-    this.filesetIdentifier = conf.get("gravitino.fileset.identifier");
+    this.filesetIdentifier =
+        conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
 
-    @SuppressWarnings("unused")
-    String metalake = conf.get("fs.gravitino.client.metalake");
-    @SuppressWarnings("unused")
-    String gravitinoServer = conf.get("fs.gravitino.server.uri");
-
-    // TODO, support auth between client and server.
-    this.client =
-        GravitinoClient.builder(gravitinoServer).withMetalake(metalake).withSimpleAuth().build();
+    // extra value and init Gravitino client here
+    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
+    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
   }
 
   @Override
-  public String getSASToken(String account, String fileSystem, String path, String operation)
-      throws IOException, AccessControlException {
+  public String getSASToken(String account, String fileSystem, String path, String operation) {
     // Refresh credentials if they are null or about to expire in 5 minutes
     if (sasToken == null || System.currentTimeMillis() > expirationTime - 5 * 60 * 1000) {
       synchronized (this) {
@@ -84,21 +100,33 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
   }
 
   private void refresh() {
-    // The format of filesetIdentifier is "metalake.catalog.fileset.schema"
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
-
-    @SuppressWarnings("unused")
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    // Should mock
-    // Credential credentials = fileset.supportsCredentials().getCredential("s3-token");
 
-    Credential credential = new ADLSTokenCredential("xxx", "xxx", 1L);
+    Credential[] credentials = fileset.supportsCredentials().getCredentials();
+    if (credentials.length == 0) {
+      LOGGER.warn("No credentials found for fileset {}", filesetIdentifier);
+      return;
+    }
 
-    Map<String, String> credentialMap = credential.credentialInfo();
-    this.sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
+    // Use the first one.
+    Credential credential = credentials[0];
+    Map<String, String> credentialMap = credential.toProperties();
+
+    if (ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE.equals(
+        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
+      this.sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
+    } else {
+      this.azureStorageAccountName = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
+      this.azureStorageAccountKey = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    }
+
     this.expirationTime = credential.expireTimeInMs();
+    if (expirationTime <= 0) {
+      expirationTime = Long.MAX_VALUE;
+    }
   }
 }
