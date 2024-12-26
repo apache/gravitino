@@ -93,7 +93,7 @@ public class IcebergRESTADLSTokenIT extends IcebergRESTJdbcCatalogIT {
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE);
+        ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
         storageAccountName);
