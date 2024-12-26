@@ -32,7 +32,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.OperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.credential.PathBasedContext;
+import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.IdGenerator;
@@ -79,9 +79,9 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
     }
 
     if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {
-      List<PathBasedContext> pathBasedContexts =
+      List<PathContext> pathContexts =
           ((SupportsPathBasedCredentials) baseCatalog.ops()).getPathBasedContext(nameIdentifier);
-      return getPathBasedCredentialContexts(privilege, pathBasedContexts);
+      return getPathBasedCredentialContexts(privilege, pathContexts);
     }
     throw new NotSupportedException(
         String.format("Catalog %s doesn't support generate credentials", baseCatalog.name()));
@@ -96,13 +96,13 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   }
 
   public static Map<String, CredentialContext> getPathBasedCredentialContexts(
-      CredentialPrivilege privilege, List<PathBasedContext> pathBasedContexts) {
-    return pathBasedContexts.stream()
+      CredentialPrivilege privilege, List<PathContext> pathContexts) {
+    return pathContexts.stream()
         .collect(
             Collectors.toMap(
-                pathBasedContext -> pathBasedContext.credentialType(),
-                pathBasedContext -> {
-                  String path = pathBasedContext.path();
+                pathContext -> pathContext.credentialType(),
+                pathContext -> {
+                  String path = pathContext.path();
                   Set<String> writePaths = new HashSet<>();
                   Set<String> readPaths = new HashSet<>();
                   if (CredentialPrivilege.WRITE.equals(privilege)) {

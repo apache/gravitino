@@ -22,23 +22,23 @@ package org.apache.gravitino.connector.credential;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * The {@code PathBasedContext} class represents the path and its associated credential type to
- * generate a credential for {@link org.apache.gravitino.credential.CredentialOperationDispatcher}.
+ * The {@code PathContext} class represents the path and its associated credential type to generate
+ * a credential for {@link org.apache.gravitino.credential.CredentialOperationDispatcher}.
  */
 @DeveloperApi
-public class PathBasedContext {
+public class PathContext {
 
   private final String path;
 
   private final String credentialType;
 
   /**
-   * Constructs a new {@code PathBasedContext} instance with the given path and credential type.
+   * Constructs a new {@code PathContext} instance with the given path and credential type.
    *
    * @param path The path string.
    * @param credentialType The type of the credential.
    */
-  public PathBasedContext(String path, String credentialType) {
+  public PathContext(String path, String credentialType) {
     this.path = path;
     this.credentialType = credentialType;
   }
