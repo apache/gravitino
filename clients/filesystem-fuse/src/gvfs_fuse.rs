@@ -190,6 +190,7 @@ pub async fn create_gvfs_filesystem(
         .storage_location;
     let (_schema, location) = extract_storage_filesystem(&location).unwrap();
 
+    // todo need to replace the inner filesystem with the real storage filesystem
     let inner_fs = MemoryFileSystem::new().await;
 
     let fs = GvfsFilesetFs::new(
