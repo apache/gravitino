@@ -195,6 +195,11 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(name + "-%d").build();
   }
 
+  /**
+   * Get Gravitino client by the configuration.
+   * @param configuration The configuration for the Gravitino client.
+   * @return The Gravitino client.
+   */
   public GravitinoClient initializeClient(Configuration configuration) {
     // initialize the Gravitino client
     String serverUri =
