@@ -80,7 +80,7 @@ class TestCredentialFactory(unittest.TestCase):
         self.assertEqual(0, check_credential.expire_time_in_ms())
 
     def test_gcs_token_credential(self):
-        gcs_credential_info = {GCSTokenCredential._GCS_TOKEN_NAME: "token"}
+        gcs_credential_info = {GCSTokenCredential.GCS_TOKEN_NAME: "token"}
         gcs_credential = GCSTokenCredential(gcs_credential_info, 1000)
         credential_info = gcs_credential.credential_info()
         expire_time = gcs_credential.expire_time_in_ms()
