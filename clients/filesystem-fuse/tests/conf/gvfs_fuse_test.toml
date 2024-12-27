@@ -34,7 +34,7 @@ block_size = 8192
 gravitino_url = "http://localhost:8090"
 metalake = "test"
 
-# extent settings
+# extend settings
 [extend_config]
 access_key = "XXX_access_key"
 secret_key = "XXX_secret_key"
