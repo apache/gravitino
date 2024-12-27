@@ -228,7 +228,7 @@ impl AppConfig {
                     return Ok(AppConfig::default());
                 } else {
                     warn!(
-                        "Use the default config file of {}",
+                        "Using the default config file {}",
                         FUSE_CONFIG_PATH.default
                     );
                 }
