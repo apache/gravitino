@@ -25,25 +25,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
-
-  compileOnly(libs.hadoop3.common)
-
-  implementation(libs.commons.lang3)
-  // runtime used
-  implementation(libs.commons.logging)
+  implementation(project(":bundles:gcp"))
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(libs.google.auth.http)
-  implementation(libs.google.auth.credentials)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -54,8 +39,9 @@ tasks.withType(ShadowJar::class.java) {
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
-  relocate("com.google", "org.apache.gravitino.gcp.shaded.com.google")
+  relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
+  relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
 }
 
 tasks.jar {

@@ -42,22 +42,20 @@ public class ConfigServlet extends HttpServlet {
       ImmutableSet.of(OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
 
   private static final ImmutableSet<ConfigEntry<?>> basicConfigEntries =
-      ImmutableSet.of(Configs.AUTHENTICATORS);
+      ImmutableSet.of(Configs.AUTHENTICATORS, Configs.ENABLE_AUTHORIZATION);
 
-  private final Map<String, String> configs = Maps.newHashMap();
+  private final Map<String, Object> configs = Maps.newHashMap();
 
   public ConfigServlet(ServerConfig serverConfig) {
     for (ConfigEntry<?> key : basicConfigEntries) {
-      String config = String.valueOf(serverConfig.get(key));
-      configs.put(key.getKey(), config);
+      configs.put(key.getKey(), serverConfig.get(key));
     }
 
     if (serverConfig
         .get(Configs.AUTHENTICATORS)
         .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       for (ConfigEntry<?> key : oauthConfigEntries) {
-        String config = String.valueOf(serverConfig.get(key));
-        configs.put(key.getKey(), config);
+        configs.put(key.getKey(), serverConfig.get(key));
       }
     }
   }
