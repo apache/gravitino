@@ -161,6 +161,8 @@ public class GravitinoVirtualFileSystemOSSCredentialIT extends GravitinoVirtualF
     return StringUtils.isNotBlank(System.getenv("OSS_STS_ACCESS_KEY_ID"))
         && StringUtils.isNotBlank(System.getenv("OSS_STS_SECRET_ACCESS_KEY"))
         && StringUtils.isNotBlank(System.getenv("OSS_STS_ENDPOINT"))
-        && StringUtils.isNotBlank(System.getenv("OSS_STS_BUCKET_NAME"));
+        && StringUtils.isNotBlank(System.getenv("OSS_STS_BUCKET_NAME"))
+        && StringUtils.isNotBlank(System.getenv("OSS_STS_REGION"))
+        && StringUtils.isNotBlank(System.getenv("OSS_STS_ROLE_ARN"));
   }
 }

@@ -37,9 +37,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@EnabledIf(value = "s3IsConfigured", disabledReason = "s3 with credential is not prepared")
 public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG =
       LoggerFactory.getLogger(GravitinoVirtualFileSystemS3CredentialIT.class);
@@ -155,4 +158,13 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
   @Disabled(
       "GCS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
+
+  protected static boolean s3IsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("S3_STS_ACCESS_KEY_ID"))
+        && StringUtils.isNotBlank(System.getenv("S3_STS_SECRET_ACCESS_KEY"))
+        && StringUtils.isNotBlank(System.getenv("S3_STS_ENDPOINT"))
+        && StringUtils.isNotBlank(System.getenv("S3_STS_BUCKET_NAME"))
+        && StringUtils.isNotBlank(System.getenv("S3_STS_REGION"))
+        && StringUtils.isNotBlank(System.getenv("S3_STS_ROLE_ARN"));
+  }
 }

@@ -36,6 +36,7 @@ dependencies {
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
+  implementation(libs.commons.dbcp2)
   implementation(libs.guava)
   implementation(libs.javax.jaxb.api) {
     exclude("*")

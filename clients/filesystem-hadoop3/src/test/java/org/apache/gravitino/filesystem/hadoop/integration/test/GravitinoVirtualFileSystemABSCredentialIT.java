@@ -171,6 +171,9 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
   private static boolean absIsConfigured() {
     return StringUtils.isNotBlank(System.getenv("ABS_STS_ACCOUNT_NAME"))
         && StringUtils.isNotBlank(System.getenv("ABS_STS_ACCOUNT_KEY"))
-        && StringUtils.isNotBlank(System.getenv("ABS_STS_CONTAINER_NAME"));
+        && StringUtils.isNotBlank(System.getenv("ABS_STS_CONTAINER_NAME"))
+        && StringUtils.isNotBlank(System.getenv("ABS_STS_TENANT_ID"))
+        && StringUtils.isNotBlank(System.getenv("ABS_STS_CLIENT_ID"))
+        && StringUtils.isNotBlank(System.getenv("ABS_STS_CLIENT_SECRET"));
   }
 }

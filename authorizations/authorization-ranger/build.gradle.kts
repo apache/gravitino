@@ -67,7 +67,12 @@ dependencies {
     exclude("net.java.dev.jna")
     exclude("javax.ws.rs")
     exclude("org.eclipse.jetty")
+    // Conflicts with hadoop-client-api used in hadoop-catalog.
+    exclude("org.apache.hadoop", "hadoop-common")
   }
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
+
   implementation(libs.rome)
   compileOnly(libs.lombok)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -92,11 +97,7 @@ dependencies {
   testImplementation("org.apache.kyuubi:kyuubi-spark-authz-shaded_$scalaVersion:$kyuubiVersion") {
     exclude("com.sun.jersey")
   }
-  testImplementation(libs.hadoop3.client)
-  testImplementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-  }
+
   testImplementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
