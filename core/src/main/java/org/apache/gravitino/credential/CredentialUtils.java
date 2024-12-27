@@ -20,24 +20,15 @@
 package org.apache.gravitino.credential;
 
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {
 
   private static final Splitter splitter = Splitter.on(",");
-
-  public static Credential vendCredential(CredentialProvider credentialProvider, String[] path) {
-    PathBasedCredentialContext pathBasedCredentialContext =
-        new PathBasedCredentialContext(
-            PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), Collections.emptySet());
-    return credentialProvider.getCredential(pathBasedCredentialContext);
-  }
 
   public static Map<String, CredentialProvider> loadCredentialProviders(
       Map<String, String> catalogProperties) {
