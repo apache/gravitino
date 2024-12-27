@@ -30,6 +30,7 @@ dependencies {
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.oss)
+  implementation(libs.httpclient)
 }
 
 tasks.withType(ShadowJar::class.java) {
