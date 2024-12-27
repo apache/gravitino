@@ -50,11 +50,11 @@ impl GvfsFilesetFs {
         }
     }
 
-    fn map_fileset_path_to_raw_path(&self, path: &Path) -> PathBuf {
+    fn gvfs_path_to_raw_path(&self, path: &Path) -> PathBuf {
         self.fileset_location.join(path)
     }
 
-    fn map_raw_path_to_fileset_path(&self, path: &Path) -> Result<PathBuf> {
+    fn raw_path_to_gvfs_path(&self, path: &Path) -> Result<PathBuf> {
         path.strip_prefix(&self.fileset_location)
             .map_err(|_| Errno::from(libc::EBADF))?;
         Ok(path.into())
@@ -68,64 +68,61 @@ impl PathFileSystem for GvfsFilesetFs {
     }
 
     async fn stat(&self, path: &Path) -> Result<FileStat> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         let mut file_stat = self.fs.stat(&raw_path).await?;
-        file_stat.path = self.map_raw_path_to_fileset_path(&file_stat.path)?;
+        file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         Ok(file_stat)
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         let mut child_filestats = self.fs.read_dir(&raw_path).await?;
         for file_stat in child_filestats.iter_mut() {
-            file_stat.path = self.map_raw_path_to_fileset_path(&file_stat.path)?;
+            file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         }
         Ok(child_filestats)
     }
 
     async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         let mut opened_file = self.fs.open_file(&raw_path, flags).await?;
-        opened_file.file_stat.path =
-            self.map_raw_path_to_fileset_path(&opened_file.file_stat.path)?;
+        opened_file.file_stat.path = self.raw_path_to_gvfs_path(&opened_file.file_stat.path)?;
         Ok(opened_file)
     }
 
     async fn open_dir(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         let mut opened_file = self.fs.open_dir(&raw_path, flags).await?;
-        opened_file.file_stat.path =
-            self.map_raw_path_to_fileset_path(&opened_file.file_stat.path)?;
+        opened_file.file_stat.path = self.raw_path_to_gvfs_path(&opened_file.file_stat.path)?;
         Ok(opened_file)
     }
 
     async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         let mut opened_file = self.fs.create_file(&raw_path, flags).await?;
-        opened_file.file_stat.path =
-            self.map_raw_path_to_fileset_path(&opened_file.file_stat.path)?;
+        opened_file.file_stat.path = self.raw_path_to_gvfs_path(&opened_file.file_stat.path)?;
         Ok(opened_file)
     }
 
     async fn create_dir(&self, path: &Path) -> Result<FileStat> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         let mut file_stat = self.fs.create_dir(&raw_path).await?;
-        file_stat.path = self.map_raw_path_to_fileset_path(&file_stat.path)?;
+        file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         Ok(file_stat)
     }
 
     async fn set_attr(&self, path: &Path, file_stat: &FileStat, flush: bool) -> Result<()> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         self.fs.set_attr(&raw_path, file_stat, flush).await
     }
 
     async fn remove_file(&self, path: &Path) -> Result<()> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         self.fs.remove_file(&raw_path).await
     }
 
     async fn remove_dir(&self, path: &Path) -> Result<()> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
+        let raw_path = self.gvfs_path_to_raw_path(path);
         self.fs.remove_dir(&raw_path).await
     }
 
