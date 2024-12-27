@@ -223,7 +223,7 @@ impl AppConfig {
                 //use default config
                 if fs::metadata(FUSE_CONFIG_PATH.default).is_err() {
                     warn!(
-                        "The default configuration file not found, use the default configuration"
+                        "The default configuration file is not found, using the default configuration"
                     );
                     return Ok(AppConfig::default());
                 } else {
