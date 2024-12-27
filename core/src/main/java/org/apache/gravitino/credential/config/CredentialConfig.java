@@ -98,8 +98,4 @@ public class CredentialConfig extends Config {
     super(false);
     loadFromMap(properties, k -> true);
   }
-
-  public CredentialConfig(boolean loadDefaults) {
-    super(loadDefaults);
-  }
 }
