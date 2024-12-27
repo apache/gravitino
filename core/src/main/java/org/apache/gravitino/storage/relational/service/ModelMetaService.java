@@ -30,6 +30,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -64,22 +66,7 @@ public class ModelMetaService {
   }
 
   public ModelEntity getModelByIdentifier(NameIdentifier ident) {
-    NameIdentifierUtil.checkModel(ident);
-
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
-
-    ModelPO modelPO =
-        SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class,
-            mapper -> mapper.selectModelMetaBySchemaIdAndModelName(schemaId, ident.name()));
-
-    if (modelPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
-          ident.toString());
-    }
-
+    ModelPO modelPO = getModelPOByIdentifier(ident);
     return POConverters.fromModelPO(modelPO, ident.namespace());
   }
 
@@ -120,14 +107,28 @@ public class ModelMetaService {
 
     AtomicInteger modelDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
+        // delete model versions first
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteModelVersionsBySchemaIdAndModelName(schemaId, ident.name())),
+
+        // delete model version aliases
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionAliasRelMapper.class,
+                mapper ->
+                    mapper.softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
+                        schemaId, ident.name())),
+
+        // delete model meta
         () ->
             modelDeletedCount.set(
                 SessionUtils.doWithoutCommitAndFetchResult(
                     ModelMetaMapper.class,
                     mapper ->
-                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name())))
-        // TODO(jerryshao): Add delete model version
-        );
+                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))));
 
     return modelDeletedCount.get() > 0;
   }
@@ -185,5 +186,24 @@ public class ModelMetaService {
     Long schemaId =
         SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schema);
     builder.withSchemaId(schemaId);
+  }
+
+  ModelPO getModelPOByIdentifier(NameIdentifier ident) {
+    NameIdentifierUtil.checkModel(ident);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+
+    ModelPO modelPO =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper -> mapper.selectModelMetaBySchemaIdAndModelName(schemaId, ident.name()));
+
+    if (modelPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+          ident.toString());
+    }
+    return modelPO;
   }
 }

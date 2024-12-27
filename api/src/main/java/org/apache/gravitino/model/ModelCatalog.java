@@ -79,12 +79,11 @@ public interface ModelCatalog {
    * @param properties The properties of the model. The properties are optional and can be null or
    *     empty.
    * @return The registered model object.
+   * @throws NoSuchSchemaException If the schema does not exist.
    * @throws ModelAlreadyExistsException If the model already registered.
    */
-  default Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws ModelAlreadyExistsException {
-    return registerModel(ident, null, new String[0], comment, properties);
-  }
+  Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchSchemaException, ModelAlreadyExistsException;
 
   /**
    * Register a model in the catalog if the model is not existed, otherwise the {@link
@@ -94,21 +93,30 @@ public interface ModelCatalog {
    *
    * @param ident The name identifier of the model.
    * @param uri The model artifact URI.
-   * @param aliases The aliases of the model version. The alias are optional and can be empty.
+   * @param aliases The aliases of the model version. The aliases should be unique in this model,
+   *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
+   *     are optional and can be empty. Also, be aware that the alias cannot be a number or a number
+   *     string.
    * @param comment The comment of the model. The comment is optional and can be null.
    * @param properties The properties of the model. The properties are optional and can be null or
    *     empty.
    * @return The registered model object.
+   * @throws NoSuchSchemaException If the schema does not exist when register a model.
    * @throws ModelAlreadyExistsException If the model already registered.
    * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
-  Model registerModel(
+  default Model registerModel(
       NameIdentifier ident,
       String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
-      throws ModelAlreadyExistsException, ModelVersionAliasesAlreadyExistException;
+      throws NoSuchSchemaException, ModelAlreadyExistsException,
+          ModelVersionAliasesAlreadyExistException {
+    Model model = registerModel(ident, comment, properties);
+    linkModelVersion(ident, uri, aliases, comment, properties);
+    return model;
+  }
 
   /**
    * Delete the model from the catalog. If the model does not exist, return false. Otherwise, return
@@ -193,15 +201,15 @@ public interface ModelCatalog {
    * @param uri The URI of the model version artifact.
    * @param aliases The aliases of the model version. The aliases should be unique in this model,
    *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
-   *     are optional and can be empty.
+   *     are optional and can be empty. Also, be aware that the alias cannot be a number or a number
+   *     string.
    * @param comment The comment of the model version. The comment is optional and can be null.
    * @param properties The properties of the model version. The properties are optional and can be
    *     null or empty.
-   * @return The model version object.
    * @throws NoSuchModelException If the model does not exist.
    * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
-  ModelVersion linkModelVersion(
+  void linkModelVersion(
       NameIdentifier ident,
       String uri,
       String[] aliases,

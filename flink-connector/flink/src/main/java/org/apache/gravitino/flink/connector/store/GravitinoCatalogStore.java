@@ -19,20 +19,25 @@
 
 package org.apache.gravitino.flink.connector.store;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.AbstractCatalogStore;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.factories.Factory;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
-import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
-import org.apache.gravitino.flink.connector.hive.HivePropertiesConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,11 +54,15 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   public void storeCatalog(String catalogName, CatalogDescriptor descriptor)
       throws CatalogException {
     Configuration configuration = descriptor.getConfiguration();
-    String provider = getGravitinoCatalogProvider(configuration);
-    Catalog.Type type = getGravitinoCatalogType(configuration);
+    BaseCatalogFactory catalogFactory = getCatalogFactory(configuration.toMap());
     Map<String, String> gravitinoProperties =
-        getPropertiesConverter(provider).toGravitinoCatalogProperties(configuration);
-    gravitinoCatalogManager.createCatalog(catalogName, type, null, provider, gravitinoProperties);
+        catalogFactory.propertiesConverter().toGravitinoCatalogProperties(configuration);
+    gravitinoCatalogManager.createCatalog(
+        catalogName,
+        catalogFactory.gravitinoCatalogType(),
+        null,
+        catalogFactory.gravitinoCatalogProvider(),
+        gravitinoProperties);
   }
 
   @Override
@@ -69,8 +78,8 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
     try {
       Catalog catalog = gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
-      String provider = catalog.provider();
-      PropertiesConverter propertiesConverter = getPropertiesConverter(provider);
+      BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
+      PropertiesConverter propertiesConverter = catalogFactory.propertiesConverter();
       Map<String, String> flinkCatalogProperties =
           propertiesConverter.toFlinkCatalogProperties(catalog.properties());
       CatalogDescriptor descriptor =
@@ -96,43 +105,60 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     return gravitinoCatalogManager.contains(catalogName);
   }
 
-  private String getGravitinoCatalogProvider(Configuration configuration) {
+  private BaseCatalogFactory getCatalogFactory(Map<String, String> configuration) {
     String catalogType =
         Preconditions.checkNotNull(
-            configuration.get(CommonCatalogOptions.CATALOG_TYPE),
+            configuration.get(CommonCatalogOptions.CATALOG_TYPE.key()),
             "%s should not be null.",
             CommonCatalogOptions.CATALOG_TYPE);
 
-    switch (catalogType) {
-      case GravitinoHiveCatalogFactoryOptions.IDENTIFIER:
-        return "hive";
-      default:
-        throw new IllegalArgumentException(
-            String.format("The catalog type is not supported:%s", catalogType));
-    }
+    return discoverFactories(
+        catalogFactory -> (catalogFactory.factoryIdentifier().equalsIgnoreCase(catalogType)),
+        String.format(
+            "Flink catalog type [%s] matched multiple flink catalog factories, it should only match one.",
+            catalogType));
   }
 
-  private Catalog.Type getGravitinoCatalogType(Configuration configuration) {
-    String catalogType =
-        Preconditions.checkNotNull(
-            configuration.get(CommonCatalogOptions.CATALOG_TYPE),
-            "%s should not be null.",
-            CommonCatalogOptions.CATALOG_TYPE);
-
-    switch (catalogType) {
-      case GravitinoHiveCatalogFactoryOptions.IDENTIFIER:
-        return Catalog.Type.RELATIONAL;
-      default:
-        throw new IllegalArgumentException(
-            String.format("The catalog type is not supported:%s", catalogType));
-    }
+  private BaseCatalogFactory getCatalogFactory(String provider) {
+    return discoverFactories(
+        catalogFactory ->
+            ((BaseCatalogFactory) catalogFactory)
+                .gravitinoCatalogProvider()
+                .equalsIgnoreCase(provider),
+        String.format(
+            "Gravitino catalog provider [%s] matched multiple flink catalog factories, it should only match one.",
+            provider));
   }
 
-  private PropertiesConverter getPropertiesConverter(String provider) {
-    switch (provider) {
-      case "hive":
-        return HivePropertiesConverter.INSTANCE;
+  private BaseCatalogFactory discoverFactories(Predicate<Factory> predicate, String errorMessage) {
+    Iterator<Factory> serviceLoaderIterator = ServiceLoader.load(Factory.class).iterator();
+    final List<Factory> factories = new ArrayList<>();
+    while (true) {
+      try {
+        if (!serviceLoaderIterator.hasNext()) {
+          break;
+        }
+        Factory catalogFactory = serviceLoaderIterator.next();
+        if (catalogFactory instanceof BaseCatalogFactory && predicate.test(catalogFactory)) {
+          factories.add(catalogFactory);
+        }
+      } catch (Throwable t) {
+        if (t instanceof NoClassDefFoundError) {
+          LOG.debug(
+              "NoClassDefFoundError when loading a " + Factory.class.getCanonicalName() + ".", t);
+        } else {
+          throw new RuntimeException("Unexpected error when trying to load service provider.", t);
+        }
+      }
     }
-    throw new IllegalArgumentException("The provider is not supported:" + provider);
+
+    if (factories.isEmpty()) {
+      throw new RuntimeException("Failed to correctly match the Flink catalog factory.");
+    }
+    // It should only match one.
+    if (factories.size() > 1) {
+      throw new RuntimeException(errorMessage);
+    }
+    return (BaseCatalogFactory) factories.get(0);
   }
 }

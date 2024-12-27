@@ -36,10 +36,10 @@ public class OSSTokenCredential implements Credential {
   /** OSS security token. */
   public static final String GRAVITINO_OSS_TOKEN = "oss-security-token";
 
-  private final String accessKeyId;
-  private final String secretAccessKey;
-  private final String securityToken;
-  private final long expireTimeInMS;
+  private String accessKeyId;
+  private String secretAccessKey;
+  private String securityToken;
+  private long expireTimeInMS;
 
   /**
    * Constructs an instance of {@link OSSTokenCredential} with secret key and token.
@@ -51,18 +51,18 @@ public class OSSTokenCredential implements Credential {
    */
   public OSSTokenCredential(
       String accessKeyId, String secretAccessKey, String securityToken, long expireTimeInMS) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(accessKeyId), "OSS access key Id should not be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(secretAccessKey), "OSS access key secret should not be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(securityToken), "OSS security token should not be empty");
-
+    validate(accessKeyId, secretAccessKey, securityToken, expireTimeInMS);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.securityToken = securityToken;
     this.expireTimeInMS = expireTimeInMS;
   }
+
+  /**
+   * This is the constructor that is used by credential factory to create an instance of credential
+   * according to the credential information.
+   */
+  public OSSTokenCredential() {}
 
   @Override
   public String credentialType() {
@@ -81,6 +81,20 @@ public class OSSTokenCredential implements Credential {
         .put(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY, secretAccessKey)
         .put(GRAVITINO_OSS_TOKEN, securityToken)
         .build();
+  }
+
+  @Override
+  public void initialize(Map<String, String> credentialInfo, long expireTimeInMs) {
+    String accessKeyId = credentialInfo.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
+    String secretAccessKey = credentialInfo.get(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY);
+    String securityToken = credentialInfo.get(GRAVITINO_OSS_TOKEN);
+
+    validate(accessKeyId, secretAccessKey, securityToken, expireTimeInMs);
+
+    this.accessKeyId = accessKeyId;
+    this.secretAccessKey = secretAccessKey;
+    this.securityToken = securityToken;
+    this.expireTimeInMS = expireTimeInMs;
   }
 
   /**
@@ -108,5 +122,17 @@ public class OSSTokenCredential implements Credential {
    */
   public String securityToken() {
     return securityToken;
+  }
+
+  private void validate(
+      String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessKeyId), "OSS access key Id should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(secretAccessKey), "OSS secret access key should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(sessionToken), "OSS session token should not be empty");
+    Preconditions.checkArgument(
+        expireTimeInMs > 0, "The expire time of OSSTokenCredential should great than 0");
   }
 }

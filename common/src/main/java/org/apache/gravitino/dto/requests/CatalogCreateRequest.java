@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -27,6 +28,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to create a catalog. */
@@ -42,7 +44,7 @@ public class CatalogCreateRequest implements RESTRequest {
   private final Catalog.Type type;
 
   @JsonProperty("provider")
-  private final String provider;
+  private String provider;
 
   @Nullable
   @JsonProperty("comment")
@@ -51,11 +53,6 @@ public class CatalogCreateRequest implements RESTRequest {
   @Nullable
   @JsonProperty("properties")
   private final Map<String, String> properties;
-
-  /** Default constructor for CatalogCreateRequest. */
-  public CatalogCreateRequest() {
-    this(null, null, null, null, null);
-  }
 
   /**
    * Constructor for CatalogCreateRequest.
@@ -66,17 +63,28 @@ public class CatalogCreateRequest implements RESTRequest {
    * @param comment The comment for the catalog.
    * @param properties The properties for the catalog.
    */
+  @JsonCreator
   public CatalogCreateRequest(
-      String name,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
+      @JsonProperty("name") String name,
+      @JsonProperty("type") Catalog.Type type,
+      @JsonProperty("provider") String provider,
+      @JsonProperty("comment") String comment,
+      @JsonProperty("properties") Map<String, String> properties) {
     this.name = name;
     this.type = type;
-    this.provider = provider;
     this.comment = comment;
     this.properties = properties;
+
+    if (StringUtils.isNotBlank(provider)) {
+      this.provider = provider;
+    } else if (type != null && type.supportsManagedCatalog()) {
+      this.provider = CatalogProvider.shortNameForManagedCatalog(type);
+    } else {
+      throw new IllegalArgumentException(
+          "Provider cannot be null for catalog type "
+              + type
+              + " that doesn't support managed catalog");
+    }
   }
 
   /**
@@ -90,6 +98,9 @@ public class CatalogCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
+        StringUtils.isNotBlank(provider) || type.supportsManagedCatalog(),
+        "\"provider\" field is required and cannot be empty for catalog type "
+            + type
+            + " that doesn't support managed catalog");
   }
 }

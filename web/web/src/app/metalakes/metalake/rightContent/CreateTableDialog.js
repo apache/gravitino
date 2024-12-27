@@ -596,6 +596,7 @@ const CreateTableDialog = props => {
                                         handleColumnChange({ index, field: 'type', value: e.target.value })
                                       }
                                       error={!column.type.trim() || column.paramErrors}
+                                      labelId='select-column-type'
                                       data-refer={`column-type-${index}`}
                                       renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
                                     >

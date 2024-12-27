@@ -24,6 +24,7 @@ import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 import java.io.File;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
+import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.cli.OAuthData;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
@@ -73,6 +74,16 @@ public abstract class Command {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
     this.outputFormat = outputFormat;
+  }
+
+  /**
+   * Prints an error message and exits with a non-zero status.
+   *
+   * @param error The error message to display before exiting.
+   */
+  public void exitWithError(String error) {
+    System.err.println(error);
+    Main.exit(-1);
   }
 
   /**
@@ -154,7 +165,7 @@ public abstract class Command {
 
         builder = builder.withKerberosAuth(tokenProvider);
       } else {
-        System.err.println("Unsupported authentication type " + authentication);
+        exitWithError("Unsupported authentication type " + authentication);
       }
     }
 

@@ -49,7 +49,7 @@ public class RangerHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHelper.class);
 
   public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
-  /** The `*` gives access to all resources */
+  /** The `*` gives access to all table resources */
   public static final String RESOURCE_ALL = "*";
   /** The owner privileges, the owner can do anything on the metadata object */
   private final Set<AuthorizationPrivilege> ownerPrivileges;
@@ -440,61 +440,6 @@ public class RangerHelper {
               }
               policy.getPolicyItems().add(policyItem);
             });
-  }
-
-  protected RangerPolicy createPolicyAddResources(AuthorizationMetadataObject metadataObject) {
-    RangerPolicy policy = new RangerPolicy();
-    policy.setService(rangerServiceName);
-    policy.setName(metadataObject.fullName());
-    List<String> nsMetadataObject = metadataObject.names();
-    for (int i = 0; i < nsMetadataObject.size(); i++) {
-      RangerPolicy.RangerPolicyResource policyResource =
-          new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-      policy.getResources().put(policyResourceDefines.get(i), policyResource);
-    }
-    return policy;
-  }
-
-  protected RangerPolicy addOwnerToNewPolicy(
-      AuthorizationMetadataObject metadataObject, Owner newOwner) {
-    RangerPolicy policy = createPolicyAddResources(metadataObject);
-
-    ownerPrivileges.forEach(
-        ownerPrivilege -> {
-          // Each owner's privilege will create one RangerPolicyItemAccess in the policy
-          RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-          policyItem
-              .getAccesses()
-              .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
-          if (newOwner != null) {
-            if (newOwner.type() == Owner.Type.USER) {
-              policyItem.getUsers().add(newOwner.name());
-            } else {
-              policyItem.getGroups().add(newOwner.name());
-            }
-            // mark the policy item is created by Gravitino
-            policyItem.getRoles().add(GRAVITINO_OWNER_ROLE);
-          }
-          policy.getPolicyItems().add(policyItem);
-        });
-    return policy;
-  }
-
-  protected RangerPolicy addOwnerRoleToNewPolicy(
-      AuthorizationMetadataObject metadataObject, String ownerRoleName) {
-    RangerPolicy policy = createPolicyAddResources(metadataObject);
-
-    ownerPrivileges.forEach(
-        ownerPrivilege -> {
-          // Each owner's privilege will create one RangerPolicyItemAccess in the policy
-          RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-          policyItem
-              .getAccesses()
-              .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
-          policyItem.getRoles().add(generateGravitinoRoleName(ownerRoleName));
-          policy.getPolicyItems().add(policyItem);
-        });
-    return policy;
   }
 
   protected void updatePolicyOwnerRole(RangerPolicy policy, String ownerRoleName) {

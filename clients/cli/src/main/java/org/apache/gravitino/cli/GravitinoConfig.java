@@ -82,6 +82,7 @@ public class GravitinoConfig {
       return;
     } catch (IOException exp) {
       System.err.println(exp.getMessage());
+      Main.exit(-1);
     }
 
     if (prop.containsKey(metalakeKey)) {

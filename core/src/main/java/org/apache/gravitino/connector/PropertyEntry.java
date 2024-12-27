@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 
 @Getter
 public final class PropertyEntry<T> {
+
   private final String name;
   private final String description;
   private final boolean required;
@@ -90,6 +91,7 @@ public final class PropertyEntry<T> {
   }
 
   public static class Builder<T> {
+
     private String name;
     private String description;
     private boolean required;
@@ -208,6 +210,28 @@ public final class PropertyEntry<T> {
         .withJavaType(Long.class)
         .withDefaultValue(defaultValue)
         .withDecoder(Long::parseLong)
+        .withEncoder(String::valueOf)
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
+  public static PropertyEntry<Double> doublePropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      double defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<Double>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(Double.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Double::parseDouble)
         .withEncoder(String::valueOf)
         .withHidden(hidden)
         .withReserved(reserved)

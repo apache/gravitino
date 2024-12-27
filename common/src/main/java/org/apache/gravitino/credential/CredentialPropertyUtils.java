@@ -38,6 +38,14 @@ public class CredentialPropertyUtils {
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
   @VisibleForTesting static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
 
+  @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
+
+  @VisibleForTesting
+  static final String ICEBERG_ADLS_ACCOUNT_NAME = "adls.auth.shared-key.account.name";
+
+  @VisibleForTesting
+  static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
+
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.of(
           GCSTokenCredential.GCS_TOKEN_NAME,
@@ -53,7 +61,11 @@ public class CredentialPropertyUtils {
           OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID,
           ICEBERG_OSS_ACCESS_KEY_ID,
           OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
-          ICEBERG_OSS_ACCESS_KEY_SECRET);
+          ICEBERG_OSS_ACCESS_KEY_SECRET,
+          AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+          ICEBERG_ADLS_ACCOUNT_NAME,
+          AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          ICEBERG_ADLS_ACCOUNT_KEY);
 
   /**
    * Transforms a specific credential into a map of Iceberg properties.
@@ -62,6 +74,14 @@ public class CredentialPropertyUtils {
    * @return a map of Iceberg properties derived from the credential
    */
   public static Map<String, String> toIcebergProperties(Credential credential) {
+    if (credential instanceof S3TokenCredential
+        || credential instanceof S3SecretKeyCredential
+        || credential instanceof OSSTokenCredential
+        || credential instanceof OSSSecretKeyCredential
+        || credential instanceof AzureAccountKeyCredential) {
+      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+    }
+
     if (credential instanceof GCSTokenCredential) {
       Map<String, String> icebergGCSCredentialProperties =
           transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
@@ -69,12 +89,19 @@ public class CredentialPropertyUtils {
           "gcs.oauth2.token-expires-at", String.valueOf(credential.expireTimeInMs()));
       return icebergGCSCredentialProperties;
     }
-    if (credential instanceof S3TokenCredential || credential instanceof S3SecretKeyCredential) {
-      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+
+    if (credential instanceof ADLSTokenCredential) {
+      ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
+      String sasTokenKey =
+          String.format(
+              "%s.%s.%s",
+              ICEBERG_ADLS_TOKEN, adlsCredential.accountName(), ADLSTokenCredential.ADLS_DOMAIN);
+
+      Map<String, String> icebergADLSCredentialProperties = new HashMap<>();
+      icebergADLSCredentialProperties.put(sasTokenKey, adlsCredential.sasToken());
+      return icebergADLSCredentialProperties;
     }
-    if (credential instanceof OSSTokenCredential) {
-      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
-    }
+
     return credential.toProperties();
   }
 

@@ -71,6 +71,10 @@ public class SetOwner extends Command {
       this.entityType = MetadataObject.Type.TABLE;
     } else if (entityType.equals(CommandEntities.COLUMN)) {
       this.entityType = MetadataObject.Type.COLUMN;
+    } else if (entityType.equals(CommandEntities.TOPIC)) {
+      this.entityType = MetadataObject.Type.TOPIC;
+    } else if (entityType.equals(CommandEntities.FILESET)) {
+      this.entityType = MetadataObject.Type.FILESET;
     } else {
       this.entityType = null;
     }
@@ -86,14 +90,11 @@ public class SetOwner extends Command {
       GravitinoClient client = buildClient(metalake);
       client.setOwner(metadata, owner, ownerType);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchMetadataObjectException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ENTITY);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println("Set owner to " + owner);

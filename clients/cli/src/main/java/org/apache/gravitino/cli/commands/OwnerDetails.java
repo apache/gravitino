@@ -75,14 +75,11 @@ public class OwnerDetails extends Command {
       GravitinoClient client = buildClient(metalake);
       owner = client.getOwner(metadata);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchMetadataObjectException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ENTITY);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (owner.isPresent()) {

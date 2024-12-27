@@ -174,7 +174,7 @@ allprojects {
       param.environment("PROJECT_VERSION", project.version)
 
       // Gravitino CI Docker image
-      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.16")
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.17")
       param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
@@ -303,51 +303,49 @@ subprojects {
     }
   }
 
-  if (project.name != "meta") {
-    apply(plugin = "net.ltgt.errorprone")
-    dependencies {
-      errorprone("com.google.errorprone:error_prone_core:2.10.0")
-    }
+  apply(plugin = "net.ltgt.errorprone")
+  dependencies {
+    errorprone("com.google.errorprone:error_prone_core:2.10.0")
+  }
 
-    tasks.withType<JavaCompile>().configureEach {
-      options.errorprone.isEnabled.set(true)
-      options.errorprone.disableWarningsInGeneratedCode.set(true)
-      options.errorprone.disable(
-        "AlmostJavadoc",
-        "CanonicalDuration",
-        "CheckReturnValue",
-        "ComparableType",
-        "ConstantOverflow",
-        "DoubleBraceInitialization",
-        "EqualsUnsafeCast",
-        "EmptyBlockTag",
-        "FutureReturnValueIgnored",
-        "InconsistentCapitalization",
-        "InconsistentHashCode",
-        "JavaTimeDefaultTimeZone",
-        "JdkObsolete",
-        "LockNotBeforeTry",
-        "MissingSummary",
-        "MissingOverride",
-        "MutableConstantField",
-        "NonOverridingEquals",
-        "ObjectEqualsForPrimitives",
-        "OperatorPrecedence",
-        "ReturnValueIgnored",
-        "SameNameButDifferent",
-        "StaticAssignmentInConstructor",
-        "StringSplitter",
-        "ThreadPriorityCheck",
-        "ThrowIfUncheckedKnownChecked",
-        "TypeParameterUnusedInFormals",
-        "UnicodeEscape",
-        "UnnecessaryParentheses",
-        "UnsafeReflectiveConstructionCast",
-        "UnusedMethod",
-        "VariableNameSameAsType",
-        "WaitNotInLoop"
-      )
-    }
+  tasks.withType<JavaCompile>().configureEach {
+    options.errorprone.isEnabled.set(true)
+    options.errorprone.disableWarningsInGeneratedCode.set(true)
+    options.errorprone.disable(
+      "AlmostJavadoc",
+      "CanonicalDuration",
+      "CheckReturnValue",
+      "ComparableType",
+      "ConstantOverflow",
+      "DoubleBraceInitialization",
+      "EqualsUnsafeCast",
+      "EmptyBlockTag",
+      "FutureReturnValueIgnored",
+      "InconsistentCapitalization",
+      "InconsistentHashCode",
+      "JavaTimeDefaultTimeZone",
+      "JdkObsolete",
+      "LockNotBeforeTry",
+      "MissingSummary",
+      "MissingOverride",
+      "MutableConstantField",
+      "NonOverridingEquals",
+      "ObjectEqualsForPrimitives",
+      "OperatorPrecedence",
+      "ReturnValueIgnored",
+      "SameNameButDifferent",
+      "StaticAssignmentInConstructor",
+      "StringSplitter",
+      "ThreadPriorityCheck",
+      "ThrowIfUncheckedKnownChecked",
+      "TypeParameterUnusedInFormals",
+      "UnicodeEscape",
+      "UnnecessaryParentheses",
+      "UnsafeReflectiveConstructionCast",
+      "UnusedMethod",
+      "VariableNameSameAsType",
+      "WaitNotInLoop"
+    )
   }
 
   tasks.withType<Javadoc> {
@@ -585,7 +583,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", ":authorizations:copyLibAndConfig", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -781,7 +779,7 @@ tasks {
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
-        it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle"
+        it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" && it.name != "hadoop-common"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -804,7 +802,7 @@ tasks {
         it.name != "bundled-catalog" &&
         it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
         it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "docs"
+        it.name != "hadoop-common" && it.name != "docs"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -826,13 +824,8 @@ tasks {
       ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      ":catalogs:catalog-kafka:copyLibAndConfig"
-    )
-  }
-
-  register("copyAuthorizationLibAndConfigs", Copy::class) {
-    dependsOn(
-      ":authorizations:authorization-ranger:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig",
+      ":catalogs:catalog-model:copyLibAndConfig"
     )
   }
 
@@ -924,7 +917,7 @@ fun printMacDockerTip() {
 
 fun checkMacDockerConnector() {
   if (!OperatingSystem.current().isMacOsX()) {
-    // Only MacOs requires the use of `docker-connector`
+    // Only macOS requires the use of `docker-connector`
     return
   }
 

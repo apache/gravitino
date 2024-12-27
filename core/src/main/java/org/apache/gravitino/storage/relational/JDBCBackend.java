@@ -43,6 +43,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -56,6 +57,7 @@ import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
+import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -65,6 +67,8 @@ import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
@@ -73,6 +77,8 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
   private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
       ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
@@ -115,6 +121,9 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace, allFields);
       case MODEL:
         return (List<E>) ModelMetaService.getInstance().listModelsByNamespace(namespace);
+      case MODEL_VERSION:
+        return (List<E>)
+            ModelVersionMetaService.getInstance().listModelVersionsByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -156,6 +165,13 @@ public class JDBCBackend implements RelationalBackend {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
     } else if (e instanceof ModelEntity) {
       ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
+    } else if (e instanceof ModelVersionEntity) {
+      if (overwritten) {
+        LOG.warn(
+            "'overwritten' is not supported for model version meta, ignoring this flag and "
+                + "inserting the new model version.");
+      }
+      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -220,6 +236,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TagMetaService.getInstance().getTagByIdentifier(ident);
       case MODEL:
         return (E) ModelMetaService.getInstance().getModelByIdentifier(ident);
+      case MODEL_VERSION:
+        return (E) ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -252,6 +270,8 @@ public class JDBCBackend implements RelationalBackend {
         return TagMetaService.getInstance().deleteTag(ident);
       case MODEL:
         return ModelMetaService.getInstance().deleteModel(ident);
+      case MODEL_VERSION:
+        return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
@@ -310,7 +330,9 @@ public class JDBCBackend implements RelationalBackend {
             .deleteModelMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case MODEL_VERSION:
-        // TODO (jerryshao): Implement hard delete logic for these entity types.
+        return ModelVersionMetaService.getInstance()
+            .deleteModelVersionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.

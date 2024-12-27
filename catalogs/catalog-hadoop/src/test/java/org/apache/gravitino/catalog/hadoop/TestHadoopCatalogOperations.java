@@ -25,7 +25,6 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
-import static org.apache.gravitino.Configs.ENTITY_SERDE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
@@ -131,6 +130,11 @@ public class TestHadoopCatalogOperations {
         public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Does not support topic properties");
         }
+
+        @Override
+        public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Does not support model properties");
+        }
       };
 
   private static EntityStore store;
@@ -184,7 +188,6 @@ public class TestHadoopCatalogOperations {
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-    when(config.get(ENTITY_SERDE)).thenReturn("proto");
 
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
@@ -443,6 +446,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(schemaPath));
 
       // Test drop non-empty schema with cascade = false
+      createSchema(name, comment, catalogPath, null);
       Fileset fs1 = createFileset("fs1", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
 
@@ -456,6 +460,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(fs1Path));
 
       // Test drop both managed and external filesets
+      createSchema(name, comment, catalogPath, null);
       Fileset fs2 = createFileset("fs2", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs2Path = new Path(fs2.storageLocation());
 
@@ -469,6 +474,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(fs.exists(fs3Path));
 
       // Test drop schema with different storage location
+      createSchema(name, comment, catalogPath, null);
       Path fs4Path = new Path(TEST_ROOT_PATH + "/fs4");
       createFileset("fs4", name, "comment", Fileset.Type.MANAGED, catalogPath, fs4Path.toString());
       ops.dropSchema(id, true);
@@ -731,6 +737,11 @@ public class TestHadoopCatalogOperations {
 
           @Override
           public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+            return null;
+          }
+
+          @Override
+          public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
             return null;
           }
         };

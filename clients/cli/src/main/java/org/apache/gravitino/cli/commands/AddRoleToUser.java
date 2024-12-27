@@ -59,17 +59,13 @@ public class AddRoleToUser extends Command {
       roles.add(role);
       client.grantRolesToUser(roles, user);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ROLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(role + " added to " + user);

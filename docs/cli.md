@@ -228,7 +228,7 @@ gcli metalake list
 gcli metalake details
 ```
 
-#### Show a metalake audit information
+#### Show a metalake's audit information
 
 ```bash
 gcli metalake details --audit
@@ -276,6 +276,24 @@ gcli metalake set --property test --value value
 gcli metalake remove --property test
 ```
 
+#### Enable a metalake
+
+```bash
+gcli metalake update -m metalake_demo --enable
+```
+
+#### Enable a metalake and all catalogs
+
+```bash
+gcli metalake update -m metalake_demo --enable --all
+```
+
+#### Disable a metalake
+
+```bash
+gcli metalake update -m metalake_demo --disable
+```
+
 ### Catalog commands
 
 #### Show all catalogs in a metalake
@@ -290,7 +308,7 @@ gcli catalog list
 gcli catalog details --name catalog_postgres
 ```
 
-#### Show a catalog audit information
+#### Show a catalog's audit information
 
 ```bash
 gcli catalog details --name catalog_postgres --audit
@@ -390,6 +408,24 @@ gcli catalog set --name catalog_mysql --property test --value value
 gcli catalog remove --name catalog_mysql --property test
 ```
 
+#### Enable a catalog
+
+```bash
+gcli catalog update -m metalake_demo --name catalog --enable 
+```
+
+#### Enable a catalog and it's metalake
+
+```bash
+gcli catalog update -m metalake_demo --name catalog --enable --all
+```
+
+#### Disable a catalog
+
+```bash
+gcli catalog update -m metalake_demo --name catalog --disable
+```
+
 ### Schema commands
 
 #### Show all schemas in a catalog
@@ -404,7 +440,7 @@ gcli schema list --name catalog_postgres
 gcli schema details --name catalog_postgres.hr
 ```
 
-#### Show schema audit information
+#### Show schema's audit information
 
 ```bash
 gcli schema details --name catalog_postgres.hr --audit
@@ -419,7 +455,7 @@ gcli schema create --name catalog_postgres.new_db
 #### Display schema properties
 
 ```bash
-gcli schema properties --name catalog_postgres.hr -i
+gcli schema properties --name catalog_postgres.hr
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
@@ -526,6 +562,12 @@ gcli user details --user new_user
 gcli user list
 ```
 
+#### Show a roles's audit information
+
+```bash
+gcli user details --user new_user --audit
+```
+
 #### Delete a user
 
 ```bash
@@ -552,6 +594,12 @@ gcli group details --group new_group
 gcli group list
 ```
 
+#### Show a groups's audit information
+
+```bash
+gcli group details --group new_group --audit
+```
+
 #### Delete a group
 
 ```bash
@@ -569,10 +617,10 @@ gcli tag details --tag tagA
 #### Create tags
 
 ```bash
- gcli tag create --tag tagA tagB
- ```
+gcli tag create --tag tagA tagB
+```
 
-#### List all tag
+#### List all tags
 
 ```bash
 gcli tag list
@@ -660,6 +708,12 @@ gcli catalog set --owner --group groupA --name postgres
 
 ### Role commands
 
+When granting or revoking privileges the following privileges can be used.
+
+create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants
+
+Note that some are only valid for certain entities.
+
 #### Display role details
 
 ```bash
@@ -670,6 +724,12 @@ gcli role details --role admin
 
 ```bash
 gcli role list
+```
+
+#### Show a roles's audit information
+
+```bash
+gcli role details --role admin --audit
 ```
 
 #### Create a role
@@ -703,8 +763,21 @@ gcli group grant --group groupA --role admin
 ```
 
 #### Remove a role from a group
+
 ```bash
 gcli group revoke --group groupA --role admin
+```
+
+### Grant a privilege
+
+```bash
+gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
+```
+
+### Revoke a privilege
+
+```bash
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Topic commands
@@ -715,7 +788,7 @@ gcli group revoke --group groupA --role admin
 gcli topic details --name kafka.default.topic3
 ```
 
-#### Create a tag
+#### Create a topic
 
 ```bash
 gcli topic create --name kafka.default.topic3
@@ -820,7 +893,26 @@ Note that some commands are not supported depending on what the database support
 When setting the datatype of a column the following basic types are currently supported:
 null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
 
-In addition decimal(precision,scale) and varchar(length).
+In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).
+
+
+#### Show all columns
+
+```bash
+gcli column list --name catalog_postgres.hr.departments
+```
+
+#### Show column's audit information
+
+```bash
+gcli column details --name catalog_postgres.hr.departments.name --audit
+```
+
+#### Show a column's audit information
+
+```bash
+gcli column details --name catalog_postgres.hr.departments.name --audit
+```
 
 #### Add a column
 
