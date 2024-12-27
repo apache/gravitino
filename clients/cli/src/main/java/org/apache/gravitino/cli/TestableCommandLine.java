@@ -52,6 +52,7 @@ import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.FilesetDetails;
+import org.apache.gravitino.cli.commands.GetModel;
 import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
@@ -66,6 +67,7 @@ import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListIndexes;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
+import org.apache.gravitino.cli.commands.ListModel;
 import org.apache.gravitino.cli.commands.ListRoles;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
@@ -906,5 +908,15 @@ public class TestableCommandLine {
   protected CatalogDisable newCatalogDisable(
       String url, boolean ignore, String metalake, String catalog) {
     return new CatalogDisable(url, ignore, metalake, catalog);
+  }
+
+  protected ListModel newListModel(
+      String url, boolean ignore, String metalake, String catalog, String schema, String model, boolean listVersions) {
+    return new ListModel(url, ignore, metalake, catalog, schema, model, listVersions);
+  }
+
+  protected GetModel newGetModel( String url, boolean ignore, String metalake, String catalog, String schema,
+      String model, String version){
+    return new GetModel(url, ignore, metalake, catalog, schema, model, version);
   }
 }

@@ -152,6 +152,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleTagCommand();
     } else if (entity.equals(CommandEntities.ROLE)) {
       handleRoleCommand();
+    } else if (entity.equals(CommandEntities.MODEL)) {
+      handleModelCommand();
     }
   }
 
@@ -1136,6 +1138,44 @@ public class GravitinoCommandLine extends TestableCommandLine {
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
         break;
+    }
+  }
+
+  private void handleModelCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+
+    Command.setAuthenticationMode(auth, userName);
+
+    List<String> missingEntities = Lists.newArrayList();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+
+    // Handle CommandActions.LIST action separately as it doesn't require the `model`
+    if (CommandActions.LIST.equals(command) && !line.hasOption(GravitinoOptions.VERSION)) {
+      checkEntities(missingEntities);
+      newListModel(url, ignore, metalake, catalog, schema, null).handle();
+      return;
+    }
+
+    String model = name.getModelName();
+    if (model == null) missingEntities.add(CommandEntities.MODEL);
+    checkEntities(missingEntities);
+
+    switch (command) {
+      case CommandActions.GET:
+        String version = line.getOptionValue(GravitinoOptions.VERSION);
+        newGetModel(url, ignore, metalake, catalog, schema, model, version).handle();
+        break;
+
+      default:
+        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+        break;
+
     }
   }
 
