@@ -105,7 +105,7 @@ fn create_fs_with_schema(
 
 pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
     if !path.starts_with(FILESET_PREFIX) {
-        return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
+        return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
     }
 
     let path_without_prefix = &path[FILESET_PREFIX.len()..];
@@ -113,13 +113,13 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
     let parts: Vec<&str> = path_without_prefix.split('/').collect();
 
     if parts.len() != 3 {
-        return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
+        return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
     }
     // todo handle mount catalog or schema
 
-    let catalog = parts[1].to_string();
-    let schema = parts[2].to_string();
-    let fileset = parts[3].to_string();
+    let catalog = parts[0].to_string();
+    let schema = parts[1].to_string();
+    let fileset = parts[2].to_string();
 
     Ok((catalog, schema, fileset))
 }

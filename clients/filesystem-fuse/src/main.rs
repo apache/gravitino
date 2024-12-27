@@ -33,14 +33,22 @@ async fn main() -> fuse3::Result<()> {
         return Err(Errno::from(libc::EINVAL));
     }
     let config = config.unwrap();
-    let handle = tokio::spawn(async move { gvfs_mount("gvfs", "", &config).await });
+    let mount_point = "gvfs";
+    let mount_from = "gvfs://fileset/catalog1/schema1/fileset1";
+    let handle = tokio::spawn(async move {
+        let result = gvfs_mount(mount_point, mount_from, &config).await;
+        if let Err(e) = result {
+            error!("Failed to mount gvfs: {:?}", e);
+            return Err(Errno::from(libc::EINVAL));
+        }
+        Ok(())
+    });
 
-    let _ = signal::ctrl_c().await;
-    info!("Received Ctrl+C, Unmounting gvfs...");
-
-    if let Err(e) = handle.await {
-        error!("Failed to mount gvfs: {:?}", e);
-        return Err(Errno::from(libc::EINVAL));
+    tokio::select! {
+        _ = handle => {}
+        _ = signal::ctrl_c() => {
+            info!("Received Ctrl+C, unmounting gvfs...");
+        }
     }
 
     let _ = gvfs_unmount().await;
