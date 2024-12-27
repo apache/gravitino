@@ -17,8 +17,8 @@
 
 # fuse settings
 [fuse]
-file_mask= 0o600
-dir_mask= 0o700
+file_mask= 0o644
+dir_mask= 0o755
 fs_type = "memory"
 
 [fuse.properties]

@@ -80,13 +80,7 @@ pub(crate) async fn create_fuse_fs(
 ) -> GvfsResult<CreateFsResult> {
     let uid = unsafe { libc::getuid() };
     let gid = unsafe { libc::getgid() };
-    let fs_context = FileSystemContext {
-        uid: uid,
-        gid: gid,
-        default_file_perm: 0o644,
-        default_dir_perm: 0o755,
-        block_size: 4 * 1024,
-    };
+    let fs_context = FileSystemContext::new(uid, gid, config);
     let fs = create_path_fs(mount_from, config, &fs_context).await?;
     create_raw_fs(fs, config, fs_context).await
 }

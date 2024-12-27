@@ -155,7 +155,7 @@ pub(crate) struct FileSystemContext {
 }
 
 impl FileSystemContext {
-    pub(crate) fn new(uid: u32, gid: u32, config: AppConfig) -> Self {
+    pub(crate) fn new(uid: u32, gid: u32, config: &AppConfig) -> Self {
         FileSystemContext {
             uid,
             gid,
