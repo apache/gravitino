@@ -34,12 +34,16 @@ import {
   fetchTables,
   fetchFilesets,
   fetchTopics,
+  fetchModels,
+  fetchModelVersions,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
   getTableDetails,
   getFilesetDetails,
   getTopicDetails,
+  getModelDetails,
+  getVersionDetails,
   setSelectedNodes
 } from '@/lib/store/metalakes'
 
@@ -57,11 +61,13 @@ const MetalakeView = () => {
       schema: searchParams.get('schema'),
       table: searchParams.get('table'),
       fileset: searchParams.get('fileset'),
-      topic: searchParams.get('topic')
+      topic: searchParams.get('topic'),
+      model: searchParams.get('model'),
+      version: searchParams.get('version')
     }
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {
-        const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
+        const { metalake, catalog, type, schema, table, fileset, topic, model, version } = routeParams
 
         if (paramsSize === 1 && metalake) {
           dispatch(fetchCatalogs({ init: true, page: 'metalakes', metalake }))
@@ -91,6 +97,9 @@ const MetalakeView = () => {
             case 'messaging':
               dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema }))
               break
+            case 'model':
+              dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema }))
+              break
             default:
               break
           }
@@ -111,6 +120,13 @@ const MetalakeView = () => {
           if (topic) {
             dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
           }
+          if (model) {
+            dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
+            dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
+          }
+        }
+        if (paramsSize === 6 && version) {
+          dispatch(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
         }
       }
     }
@@ -124,7 +140,9 @@ const MetalakeView = () => {
                 routeParams.schema ? `{{${routeParams.schema}}}` : ''
               }${routeParams.table ? `{{${routeParams.table}}}` : ''}${
                 routeParams.fileset ? `{{${routeParams.fileset}}}` : ''
-              }${routeParams.topic ? `{{${routeParams.topic}}}` : ''}`
+              }${routeParams.topic ? `{{${routeParams.topic}}}` : ''}${
+                routeParams.model ? `{{${routeParams.model}}}` : ''
+              }${routeParams.version ? `{{${routeParams.version}}}` : ''}`
             ]
           : []
       )

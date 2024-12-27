@@ -85,7 +85,10 @@ const TabsContent = () => {
   const paramsSize = [...searchParams.keys()].length
   const type = searchParams.get('type')
   const [tab, setTab] = useState('table')
-  const isNotNeedTableTab = type && ['fileset', 'messaging'].includes(type) && paramsSize === 5
+
+  const isNotNeedTableTab =
+    (type && ['fileset', 'messaging'].includes(type) && paramsSize === 5) ||
+    (paramsSize === 6 && searchParams.get('version'))
   const isShowTableProps = paramsSize === 5 && !['fileset', 'messaging'].includes(type)
 
   const handleChangeTab = (event, newValue) => {
@@ -101,18 +104,29 @@ const TabsContent = () => {
       break
     case 4:
       switch (type) {
+        case 'table':
+          tableTitle = 'Tables'
+          break
         case 'fileset':
           tableTitle = 'Filesets'
           break
         case 'messaging':
           tableTitle = 'Topics'
           break
-        default:
-          tableTitle = 'Tables'
+        case 'model':
+          tableTitle = 'Models'
+          break
       }
       break
     case 5:
-      tableTitle = 'Columns'
+      switch (type) {
+        case 'table':
+          tableTitle = 'Columns'
+          break
+        case 'model':
+          tableTitle = 'Versions'
+          break
+      }
       break
     default:
       break
