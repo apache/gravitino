@@ -23,14 +23,15 @@ import unittest
 
 from adlfs import AzureBlobFileSystem
 
-from gravitino.filesystem import gvfs
-from gravitino.filesystem.gvfs import StorageType
-from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino import (
+    gvfs,
     GravitinoClient,
     Catalog,
     Fileset,
 )
+from gravitino.filesystem.gvfs_config import GVFSConfig
+from gravitino.filesystem.gvfs import StorageType
+
 from tests.integration.test_gvfs_with_abs import TestGvfsWithABS
 
 
