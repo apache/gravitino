@@ -104,7 +104,7 @@ const TabsContent = () => {
       break
     case 4:
       switch (type) {
-        case 'table':
+        case 'relational':
           tableTitle = 'Tables'
           break
         case 'fileset':
@@ -120,7 +120,7 @@ const TabsContent = () => {
       break
     case 5:
       switch (type) {
-        case 'table':
+        case 'relational':
           tableTitle = 'Columns'
           break
         case 'model':
