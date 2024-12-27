@@ -44,6 +44,7 @@ dependencies {
   }
   implementation(libs.google.auth.http)
   implementation(libs.google.auth.credentials)
+  implementation(project(":clients:filesystem-hadoop3-runtime", configuration = "shadow"))
 }
 
 tasks.withType(ShadowJar::class.java) {

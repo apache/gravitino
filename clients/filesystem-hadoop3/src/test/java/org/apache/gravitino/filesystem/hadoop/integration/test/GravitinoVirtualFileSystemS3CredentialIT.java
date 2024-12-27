@@ -40,9 +40,9 @@ import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoVirtualFileSystemRealS3IT extends GravitinoVirtualFileSystemIT {
+public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoVirtualFileSystemRealS3IT.class);
+      LoggerFactory.getLogger(GravitinoVirtualFileSystemS3CredentialIT.class);
 
   public static final String BUCKET_NAME = System.getenv("S3_STS_BUCKET_NAME");
   public static final String S3_ACCESS_KEY = System.getenv("S3_STS_ACCESS_KEY_ID");

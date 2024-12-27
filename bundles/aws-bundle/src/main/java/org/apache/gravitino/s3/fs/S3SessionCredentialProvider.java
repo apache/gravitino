@@ -39,9 +39,12 @@ import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class S3SessionCredentialProvider implements AWSCredentialsProvider {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(S3SessionCredentialProvider.class);
   private final GravitinoClient client;
   private final String filesetIdentifier;
   private final Configuration configuration;
@@ -85,6 +88,7 @@ public class S3SessionCredentialProvider implements AWSCredentialsProvider {
 
     // Can't find any credential, use the default one.
     if (credentials.length == 0) {
+      LOGGER.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
       expirationTime = Long.MAX_VALUE;
       this.basicSessionCredentials =
           new BasicAWSCredentials(

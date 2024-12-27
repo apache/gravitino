@@ -39,9 +39,12 @@ import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.aliyun.oss.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OSSSessionCredentialProvider implements CredentialsProvider {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(OSSSessionCredentialProvider.class);
   private Credentials basicCredentials;
   private final String filesetIdentifier;
   private long expirationTime;
@@ -79,10 +82,9 @@ public class OSSSessionCredentialProvider implements CredentialsProvider {
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    // Use dynamic credential by default.
-
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
     if (credentials.length == 0) {
+      LOGGER.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
       expirationTime = Long.MAX_VALUE;
       this.basicCredentials =
           new DefaultCredentials(
