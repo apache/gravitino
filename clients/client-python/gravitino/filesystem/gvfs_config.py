@@ -32,20 +32,15 @@ class GVFSConfig:
     OAUTH2_PATH = "oauth2_path"
     OAUTH2_SCOPE = "oauth2_scope"
 
-    GVFS_USE_CLOUD_STORE_CREDENTIAL = "use_cloud_store_credential"
-
     GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE = "gcs_service_account_file"
 
     GVFS_FILESYSTEM_S3_ACCESS_KEY = "s3_access_key_id"
     GVFS_FILESYSTEM_S3_SECRET_KEY = "s3_secret_access_key"
     GVFS_FILESYSTEM_S3_ENDPOINT = "s3_endpoint"
-    GVFS_FILESYSTEM_S3_USE_STATIC_CREDENTIAL = "s3_use_static_credential"
 
     GVFS_FILESYSTEM_OSS_ACCESS_KEY = "oss_access_key_id"
     GVFS_FILESYSTEM_OSS_SECRET_KEY = "oss_secret_access_key"
     GVFS_FILESYSTEM_OSS_ENDPOINT = "oss_endpoint"
-    GVFS_FILESYSTEM_OSS_USE_STATIC_CREDENTIAL = "oss_use_static_credential"
 
     GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME = "abs_account_name"
     GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY = "abs_account_key"
-    GVFS_FILESYSTEM_AZURE_USE_STATIC_CREDENTIAL = "abs_use_static_credential"
