@@ -62,7 +62,7 @@ pub async fn mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> Gvfs
 }
 
 pub async fn unmount() -> GvfsResult<()> {
-    info!("Stop gvfs-fuse server...");
+    info!("Stopping gvfs-fuse server...");
     let svr = {
         let mut server = SERVER.lock().await;
         if server.is_none() {
