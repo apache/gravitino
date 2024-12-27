@@ -197,6 +197,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   /**
    * Get Gravitino client by the configuration.
+   *
    * @param configuration The configuration for the Gravitino client.
    * @return The Gravitino client.
    */
