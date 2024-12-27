@@ -16,18 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 use crate::config::AppConfig;
-use crate::error::ErrorCode::InvalidConfig;
+use crate::error::ErrorCode::{InvalidConfig, UnSupportedFilesystem};
 use crate::filesystem::{FileSystemContext, PathFileSystem};
-use crate::gravitino_client::GravitinoClient;
+use crate::gravitino_client::{Fileset, GravitinoClient};
 use crate::gvfs_fileset_fs::GvfsFilesetFs;
 use crate::gvfs_fuse::{CreateFsResult, FileSystemSchema};
 use crate::open_dal_filesystem::OpenDalFileSystem;
-use crate::utils::GvfsResult;
-use std::path::Path;
+use crate::utils::{extract_root_path, parse_location, GvfsResult};
 
-const FILESET_PREFIX: &str = "gvfs://fileset/";
+const GRAVITINO_FILESET_SCHEMA: &str = "gvfs";
 
 pub async fn create_gvfs_filesystem(
     mount_from: &str,
@@ -81,69 +79,72 @@ pub async fn create_gvfs_filesystem(
     let client = GravitinoClient::new(&config.gravitino);
 
     let (catalog, schema, fileset) = extract_fileset(mount_from)?;
-    let location = client
-        .get_fileset(&catalog, &schema, &fileset)
-        .await?
-        .storage_location;
-    let (schema, location) = extract_storage_filesystem(&location).unwrap();
+    let fileset = client.get_fileset(&catalog, &schema, &fileset).await?;
 
-    let inner_fs = create_fs_with_schema(&schema, config, fs_context)?;
+    let inner_fs = create_fs_with_fileset(&fileset, config, fs_context)?;
 
-    let fs = GvfsFilesetFs::new(inner_fs, Path::new(&location), client, config, fs_context).await;
+    let target_path = extract_root_path(fileset.storage_location.as_str())?;
+    let fs = GvfsFilesetFs::new(inner_fs, &target_path, client, config, fs_context).await;
     Ok(CreateFsResult::Gvfs(fs))
 }
 
-fn create_fs_with_schema(
-    schema: &FileSystemSchema,
+fn create_fs_with_fileset(
+    fileset: &Fileset,
     config: &AppConfig,
     fs_context: &FileSystemContext,
 ) -> GvfsResult<Box<dyn PathFileSystem>> {
+    let schema = extract_filesystem_scheme(&fileset.storage_location).unwrap();
     match schema {
-        FileSystemSchema::S3 => OpenDalFileSystem::create_file_system(schema, config, fs_context),
+        FileSystemSchema::S3 => {
+            OpenDalFileSystem::create_file_system(&schema, fileset, config, fs_context)
+        }
     }
 }
 
 pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
-    if !path.starts_with(FILESET_PREFIX) {
+    let path = parse_location(path)?;
+
+    if path.scheme() != GRAVITINO_FILESET_SCHEMA {
+        return Err(InvalidConfig.to_error(format!("Invalid fileset schema: {}", path)));
+    }
+
+    let split = path.path_segments();
+    if split.is_none() {
+        return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
+    }
+    let split = split.unwrap().collect::<Vec<&str>>();
+    if split.len() != 4 {
         return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
     }
 
-    let path_without_prefix = &path[FILESET_PREFIX.len()..];
-
-    let parts: Vec<&str> = path_without_prefix.split('/').collect();
-
-    if parts.len() != 3 {
-        return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
-    }
-    // todo handle mount catalog or schema
-
-    let catalog = parts[0].to_string();
-    let schema = parts[1].to_string();
-    let fileset = parts[2].to_string();
-
+    let catalog = split[1].to_string();
+    let schema = split[2].to_string();
+    let fileset = split[3].to_string();
     Ok((catalog, schema, fileset))
 }
 
-pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemSchema, String)> {
+pub fn extract_filesystem_scheme(path: &str) -> GvfsResult<FileSystemSchema> {
     // todo need to improve the logic
-    if let Some(pos) = path.find("://") {
-        let protocol = &path[..pos];
-        let location = &path[pos + 3..];
-        let location = match location.find('/') {
-            Some(index) => &location[index + 1..],
-            None => "",
-        };
-        let location = match location.ends_with('/') {
-            true => location.to_string(),
-            false => format!("{}/", location),
-        };
+    let url = parse_location(path)?;
+    let scheme = url.scheme();
 
-        match protocol {
-            "s3" => Some((FileSystemSchema::S3, location.to_string())),
-            "s3a" => Some((FileSystemSchema::S3, location.to_string())),
-            _ => None,
-        }
-    } else {
-        None
+    match scheme {
+        "s3" => Ok(FileSystemSchema::S3),
+        "s3a" => Ok(FileSystemSchema::S3),
+        _ => Err(UnSupportedFilesystem.to_error(format!("Invalid storage schema: {}", path))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::gvfs_creator::extract_fileset;
+
+    #[test]
+    fn test_extract_fileset() {
+        let location = "gvfs://fileset/test/c1/s1/fileset1";
+        let (catalog, schema, fileset) = extract_fileset(location).unwrap();
+        assert_eq!(catalog, "c1");
+        assert_eq!(schema, "s1");
+        assert_eq!(fileset, "fileset1");
     }
 }

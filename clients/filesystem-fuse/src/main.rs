@@ -34,7 +34,7 @@ async fn main() -> fuse3::Result<()> {
     }
     let config = config.unwrap();
     let mount_point = "gvfs";
-    let mount_from = "gvfs://fileset/catalog1/schema1/fileset1";
+    let mount_from = "gvfs://fileset/test/c1/s1/fileset1";
     let handle = tokio::spawn(async move {
         let result = gvfs_mount(mount_point, mount_from, &config).await;
         if let Err(e) = result {

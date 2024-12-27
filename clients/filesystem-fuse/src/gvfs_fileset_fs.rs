@@ -32,13 +32,13 @@ pub(crate) struct GravitinoFileSystemConfig {}
 pub(crate) struct GvfsFilesetFs {
     fs: Box<dyn PathFileSystem>,
     client: GravitinoClient,
-    fileset_location: PathBuf,
+    target_path: PathBuf,
 }
 
 impl GvfsFilesetFs {
     pub async fn new(
         fs: Box<dyn PathFileSystem>,
-        location: &Path,
+        target_path: &Path,
         client: GravitinoClient,
         _config: &AppConfig,
         _context: &FileSystemContext,
@@ -46,16 +46,16 @@ impl GvfsFilesetFs {
         Self {
             fs: fs,
             client: client,
-            fileset_location: location.into(),
+            target_path: target_path.into(),
         }
     }
 
     fn map_fileset_path_to_raw_path(&self, path: &Path) -> PathBuf {
-        self.fileset_location.join(path)
+        self.target_path.join(path)
     }
 
     fn map_raw_path_to_fileset_path(&self, path: &Path) -> Result<PathBuf> {
-        path.strip_prefix(&self.fileset_location)
+        path.strip_prefix(&self.target_path)
             .map_err(|_| Errno::from(libc::EBADF))?;
         Ok(path.into())
     }
