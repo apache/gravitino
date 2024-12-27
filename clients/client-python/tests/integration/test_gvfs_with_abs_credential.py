@@ -30,8 +30,6 @@ from gravitino import (
     Fileset,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
-from gravitino.filesystem.gvfs import StorageType
-
 from tests.integration.test_gvfs_with_abs import TestGvfsWithABS
 
 
@@ -146,7 +144,7 @@ class TestGvfsWithCredentialABS(TestGvfsWithABS):
 
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
 
-        self.assertTrue(self.fs.exists(f"{StorageType.ABS.value}://{new_bucket}"))
+        self.assertTrue(self.fs.exists(f"abfss://{new_bucket}"))
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
