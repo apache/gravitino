@@ -104,9 +104,9 @@ In the meantime, you need to add the corresponding bundle jar
 
 In the meantime, you need to place the corresponding bundle jar
 1. [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the class path, or
-2. [`gravitino-aliyun-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun/) and hadoop-aliyun jar and other necessary depend[encies in the classpath.
+2. [`gravitino-aliyun-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun/) and hadoop-aliyun jar and other necessary dependencies in the classpath.
 
-]()#### Azure Blob Storage fileset
+#### Azure Blob Storage fileset
 
 | Configuration item                | Description                                                                                                                                                                                                     | Default value | Required                                  | Since version    |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------|------------------|
