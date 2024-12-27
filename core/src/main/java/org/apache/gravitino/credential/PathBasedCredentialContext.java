@@ -20,6 +20,7 @@
 package org.apache.gravitino.credential;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.Set;
 import javax.validation.constraints.NotNull;
 
@@ -54,5 +55,37 @@ public class PathBasedCredentialContext implements CredentialContext {
 
   public Set<String> getReadPaths() {
     return readPaths;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(userName, writePaths, readPaths);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || !(o instanceof PathBasedCredentialContext)) {
+      return false;
+    }
+    PathBasedCredentialContext that = (PathBasedCredentialContext) o;
+    return Objects.equals(userName, that.userName)
+        && Objects.equals(writePaths, that.writePaths)
+        && Objects.equals(readPaths, that.readPaths);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder
+        .append("User name: ")
+        .append(userName)
+        .append(", write path: ")
+        .append(writePaths)
+        .append(", read path: ")
+        .append(readPaths);
+    return stringBuilder.toString();
   }
 }

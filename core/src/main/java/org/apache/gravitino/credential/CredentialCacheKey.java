@@ -19,27 +19,23 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
-import javax.validation.constraints.NotNull;
+import java.util.Objects;
+import lombok.Getter;
 
-/** CatalogCredentialContext is generated when user requesting catalog credentials. */
-public class CatalogCredentialContext implements CredentialContext {
-  @NotNull private final String userName;
+@Getter
+public class CredentialCacheKey {
 
-  public CatalogCredentialContext(String userName) {
-    Preconditions.checkNotNull(userName, "User name should not be null");
-    this.userName = userName;
-  }
+  private final String credentialType;
+  private final CredentialContext credentialContext;
 
-  @Override
-  public String getUserName() {
-    return userName;
+  public CredentialCacheKey(String credentialType, CredentialContext credentialContext) {
+    this.credentialType = credentialType;
+    this.credentialContext = credentialContext;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(userName);
+    return Objects.hash(credentialType, credentialContext);
   }
 
   @Override
@@ -47,16 +43,22 @@ public class CatalogCredentialContext implements CredentialContext {
     if (this == o) {
       return true;
     }
-    if (o == null || !(o instanceof CatalogCredentialContext)) {
+    if (o == null || !(o instanceof CredentialCacheKey)) {
       return false;
     }
-    return Objects.equal(userName, ((CatalogCredentialContext) o).userName);
+    CredentialCacheKey that = (CredentialCacheKey) o;
+    return Objects.equals(credentialType, that.credentialType)
+        && Objects.equals(credentialContext, that.credentialContext);
   }
 
   @Override
   public String toString() {
     StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append("User name: ").append(userName);
+    stringBuilder
+        .append("credentialType: ")
+        .append(credentialType)
+        .append("credentialContext: ")
+        .append(credentialContext);
     return stringBuilder.toString();
   }
 }
