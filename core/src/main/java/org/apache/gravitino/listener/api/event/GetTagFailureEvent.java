@@ -20,7 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Represents an event triggered when an attempt to get a tag from the database fails due to an
@@ -40,7 +40,7 @@ public class GetTagFailureEvent extends TagFailureEvent {
    *     into the reasons behind the operation's failure.
    */
   public GetTagFailureEvent(String user, String metalake, String name, Exception exception) {
-    super(user, TagManager.ofTagIdent(metalake, name), exception);
+    super(user, NameIdentifierUtil.ofTag(metalake, name), exception);
     this.name = name;
     this.metalake = metalake;
   }

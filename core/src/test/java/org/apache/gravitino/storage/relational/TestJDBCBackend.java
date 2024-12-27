@@ -84,7 +84,6 @@ import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
@@ -656,7 +655,7 @@ public class TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag")
-            .withNamespace(TagManager.ofTagNamespace("metalake"))
+            .withNamespace(NamespaceUtil.ofTag("metalake"))
             .withComment("tag comment")
             .withAuditInfo(auditInfo)
             .build();
@@ -744,7 +743,7 @@ public class TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("another-tag")
-            .withNamespace(TagManager.ofTagNamespace("another-metalake"))
+            .withNamespace(NamespaceUtil.ofTag("another-metalake"))
             .withComment("another-tag comment")
             .withAuditInfo(auditInfo)
             .build();

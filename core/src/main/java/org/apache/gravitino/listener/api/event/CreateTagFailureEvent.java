@@ -21,7 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
-import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Represents an event triggered when an attempt to create a tag in the database fails due to an
@@ -41,7 +41,7 @@ public class CreateTagFailureEvent extends TagFailureEvent {
    *     insights into the reasons behind the operation's failure.
    */
   public CreateTagFailureEvent(String user, String metalake, TagInfo tagInfo, Exception exception) {
-    super(user, TagManager.ofTagIdent(metalake, tagInfo.name()), exception);
+    super(user, NameIdentifierUtil.ofTag(metalake, tagInfo.name()), exception);
     this.metalake = metalake;
     this.tagInfo = tagInfo;
   }
