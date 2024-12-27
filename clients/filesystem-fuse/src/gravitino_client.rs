@@ -37,13 +37,13 @@ pub(crate) struct Fileset {
 
 #[derive(Debug, Deserialize)]
 struct FilesetResponse {
-    code: i32,
+    code: u32,
     fileset: Fileset,
 }
 
 #[derive(Debug, Deserialize)]
 struct FileLocationResponse {
-    code: i32,
+    code: u32,
     #[serde(rename = "fileLocation")]
     location: String,
 }
@@ -52,7 +52,7 @@ pub(crate) struct GravitinoClient {
     gravitino_uri: String,
     metalake: String,
 
-    http_client: Client,
+    client: Client,
 }
 
 impl GravitinoClient {
@@ -60,7 +60,7 @@ impl GravitinoClient {
         Self {
             gravitino_uri: config.gravitino_url.clone(),
             metalake: config.metalake.clone(),
-            http_client: Client::new(),
+            client: Client::new(),
         }
     }
 
@@ -94,7 +94,7 @@ impl GravitinoClient {
         T: for<'de> Deserialize<'de>,
     {
         let http_resp =
-            self.http_client.get(url).send().await.map_err(|e| {
+            self.client.get(url).send().await.map_err(|e| {
                 GvfsError::RestError(format!("Failed to send request to {}", url), e)
             })?;
 

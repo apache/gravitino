@@ -16,6 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::{
+    AppConfig, CONF_FILESYSTEM_BLOCK_SIZE, CONF_FUSE_DIR_MASK, CONF_FUSE_FILE_MASK,
+};
 use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -152,13 +155,13 @@ pub(crate) struct FileSystemContext {
 }
 
 impl FileSystemContext {
-    pub(crate) fn new(uid: u32, gid: u32) -> Self {
+    pub(crate) fn new(uid: u32, gid: u32, config: &AppConfig) -> Self {
         FileSystemContext {
             uid,
             gid,
-            default_file_perm: 0o644,
-            default_dir_perm: 0o755,
-            block_size: 4 * 1024,
+            default_file_perm: config.fuse.file_mask as u16,
+            default_dir_perm: config.fuse.dir_mask as u16,
+            block_size: config.filesystem.block_size,
         }
     }
 
@@ -166,9 +169,9 @@ impl FileSystemContext {
         FileSystemContext {
             uid: 0,
             gid: 0,
-            default_file_perm: 0o644,
-            default_dir_perm: 0o755,
-            block_size: 4 * 1024,
+            default_file_perm: CONF_FUSE_FILE_MASK.default as u16,
+            default_dir_perm: CONF_FUSE_DIR_MASK.default as u16,
+            block_size: CONF_FILESYSTEM_BLOCK_SIZE.default,
         }
     }
 }

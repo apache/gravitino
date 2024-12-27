@@ -17,12 +17,11 @@
 
 # fuse settings
 [fuse]
-default_mask = 0o600
+file_mask = 0o600
+dir_mask = 0o700
 fs_type = "memory"
 
 [fuse.properties]
-key1 = "value1"
-key2 = "value2"
 
 # filesystem settings
 [filesystem]
@@ -31,9 +30,9 @@ block_size = 8192
 # Gravitino settings
 [gravitino]
 gravitino_url = "http://localhost:8090"
-metalake = "test"
+metalake = "your_metalake"
 
 # extent settings
-[extent_config]
-access_key = "XXX_access_key"
-secret_key = "XXX_secret_key"
+[extend_config]
+access_key = "your access_key"
+secret_key = "your_secret_key"

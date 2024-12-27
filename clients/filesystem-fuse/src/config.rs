@@ -19,65 +19,65 @@
 use crate::error::ErrorCode::{ConfigNotFound, InvalidConfig};
 use crate::utils::GvfsResult;
 use config::{builder, Config};
-use log::{info, warn};
+use log::{error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
-const FUSE_DEFAULT_FILE_MASK: ConfigEntity<u32> = ConfigEntity::new(
+pub(crate) const CONF_FUSE_FILE_MASK: ConfigEntity<u32> = ConfigEntity::new(
     FuseConfig::MODULE_NAME,
-    "default_file_mask",
+    "file_mask",
     "The default file mask for the FUSE filesystem",
     0o600,
 );
 
-const FUSE_DEFAULT_DIR_MASK: ConfigEntity<u32> = ConfigEntity::new(
+pub(crate) const CONF_FUSE_DIR_MASK: ConfigEntity<u32> = ConfigEntity::new(
     FuseConfig::MODULE_NAME,
-    "default_dir_mask",
+    "dir_mask",
     "The default directory mask for the FUSE filesystem",
     0o700,
 );
 
-const FUSE_FS_TYPE: ConfigEntity<&'static str> = ConfigEntity::new(
+pub(crate) const CONF_FUSE_FS_TYPE: ConfigEntity<&'static str> = ConfigEntity::new(
     FuseConfig::MODULE_NAME,
     "fs_type",
     "The type of the FUSE filesystem",
     "memory",
 );
 
-const FUSE_CONFIG_PATH: ConfigEntity<&'static str> = ConfigEntity::new(
+pub(crate) const CONF_FUSE_CONFIG_PATH: ConfigEntity<&'static str> = ConfigEntity::new(
     FuseConfig::MODULE_NAME,
     "config_path",
     "The path of the FUSE configuration file",
     "/etc/gvfs/gvfs.toml",
 );
 
-const FILESYSTEM_BLOCK_SIZE: ConfigEntity<u32> = ConfigEntity::new(
+pub(crate) const CONF_FILESYSTEM_BLOCK_SIZE: ConfigEntity<u32> = ConfigEntity::new(
     FilesystemConfig::MODULE_NAME,
     "block_size",
     "The block size of the gvfs fuse filesystem",
     4096,
 );
 
-const GRAVITINO_URL: ConfigEntity<&'static str> = ConfigEntity::new(
+pub(crate) const CONF_GRAVITINO_URL: ConfigEntity<&'static str> = ConfigEntity::new(
     GravitinoConfig::MODULE_NAME,
     "gravitino_url",
     "The URL of the Gravitino server",
     "http://localhost:8090",
 );
 
-const GRAVITINO_METALAKE: ConfigEntity<&'static str> = ConfigEntity::new(
+pub(crate) const CONF_GRAVITINO_METALAKE: ConfigEntity<&'static str> = ConfigEntity::new(
     GravitinoConfig::MODULE_NAME,
     "metalake",
     "The metalake of the Gravitino server",
     "",
 );
 
-struct ConfigEntity<T: 'static> {
+pub(crate) struct ConfigEntity<T: 'static> {
     module: &'static str,
     name: &'static str,
     description: &'static str,
-    default: T,
+    pub(crate) default: T,
 }
 
 impl<T> ConfigEntity<T> {
@@ -113,32 +113,32 @@ impl Default for DefaultConfig {
         let mut configs = HashMap::new();
 
         configs.insert(
-            Self::compose_key(FUSE_DEFAULT_FILE_MASK),
-            ConfigValue::U32(FUSE_DEFAULT_FILE_MASK),
+            Self::compose_key(CONF_FUSE_FILE_MASK),
+            ConfigValue::U32(CONF_FUSE_FILE_MASK),
         );
         configs.insert(
-            Self::compose_key(FUSE_DEFAULT_DIR_MASK),
-            ConfigValue::U32(FUSE_DEFAULT_DIR_MASK),
+            Self::compose_key(CONF_FUSE_DIR_MASK),
+            ConfigValue::U32(CONF_FUSE_DIR_MASK),
         );
         configs.insert(
-            Self::compose_key(FUSE_FS_TYPE),
-            ConfigValue::String(FUSE_FS_TYPE),
+            Self::compose_key(CONF_FUSE_FS_TYPE),
+            ConfigValue::String(CONF_FUSE_FS_TYPE),
         );
         configs.insert(
-            Self::compose_key(FUSE_CONFIG_PATH),
-            ConfigValue::String(FUSE_CONFIG_PATH),
+            Self::compose_key(CONF_FUSE_CONFIG_PATH),
+            ConfigValue::String(CONF_FUSE_CONFIG_PATH),
         );
         configs.insert(
-            Self::compose_key(GRAVITINO_URL),
-            ConfigValue::String(GRAVITINO_URL),
+            Self::compose_key(CONF_GRAVITINO_URL),
+            ConfigValue::String(CONF_GRAVITINO_URL),
         );
         configs.insert(
-            Self::compose_key(GRAVITINO_METALAKE),
-            ConfigValue::String(GRAVITINO_METALAKE),
+            Self::compose_key(CONF_GRAVITINO_METALAKE),
+            ConfigValue::String(CONF_GRAVITINO_METALAKE),
         );
         configs.insert(
-            Self::compose_key(FILESYSTEM_BLOCK_SIZE),
-            ConfigValue::U32(FILESYSTEM_BLOCK_SIZE),
+            Self::compose_key(CONF_FILESYSTEM_BLOCK_SIZE),
+            ConfigValue::U32(CONF_FILESYSTEM_BLOCK_SIZE),
         );
 
         DefaultConfig { configs }
@@ -160,7 +160,7 @@ pub struct AppConfig {
     #[serde(default)]
     pub gravitino: GravitinoConfig,
     #[serde(default)]
-    pub extent_config: HashMap<String, String>,
+    pub extend_config: HashMap<String, String>,
 }
 
 impl Default for AppConfig {
@@ -221,32 +221,36 @@ impl AppConfig {
                 path
             } else {
                 //use default config
-                if fs::metadata(FUSE_CONFIG_PATH.default).is_err() {
+                if fs::metadata(CONF_FUSE_CONFIG_PATH.default).is_err() {
                     warn!(
-                        "The default configuration file not found, use the default configuration"
+                        "The default configuration file is not found, using the default configuration"
                     );
                     return Ok(AppConfig::default());
                 } else {
                     warn!(
-                        "Use the default config file of {}",
-                        FUSE_CONFIG_PATH.default
+                        "Using the default config file {}",
+                        CONF_FUSE_CONFIG_PATH.default
                     );
                 }
-                FUSE_CONFIG_PATH.default
+                CONF_FUSE_CONFIG_PATH.default
             }
         };
         let config = builder
             .add_source(config::File::with_name(config_path).required(true))
             .build();
-        if config.is_err() {
-            return Err(InvalidConfig.to_error("Failed to build configuration".to_string()));
+        if let Err(e) = config {
+            let msg = format!("Failed to build configuration: {}", e);
+            error!("{}", msg);
+            return Err(InvalidConfig.to_error(msg));
         }
 
         let conf = config.unwrap();
         let app_config = conf.try_deserialize::<AppConfig>();
 
-        if app_config.is_err() {
-            return Err(InvalidConfig.to_error("Failed to deserialize configuration".to_string()));
+        if let Err(e) = app_config {
+            let msg = format!("Failed to deserialize configuration: {}", e);
+            error!("{}", msg);
+            return Err(InvalidConfig.to_error(msg));
         }
         Ok(app_config.unwrap())
     }
@@ -255,9 +259,9 @@ impl AppConfig {
 #[derive(Debug, Deserialize, Default)]
 pub struct FuseConfig {
     #[serde(default)]
-    pub default_file_mask: u32,
+    pub file_mask: u32,
     #[serde(default)]
-    pub default_dir_mask: u32,
+    pub dir_mask: u32,
     #[serde(default)]
     pub fs_type: String,
     #[serde(default)]
@@ -299,16 +303,17 @@ mod test {
     #[test]
     fn test_config_from_file() {
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_test.toml")).unwrap();
-        assert_eq!(config.fuse.default_file_mask, 0o600);
+        assert_eq!(config.fuse.file_mask, 0o644);
+        assert_eq!(config.fuse.dir_mask, 0o755);
         assert_eq!(config.filesystem.block_size, 8192);
         assert_eq!(config.gravitino.gravitino_url, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "test");
         assert_eq!(
-            config.extent_config.get("access_key"),
+            config.extend_config.get("access_key"),
             Some(&"XXX_access_key".to_string())
         );
         assert_eq!(
-            config.extent_config.get("secret_key"),
+            config.extend_config.get("secret_key"),
             Some(&"XXX_secret_key".to_string())
         );
     }
@@ -316,7 +321,8 @@ mod test {
     #[test]
     fn test_default_config() {
         let config = AppConfig::default();
-        assert_eq!(config.fuse.default_file_mask, 0o600);
+        assert_eq!(config.fuse.file_mask, 0o600);
+        assert_eq!(config.fuse.dir_mask, 0o700);
         assert_eq!(config.filesystem.block_size, 4096);
         assert_eq!(config.gravitino.gravitino_url, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "");
