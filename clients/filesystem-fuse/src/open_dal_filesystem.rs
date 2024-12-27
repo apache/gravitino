@@ -53,7 +53,7 @@ impl OpenDalFileSystem {
     ) -> GvfsResult<Box<dyn PathFileSystem>> {
         match schema {
             FileSystemSchema::S3 => {
-                let builder = S3::from_map(config.extent_config.clone());
+                let builder = S3::from_map(config.extend_config.clone());
 
                 let op = Operator::new(builder);
                 if let Err(e) = op {

@@ -87,13 +87,13 @@ pub async fn create_gvfs_filesystem(
         .storage_location;
     let (schema, location) = extract_storage_filesystem(&location).unwrap();
 
-    let inner_fs = create_fs_by_schema(&schema, config, fs_context)?;
+    let inner_fs = create_fs_with_schema(&schema, config, fs_context)?;
 
     let fs = GvfsFilesetFs::new(inner_fs, Path::new(&location), client, config, fs_context).await;
     Ok(CreateFsResult::Gvfs(fs))
 }
 
-fn create_fs_by_schema(
+fn create_fs_with_schema(
     schema: &FileSystemSchema,
     config: &AppConfig,
     fs_context: &FileSystemContext,
