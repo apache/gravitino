@@ -33,7 +33,6 @@ from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
-from gravitino.exceptions.base import NoSuchModelException, NoSuchModelVersionException
 from gravitino.exceptions.handlers.model_error_handler import MODEL_ERROR_HANDLER
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
@@ -122,21 +121,6 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_resp.validate()
 
         return GenericModel(model_resp.model())
-
-    def model_exists(self, ident: NameIdentifier) -> bool:
-        """Check if the model exists in the catalog.
-
-        Args:
-            ident: The identifier of the model.
-
-        Returns:
-            True if the model exists, false otherwise.
-        """
-        try:
-            self.get_model(ident)
-            return True
-        except NoSuchModelException:
-            return False
 
     def register_model(
         self, ident: NameIdentifier, comment: str, properties: Dict[str, str]
@@ -254,22 +238,6 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         return GenericModelVersion(model_version_resp.model_version())
 
-    def model_version_exists(self, model_ident: NameIdentifier, version: int) -> bool:
-        """Check if the model version exists in the catalog.
-
-        Args:
-            model_ident: The identifier of the model.
-            version: The version of the model.
-
-        Returns:
-            True if the model version exists, false otherwise.
-        """
-        try:
-            self.get_model_version(model_ident, version)
-            return True
-        except NoSuchModelVersionException:
-            return False
-
     def get_model_version_by_alias(
         self, model_ident: NameIdentifier, alias: str
     ) -> ModelVersion:
@@ -299,25 +267,6 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_version_resp.validate()
 
         return GenericModelVersion(model_version_resp.model_version())
-
-    def model_version_alias_exists(
-        self, model_ident: NameIdentifier, alias: str
-    ) -> bool:
-        """
-        Check if the model version by alias exists in the catalog.
-
-        Args:
-            model_ident: The identifier of the model.
-            alias: The alias of the model version.
-
-        Returns:
-            True if the model version alias exists, false otherwise.
-        """
-        try:
-            self.get_model_version_by_alias(model_ident, alias)
-            return True
-        except NoSuchModelVersionException:
-            return False
 
     def link_model_version(
         self,
