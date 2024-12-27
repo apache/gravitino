@@ -16,7 +16,6 @@
 # under the License.
 
 # coding=utf-8
-# pylint: disable=R0401
 
 import re
 import configparser

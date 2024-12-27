@@ -35,7 +35,7 @@ from fsspec.utils import infer_storage_options
 
 from readerwriterlock import rwlock
 
-from gravitino import Catalog
+from gravitino.api.catalog import Catalog
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
