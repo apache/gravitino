@@ -30,7 +30,7 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
  */
 public class GravitinoPaimonCatalog extends BaseCatalog {
 
-  private AbstractCatalog paimonCatalog;
+  private final AbstractCatalog paimonCatalog;
 
   protected GravitinoPaimonCatalog(
       String catalogName,
@@ -38,6 +38,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter) {
     super(catalogName, paimonCatalog.getDefaultDatabase(), propertiesConverter, partitionConverter);
+    this.paimonCatalog = paimonCatalog;
   }
 
   @Override
