@@ -120,6 +120,10 @@ public class TestDynamicIcebergConfigProvider {
   @Test
   public void testCustomProperties() {
     String customCatalogName = "custom_backend";
+    String customKey1 = "custom-k1";
+    String customValue1 = "custom-v1";
+    String customKey2 = "custom-k2";
+    String customValue2 = "custom-v2";
 
     Catalog customMockCatalog = Mockito.mock(Catalog.class);
 
@@ -134,8 +138,8 @@ public class TestDynamicIcebergConfigProvider {
               {
                 put(IcebergConstants.CATALOG_BACKEND, "custom");
                 put(IcebergConstants.CATALOG_BACKEND_NAME, customCatalogName);
-                put("gravitino.bypass.custom-k1", "custom-v1");
-                put("custom-k2", "custom-v2");
+                put("gravitino.bypass." + customKey1, customValue1);
+                put(customKey2, customValue2);
               }
             });
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
@@ -147,8 +151,8 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertTrue(icebergCatalogConfig.isPresent());
     Map<String, String> icebergCatalogProperties =
         icebergCatalogConfig.get().getIcebergCatalogProperties();
-    Assertions.assertEquals(icebergCatalogProperties.get("custom_k1"), "custom_v1");
-    Assertions.assertFalse(icebergCatalogProperties.containsKey("custom_k2"));
+    Assertions.assertEquals(icebergCatalogProperties.get(customKey1), customValue1);
+    Assertions.assertFalse(icebergCatalogProperties.containsKey(customKey2));
     Assertions.assertEquals(
         icebergCatalogProperties.get(IcebergConstants.CATALOG_BACKEND_NAME), customCatalogName);
   }
