@@ -28,8 +28,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public class AssociateTagsForMetadataObjectFailureEvent extends TagFailureEvent {
-  private final String metalake;
-  private final MetadataObject metadataObject;
   private final String[] tagsToAdd;
   private final String[] tagsToRemove;
 
@@ -52,28 +50,8 @@ public class AssociateTagsForMetadataObjectFailureEvent extends TagFailureEvent 
       String[] tagsToRemove,
       Exception exception) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
-    this.metalake = metalake;
-    this.metadataObject = metadataObject;
     this.tagsToAdd = tagsToAdd;
     this.tagsToRemove = tagsToRemove;
-  }
-
-  /**
-   * Returns the metalake name where the metadata object resides.
-   *
-   * @return The metalake name.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Returns the metadata object for which tags are being associated.
-   *
-   * @return The metadata object.
-   */
-  public MetadataObject metadataObject() {
-    return metadataObject;
   }
 
   /**

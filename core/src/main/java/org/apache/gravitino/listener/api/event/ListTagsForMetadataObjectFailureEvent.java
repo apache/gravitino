@@ -28,8 +28,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public class ListTagsForMetadataObjectFailureEvent extends TagFailureEvent {
-  private final String metalake;
-  private final MetadataObject metadataObject;
 
   /**
    * Constructs a new {@code ListTagsForMetadataObjectFailureEvent} instance.
@@ -43,26 +41,6 @@ public class ListTagsForMetadataObjectFailureEvent extends TagFailureEvent {
   public ListTagsForMetadataObjectFailureEvent(
       String user, String metalake, MetadataObject metadataObject, Exception exception) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
-    this.metalake = metalake;
-    this.metadataObject = metadataObject;
-  }
-
-  /**
-   * Returns the metalake name where the metadata object resides.
-   *
-   * @return The metalake name.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Returns the metadata object for which tags are being listed.
-   *
-   * @return The metadata object.
-   */
-  public MetadataObject metadataObject() {
-    return metadataObject;
   }
 
   /**

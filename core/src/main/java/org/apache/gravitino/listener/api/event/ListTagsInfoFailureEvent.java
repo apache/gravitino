@@ -27,7 +27,6 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class ListTagsInfoFailureEvent extends FailureEvent {
-  private final String metalake;
 
   /**
    * Constructs a new {@code ListTagsInfoFailureEvent} instance.
@@ -39,16 +38,6 @@ public class ListTagsInfoFailureEvent extends FailureEvent {
    */
   public ListTagsInfoFailureEvent(String user, String metalake, Exception exception) {
     super(user, NameIdentifier.of(metalake), exception);
-    this.metalake = metalake;
-  }
-
-  /**
-   * Returns the metalake name where the tags are being listed.
-   *
-   * @return The metalake name.
-   */
-  public String metalake() {
-    return metalake;
   }
 
   /**

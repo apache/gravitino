@@ -29,9 +29,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public class GetTagForMetadataObjectFailureEvent extends TagFailureEvent {
-  private final String metalake;
-  private final MetadataObject metadataObject;
-  private final String name;
 
   /**
    * Constructs a new {@code GetTagForMetadataObjectFailureEvent} instance.
@@ -50,36 +47,6 @@ public class GetTagForMetadataObjectFailureEvent extends TagFailureEvent {
       String name,
       Exception exception) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
-    this.metalake = metalake;
-    this.metadataObject = metadataObject;
-    this.name = name;
-  }
-
-  /**
-   * Returns the metalake name where the metadata object resides.
-   *
-   * @return The metalake name.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Returns the metadata object for which the tag is being retrieved.
-   *
-   * @return The metadata object.
-   */
-  public MetadataObject metadataObject() {
-    return metadataObject;
-  }
-
-  /**
-   * Returns the name of the tag being retrieved.
-   *
-   * @return The tag name.
-   */
-  public String name() {
-    return name;
   }
 
   /**

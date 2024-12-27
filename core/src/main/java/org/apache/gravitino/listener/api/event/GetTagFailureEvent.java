@@ -28,8 +28,6 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 @DeveloperApi
 public class GetTagFailureEvent extends TagFailureEvent {
-  private final String metalake;
-  private final String name;
   /**
    * Constructs a new {@code GetTagFailureEvent} instance.
    *
@@ -41,25 +39,6 @@ public class GetTagFailureEvent extends TagFailureEvent {
    */
   public GetTagFailureEvent(String user, String metalake, String name, Exception exception) {
     super(user, NameIdentifierUtil.ofTag(metalake, name), exception);
-    this.name = name;
-    this.metalake = metalake;
-  }
-  /**
-   * Returns the metalake name where the tag resides.
-   *
-   * @return the metalake name.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Returns the name of the tag.
-   *
-   * @return the name of the tag.
-   */
-  public String name() {
-    return name;
   }
 
   /**

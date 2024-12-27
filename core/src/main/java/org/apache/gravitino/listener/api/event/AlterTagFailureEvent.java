@@ -29,8 +29,6 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 @DeveloperApi
 public class AlterTagFailureEvent extends TagFailureEvent {
-  private final String metalake;
-  private final String name;
   private final TagChange[] changes;
 
   /**
@@ -45,18 +43,7 @@ public class AlterTagFailureEvent extends TagFailureEvent {
   public AlterTagFailureEvent(
       String user, String metalake, String name, TagChange[] changes, Exception exception) {
     super(user, NameIdentifierUtil.ofTag(metalake, name), exception);
-    this.name = name;
-    this.metalake = metalake;
     this.changes = changes;
-  }
-
-  /**
-   * Returns the name of the tag.
-   *
-   * @return the name of the tag
-   */
-  public String name() {
-    return name;
   }
 
   /**
@@ -66,15 +53,6 @@ public class AlterTagFailureEvent extends TagFailureEvent {
    */
   public TagChange[] changes() {
     return changes;
-  }
-
-  /**
-   * Returns the metalake identifier.
-   *
-   * @return the metalake identifier
-   */
-  public String metalake() {
-    return metalake;
   }
 
   /**

@@ -29,7 +29,6 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 @DeveloperApi
 public class CreateTagFailureEvent extends TagFailureEvent {
-  private final String metalake;
   private final TagInfo tagInfo;
   /**
    * Constructs a new {@code CreateTagFailureEvent} instance.
@@ -42,7 +41,6 @@ public class CreateTagFailureEvent extends TagFailureEvent {
    */
   public CreateTagFailureEvent(String user, String metalake, TagInfo tagInfo, Exception exception) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagInfo.name()), exception);
-    this.metalake = metalake;
     this.tagInfo = tagInfo;
   }
 
@@ -53,15 +51,6 @@ public class CreateTagFailureEvent extends TagFailureEvent {
    */
   public TagInfo tagInfo() {
     return tagInfo;
-  }
-
-  /**
-   * Returns the metalake identifier.
-   *
-   * @return the metalake identifier
-   */
-  public String metalake() {
-    return metalake;
   }
 
   /**

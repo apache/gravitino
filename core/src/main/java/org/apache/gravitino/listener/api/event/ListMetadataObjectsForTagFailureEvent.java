@@ -27,9 +27,6 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class ListMetadataObjectsForTagFailureEvent extends TagFailureEvent {
-  private final String metalake;
-  private final String name;
-
   /**
    * Constructs a new {@code ListMetadataObjectsForTagFailureEvent} instance.
    *
@@ -42,26 +39,6 @@ public class ListMetadataObjectsForTagFailureEvent extends TagFailureEvent {
   public ListMetadataObjectsForTagFailureEvent(
       String user, String metalake, String name, Exception exception) {
     super(user, NameIdentifier.of(metalake), exception);
-    this.metalake = metalake;
-    this.name = name;
-  }
-
-  /**
-   * Returns the metalake name where the tag resides.
-   *
-   * @return The metalake name.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Returns the name of the tag.
-   *
-   * @return The name of the tag.
-   */
-  public String name() {
-    return name;
   }
 
   /**
