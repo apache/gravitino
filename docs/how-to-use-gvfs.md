@@ -78,7 +78,7 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 | `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
 
 At the same time, you need to add the corresponding bundle jar
-1. [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if there already have hadoop environment, or
+1. [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if no hadoop environment is available, or
 2. [`gravitino-aws-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws/) and hadoop-aws jar and other necessary dependencies in the classpath.
 
 
@@ -89,8 +89,8 @@ At the same time, you need to add the corresponding bundle jar
 | `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
 
 In the meantime, you need to add the corresponding bundle jar
-1. [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if there already have hadoop environment, or
-2. or [`gravitino-gcp-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp/) and [gcs-connectors jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and other necessary dependencies in the classpath.
+1. [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if no hadoop environment is available, or
+2. or [`gravitino-gcp-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp/) and [gcs-connector jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and other necessary dependencies in the classpath.
 
 
 #### OSS fileset
@@ -103,7 +103,7 @@ In the meantime, you need to add the corresponding bundle jar
 
 
 In the meantime, you need to place the corresponding bundle jar
-1. [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the classpath if there already have hadoop environment, or
+1. [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the classpath if no hadoop environment is available, or
 2. [`gravitino-aliyun-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun/) and hadoop-aliyun jar and other necessary dependencies in the classpath.
 
 #### Azure Blob Storage fileset
@@ -114,7 +114,7 @@ In the meantime, you need to place the corresponding bundle jar
 | `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                          | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
 
 Similar to the above, you need to place the corresponding bundle jar
-1. [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the classpath if there already have hadoop environment, or 
+1. [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the classpath if no hadoop environment is available, or 
 2. [`gravitino-azure-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure/) and hadoop-azure jar and other necessary dependencies in the classpath.
 
 #### Custom fileset 
