@@ -171,6 +171,31 @@ public class ConfigBuilder {
   }
 
   /**
+   * Creates a configuration entry for Double data type.
+   *
+   * @return The created ConfigEntry instance for Double data type.
+   */
+  public ConfigEntry<Double> doubleConf() {
+    ConfigEntry<Double> conf =
+        new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+    Function<String, Double> func =
+        s -> {
+          if (s == null || s.isEmpty()) {
+            return null;
+          } else {
+            return Double.parseDouble(s);
+          }
+        };
+    conf.setValueConverter(func);
+
+    Function<Double, String> stringFunc =
+        t -> Optional.ofNullable(t).map(String::valueOf).orElse(null);
+    conf.setStringConverter(stringFunc);
+
+    return conf;
+  }
+
+  /**
    * Creates a configuration entry for Boolean data type.
    *
    * @return The created ConfigEntry instance for Boolean data type.

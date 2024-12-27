@@ -34,20 +34,21 @@ public class CatalogCredentialManager implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogCredentialManager.class);
 
+  private final CredentialCache<CredentialCacheKey> credentialCache;
+
   private final String catalogName;
   private final Map<String, CredentialProvider> credentialProviders;
 
   public CatalogCredentialManager(String catalogName, Map<String, String> catalogProperties) {
     this.catalogName = catalogName;
     this.credentialProviders = CredentialUtils.loadCredentialProviders(catalogProperties);
+    this.credentialCache = new CredentialCache();
+    credentialCache.initialize(catalogProperties);
   }
 
   public Credential getCredential(String credentialType, CredentialContext context) {
-    // todo: add credential cache
-    Preconditions.checkState(
-        credentialProviders.containsKey(credentialType),
-        String.format("Credential %s not found", credentialType));
-    return credentialProviders.get(credentialType).getCredential(context);
+    CredentialCacheKey credentialCacheKey = new CredentialCacheKey(credentialType, context);
+    return credentialCache.getCredential(credentialCacheKey, cacheKey -> doGetCredential(cacheKey));
   }
 
   @Override
@@ -66,5 +67,15 @@ public class CatalogCredentialManager implements Closeable {
                     e);
               }
             });
+  }
+
+  private Credential doGetCredential(CredentialCacheKey credentialCacheKey) {
+    String credentialType = credentialCacheKey.getCredentialType();
+    CredentialContext context = credentialCacheKey.getCredentialContext();
+    LOG.debug("Try get credential, credential type: {}, context: {}.", credentialType, context);
+    Preconditions.checkState(
+        credentialProviders.containsKey(credentialType),
+        String.format("Credential %s not found", credentialType));
+    return credentialProviders.get(credentialType).getCredential(context);
   }
 }
