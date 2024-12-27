@@ -66,8 +66,8 @@ impl GravitinoClient {
 
     pub fn init(&self) {}
 
-    pub fn do_post(&self, path: &str, data: &str) {
-        println!("POST request to {} with data: {}", path, data);
+    pub fn do_post(&self, _path: &str, _data: &str) {
+        todo!()
     }
 
     pub fn request(&self, _path: &str, _data: &str) -> Result<(), GvfsError> {
