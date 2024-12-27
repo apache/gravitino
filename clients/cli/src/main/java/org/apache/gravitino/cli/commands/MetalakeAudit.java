@@ -43,15 +43,13 @@ public class MetalakeAudit extends AuditCommand {
   /** Displays the audit information of a metalake. */
   @Override
   public void handle() {
-    Audit audit;
+    Audit audit = null;
     try (GravitinoClient client = buildClient(metalake)) {
       audit = client.loadMetalake(metalake).auditInfo();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     displayAuditInfo(audit);

@@ -42,8 +42,7 @@ public class ClientVersion extends Command {
       GravitinoAdminClient client = buildAdminClient();
       version = client.clientVersion().version();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
     System.out.println("Apache Gravitino " + version);
   }

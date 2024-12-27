@@ -66,7 +66,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
   // Underlying access control system plugin for this catalog.
-  private volatile BaseAuthorization<?> authorization;
+  private volatile AuthorizationPlugin authorizationPlugin;
 
   private CatalogEntity entity;
 
@@ -187,54 +187,64 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   public AuthorizationPlugin getAuthorizationPlugin() {
-    if (authorization == null) {
-      return null;
+    if (authorizationPlugin == null) {
+      synchronized (this) {
+        if (authorizationPlugin == null) {
+          return null;
+        }
+      }
     }
-    return authorization.plugin(entity.namespace().level(0), provider(), this.conf);
+    return authorizationPlugin;
   }
 
   public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
-    if (authorization != null) {
-      return;
-    }
+    if (authorizationPlugin == null) {
+      synchronized (this) {
+        if (authorizationPlugin == null) {
+          String authorizationProvider =
+              (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
+          if (authorizationProvider == null) {
+            LOG.info("Authorization provider is not set!");
+            return;
+          }
+          try {
+            BaseAuthorization<?> authorization =
+                classLoader.withClassLoader(
+                    cl -> {
+                      try {
+                        ServiceLoader<AuthorizationProvider> loader =
+                            ServiceLoader.load(AuthorizationProvider.class, cl);
 
-    String authorizationProvider =
-        (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
-    if (authorizationProvider == null) {
-      LOG.info("Authorization provider is not set!");
-      return;
-    }
-
-    try {
-      authorization =
-          classLoader.withClassLoader(
-              cl -> {
-                try {
-                  ServiceLoader<AuthorizationProvider> loader =
-                      ServiceLoader.load(AuthorizationProvider.class, cl);
-
-                  List<Class<? extends AuthorizationProvider>> providers =
-                      Streams.stream(loader.iterator())
-                          .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
-                          .map(AuthorizationProvider::getClass)
-                          .collect(Collectors.toList());
-                  if (providers.isEmpty()) {
-                    throw new IllegalArgumentException(
-                        "No authorization provider found for: " + authorizationProvider);
-                  } else if (providers.size() > 1) {
-                    throw new IllegalArgumentException(
-                        "Multiple authorization providers found for: " + authorizationProvider);
-                  }
-                  return (BaseAuthorization<?>)
-                      Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
-                } catch (Exception e) {
-                  LOG.error("Failed to create authorization instance", e);
-                  throw new RuntimeException(e);
-                }
-              });
-    } catch (Exception e) {
-      LOG.error("Failed to load authorization with class loader", e);
-      throw new RuntimeException(e);
+                        List<Class<? extends AuthorizationProvider>> providers =
+                            Streams.stream(loader.iterator())
+                                .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
+                                .map(AuthorizationProvider::getClass)
+                                .collect(Collectors.toList());
+                        if (providers.isEmpty()) {
+                          throw new IllegalArgumentException(
+                              "No authorization provider found for: " + authorizationProvider);
+                        } else if (providers.size() > 1) {
+                          throw new IllegalArgumentException(
+                              "Multiple authorization providers found for: "
+                                  + authorizationProvider);
+                        }
+                        return (BaseAuthorization<?>)
+                            Iterables.getOnlyElement(providers)
+                                .getDeclaredConstructor()
+                                .newInstance();
+                      } catch (Exception e) {
+                        LOG.error("Failed to create authorization instance", e);
+                        throw new RuntimeException(e);
+                      }
+                    });
+            authorizationPlugin =
+                authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
+          } catch (Exception e) {
+            LOG.error("Failed to load authorization with class loader", e);
+            throw new RuntimeException(e);
+          }
+        }
+      }
     }
   }
 
@@ -244,9 +254,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       ops.close();
       ops = null;
     }
-    if (authorization != null) {
-      authorization.close();
-      authorization = null;
+    if (authorizationPlugin != null) {
+      authorizationPlugin.close();
+      authorizationPlugin = null;
     }
   }
 

@@ -48,11 +48,9 @@ public class CreateMetalake extends Command {
       GravitinoAdminClient client = buildAdminClient();
       client.createMetalake(metalake, comment, null);
     } catch (MetalakeAlreadyExistsException err) {
-      System.err.println(ErrorMessages.METALAKE_EXISTS);
-      return;
+      exitWithError(ErrorMessages.METALAKE_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(metalake + " created");
