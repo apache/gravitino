@@ -440,8 +440,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         self.link_model_version(ident, uri, aliases, comment, properties)
         return model
 
-    @staticmethod
-    def _check_model_namespace(namespace: Namespace):
+    def _check_model_namespace(self, namespace: Namespace):
         """Check the validity of the model namespace.
 
         Args:
@@ -455,8 +454,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
             f"Model namespace must be non-null and have 1 level, the input namespace is {namespace}",
         )
 
-    @staticmethod
-    def _check_model_ident(ident: NameIdentifier):
+    def _check_model_ident(self, ident: NameIdentifier):
         """Check the validity of the model identifier.
 
         Args:
@@ -474,10 +472,9 @@ class GenericModelCatalog(BaseSchemaCatalog):
             ident.name() is not None and len(ident.name()) > 0,
             f"Model name must be non-null and non-empty, the input name is {ident.name()}",
         )
-        GenericModelCatalog._check_model_namespace(ident.namespace())
+        self._check_model_namespace(ident.namespace())
 
-    @staticmethod
-    def _format_model_request_path(model_ns: Namespace) -> str:
+    def _format_model_request_path(self, model_ns: Namespace) -> str:
         """Format the model request path.
 
         Args:
@@ -492,8 +489,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
             f"{encode_string(model_ns.level(2))}/models"
         )
 
-    @staticmethod
-    def _format_model_version_request_path(model_ident: NameIdentifier) -> str:
+    def _format_model_version_request_path(self, model_ident: NameIdentifier) -> str:
         """Format the model version request path.
 
         Args:
@@ -503,7 +499,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
             The formatted model version request path.
         """
         return (
-            f"{GenericModelCatalog._format_model_request_path(model_ident.namespace())}"
+            f"{self._format_model_request_path(model_ident.namespace())}"
             f"/{encode_string(model_ident.name())}"
         )
 

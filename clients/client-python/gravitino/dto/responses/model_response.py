@@ -45,7 +45,7 @@ class ModelResponse(BaseResponse):
         if self._model is None:
             raise IllegalArgumentException("model must not be null")
         if not self._model.name():
-            raise IllegalArgumentException("model 'name' must not be null and empty")
+            raise IllegalArgumentException("model 'name' must not be null or empty")
         if self._model.latest_version() is None:
             raise IllegalArgumentException("model 'latestVersion' must not be null")
         if self._model.audit_info() is None:
