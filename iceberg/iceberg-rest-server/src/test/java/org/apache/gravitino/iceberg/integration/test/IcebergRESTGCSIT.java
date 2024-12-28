@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.config.GCSCredentialConfig;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -73,7 +74,7 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE);
+        GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX
             + GCSCredentialConfig.GRAVITINO_GCS_CREDENTIAL_FILE_PATH,

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -82,7 +83,7 @@ public class IcebergRESTAzureAccountKeyIT extends IcebergRESTJdbcCatalogIT {
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE);
+        AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
         storageAccountName);
