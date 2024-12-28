@@ -131,11 +131,11 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
    * Parses a string representing table properties into a map of key-value pairs.
    *
    * @param tableProperties A string representing the table properties in the format:
-   *                        "[key1=value1,key2=value2,...]"
+   *     "[key1=value1,key2=value2,...]"
    * @return A Map where each key is a property name (String) and the corresponding value is the
-   * property value (String). Example input:
-   * "[write.data.path=path/to/data,write.metadata.path=path/to/metadata]" Example output: {
-   * "write.data.path" -> "path/to/data", "write.metadata.path" -> "path/to/metadata" }
+   *     property value (String). Example input:
+   *     "[write.data.path=path/to/data,write.metadata.path=path/to/metadata]" Example output: {
+   *     "write.data.path" -> "path/to/data", "write.metadata.path" -> "path/to/metadata" }
    */
   private Map<String, String> parseTableProperties(String tableProperties) {
     Map<String, String> propertiesMap = new HashMap<>();
