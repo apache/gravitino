@@ -33,8 +33,60 @@ use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
 use log::debug;
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
+
+/// Wrapper Struct for `Timestamp` to enable custom Display implementation
+pub struct TimestampDebug(pub Timestamp);
+
+impl fmt::Display for TimestampDebug {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ts = &self.0; // Access the inner `Timestamp`
+        write!(f, "{}.{:09}", ts.sec, ts.nsec) // Nanoseconds padded to 9 digits
+    }
+}
+
+// Optional Debug implementation for `TimestampDebug`
+impl fmt::Debug for TimestampDebug {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Timestamp({})", self) // Reuses `Display` formatting
+    }
+}
+
+pub struct FileAttrDebug<'a> {
+    pub file_attr: &'a FileAttr,
+}
+
+impl<'a> std::fmt::Debug for FileAttrDebug<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let attr = &self.file_attr;
+        let mut struc = f.debug_struct("FileAttr");
+
+        struc
+            .field("ino", &attr.ino)
+            .field("size", &attr.size)
+            .field("blocks", &attr.blocks)
+            .field("atime", &TimestampDebug(attr.atime))
+            .field("mtime", &TimestampDebug(attr.mtime))
+            .field("ctime", &TimestampDebug(attr.ctime));
+
+        // Conditionally add the "crtime" field only for macOS
+        #[cfg(target_os = "macos")]
+        {
+           struc.field("crtime", &TimestampDebug(attr.crtime));
+        }
+
+        struc.
+            field("kind", &attr.kind)
+            .field("perm", &attr.perm)
+            .field("nlink", &attr.nlink)
+            .field("uid", &attr.uid)
+            .field("gid", &attr.gid)
+            .field("rdev", &attr.rdev)
+            .finish()
+    }
+}
 
 pub(crate) struct FuseApiHandleDebug<T: RawFileSystem> {
     inner: FuseApiHandle<T>,
@@ -102,7 +154,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         let result = self.inner.getattr(req, inode, fh, flags).await;
         match result {
             Ok(reply) => {
-                debug!("getattr [id={}]: reply: {:?}", req.unique, reply);
+                debug!("getattr [id={}]: reply: {:?}", req.unique, FileAttrDebug{file_attr: &reply.attr});
                 Ok(reply)
             }
             Err(e) => {
