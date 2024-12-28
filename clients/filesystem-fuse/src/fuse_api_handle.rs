@@ -50,26 +50,42 @@ impl<T: RawFileSystem> FuseApiHandleDebug<T> {
 
 impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     async fn init(&self, req: Request) -> fuse3::Result<ReplyInit> {
-        debug!("init: req: {:?}", req);
-        let result = self.inner.init(req).await;
-        debug!("init result: {:?}", result);
-        result
+        debug!("init [id={}]: req: {:?}", req.unique, req);
+        let res = self.inner.init(req).await;
+        match res {
+            Ok(reply) => {
+                debug!("init [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("init [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn destroy(&self, req: Request) {
-        debug!("destroy: req: {:?}", req);
+        debug!("destroy [id={}]: req: {:?}", req.unique, req);
         self.inner.destroy(req).await;
-        debug!("destroy completed");
+        debug!("destroy [id={}]: completed", req.unique);
     }
 
     async fn lookup(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<ReplyEntry> {
         debug!(
-            "lookup: req: {:?}, parent: {:?}, name: {:?}",
-            req, parent, name
+            "lookup [id={}]: req: {:?}, parent: {:?}, name: {:?}",
+            req.unique, req, parent, name
         );
         let result = self.inner.lookup(req, parent, name).await;
-        debug!("lookup result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("lookup [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("lookup [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn getattr(
@@ -80,12 +96,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         flags: u32,
     ) -> fuse3::Result<ReplyAttr> {
         debug!(
-            "getattr: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}",
-            req, inode, fh, flags
+            "getattr [id={}]: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}",
+            req.unique, req, inode, fh, flags
         );
         let result = self.inner.getattr(req, inode, fh, flags).await;
-        debug!("getattr result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("getattr [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("getattr [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn setattr(
@@ -96,12 +120,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
         debug!(
-            "setattr: req: {:?}, inode: {:?}, fh: {:?}, set_attr: {:?}",
-            req, inode, fh, set_attr
+            "setattr [id={}]: req: {:?}, inode: {:?}, fh: {:?}, set_attr: {:?}",
+            req.unique, req, inode, fh, set_attr
         );
         let result = self.inner.setattr(req, inode, fh, set_attr).await;
-        debug!("setattr result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("setattr [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("setattr [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn mkdir(
@@ -113,12 +145,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
         debug!(
-            "mkdir: req: {:?}, parent: {:?}, name: {:?}, mode: {}, umask: {}",
-            req, parent, name, mode, umask
+            "mkdir [id={}]: req: {:?}, parent: {:?}, name: {:?}, mode: {}, umask: {}",
+            req.unique, req, parent, name, mode, umask
         );
         let result = self.inner.mkdir(req, parent, name, mode, umask).await;
-        debug!("mkdir result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("mkdir [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("mkdir [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
@@ -127,28 +167,52 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             req, parent, name
         );
         let result = self.inner.unlink(req, parent, name).await;
-        debug!("unlink result: {:?}", result);
-        result
+        match result {
+            Ok(()) => {
+                debug!("unlink [id={}]: success", req.unique);
+                Ok(())
+            }
+            Err(e) => {
+                debug!("unlink [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
         debug!(
-            "rmdir: req: {:?}, parent: {:?}, name: {:?}",
-            req, parent, name
+            "rmdir [id={}]: req: {:?}, parent: {:?}, name: {:?}",
+            req.unique, req, parent, name
         );
         let result = self.inner.rmdir(req, parent, name).await;
-        debug!("rmdir result: {:?}", result);
-        result
+        match result {
+            Ok(()) => {
+                debug!("rmdir [id={}]: success", req.unique);
+                Ok(())
+            }
+            Err(e) => {
+                debug!("rmdir [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
         debug!(
-            "open: req: {:?}, inode: {:?}, flags: {:?}",
-            req, inode, flags
+            "open [id={}]: req: {:?}, inode: {:?}, flags: {:?}",
+            req.unique, req, inode, flags
         );
         let result = self.inner.open(req, inode, flags).await;
-        debug!("open result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("open [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("open [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn read(
@@ -160,12 +224,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         size: u32,
     ) -> fuse3::Result<ReplyData> {
         debug!(
-            "read: req: {:?}, inode: {:?}, fh: {:?}, offset: {:?}, size: {:?}",
-            req, inode, fh, offset, size
+            "read [id={}]: req: {:?}, inode: {:?}, fh: {:?}, offset: {:?}, size: {:?}",
+            req.unique, req, inode, fh, offset, size
         );
         let result = self.inner.read(req, inode, fh, offset, size).await;
-        debug!("read result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("read [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("read [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn write(
@@ -178,20 +250,39 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         write_flags: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyWrite> {
-        debug!("write: req: {:?}, inode: {:?}, fh: {:?}, offset: {:?}, data_len: {}, write_flags: {:?}, flags: {:?}", req, inode, fh, offset, data.len(), write_flags, flags);
+        debug!(
+            "write [id={}]: req: {:?}, inode: {:?}, fh: {:?}, offset: {:?}, data_len: {}, write_flags: {:?}, flags: {:?}",
+            req.unique, req, inode, fh, offset, data.len(), write_flags, flags
+        );
         let result = self
             .inner
             .write(req, inode, fh, offset, data, write_flags, flags)
             .await;
-        debug!("write result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("write [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("write [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {
-        debug!("statfs: req: {:?}, inode: {:?}", req, inode);
+        debug!("statfs [id={}]: req: {:?}, inode: {:?}", req.unique, req, inode);
         let result = self.inner.statfs(req, inode).await;
-        debug!("statfs result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("statfs [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("statfs [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn release(
@@ -204,25 +295,41 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         flush: bool,
     ) -> fuse3::Result<()> {
         debug!(
-            "release: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}, lock_owner: {:?}, flush: {:?}",
-            req, inode, fh, flags, lock_owner, flush
+            "release [id={}]: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}, lock_owner: {:?}, flush: {:?}",
+            req.unique, req, inode, fh, flags, lock_owner, flush
         );
         let result = self
             .inner
             .release(req, inode, fh, flags, lock_owner, flush)
             .await;
-        debug!("release result: {:?}", result);
-        result
+        match result {
+            Ok(()) => {
+                debug!("release [id={}]: success", req.unique);
+                Ok(())
+            }
+            Err(e) => {
+                debug!("release [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
         debug!(
-            "opendir: req: {:?}, inode: {:?}, flags: {:?}",
-            req, inode, flags
+            "opendir [id={}]: req: {:?}, inode: {:?}, flags: {:?}",
+            req.unique, req, inode, flags
         );
         let result = self.inner.opendir(req, inode, flags).await;
-        debug!("opendir result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("opendir [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("opendir [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>> where T: 'a;
@@ -235,14 +342,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         offset: i64,
     ) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
         debug!(
-            "readdir: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}",
-            req, parent, fh, offset
+            "readdir [id={}]: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}",
+            req.unique, req, parent, fh, offset
         );
         let result = self.inner.readdir(req, parent, fh, offset).await;
-        // FIXME: how to show debug log of result ?
-
-        debug!("readdir result: 1");
-        result
+        match result {
+            Ok(reply) => {
+                debug!("readdir [id={}]: success", req.unique);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("readdir [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn releasedir(
@@ -253,12 +366,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         flags: u32,
     ) -> fuse3::Result<()> {
         debug!(
-            "releasedir: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}",
-            req, inode, fh, flags
+            "releasedir [id={}]: req: {:?}, inode: {:?}, fh: {:?}, flags: {:?}",
+            req.unique, req, inode, fh, flags
         );
         let result = self.inner.releasedir(req, inode, fh, flags).await;
-        debug!("releasedir result: {:?}", result);
-        result
+        match result {
+            Ok(()) => {
+                debug!("releasedir [id={}]: success", req.unique);
+                Ok(())
+            }
+            Err(e) => {
+                debug!("releasedir [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     async fn create(
@@ -270,12 +391,20 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         flags: u32,
     ) -> fuse3::Result<ReplyCreated> {
         debug!(
-            "create: req: {:?}, parent: {:?}, name: {:?}, mode: {:?}, flags: {:?}",
-            req, parent, name, mode, flags
+            "create [id={}]: req: {:?}, parent: {:?}, name: {:?}, mode: {:?}, flags: {:?}",
+            req.unique, req, parent, name, mode, flags
         );
         let result = self.inner.create(req, parent, name, mode, flags).await;
-        debug!("create result: {:?}", result);
-        result
+        match result {
+            Ok(reply) => {
+                debug!("create [id={}]: reply: {:?}", req.unique, reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("create [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 
     type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>> where T: 'a;
@@ -289,15 +418,23 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         lock_owner: u64,
     ) -> fuse3::Result<ReplyDirectoryPlus<Self::DirEntryPlusStream<'a>>> {
         debug!(
-            "readdirplus: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}, lock_owner: {:?}",
-            req, parent, fh, offset, lock_owner
+            "readdirplus [id={}]: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}, lock_owner: {:?}",
+            req.unique, req, parent, fh, offset, lock_owner
         );
         let result = self
             .inner
             .readdirplus(req, parent, fh, offset, lock_owner)
             .await;
-        debug!("readdirplus result: 1");
-        result
+        match result {
+            Ok(reply) => {
+                debug!("readdirplus [id={}]: success", req.unique);
+                Ok(reply)
+            }
+            Err(e) => {
+                debug!("readdirplus [id={}]: error: {:?}", req.unique, e);
+                Err(e)
+            }
+        }
     }
 }
 
