@@ -142,6 +142,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.MODEL)) {
+      handleModelCommand();
     } else if (entity.equals(CommandEntities.TOPIC)) {
       handleTopicCommand();
     } else if (entity.equals(CommandEntities.FILESET)) {
@@ -512,6 +514,23 @@ public class GravitinoCommandLine extends TestableCommandLine {
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
         break;
     }
+  }
+
+  /** Handles the command execution for Models based on command type and the command line options. */
+  private void handleModelCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+
+    Command.setAuthenticationMode(auth, userName);
+    List<String> missingEntities = Lists.newArrayList();
+    if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+
+    // TODO: Add remaining commands
   }
 
   /** Handles the command execution for Users based on command type and the command line options. */
