@@ -99,7 +99,6 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @Test
-  @Disabled
   public void testFSCache() throws IOException {
     String filesetName = "testFSCache";
     Path managedFilesetPath =
@@ -150,7 +149,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           Objects.requireNonNull(
               ((GravitinoVirtualFileSystem) gravitinoFileSystem)
                   .internalFileSystemCache()
-                  .getIfPresent(NameIdentifier.of("file")));
+                  .getIfPresent(
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache")));
 
       String anotherFilesetName = "test_new_fs";
       Path diffLocalPath =
@@ -163,7 +163,6 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @Test
-  @Disabled
   public void testInternalCache() throws IOException {
     Path localPath1 = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, "fileset1");
     Path filesetPath1 =
