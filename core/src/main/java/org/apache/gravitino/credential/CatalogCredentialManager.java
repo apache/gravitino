@@ -54,9 +54,10 @@ public class CatalogCredentialManager implements Closeable {
   // Get credential with only one credential provider.
   public Credential getCredential(CredentialContext context) {
     if (credentialProviders.size() == 0) {
-      throw new RuntimeException("There are not any credential provider for the catalog.");
+      throw new IllegalArgumentException("There are no credential provider for the catalog.");
     } else if (credentialProviders.size() > 1) {
-      throw new RuntimeException("There are multiple credential providers for the catalog.");
+      throw new UnsupportedOperationException(
+          "There are multiple credential providers for the catalog.");
     }
     return getCredential(credentialProviders.keySet().iterator().next(), context);
   }

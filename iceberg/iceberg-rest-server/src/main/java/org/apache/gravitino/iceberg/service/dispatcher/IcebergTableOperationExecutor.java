@@ -42,7 +42,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .createTable(namespace, createTableRequest, context.isRequestCredentialVending());
+        .createTable(namespace, createTableRequest, context.requestCredentialVending());
   }
 
   @Override
@@ -74,7 +74,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTable(tableIdentifier, context.isRequestCredentialVending());
+        .loadTable(tableIdentifier, context.requestCredentialVending());
   }
 
   @Override

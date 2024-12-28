@@ -36,7 +36,7 @@ public class IcebergRequestContext {
   private final boolean requestCredentialVending;
 
   /**
-   * Constructs a new {@code IcebergRequestContext} with specified HTTP request and catalog name.
+   * Constructs a new {@code IcebergRequestContext} instance.
    *
    * @param httpRequest The HttpServletRequest object containing request details.
    * @param catalogName The name of the catalog to be accessed in the request.
@@ -46,7 +46,7 @@ public class IcebergRequestContext {
   }
 
   /**
-   * Constructs a new {@code IcebergRequestContext} with specified HTTP request and catalog name.
+   * Constructs a new {@code IcebergRequestContext} instance.
    *
    * @param httpRequest The HttpServletRequest object containing request details.
    * @param catalogName The name of the catalog to be accessed in the request.
@@ -103,7 +103,7 @@ public class IcebergRequestContext {
    *
    * @return true if the request is for credential vending, false otherwise.
    */
-  public boolean isRequestCredentialVending() {
+  public boolean requestCredentialVending() {
     return requestCredentialVending;
   }
 

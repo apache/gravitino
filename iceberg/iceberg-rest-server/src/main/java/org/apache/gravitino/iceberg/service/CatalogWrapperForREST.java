@@ -65,7 +65,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             config.getIcebergCatalogProperties(),
             key -> catalogPropertiesToClientKeys.contains(key));
     // To compatibility with old version
-    Map<String, String> catalogProperties = normalizeCredentialProperties(config.getAllConfig());
+    Map<String, String> catalogProperties =
+        adjustCredentialPropertiesForCompatibility(config.getAllConfig());
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
   }
 
@@ -132,7 +133,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @SuppressWarnings("deprecation")
-  private Map<String, String> normalizeCredentialProperties(Map<String, String> properties) {
+  private Map<String, String> adjustCredentialPropertiesForCompatibility(
+      Map<String, String> properties) {
     HashMap<String, String> normalizedProperties = new HashMap<>(properties);
     String credentialProviderType = properties.get(CredentialConstants.CREDENTIAL_PROVIDER_TYPE);
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
