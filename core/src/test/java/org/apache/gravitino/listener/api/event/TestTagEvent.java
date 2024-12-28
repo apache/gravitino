@@ -64,7 +64,6 @@ public class TestTagEvent {
     Assertions.assertEquals(CreateTagFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((CreateTagFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((CreateTagFailureEvent) event).metalake());
     Assertions.assertEquals(tag.name(), ((CreateTagFailureEvent) event).tagInfo().name());
     Assertions.assertEquals(tag.comment(), ((CreateTagFailureEvent) event).tagInfo().comment());
     Assertions.assertEquals(
@@ -81,8 +80,6 @@ public class TestTagEvent {
     Assertions.assertEquals(GetTagFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((GetTagFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((GetTagFailureEvent) event).metalake());
-    Assertions.assertEquals(tag.name(), ((GetTagFailureEvent) event).name());
     Assertions.assertEquals(OperationType.GET_TAG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -102,10 +99,6 @@ public class TestTagEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
         ((GetTagForMetadataObjectFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((GetTagForMetadataObjectFailureEvent) event).metalake());
-    Assertions.assertEquals(tag.name(), ((GetTagForMetadataObjectFailureEvent) event).name());
-    Assertions.assertEquals(
-        metadataObject, ((GetTagForMetadataObjectFailureEvent) event).metadataObject());
     Assertions.assertEquals(OperationType.GET_TAG_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -118,8 +111,6 @@ public class TestTagEvent {
     Assertions.assertEquals(DeleteTagFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DeleteTagFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((DeleteTagFailureEvent) event).metalake());
-    Assertions.assertEquals(tag.name(), ((DeleteTagFailureEvent) event).name());
     Assertions.assertEquals(OperationType.DELETE_TAG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -138,8 +129,6 @@ public class TestTagEvent {
     Assertions.assertEquals(AlterTagFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((AlterTagFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((AlterTagFailureEvent) event).metalake());
-    Assertions.assertEquals(tag.name(), ((AlterTagFailureEvent) event).name());
     Assertions.assertEquals(changes, ((AlterTagFailureEvent) event).changes());
     Assertions.assertEquals(OperationType.ALTER_TAG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
@@ -153,7 +142,6 @@ public class TestTagEvent {
     Assertions.assertEquals(ListTagFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListTagFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((ListTagFailureEvent) event).metalake());
     Assertions.assertEquals(OperationType.LIST_TAG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -173,9 +161,6 @@ public class TestTagEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
         ((ListTagsForMetadataObjectFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((ListTagsForMetadataObjectFailureEvent) event).metalake());
-    Assertions.assertEquals(
-        metadataObject, ((ListTagsForMetadataObjectFailureEvent) event).metadataObject());
     Assertions.assertEquals(OperationType.LIST_TAGS_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -188,7 +173,6 @@ public class TestTagEvent {
     Assertions.assertEquals(ListTagsInfoFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListTagsInfoFailureEvent) event).exception().getClass());
-    Assertions.assertEquals("metalake", ((ListTagsInfoFailureEvent) event).metalake());
     Assertions.assertEquals(OperationType.LIST_TAGS_INFO, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -208,10 +192,6 @@ public class TestTagEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
         ((ListTagsInfoForMetadataObjectFailureEvent) event).exception().getClass());
-    Assertions.assertEquals(
-        "metalake", ((ListTagsInfoForMetadataObjectFailureEvent) event).metalake());
-    Assertions.assertEquals(
-        metadataObject, ((ListTagsInfoForMetadataObjectFailureEvent) event).metadataObject());
     Assertions.assertEquals(
         OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
@@ -237,10 +217,6 @@ public class TestTagEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
         ((AssociateTagsForMetadataObjectFailureEvent) event).exception().getClass());
-    Assertions.assertEquals(
-        "metalake", ((AssociateTagsForMetadataObjectFailureEvent) event).metalake());
-    Assertions.assertEquals(
-        metadataObject, ((AssociateTagsForMetadataObjectFailureEvent) event).metadataObject());
     Assertions.assertEquals(
         tagsToAssociate, ((AssociateTagsForMetadataObjectFailureEvent) event).tagsToAdd());
     Assertions.assertEquals(
