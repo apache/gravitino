@@ -17,16 +17,24 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential;
+package org.apache.gravitino.oss.credential;
 
-public class CredentialConstants {
-  public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
-  public static final String CREDENTIAL_PROVIDERS = "credential-providers";
-  public static final String CREDENTIAL_CACHE_EXPIRE_RATIO = "credential-cache-expire-ratio";
-  public static final String CREDENTIAL_CACHE_MAX_SIZE = "credential-cache-max-size";
-  public static final String S3_TOKEN_EXPIRE_IN_SECS = "s3-token-expire-in-secs";
-  public static final String OSS_TOKEN_EXPIRE_IN_SECS = "oss-token-expire-in-secs";
-  public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-  private CredentialConstants() {}
+public class TestCredentialProvider {
+
+  @Test
+  void testCredentialProviderType() {
+    OSSTokenProvider ossTokenProvider = new OSSTokenProvider();
+    Assertions.assertEquals(
+        OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenProvider.credentialType());
+
+    OSSSecretKeyProvider ossSecretKeyProvider = new OSSSecretKeyProvider();
+    Assertions.assertEquals(
+        OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
+        ossSecretKeyProvider.credentialType());
+  }
 }

@@ -25,7 +25,7 @@ from gravitino.utils.precondition import Precondition
 class ADLSTokenCredential(Credential, ABC):
     """Represents ADLS token credential."""
 
-    ADLS_SAS_TOKEN_CREDENTIAL_TYPE: str = "adls-sas-token"
+    ADLS_TOKEN_CREDENTIAL_TYPE: str = "adls-token"
     ADLS_DOMAIN: str = "dfs.core.windows.net"
     _STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
     _SAS_TOKEN: str = "adls-sas-token"
@@ -51,7 +51,7 @@ class ADLSTokenCredential(Credential, ABC):
         Returns:
              the type of the credential.
         """
-        return self.ADLS_SAS_TOKEN_CREDENTIAL_TYPE
+        return self.ADLS_TOKEN_CREDENTIAL_TYPE
 
     def expire_time_in_ms(self) -> int:
         """Returns the expiration time of the credential in milliseconds since

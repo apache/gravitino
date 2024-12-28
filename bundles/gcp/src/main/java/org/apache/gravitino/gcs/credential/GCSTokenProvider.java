@@ -38,7 +38,6 @@ import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.GCSTokenCredential;
@@ -68,7 +67,7 @@ public class GCSTokenProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE;
+    return GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override
