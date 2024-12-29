@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -32,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 public class UntagEntity extends Command {
+  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
   protected final String metalake;
   protected final FullName name;
   protected final String[] tags;
@@ -91,24 +93,20 @@ public class UntagEntity extends Command {
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      exitWithError(ErrorMessages.UNKNOWN_TABLE);
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
       exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", removeTags);
-
-    if (all.equals("")) {
-      all = "nothing";
-    }
-
-    if (tags.length > 1) {
-      System.out.println(
-          entity + " removed tags " + String.join(",", tags) + " now tagged with " + all);
-    } else {
-      System.out.println(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
-    }
+    System.out.println(
+        entity
+            + " removed tag(s): ["
+            + COMMA_JOINER.join(tags)
+            + "], now tagged with "
+            + "["
+            + COMMA_JOINER.join(removeTags)
+            + "]");
   }
 }

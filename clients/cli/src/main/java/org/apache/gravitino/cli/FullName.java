@@ -192,6 +192,15 @@ public class FullName {
   }
 
   /**
+   * Are there any names that can be retrieved?
+   *
+   * @return True if the name exists, or false if it does not.
+   */
+  public Boolean hasName() {
+    return line.hasOption(GravitinoOptions.NAME);
+  }
+
+  /**
    * Does the catalog name exist?
    *
    * @return True if the catalog name exists, or false if it does not.
