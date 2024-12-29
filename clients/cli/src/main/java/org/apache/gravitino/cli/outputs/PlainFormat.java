@@ -50,10 +50,14 @@ public class PlainFormat {
   static final class MetalakesPlainFormat implements OutputFormat<Metalake[]> {
     @Override
     public void output(Metalake[] metalakes) {
-      List<String> metalakeNames =
-          Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
-      String all = String.join(System.lineSeparator(), metalakeNames);
-      System.out.println(all);
+      if (metalakes.length == 0) {
+        System.out.println("No metalakes exist.");
+      } else {
+        List<String> metalakeNames =
+            Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
+        String all = String.join(System.lineSeparator(), metalakeNames);
+        System.out.println(all);
+      }
     }
   }
 
@@ -74,10 +78,14 @@ public class PlainFormat {
   static final class CatalogsPlainFormat implements OutputFormat<Catalog[]> {
     @Override
     public void output(Catalog[] catalogs) {
-      List<String> catalogNames =
-          Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
-      String all = String.join(System.lineSeparator(), catalogNames);
-      System.out.println(all);
+      if (catalogs.length == 0) {
+        System.out.println("No catalogs exist.");
+      } else {
+        List<String> catalogNames =
+            Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
+        String all = String.join(System.lineSeparator(), catalogNames);
+        System.out.println(all);
+      }
     }
   }
 }

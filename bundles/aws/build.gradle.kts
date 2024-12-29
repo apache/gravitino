@@ -48,6 +48,12 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.hadoop3.aws)
   implementation(libs.guava)
+
+  testImplementation(project(":api"))
+  testImplementation(project(":core"))
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
