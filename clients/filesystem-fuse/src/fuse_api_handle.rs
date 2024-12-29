@@ -577,6 +577,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         }
 
         let file_stat = self.fs.stat(inode).await?;
+
+        debug!("getattr[id={}]: file_stat: {:?}", _req.unique, file_stat);
+
         Ok(ReplyAttr {
             ttl: self.default_ttl,
             attr: fstat_to_file_attr(&file_stat, &self.fs_context),
