@@ -530,7 +530,7 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         };
 
         debug!(
-            "get_modified_file_stat: file_name: {:?}, size: {:?}, atime: {:?}, mtime: {:?}",
+            "get_modified_file_stat: file_name: {:?}, size: {:?}, atime: {}, mtime: {}",
             file_stat.name, size, TimestampDebug(file_stat.atime), TimestampDebug(file_stat.mtime)
         );
 
