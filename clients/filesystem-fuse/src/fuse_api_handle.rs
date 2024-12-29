@@ -74,11 +74,11 @@ impl<'a> std::fmt::Debug for FileAttrDebug<'a> {
         // Conditionally add the "crtime" field only for macOS
         #[cfg(target_os = "macos")]
         {
-           struc.field("crtime", &TimestampDebug(attr.crtime));
+            struc.field("crtime", &TimestampDebug(attr.crtime));
         }
 
-        struc.
-            field("kind", &attr.kind)
+        struc
+            .field("kind", &attr.kind)
             .field("perm", &attr.perm)
             .field("nlink", &attr.nlink)
             .field("uid", &attr.uid)
@@ -154,7 +154,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         let result = self.inner.getattr(req, inode, fh, flags).await;
         match result {
             Ok(reply) => {
-                debug!("getattr [id={}]: reply: {:?}", req.unique, FileAttrDebug{file_attr: &reply.attr});
+                debug!(
+                    "getattr [id={}]: reply: {:?}",
+                    req.unique,
+                    FileAttrDebug {
+                        file_attr: &reply.attr
+                    }
+                );
                 Ok(reply)
             }
             Err(e) => {
@@ -323,7 +329,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {
-        debug!("statfs [id={}]: req: {:?}, inode: {:?}", req.unique, req, inode);
+        debug!(
+            "statfs [id={}]: req: {:?}, inode: {:?}",
+            req.unique, req, inode
+        );
         let result = self.inner.statfs(req, inode).await;
         match result {
             Ok(reply) => {
@@ -531,7 +540,10 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
 
         debug!(
             "get_modified_file_stat: file_name: {:?}, size: {:?}, atime: {}, mtime: {}",
-            file_stat.name, size, TimestampDebug(file_stat.atime), TimestampDebug(file_stat.mtime)
+            file_stat.name,
+            size,
+            TimestampDebug(file_stat.atime),
+            TimestampDebug(file_stat.mtime)
         );
 
         Ok(file_stat)
