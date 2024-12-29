@@ -156,7 +156,7 @@ public class OSSTokenProvider implements CredentialProvider {
                   key ->
                       Statement.builder()
                           .effect(Effect.ALLOW)
-                          .addAction("oss:ListBucket")
+                          .addAction("oss:ListObjects")
                           .addResource(key)
                           .condition(getCondition(uri)));
               // GetBucketLocation

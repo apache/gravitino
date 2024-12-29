@@ -62,14 +62,15 @@ public class S3FileSystemProvider implements FileSystemProvider {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
-    if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)
-        && config.containsKey(
-            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
-      hadoopConfMap.put(
-          Constants.AWS_CREDENTIALS_PROVIDER, S3SessionCredentialProvider.class.getCanonicalName());
+    hadoopConfMap.forEach(configuration::set);
+    if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
+      configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
 
-    hadoopConfMap.forEach(configuration::set);
+    if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
+      configuration.set(
+          Constants.AWS_CREDENTIALS_PROVIDER, S3SessionCredentialProvider.class.getCanonicalName());
+    }
 
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
     checkAndSetCredentialProvider(configuration);

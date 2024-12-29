@@ -50,6 +50,7 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
   public static final String BUCKET_NAME = System.getenv("S3_STS_BUCKET_NAME");
   public static final String S3_ACCESS_KEY = System.getenv("S3_STS_ACCESS_KEY_ID");
   public static final String S3_SECRET_KEY = System.getenv("S3_STS_SECRET_ACCESS_KEY");
+  public static final String S3_ENDPOINT = System.getenv("S3_STS_ENDPOINT");
   public static final String S3_REGION = System.getenv("S3_STS_REGION");
   public static final String S3_ROLE_ARN = System.getenv("S3_STS_ROLE_ARN");
 
@@ -82,6 +83,7 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
     Map<String, String> properties = Maps.newHashMap();
     properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
     properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
+    properties.put(S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
     properties.put(
         "gravitino.bypass.fs.s3a.aws.credentials.provider",
         "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
@@ -109,6 +111,7 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
     // Pass this configuration to the real file system
     conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
     conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
+    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
     conf.set(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
     conf.set(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
   }
