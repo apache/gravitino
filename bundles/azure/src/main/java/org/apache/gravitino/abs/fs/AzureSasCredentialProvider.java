@@ -116,7 +116,7 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
     Credential credential = credentials[0];
     Map<String, String> credentialMap = credential.toProperties();
 
-    if (ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE.equals(
+    if (ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE.equals(
         credentialMap.get(Credential.CREDENTIAL_TYPE))) {
       this.sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
     } else {
