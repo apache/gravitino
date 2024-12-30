@@ -59,7 +59,7 @@ class ModelVersionLinkRequest(RESTRequest):
 
         for alias in self._aliases or []:
             if not self._is_not_blank(alias):
-                raise IllegalArgumentException('Alias must not be null or empty')
+                raise IllegalArgumentException("Alias must not be null or empty")
 
     def _is_not_blank(self, string: str) -> bool:
         return string is not None and string.strip()
