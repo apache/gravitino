@@ -65,8 +65,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
         && config.containsKey(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       hadoopConfMap.put(
-          Constants.CREDENTIALS_PROVIDER_KEY,
-          OSSSessionCredentialProvider.class.getCanonicalName());
+          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialProvider.class.getCanonicalName());
     }
 
     hadoopConfMap.forEach(configuration::set);

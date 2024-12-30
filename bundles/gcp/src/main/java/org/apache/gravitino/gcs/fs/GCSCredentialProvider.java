@@ -95,7 +95,6 @@ public class GCSCredentialProvider implements AccessTokenProvider {
 
     this.filesetIdentifier =
         configuration.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    // extra value and init Gravitino client here
     GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
     this.client = gravitinoVirtualFileSystem.initializeClient(configuration);
   }

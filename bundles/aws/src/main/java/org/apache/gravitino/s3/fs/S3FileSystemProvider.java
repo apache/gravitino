@@ -69,7 +69,7 @@ public class S3FileSystemProvider implements FileSystemProvider {
 
     if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       configuration.set(
-          Constants.AWS_CREDENTIALS_PROVIDER, S3SessionCredentialProvider.class.getCanonicalName());
+          Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialProvider.class.getCanonicalName());
     }
 
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider

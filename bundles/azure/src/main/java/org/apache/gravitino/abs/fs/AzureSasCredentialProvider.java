@@ -56,10 +56,6 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
 
   private long expirationTime;
 
-  public String getSasToken() {
-    return sasToken;
-  }
-
   public String getAzureStorageAccountName() {
     return azureStorageAccountName;
   }
@@ -82,8 +78,6 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
   public void initialize(Configuration conf, String accountName) throws IOException {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-
-    // extra value and init Gravitino client here
     GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
     this.client = gravitinoVirtualFileSystem.initializeClient(conf);
   }

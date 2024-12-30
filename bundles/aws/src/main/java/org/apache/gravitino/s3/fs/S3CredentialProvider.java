@@ -17,65 +17,65 @@
  *  under the License.
  */
 
-package org.apache.gravitino.oss.fs;
+package org.apache.gravitino.s3.fs;
 
-import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID;
-import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY;
-import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_TOKEN;
+import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_SESSION_ACCESS_KEY_ID;
+import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY;
+import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_TOKEN;
 
-import com.aliyun.oss.common.auth.BasicCredentials;
-import com.aliyun.oss.common.auth.Credentials;
-import com.aliyun.oss.common.auth.CredentialsProvider;
-import com.aliyun.oss.common.auth.DefaultCredentials;
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.aliyun.oss.Constants;
+import org.apache.hadoop.fs.s3a.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OSSSessionCredentialProvider implements CredentialsProvider {
+public class S3CredentialProvider implements AWSCredentialsProvider {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(OSSSessionCredentialProvider.class);
-  private Credentials basicCredentials;
-  private final String filesetIdentifier;
-  private long expirationTime;
+  private static final Logger LOGGER = LoggerFactory.getLogger(S3CredentialProvider.class);
   private final GravitinoClient client;
+  private final String filesetIdentifier;
   private final Configuration configuration;
 
-  public OSSSessionCredentialProvider(URI uri, Configuration conf) {
+  private AWSCredentials basicSessionCredentials;
+  private long expirationTime;
+
+  public S3CredentialProvider(final URI uri, final Configuration conf) {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    // extra value and init Gravitino client here
+    this.configuration = conf;
     GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
     this.client = gravitinoVirtualFileSystem.initializeClient(conf);
-    this.configuration = conf;
   }
 
   @Override
-  public void setCredentials(Credentials credentials) {}
-
-  @Override
-  public Credentials getCredentials() {
-    // If the credentials are null or about to expire, refresh the credentials.
-    if (basicCredentials == null || System.currentTimeMillis() > expirationTime - 5 * 60 * 1000) {
+  public AWSCredentials getCredentials() {
+    // Refresh credentials if they are null or about to expire in 5 minutes
+    if (basicSessionCredentials == null
+        || System.currentTimeMillis() > expirationTime - 5 * 60 * 1000) {
       synchronized (this) {
         refresh();
       }
     }
 
-    return basicCredentials;
+    return basicSessionCredentials;
   }
 
-  private void refresh() {
+  @Override
+  public void refresh() {
+    // The format of filesetIdentifier is "metalake.catalog.fileset.schema"
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
@@ -83,29 +83,30 @@ public class OSSSessionCredentialProvider implements CredentialsProvider {
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
+
+    // Can't find any credential, use the default AKSK if possible.
     if (credentials.length == 0) {
       LOGGER.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
       expirationTime = Long.MAX_VALUE;
-      this.basicCredentials =
-          new DefaultCredentials(
-              configuration.get(Constants.ACCESS_KEY_ID),
-              configuration.get(Constants.ACCESS_KEY_SECRET));
+      this.basicSessionCredentials =
+          new BasicAWSCredentials(
+              configuration.get(Constants.ACCESS_KEY), configuration.get(Constants.SECRET_KEY));
       return;
     }
 
-    // Use the first one.
     Credential credential = credentials[0];
     Map<String, String> credentialMap = credential.toProperties();
 
-    String accessKeyId = credentialMap.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
-    String secretAccessKey = credentialMap.get(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY);
+    String accessKeyId = credentialMap.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
+    String secretAccessKey = credentialMap.get(GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY);
 
-    if (OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE.equals(
+    if (S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE.equals(
         credentialMap.get(Credential.CREDENTIAL_TYPE))) {
-      String sessionToken = credentialMap.get(GRAVITINO_OSS_TOKEN);
-      this.basicCredentials = new BasicCredentials(accessKeyId, secretAccessKey, sessionToken);
+      String sessionToken = credentialMap.get(GRAVITINO_S3_TOKEN);
+      this.basicSessionCredentials =
+          new BasicSessionCredentials(accessKeyId, secretAccessKey, sessionToken);
     } else {
-      this.basicCredentials = new DefaultCredentials(accessKeyId, secretAccessKey);
+      this.basicSessionCredentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
     }
 
     this.expirationTime = credential.expireTimeInMs();
