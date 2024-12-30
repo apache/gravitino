@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.iceberg.service.provider;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.utils.MapUtils;
 
 /**
  * This provider proxy Gravitino lakehouse-iceberg catalogs.
@@ -75,8 +79,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    Map<String, String> properties =
-        IcebergPropertiesUtils.toIcebergCatalogProperties(catalog.properties());
+    Map<String, String> catalogProperties = catalog.properties();
+    Map<String, String> properties = new HashMap<>();
+    properties.putAll(IcebergPropertiesUtils.toIcebergCatalogProperties(catalogProperties));
+    properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
+
     return Optional.of(new IcebergConfig(properties));
   }
 
