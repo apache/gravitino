@@ -124,7 +124,6 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
 }
 
 pub fn extract_filesystem_scheme(path: &str) -> GvfsResult<FileSystemSchema> {
-    // todo need to improve the logic
     let url = parse_location(path)?;
     let scheme = url.scheme();
 
