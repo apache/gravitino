@@ -78,6 +78,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
     }
 
     async fn resolve_file_id_to_filestat(&self, file_stat: &mut FileStat, parent_file_id: u64) {
+        debug_assert!(parent_file_id != 0);
         let mut file_manager = self.file_entry_manager.write().await;
         let file_entry = file_manager.get_file_entry_by_path(&file_stat.path);
         match file_entry {
@@ -190,7 +191,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
         for file_stat in child_filestats.iter_mut() {
-            self.resolve_file_id_to_filestat(file_stat, file_id).await;
+            self.resolve_file_id_to_filestat(file_stat, file_stat.file_id)
+                .await;
         }
         Ok(child_filestats)
     }
