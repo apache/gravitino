@@ -49,7 +49,21 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogBackend),
         String.format("%s should not be empty", IcebergConstants.CATALOG_BACKEND));
-    all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
+    if (catalogBackend.equalsIgnoreCase(
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_CUSTOM)) {
+      String catalogBackendImpl = all.remove(IcebergConstants.CATALOG_BACKEND_IMPL);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(catalogBackendImpl),
+          String.format(
+              "%s should not be empty when %s is %s",
+              IcebergConstants.CATALOG_BACKEND_IMPL,
+              IcebergConstants.CATALOG_BACKEND,
+              IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_CUSTOM));
+      all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL, catalogBackendImpl);
+    } else {
+      all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
+    }
+
     all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED, "FALSE");
     return all;
   }
