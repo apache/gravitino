@@ -20,6 +20,7 @@
 package org.apache.gravitino.s3.credential;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -121,6 +122,7 @@ public class S3TokenProvider implements CredentialProvider {
         IamStatement.builder()
             .effect(IamEffect.ALLOW)
             .addAction("s3:GetObject")
+            .addAction("s3:GetObjectAttributes")
             .addAction("s3:GetObjectVersion");
     Map<String, IamStatement.Builder> bucketListStatmentBuilder = new HashMap<>();
     Map<String, IamStatement.Builder> bucketGetLocationStatmentBuilder = new HashMap<>();
@@ -134,6 +136,7 @@ public class S3TokenProvider implements CredentialProvider {
               allowGetObjectStatementBuilder.addResource(
                   IamResource.create(getS3UriWithArn(arnPrefix, uri)));
               String bucketArn = arnPrefix + getBucketName(uri);
+              String rawPath = trimLeadingSlash(uri.getPath());
               bucketListStatmentBuilder
                   .computeIfAbsent(
                       bucketArn,
@@ -142,10 +145,14 @@ public class S3TokenProvider implements CredentialProvider {
                               .effect(IamEffect.ALLOW)
                               .addAction("s3:ListBucket")
                               .addResource(key))
-                  .addCondition(
+                  .addConditions(
                       IamConditionOperator.STRING_LIKE,
                       "s3:prefix",
-                      concatPathWithSep(trimLeadingSlash(uri.getPath()), "*", "/"));
+                      Arrays.asList(
+                          // Get raw path metadata information for AWS hadoop connector
+                          rawPath,
+                          // Listing objects in raw path
+                          concatPathWithSep(rawPath, "*", "/")));
               bucketGetLocationStatmentBuilder.computeIfAbsent(
                   bucketArn,
                   key ->

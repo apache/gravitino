@@ -166,6 +166,7 @@ public class OSSTokenProvider implements CredentialProvider {
                       Statement.builder()
                           .effect(Effect.ALLOW)
                           .addAction("oss:GetBucketLocation")
+                          .addAction("oss:GetBucketInfo")
                           .addResource(key));
             });
 

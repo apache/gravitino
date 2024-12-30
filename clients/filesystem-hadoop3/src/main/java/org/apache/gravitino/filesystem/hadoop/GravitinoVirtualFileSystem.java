@@ -43,6 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
@@ -371,6 +372,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     FilesetCatalog filesetCatalog =
         catalogCache.get(
             catalogIdent, ident -> client.loadCatalog(catalogIdent.name()).asFilesetCatalog());
+    Catalog catalog = (Catalog) filesetCatalog;
+
     Preconditions.checkArgument(
         filesetCatalog != null, String.format("Loaded fileset catalog: %s is null.", catalogIdent));
 
@@ -412,6 +415,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 Map<String, String> maps = getConfigMap(getConf());
                 // If enable the cloud store credential, we should pass the configuration here.
                 maps.put(GVFS_FILESET_IDENTIFIER, identifier.toString());
+
+                // Should add catalog properties to the configuration
+                maps.putAll(catalog.properties());
 
                 return provider.getFileSystem(filePath, maps);
               } catch (IOException ioe) {
