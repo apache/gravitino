@@ -29,7 +29,7 @@ block_size = 8192
 
 # Gravitino settings
 [gravitino]
-gravitino_url = "http://localhost:8090"
+gravitino_uri = "http://localhost:8090"
 metalake = "your_metalake"
 
 # extent settings
