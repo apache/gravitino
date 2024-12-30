@@ -53,6 +53,12 @@ const MetalakeView = () => {
   const paramsSize = [...searchParams.keys()].length
   const store = useAppSelector(state => state.metalakes)
 
+  const buildNodePath = routeParams => {
+    const keys = ['metalake', 'catalog', 'type', 'schema', 'table', 'fileset', 'topic', 'model']
+
+    return keys.map(key => (routeParams[key] ? `{{${routeParams[key]}}}` : '')).join('')
+  }
+
   useEffect(() => {
     const routeParams = {
       metalake: searchParams.get('metalake'),
@@ -132,21 +138,7 @@ const MetalakeView = () => {
     }
     fetchDependsData()
 
-    dispatch(
-      setSelectedNodes(
-        routeParams.catalog
-          ? [
-              `{{${routeParams.metalake}}}{{${routeParams.catalog}}}{{${routeParams.type}}}${
-                routeParams.schema ? `{{${routeParams.schema}}}` : ''
-              }${routeParams.table ? `{{${routeParams.table}}}` : ''}${
-                routeParams.fileset ? `{{${routeParams.fileset}}}` : ''
-              }${routeParams.topic ? `{{${routeParams.topic}}}` : ''}${
-                routeParams.model ? `{{${routeParams.model}}}` : ''
-              }${routeParams.version ? `{{${routeParams.version}}}` : ''}`
-            ]
-          : []
-      )
-    )
+    dispatch(setSelectedNodes(routeParams.catalog ? [buildNodePath(routeParams)] : []))
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
