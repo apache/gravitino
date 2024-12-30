@@ -55,7 +55,7 @@ impl S3FileSystem {
         let region = region.unwrap();
         opendal_config.insert("region".to_string(), region.to_string());
 
-        let builder = S3::from_map(config.extend_config.clone());
+        let builder = S3::from_map(opendal_config.clone());
 
         let op = Operator::new(builder);
         if let Err(e) = op {
