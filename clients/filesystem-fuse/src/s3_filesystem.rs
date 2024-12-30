@@ -19,7 +19,7 @@
 use crate::config::AppConfig;
 use crate::error::ErrorCode::OpenDalError;
 use crate::filesystem::{FileStat, FileSystemCapacity, FileSystemContext, PathFileSystem, Result};
-use crate::gravitino_client::Fileset;
+use crate::gravitino_client::{Catalog, Fileset};
 use crate::open_dal_filesystem::OpenDalFileSystem;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
 use crate::utils::{extract_bucket, GvfsResult};
@@ -38,6 +38,7 @@ impl S3FileSystem {}
 
 impl S3FileSystem {
     pub(crate) fn new(
+        catalog: &Catalog,
         fileset: &Fileset,
         config: &AppConfig,
         _fs_context: &FileSystemContext,
@@ -46,6 +47,13 @@ impl S3FileSystem {
 
         let bucket = extract_bucket(&fileset.storage_location)?;
         opendal_config.insert("bucket".to_string(), bucket);
+
+        let region = catalog.properties.get("s3-endpoint");
+        if region.is_none() {
+            return Err(OpenDalError.to_error("s3-endpoint is not found in catalog"));
+        }
+        let region = region.unwrap();
+        opendal_config.insert("region".to_string(), region.to_string());
 
         let builder = S3::from_map(config.extend_config.clone());
 
