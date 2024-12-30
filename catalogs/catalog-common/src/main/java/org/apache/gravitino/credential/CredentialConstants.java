@@ -20,7 +20,7 @@
 package org.apache.gravitino.credential;
 
 public class CredentialConstants {
-  public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
+  @Deprecated public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
   public static final String CREDENTIAL_PROVIDERS = "credential-providers";
   public static final String CREDENTIAL_CACHE_EXPIRE_RATIO = "credential-cache-expire-ratio";
   public static final String CREDENTIAL_CACHE_MAX_SIZE = "credential-cache-max-size";

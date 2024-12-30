@@ -19,7 +19,7 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
@@ -32,9 +32,9 @@ import org.apache.iceberg.types.Types.StringType;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 // Used to override registerTable
-public class IcebergCatalogWrapperForTest extends IcebergCatalogWrapper {
-  public IcebergCatalogWrapperForTest(IcebergConfig icebergConfig) {
-    super(icebergConfig);
+public class CatalogWrapperForTest extends CatalogWrapperForREST {
+  public CatalogWrapperForTest(String catalogName, IcebergConfig icebergConfig) {
+    super(catalogName, icebergConfig);
   }
 
   @Override
