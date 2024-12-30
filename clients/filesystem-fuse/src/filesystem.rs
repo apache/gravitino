@@ -428,6 +428,9 @@ pub(crate) mod tests {
             // Test root dir
             self.test_root_dir().await;
 
+            // test read root dir
+            self.test_list_dir(ROOT_DIR_FILE_ID, false).await;
+
             let parent_file_id = ROOT_DIR_FILE_ID;
             // Test lookup file
             let file_id = self
@@ -463,7 +466,7 @@ pub(crate) mod tests {
             self.test_create_dir(parent_file_id, "dir1".as_ref()).await;
 
             // Test list dir
-            self.test_list_dir(parent_file_id).await;
+            self.test_list_dir(parent_file_id, true).await;
 
             // Test remove file
             self.test_remove_file(parent_file_id, "file1.txt".as_ref())
@@ -473,7 +476,7 @@ pub(crate) mod tests {
             self.test_remove_dir(parent_file_id, "dir1".as_ref()).await;
 
             // Test list dir again
-            self.test_list_dir(parent_file_id).await;
+            self.test_list_dir(parent_file_id, true).await;
 
             // Test file not found
             self.test_file_not_found(23).await;
@@ -595,10 +598,14 @@ pub(crate) mod tests {
                 .await;
         }
 
-        async fn test_list_dir(&self, root_file_id: u64) {
+        async fn test_list_dir(&self, root_file_id: u64, check_child: bool) {
             let list_dir = self.fs.read_dir(root_file_id).await;
             assert!(list_dir.is_ok());
             let list_dir = list_dir.unwrap();
+
+            if !check_child {
+                return;
+            }
             assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
                 assert!(self.files.contains_key(&file_stat.file_id));
