@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import java.util.Collections;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -27,7 +28,7 @@ import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 
 public class CreateRole extends Command {
   protected String metalake;
-  protected String role;
+  protected String[] roles;
 
   /**
    * Create a new role.
@@ -35,12 +36,12 @@ public class CreateRole extends Command {
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param role The name of the role.
+   * @param roles The array of roles.
    */
-  public CreateRole(String url, boolean ignoreVersions, String metalake, String role) {
+  public CreateRole(String url, boolean ignoreVersions, String metalake, String[] roles) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.role = role;
+    this.roles = roles;
   }
 
   /** Create a new role. */
@@ -48,7 +49,9 @@ public class CreateRole extends Command {
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      client.createRole(role, null, Collections.EMPTY_LIST);
+      for (String role : roles) {
+        client.createRole(role, null, Collections.EMPTY_LIST);
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (RoleAlreadyExistsException err) {
@@ -57,6 +60,6 @@ public class CreateRole extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(role + " created");
+    System.out.println(Joiner.on(", ").join(roles) + " created");
   }
 }

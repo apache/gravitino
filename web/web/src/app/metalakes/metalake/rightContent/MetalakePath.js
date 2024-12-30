@@ -47,10 +47,12 @@ const MetalakePath = props => {
     schema: searchParams.get('schema'),
     table: searchParams.get('table'),
     fileset: searchParams.get('fileset'),
-    topic: searchParams.get('topic')
+    topic: searchParams.get('topic'),
+    model: searchParams.get('model'),
+    version: searchParams.get('version')
   }
 
-  const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
+  const { metalake, catalog, type, schema, table, fileset, topic, model, version } = routeParams
 
   const metalakeUrl = `?metalake=${metalake}`
   const catalogUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}`
@@ -58,6 +60,8 @@ const MetalakePath = props => {
   const tableUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&table=${table}`
   const filesetUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&fileset=${fileset}`
   const topicUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&topic=${topic}`
+  const modelUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&model=${model}`
+  const versionUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&model=${model}&version=${version}`
 
   const handleClick = (event, path) => {
     path === `?${searchParams.toString()}` && event.preventDefault()
@@ -149,6 +153,27 @@ const MetalakePath = props => {
           <MUILink component={Link} href={topicUrl} onClick={event => handleClick(event, topicUrl)} underline='hover'>
             <Icon icon='bx:file' fontSize={20} />
             <Text>{topic}</Text>
+          </MUILink>
+        </Tooltip>
+      )}
+      {model && (
+        <Tooltip title={model} placement='top'>
+          <MUILink component={Link} href={modelUrl} onClick={event => handleClick(event, modelUrl)} underline='hover'>
+            <Icon icon='bx:file' fontSize={20} />
+            <Text>{model}</Text>
+          </MUILink>
+        </Tooltip>
+      )}
+      {version && (
+        <Tooltip title={version} placement='top'>
+          <MUILink
+            component={Link}
+            href={versionUrl}
+            onClick={event => handleClick(event, versionUrl)}
+            underline='hover'
+          >
+            <Icon icon='bx:file' fontSize={20} />
+            <Text>{version}</Text>
           </MUILink>
         </Tooltip>
       )}

@@ -43,8 +43,8 @@ from gravitino.audit.internal_client_type import InternalClientType
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
-from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_fileset import GenericFileset
+from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
@@ -1181,7 +1181,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 if credential.expire_time_in_ms() > 0
                 else sys.maxsize
             )
-            if credential_type == ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE:
+            if credential_type == ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE:
                 fs = importlib.import_module("adlfs").AzureBlobFileSystem(
                     account_name=credential_info[
                         ADLSTokenCredential.STORAGE_ACCOUNT_NAME

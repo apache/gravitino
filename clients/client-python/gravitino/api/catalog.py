@@ -179,6 +179,16 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support topic operations")
 
+    def as_model_catalog(self) -> "ModelCatalog":
+        """
+        Returns:
+            the {@link ModelCatalog} if the catalog supports model operations.
+
+        Raises:
+            UnsupportedOperationException if the catalog does not support model operations.
+        """
+        raise UnsupportedOperationException("Catalog does not support model operations")
+
 
 class UnsupportedOperationException(Exception):
     pass

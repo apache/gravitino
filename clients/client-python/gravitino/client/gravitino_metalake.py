@@ -20,7 +20,7 @@ from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
-from gravitino.dto.dto_converters import DTOConverters
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
 from gravitino.dto.requests.catalog_set_request import CatalogSetRequest

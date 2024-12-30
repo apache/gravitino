@@ -156,7 +156,7 @@ class TestCredentialFactory(unittest.TestCase):
             adls_credential.credential_type(), credential_info, expire_time
         )
         self.assertEqual(
-            ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE,
+            ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
             check_credential.credential_type(),
         )
 

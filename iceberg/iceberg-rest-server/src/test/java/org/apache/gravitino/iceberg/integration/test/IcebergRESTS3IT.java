@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
@@ -86,8 +87,8 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.S3_TOKEN_CREDENTIAL_PROVIDER);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
+        S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + S3Properties.GRAVITINO_S3_REGION, region);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);

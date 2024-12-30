@@ -22,7 +22,6 @@ package org.apache.gravitino.abs.credential;
 import java.util.Map;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.config.AzureCredentialConfig;
@@ -44,7 +43,7 @@ public class AzureAccountKeyProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.AZURE_ACCOUNT_KEY_CREDENTIAL_PROVIDER_TYPE;
+    return AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE;
   }
 
   @Override
