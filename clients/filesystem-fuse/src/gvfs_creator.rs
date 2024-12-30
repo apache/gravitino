@@ -22,7 +22,7 @@ use crate::filesystem::{FileSystemContext, PathFileSystem};
 use crate::gravitino_client::{Fileset, GravitinoClient};
 use crate::gvfs_fileset_fs::GvfsFilesetFs;
 use crate::gvfs_fuse::{CreateFsResult, FileSystemSchema};
-use crate::open_dal_filesystem::OpenDalFileSystem;
+use crate::s3_filesystem::S3FileSystem;
 use crate::utils::{extract_root_path, parse_location, GvfsResult};
 
 const GRAVITINO_FILESET_SCHEMA: &str = "gvfs";
@@ -93,11 +93,10 @@ fn create_fs_with_fileset(
     config: &AppConfig,
     fs_context: &FileSystemContext,
 ) -> GvfsResult<Box<dyn PathFileSystem>> {
-    let schema = extract_filesystem_scheme(&fileset.storage_location).unwrap();
+    let schema = extract_filesystem_scheme(&fileset.storage_location)?;
+
     match schema {
-        FileSystemSchema::S3 => {
-            OpenDalFileSystem::create_file_system(&schema, fileset, config, fs_context)
-        }
+        FileSystemSchema::S3 => Ok(Box::new(S3FileSystem::new(fileset, config, fs_context)?)),
     }
 }
 

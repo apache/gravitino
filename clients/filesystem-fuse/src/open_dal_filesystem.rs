@@ -17,22 +17,16 @@
  * under the License.
  */
 use crate::config::AppConfig;
-use crate::error::ErrorCode::OpenDalError;
 use crate::filesystem::{
     FileReader, FileStat, FileSystemCapacity, FileSystemContext, FileWriter, PathFileSystem, Result,
 };
-use crate::gravitino_client::Fileset;
-use crate::gvfs_fuse::FileSystemSchema;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
-use crate::utils::{extract_bucket, GvfsResult};
 use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
 use log::{debug, error};
-use opendal::layers::LoggingLayer;
-use opendal::services::S3;
-use opendal::{Builder, EntryMode, ErrorKind, Metadata, Operator};
+use opendal::{EntryMode, ErrorKind, Metadata, Operator};
 use std::path::Path;
 use std::time::SystemTime;
 
@@ -43,32 +37,8 @@ pub(crate) struct OpenDalFileSystem {
 impl OpenDalFileSystem {}
 
 impl OpenDalFileSystem {
-    fn new(op: Operator, _config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
+    pub(crate) fn new(op: Operator, _config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
         Self { op: op }
-    }
-
-    pub(crate) fn create_file_system(
-        schema: &FileSystemSchema,
-        fileset: &Fileset,
-        config: &AppConfig,
-        fs_context: &FileSystemContext,
-    ) -> GvfsResult<Box<dyn PathFileSystem>> {
-        match schema {
-            FileSystemSchema::S3 => {
-                let mut opendal_config = config.extend_config.clone();
-                let bucket = extract_bucket(&fileset.storage_location)?;
-                opendal_config.insert("bucket".to_string(), bucket);
-                let builder = S3::from_map(config.extend_config.clone());
-
-                let op = Operator::new(builder);
-                if let Err(e) = op {
-                    error!("opendal create failed: {:?}", e);
-                    return Err(OpenDalError.to_error(format!("opendal create failed: {:?}", e)));
-                }
-                let op = op.unwrap().layer(LoggingLayer::default()).finish();
-                Ok(Box::new(OpenDalFileSystem::new(op, config, fs_context)))
-            }
-        }
     }
 
     fn opendal_meta_to_file_stat(&self, meta: &Metadata, file_stat: &mut FileStat) {

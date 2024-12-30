@@ -190,8 +190,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
         for file_stat in child_filestats.iter_mut() {
-            self.resolve_file_id_to_filestat(file_stat, file_stat.file_id)
-                .await;
+            self.resolve_file_id_to_filestat(file_stat, file_id).await;
         }
         Ok(child_filestats)
     }
