@@ -26,7 +26,7 @@ mod filesystem;
 mod fuse_api_handle;
 mod fuse_server;
 mod gravitino_client;
-mod gvfs_fileset_fs;
+mod gravitino_fileset_filesystem;
 mod gvfs_fuse;
 mod memory_filesystem;
 mod opened_file;

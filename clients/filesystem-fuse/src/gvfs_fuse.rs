@@ -23,7 +23,7 @@ use crate::filesystem::FileSystemContext;
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::fuse_server::FuseServer;
 use crate::gravitino_client::GravitinoClient;
-use crate::gvfs_fileset_fs::GvfsFilesetFs;
+use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
 use crate::memory_filesystem::MemoryFileSystem;
 use crate::utils::GvfsResult;
 use log::info;
@@ -38,9 +38,9 @@ static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(No
 
 pub(crate) enum CreateFsResult {
     Memory(MemoryFileSystem),
-    Gvfs(GvfsFilesetFs),
+    Gvfs(GravitinoFilesetFileSystem),
     FuseMemoryFs(FuseApiHandle<DefaultRawFileSystem<MemoryFileSystem>>),
-    FuseGvfs(FuseApiHandle<DefaultRawFileSystem<GvfsFilesetFs>>),
+    FuseGvfs(FuseApiHandle<DefaultRawFileSystem<GravitinoFilesetFileSystem>>),
     None,
 }
 
@@ -187,7 +187,7 @@ pub async fn create_gvfs_filesystem(
     // todo need to replace the inner filesystem with the real storage filesystem
     let inner_fs = MemoryFileSystem::new().await;
 
-    let fs = GvfsFilesetFs::new(
+    let fs = GravitinoFilesetFileSystem::new(
         Box::new(inner_fs),
         Path::new(&location),
         client,
