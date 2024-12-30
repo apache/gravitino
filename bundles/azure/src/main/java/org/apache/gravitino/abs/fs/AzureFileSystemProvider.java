@@ -81,9 +81,15 @@ public class AzureFileSystemProvider implements FileSystemProvider {
         azureSasCredentialProvider.initialize(configuration, null);
         String sas = azureSasCredentialProvider.getSASToken(null, null, null, null);
         if (sas != null) {
-          configuration.set(FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME, AuthType.SAS.name());
+          String accountName =
+              String.format(
+                  "%s.dfs.core.windows.net",
+                  config.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+
           configuration.set(
-              FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + ".dfs.core.windows.net",
+              FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
+          configuration.set(
+              FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
               AzureSasCredentialProvider.class.getName());
         } else if (azureSasCredentialProvider.getAzureStorageAccountKey() != null
             && azureSasCredentialProvider.getAzureStorageAccountName() != null) {
