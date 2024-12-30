@@ -20,7 +20,7 @@ from typing import List, Dict
 
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
-from gravitino.dto.dto_converters import DTOConverters
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_create_request import MetalakeCreateRequest
 from gravitino.dto.requests.metalake_set_request import MetalakeSetRequest
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
