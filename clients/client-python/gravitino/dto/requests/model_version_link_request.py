@@ -52,7 +52,23 @@ class ModelVersionLinkRequest(RESTRequest):
         Raises:
             IllegalArgumentException if the request is invalid
         """
-        if not self._uri:
+        if not self._is_not_blank(self._uri):
             raise IllegalArgumentException(
                 '"uri" field is required and cannot be empty'
             )
+
+        for alias in self._aliases or []:
+            if self._is_a_number(alias):
+                raise IllegalArgumentException(f'Alias "{alias}" must not be a number')
+
+    def _is_not_blank(self, string: str) -> bool:
+        return string is not None and string.strip()
+
+    def _is_a_number(self, string: str) -> bool:
+        if string is None or not string.strip():
+            return False
+        try:
+            float(string)
+            return True
+        except ValueError:
+            return False
