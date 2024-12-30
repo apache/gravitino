@@ -23,52 +23,42 @@ import { useState, forwardRef, useEffect, Fragment } from 'react'
 
 import {
   Box,
-  Grid,
   Button,
   Dialog,
-  TextField,
-  Typography,
-  DialogContent,
   DialogActions,
-  IconButton,
+  DialogContent,
   Fade,
-  Select,
-  MenuItem,
-  InputLabel,
   FormControl,
-  FormHelperText
+  FormHelperText,
+  Grid,
+  IconButton,
+  InputLabel,
+  TextField,
+  Typography
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { createFileset, updateFileset } from '@/lib/store/metalakes'
+import { registerModel } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
-import { genUpdates } from '@/lib/utils'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
 const defaultValues = {
   name: '',
-  type: 'managed',
-  storageLocation: '',
   comment: '',
   propItems: []
 }
 
 const schema = yup.object().shape({
   name: yup.string().required().matches(nameRegex, nameRegexDesc),
-  type: yup.mixed().oneOf(['managed', 'external']).required(),
-  storageLocation: yup.string().when('type', {
-    is: 'external',
-    then: schema => schema.required(),
-    otherwise: schema => schema
-  }),
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
@@ -85,15 +75,16 @@ const Transition = forwardRef(function Transition(props, ref) {
   return <Fade ref={ref} {...props} />
 })
 
-const CreateFilesetDialog = props => {
+const RegisterModelDialog = props => {
   const { open, setOpen, type = 'create', data = {} } = props
   const searchParams = useSearchParams()
   const metalake = searchParams.get('metalake')
   const catalog = searchParams.get('catalog')
-  const catalogType = searchParams.get('type')
   const schemaName = searchParams.get('schema')
+  const catalogType = searchParams.get('type')
   const [innerProps, setInnerProps] = useState([])
   const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.metalakes)
   const [cacheData, setCacheData] = useState()
 
   const {
@@ -185,41 +176,20 @@ const CreateFilesetDialog = props => {
           return acc
         }, {})
 
-        const filesetData = {
+        const schemaData = {
           name: data.name,
-          type: data.type,
-          storageLocation: data.storageLocation,
           comment: data.comment,
           properties
         }
 
         if (type === 'create') {
-          dispatch(createFileset({ data: filesetData, metalake, catalog, type: catalogType, schema: schemaName })).then(
+          dispatch(registerModel({ data: schemaData, metalake, catalog, schema: schemaName, type: catalogType })).then(
             res => {
               if (!res.payload?.err) {
                 handleClose()
               }
             }
           )
-        } else {
-          const reqData = { updates: genUpdates(cacheData, filesetData) }
-
-          if (reqData.updates.length !== 0) {
-            dispatch(
-              updateFileset({
-                metalake,
-                catalog,
-                type: catalogType,
-                schema: schemaName,
-                fileset: cacheData.name,
-                data: reqData
-              })
-            ).then(res => {
-              if (!res.payload?.err) {
-                handleClose()
-              }
-            })
-          }
         }
       })
       .catch(err => {
@@ -237,8 +207,6 @@ const CreateFilesetDialog = props => {
 
       setCacheData(data)
       setValue('name', data.name)
-      setValue('type', data.type)
-      setValue('storageLocation', data.storageLocation)
       setValue('comment', data.comment)
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
@@ -273,7 +241,7 @@ const CreateFilesetDialog = props => {
           </IconButton>
           <Box sx={{ mb: 8, textAlign: 'center' }}>
             <Typography variant='h5' sx={{ mb: 3 }}>
-              {type === 'create' ? 'Create' : 'Edit'} Fileset
+              {type === 'create' ? 'Register' : 'Edit'} Model
             </Typography>
           </Box>
 
@@ -290,76 +258,13 @@ const CreateFilesetDialog = props => {
                       label='Name'
                       onChange={onChange}
                       placeholder=''
+                      disabled={type === 'update'}
                       error={Boolean(errors.name)}
-                      data-refer='fileset-name-field'
+                      data-refer='model-name-field'
                     />
                   )}
                 />
                 {errors.name && <FormHelperText sx={{ color: 'error.main' }}>{errors.name.message}</FormHelperText>}
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel id='select-fileset-type' error={Boolean(errors.type)}>
-                  Type
-                </InputLabel>
-                <Controller
-                  name='type'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <Select
-                      value={value}
-                      label='Type'
-                      defaultValue='managed'
-                      onChange={onChange}
-                      disabled={type === 'update'}
-                      error={Boolean(errors.type)}
-                      labelId='select-fileset-type'
-                      data-refer='fileset-type-selector'
-                    >
-                      <MenuItem value={'managed'}>Managed</MenuItem>
-                      <MenuItem value={'external'}>External</MenuItem>
-                    </Select>
-                  )}
-                />
-                {errors.type && <FormHelperText sx={{ color: 'error.main' }}>{errors.type.message}</FormHelperText>}
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <Controller
-                  name='storageLocation'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <TextField
-                      value={value}
-                      label='Storage Location'
-                      onChange={onChange}
-                      disabled={type === 'update'}
-                      placeholder=''
-                      error={Boolean(errors.storageLocation)}
-                      data-refer='fileset-storageLocation-field'
-                    />
-                  )}
-                />
-                {errors.storageLocation ? (
-                  <FormHelperText sx={{ color: 'error.main' }}>{errors.storageLocation.message}</FormHelperText>
-                ) : (
-                  <>
-                    <FormHelperText sx={{ color: 'text.main' }}>
-                      It is optional if the fileset is 'Managed' type and a storage location is already specified at the
-                      parent catalog or schema level.
-                    </FormHelperText>
-                    <FormHelperText sx={{ color: 'text.main' }}>
-                      It becomes mandatory if the fileset type is 'External' or no storage location is defined at the
-                      parent level.
-                    </FormHelperText>
-                  </>
-                )}
               </FormControl>
             </Grid>
 
@@ -378,14 +283,14 @@ const CreateFilesetDialog = props => {
                       onChange={onChange}
                       placeholder=''
                       error={Boolean(errors.comment)}
-                      data-refer='fileset-comment-field'
+                      data-refer='model-comment-field'
                     />
                   )}
                 />
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} data-refer='fileset-props-layout'>
+            <Grid item xs={12} data-refer='model-props-layout'>
               <Typography sx={{ mb: 2 }} variant='body2'>
                 Properties
               </Typography>
@@ -397,7 +302,7 @@ const CreateFilesetDialog = props => {
                         <Box>
                           <Box
                             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                            data-refer={`fileset-props-${index}`}
+                            data-refer={`model-props-${index}`}
                           >
                             <Box>
                               <TextField
@@ -469,7 +374,7 @@ const CreateFilesetDialog = props => {
                 onClick={addFields}
                 variant='outlined'
                 startIcon={<Icon icon='mdi:plus-circle-outline' />}
-                data-refer='add-fileset-props'
+                data-refer='add-model-props'
               >
                 Add Property
               </Button>
@@ -483,8 +388,8 @@ const CreateFilesetDialog = props => {
             pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
-          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-fileset'>
-            {type === 'create' ? 'Create' : 'Update'}
+          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-model'>
+            {type === 'create' ? 'Register' : 'Update'}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
             Cancel
@@ -495,4 +400,4 @@ const CreateFilesetDialog = props => {
   )
 }
 
-export default CreateFilesetDialog
+export default RegisterModelDialog

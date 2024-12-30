@@ -23,52 +23,70 @@ import { useState, forwardRef, useEffect, Fragment } from 'react'
 
 import {
   Box,
-  Grid,
   Button,
   Dialog,
-  TextField,
-  Typography,
-  DialogContent,
   DialogActions,
-  IconButton,
+  DialogContent,
   Fade,
-  Select,
-  MenuItem,
-  InputLabel,
   FormControl,
-  FormHelperText
+  FormHelperText,
+  Grid,
+  IconButton,
+  InputLabel,
+  TextField,
+  Typography
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { createFileset, updateFileset } from '@/lib/store/metalakes'
+import { linkVersion } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
-import { genUpdates } from '@/lib/utils'
-import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
+import { keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
 const defaultValues = {
-  name: '',
-  type: 'managed',
-  storageLocation: '',
+  uri: '',
+  aliases: [{ name: '' }],
   comment: '',
   propItems: []
 }
 
 const schema = yup.object().shape({
-  name: yup.string().required().matches(nameRegex, nameRegexDesc),
-  type: yup.mixed().oneOf(['managed', 'external']).required(),
-  storageLocation: yup.string().when('type', {
-    is: 'external',
-    then: schema => schema.required(),
-    otherwise: schema => schema
-  }),
+  uri: yup.string().required(),
+  aliases: yup
+    .array()
+    .of(
+      yup.object().shape({
+        name: yup
+          .string()
+          .required('This aliase is required')
+          .test('not-number', 'Aliase cannot be a number or numeric string', value => {
+            return value === undefined || isNaN(Number(value))
+          })
+      })
+    )
+    .test('unique', 'Aliase must be unique', (aliases, ctx) => {
+      const values = aliases?.filter(a => !!a.name).map(a => a.name)
+      const duplicates = values.filter((value, index, self) => self.indexOf(value) !== index)
+
+      if (duplicates.length > 0) {
+        const duplicateIndex = values.lastIndexOf(duplicates[0])
+
+        return ctx.createError({
+          path: `aliases.${duplicateIndex}.name`,
+          message: 'This aliase is duplicated'
+        })
+      }
+
+      return true
+    }),
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
@@ -85,15 +103,17 @@ const Transition = forwardRef(function Transition(props, ref) {
   return <Fade ref={ref} {...props} />
 })
 
-const CreateFilesetDialog = props => {
+const LinkVersionDialog = props => {
   const { open, setOpen, type = 'create', data = {} } = props
   const searchParams = useSearchParams()
   const metalake = searchParams.get('metalake')
   const catalog = searchParams.get('catalog')
-  const catalogType = searchParams.get('type')
   const schemaName = searchParams.get('schema')
+  const catalogType = searchParams.get('type')
+  const model = searchParams.get('model')
   const [innerProps, setInnerProps] = useState([])
   const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.metalakes)
   const [cacheData, setCacheData] = useState()
 
   const {
@@ -154,6 +174,13 @@ const CreateFilesetDialog = props => {
     setValue('propItems', data)
   }
 
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'aliases'
+  })
+
+  const watchAliases = watch('aliases')
+
   const handleClose = () => {
     reset()
     setInnerProps([])
@@ -185,41 +212,21 @@ const CreateFilesetDialog = props => {
           return acc
         }, {})
 
-        const filesetData = {
-          name: data.name,
-          type: data.type,
-          storageLocation: data.storageLocation,
+        const schemaData = {
+          uri: data.uri,
+          aliases: data.aliases.map(alias => alias.name),
           comment: data.comment,
           properties
         }
 
         if (type === 'create') {
-          dispatch(createFileset({ data: filesetData, metalake, catalog, type: catalogType, schema: schemaName })).then(
-            res => {
-              if (!res.payload?.err) {
-                handleClose()
-              }
+          dispatch(
+            linkVersion({ data: schemaData, metalake, catalog, schema: schemaName, type: catalogType, model })
+          ).then(res => {
+            if (!res.payload?.err) {
+              handleClose()
             }
-          )
-        } else {
-          const reqData = { updates: genUpdates(cacheData, filesetData) }
-
-          if (reqData.updates.length !== 0) {
-            dispatch(
-              updateFileset({
-                metalake,
-                catalog,
-                type: catalogType,
-                schema: schemaName,
-                fileset: cacheData.name,
-                data: reqData
-              })
-            ).then(res => {
-              if (!res.payload?.err) {
-                handleClose()
-              }
-            })
-          }
+          })
         }
       })
       .catch(err => {
@@ -236,9 +243,7 @@ const CreateFilesetDialog = props => {
       const { properties = {} } = data
 
       setCacheData(data)
-      setValue('name', data.name)
-      setValue('type', data.type)
-      setValue('storageLocation', data.storageLocation)
+      setValue('uri', data.uri)
       setValue('comment', data.comment)
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
@@ -273,7 +278,7 @@ const CreateFilesetDialog = props => {
           </IconButton>
           <Box sx={{ mb: 8, textAlign: 'center' }}>
             <Typography variant='h5' sx={{ mb: 3 }}>
-              {type === 'create' ? 'Create' : 'Edit'} Fileset
+              {type === 'create' ? 'Link' : 'Edit'} Version
             </Typography>
           </Box>
 
@@ -281,86 +286,74 @@ const CreateFilesetDialog = props => {
             <Grid item xs={12}>
               <FormControl fullWidth>
                 <Controller
-                  name='name'
+                  name='uri'
                   control={control}
                   rules={{ required: true }}
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
-                      label='Name'
+                      label='URI'
                       onChange={onChange}
                       placeholder=''
-                      error={Boolean(errors.name)}
-                      data-refer='fileset-name-field'
+                      disabled={type === 'update'}
+                      error={Boolean(errors.uri)}
+                      data-refer='link-uri-field'
                     />
                   )}
                 />
-                {errors.name && <FormHelperText sx={{ color: 'error.main' }}>{errors.name.message}</FormHelperText>}
+                {errors.uri && <FormHelperText sx={{ color: 'error.main' }}>{errors.uri.message}</FormHelperText>}
               </FormControl>
             </Grid>
 
             <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel id='select-fileset-type' error={Boolean(errors.type)}>
-                  Type
-                </InputLabel>
-                <Controller
-                  name='type'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <Select
-                      value={value}
-                      label='Type'
-                      defaultValue='managed'
-                      onChange={onChange}
-                      disabled={type === 'update'}
-                      error={Boolean(errors.type)}
-                      labelId='select-fileset-type'
-                      data-refer='fileset-type-selector'
-                    >
-                      <MenuItem value={'managed'}>Managed</MenuItem>
-                      <MenuItem value={'external'}>External</MenuItem>
-                    </Select>
-                  )}
-                />
-                {errors.type && <FormHelperText sx={{ color: 'error.main' }}>{errors.type.message}</FormHelperText>}
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <Controller
-                  name='storageLocation'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <TextField
-                      value={value}
-                      label='Storage Location'
-                      onChange={onChange}
-                      disabled={type === 'update'}
-                      placeholder=''
-                      error={Boolean(errors.storageLocation)}
-                      data-refer='fileset-storageLocation-field'
-                    />
-                  )}
-                />
-                {errors.storageLocation ? (
-                  <FormHelperText sx={{ color: 'error.main' }}>{errors.storageLocation.message}</FormHelperText>
-                ) : (
-                  <>
-                    <FormHelperText sx={{ color: 'text.main' }}>
-                      It is optional if the fileset is 'Managed' type and a storage location is already specified at the
-                      parent catalog or schema level.
-                    </FormHelperText>
-                    <FormHelperText sx={{ color: 'text.main' }}>
-                      It becomes mandatory if the fileset type is 'External' or no storage location is defined at the
-                      parent level.
-                    </FormHelperText>
-                  </>
-                )}
-              </FormControl>
+              {fields.map((field, index) => {
+                return (
+                  <Grid key={index} item xs={12} sx={{ '& + &': { mt: 2 } }}>
+                    <FormControl fullWidth>
+                      <Box
+                        key={field.id}
+                        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                        data-refer={`version-aliases-${index}`}
+                      >
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Controller
+                            name={`aliases.${index}.name`}
+                            control={control}
+                            render={({ field }) => (
+                              <TextField
+                                {...field}
+                                onChange={event => {
+                                  field.onChange(event)
+                                  trigger('aliases')
+                                }}
+                                label={`Aliase ${index + 1}`}
+                                error={!!errors.aliases?.[index]?.name || !!errors.aliases?.message}
+                                helperText={errors.aliases?.[index]?.name?.message || errors.aliases?.message}
+                                fullWidth
+                              />
+                            )}
+                          />
+                        </Box>
+                        <Box>
+                          {index === 0 ? (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton onClick={() => append({ name: '' })}>
+                                <Icon icon='mdi:plus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton onClick={() => remove(index)}>
+                                <Icon icon='mdi:minus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </FormControl>
+                  </Grid>
+                )
+              })}
             </Grid>
 
             <Grid item xs={12}>
@@ -378,14 +371,14 @@ const CreateFilesetDialog = props => {
                       onChange={onChange}
                       placeholder=''
                       error={Boolean(errors.comment)}
-                      data-refer='fileset-comment-field'
+                      data-refer='version-comment-field'
                     />
                   )}
                 />
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} data-refer='fileset-props-layout'>
+            <Grid item xs={12} data-refer='version-props-layout'>
               <Typography sx={{ mb: 2 }} variant='body2'>
                 Properties
               </Typography>
@@ -397,7 +390,7 @@ const CreateFilesetDialog = props => {
                         <Box>
                           <Box
                             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                            data-refer={`fileset-props-${index}`}
+                            data-refer={`version-props-${index}`}
                           >
                             <Box>
                               <TextField
@@ -407,7 +400,7 @@ const CreateFilesetDialog = props => {
                                 value={item.key}
                                 disabled={item.disabled || (item.key === 'location' && type === 'update')}
                                 onChange={event => handleFormChange({ index, event })}
-                                error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
+                                error={item.hasDuplicateKey || item.invalid || !item.key?.trim()}
                                 data-refer={`props-key-${index}`}
                               />
                             </Box>
@@ -453,7 +446,7 @@ const CreateFilesetDialog = props => {
                             underscores, hyphens, or dots.
                           </FormHelperText>
                         )}
-                        {!item.key.trim() && (
+                        {!item.key?.trim() && (
                           <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                         )}
                       </FormControl>
@@ -469,7 +462,7 @@ const CreateFilesetDialog = props => {
                 onClick={addFields}
                 variant='outlined'
                 startIcon={<Icon icon='mdi:plus-circle-outline' />}
-                data-refer='add-fileset-props'
+                data-refer='add-version-props'
               >
                 Add Property
               </Button>
@@ -483,8 +476,8 @@ const CreateFilesetDialog = props => {
             pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
-          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-fileset'>
-            {type === 'create' ? 'Create' : 'Update'}
+          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-model'>
+            {type === 'create' ? 'Submit' : 'Update'}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
             Cancel
@@ -495,4 +488,4 @@ const CreateFilesetDialog = props => {
   )
 }
 
-export default CreateFilesetDialog
+export default LinkVersionDialog
