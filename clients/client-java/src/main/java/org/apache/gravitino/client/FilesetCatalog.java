@@ -154,7 +154,7 @@ class FilesetCatalog extends BaseSchemaCatalog
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
-            .name(RESTUtils.encodeString(ident.name()))
+            .name(ident.name())
             .comment(comment)
             .type(type)
             .storageLocation(storageLocation)

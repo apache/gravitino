@@ -144,8 +144,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    SchemaCreateRequest req =
-        new SchemaCreateRequest(RESTUtils.encodeString(schemaName), comment, properties);
+    SchemaCreateRequest req = new SchemaCreateRequest(schemaName, comment, properties);
     req.validate();
 
     SchemaResponse resp =
