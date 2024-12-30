@@ -25,7 +25,7 @@ from gravitino.utils.precondition import Precondition
 class ADLSTokenCredential(Credential, ABC):
     """Represents ADLS token credential."""
 
-    ADLS_SAS_TOKEN_CREDENTIAL_TYPE: str = "adls-sas-token"
+    ADLS_SAS_TOKEN_CREDENTIAL_TYPE: str = "adls-token"
     ADLS_DOMAIN: str = "dfs.core.windows.net"
     STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
     SAS_TOKEN: str = "adls-sas-token"

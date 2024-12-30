@@ -23,6 +23,7 @@ import unittest
 from gcsfs import GCSFileSystem
 
 from gravitino import Catalog, Fileset, GravitinoClient
+from gravitino.filesystem import gvfs
 from tests.integration.test_gvfs_with_gcs import TestGvfsWithGCS
 
 logger = logging.getLogger(__name__)
@@ -87,3 +88,25 @@ class TestGvfsWithGCSCredential(TestGvfsWithGCS):
         )
 
         cls.fs = GCSFileSystem(token=cls.key_file)
+
+    def test_mkdir(self):
+        mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
+        mkdir_actual_dir = self.fileset_storage_location + "/test_mkdir"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+
+        # it actually takes no effect.
+        self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
+
+        # check whether it will automatically create the bucket if 'create_parents'
+        # is set to True.
+        new_bucket = self.bucket_name + "1"
+        mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
+        mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
+
+        fs.mkdir(mkdir_dir, create_parents=True)
+        self.assertFalse(self.fs.exists(mkdir_actual_dir))

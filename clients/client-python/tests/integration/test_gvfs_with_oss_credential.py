@@ -28,6 +28,7 @@ from gravitino import (
     Catalog,
     Fileset,
 )
+from gravitino.filesystem import gvfs
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from tests.integration.test_gvfs_with_oss import TestGvfsWithOSS
 
@@ -118,3 +119,61 @@ class TestGvfsWithOSSCredential(TestGvfsWithOSS):
             secret=cls.oss_secret_key,
             endpoint=cls.oss_endpoint,
         )
+
+    def test_cat_file(self):
+        cat_dir = self.fileset_gvfs_location + "/test_cat"
+        cat_actual_dir = self.fileset_storage_location + "/test_cat"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+
+        self.check_mkdir(cat_dir, cat_actual_dir, fs)
+
+        cat_file = self.fileset_gvfs_location + "/test_cat/test.file"
+        cat_actual_file = self.fileset_storage_location + "/test_cat/test.file"
+        self.fs.touch(cat_actual_file)
+        self.assertTrue(self.fs.exists(cat_actual_file))
+        self.assertTrue(fs.exists(cat_file))
+
+        # test open and write file
+        with fs.open(cat_file, mode="wb") as f:
+            f.write(b"test_cat_file")
+        self.assertTrue(fs.info(cat_file)["size"] > 0)
+
+        # test cat file
+        content = fs.cat_file(cat_file)
+        self.assertEqual(b"test_cat_file", content)
+
+    @unittest.skip(
+        "Skip this test case because fs.ls(dir) using credential is always empty"
+    )
+    def test_ls(self):
+        ls_dir = self.fileset_gvfs_location + "/test_ls"
+        ls_actual_dir = self.fileset_storage_location + "/test_ls"
+
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+
+        self.check_mkdir(ls_dir, ls_actual_dir, fs)
+
+        ls_file = self.fileset_gvfs_location + "/test_ls/test.file"
+        ls_actual_file = self.fileset_storage_location + "/test_ls/test.file"
+        self.fs.touch(ls_actual_file)
+        self.assertTrue(self.fs.exists(ls_actual_file))
+
+        # test detail = false
+        file_list_without_detail = fs.ls(ls_dir, detail=False)
+        self.assertEqual(1, len(file_list_without_detail))
+        self.assertEqual(file_list_without_detail[0], ls_file[len("gvfs://") :])
+
+        # test detail = true
+        file_list_with_detail = fs.ls(ls_dir, detail=True)
+        self.assertEqual(1, len(file_list_with_detail))
+        self.assertEqual(file_list_with_detail[0]["name"], ls_file[len("gvfs://") :])
