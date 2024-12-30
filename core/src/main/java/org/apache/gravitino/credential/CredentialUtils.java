@@ -19,21 +19,20 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.base.Splitter;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class CredentialUtils {
 
-  private static final Splitter splitter = Splitter.on(",");
-
   public static Map<String, CredentialProvider> loadCredentialProviders(
       Map<String, String> catalogProperties) {
-    Set<String> credentialProviders =
-        CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
+    CredentialConfig credentialConfig = new CredentialConfig(catalogProperties);
+    List<String> credentialProviders = credentialConfig.get(CredentialConfig.CREDENTIAL_PROVIDERS);
 
     return credentialProviders.stream()
         .collect(
@@ -71,14 +70,8 @@ public class CredentialUtils {
       return Collections.emptySet();
     }
 
-    String providers = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    if (providers == null) {
-      return Collections.emptySet();
-    }
-    return splitter
-        .trimResults()
-        .omitEmptyStrings()
-        .splitToStream(providers)
+    CredentialConfig credentialConfig = new CredentialConfig(properties);
+    return credentialConfig.get(CredentialConfig.CREDENTIAL_PROVIDERS).stream()
         .collect(Collectors.toSet());
   }
 }
