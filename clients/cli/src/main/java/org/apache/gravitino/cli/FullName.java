@@ -100,6 +100,15 @@ public class FullName {
   }
 
   /**
+   * Retrieves the model name from the second part of the full name option.
+   *
+   * @return The model name, or null if not found.
+   */
+  public String getModelName() {
+    return getNamePart(1);
+  }
+
+  /**
    * Retrieves the table name from the third part of the full name option.
    *
    * @return The table name, or null if not found.

@@ -71,6 +71,7 @@ class TestModelCommands {
             .when(commandLine)
             .newModelAudit(
                     GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "model");
-
+    commandLine.handleCommandLine();
+    verify(mockAudit).handle();
   }
 }

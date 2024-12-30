@@ -530,7 +530,26 @@ public class GravitinoCommandLine extends TestableCommandLine {
     if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
 
-    // TODO: Add remaining commands
+    // TODO: Add remaining commands to TestableCommandLine
+    String model = name.getModelName();
+    if (model == null) {
+      missingEntities.add(CommandEntities.MODEL);
+    }
+
+    if (!missingEntities.isEmpty()) {
+      System.err.println("Missing required argument(s): " + COMMA_JOINER.join(missingEntities));
+      Main.exit(-1);
+    }
+
+    switch (command) {
+      case CommandActions.DETAILS:
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newModelAudit(url, ignore, metalake, catalog, model).handle();
+        } else {
+//          newModelDetails(url, ignore, metalake, catalog, model).handle()
+        }
+        break;
+    }
   }
 
   /** Handles the command execution for Users based on command type and the command line options. */
