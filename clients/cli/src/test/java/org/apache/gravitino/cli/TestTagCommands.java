@@ -322,10 +322,7 @@ class TestTagCommands {
             isNull(),
             eq("value"));
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals(
-        output,
-        "Command cannot be executed. The set command only supports configuring tag properties or attaching "
-            + "tags to entity.");
+    assertEquals(output, "The set command only supports tag properties or attaching tags.");
   }
 
   @Test
@@ -353,10 +350,7 @@ class TestTagCommands {
             eq("property"),
             isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals(
-        output,
-        "Command cannot be executed. The set command only supports configuring tag properties or attaching "
-            + "tags to entity.");
+    assertEquals(output, "The set command only supports tag properties or attaching tags.");
   }
 
   @Test

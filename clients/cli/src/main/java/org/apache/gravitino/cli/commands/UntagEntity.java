@@ -100,13 +100,17 @@ public class UntagEntity extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(
-        entity
-            + " removed tag(s): ["
-            + COMMA_JOINER.join(tags)
-            + "], now tagged with "
-            + "["
-            + COMMA_JOINER.join(removeTags)
-            + "]");
+    String all = String.join(",", removeTags);
+
+    if (all.equals("")) {
+      all = "nothing";
+    }
+
+    if (tags.length > 1) {
+      System.out.println(
+          entity + " removed tags " + String.join(",", tags) + " now tagged with " + all);
+    } else {
+      System.out.println(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
+    }
   }
 }

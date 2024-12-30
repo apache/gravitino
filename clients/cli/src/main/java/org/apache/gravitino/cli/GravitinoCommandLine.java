@@ -673,9 +673,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
           }
           newTagEntity(url, ignore, metalake, name, tags).handle();
         } else {
-          System.err.println(
-              "Command cannot be executed. The set command only supports configuring tag properties or attaching "
-                  + "tags to entity.");
+          System.err.println("The set command only supports tag properties or attaching tags.");
           Main.exit(-1);
         }
         break;
