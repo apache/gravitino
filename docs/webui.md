@@ -165,7 +165,7 @@ Creating a catalog requires these fields:
     1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`
     2. Type `fileset` - `hadoop`
     3. Type `messaging` - `kafka`
-    4. Type `model` have no provider
+    4. Type `model` has no provider
 4. **Comment**(_optional_): the comment of this catalog
 5. **Properties**(**each `provider` must fill in the required property fields specifically**)
 
@@ -426,6 +426,7 @@ Displays a confirmation dialog, clicking on the SUBMIT button deletes this catal
 ![delete-catalog](./assets/webui/delete-catalog.png)
 
 ### Schema
+
 Click the catalog tree node on the left sidebar or the catalog name link in the table cell.
 
 Displays the list schemas of the catalog.
@@ -469,6 +470,7 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this schema.
 ![delete-schema](./assets/webui/delete-schema.png)
 
 ### Table
+
 Click the hive schema tree node on the left sidebar or the schema name link in the table cell.
 
 Displays the list tables of the schema.
@@ -487,7 +489,7 @@ Creating a table needs these fields:
 2. **columns**(**_required_**): 
     1. The name and type of each column are required.
     2. Only suppport simple types, cannot support complex types by ui, you can create complex types by api.
-3. **Comment**(_optional_): the comment of the fileset.
+3. **Comment**(_optional_): the comment of the table.
 4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
 #### Show table details
@@ -522,6 +524,7 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this table.
 ![delete-table](./assets/webui/delete-table.png)
 
 ### Fileset
+
 Click the fileset schema tree node on the left sidebar or the schema name link in the table cell.
 
 Displays the list filesets of the schema.
@@ -575,6 +578,7 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this fileset
 ![delete-fileset](./assets/webui/delete-fileset.png)
 
 ### Topic
+
 Click the kafka schema tree node on the left sidebar or the schema name link in the table cell.
 
 Displays the list topics of the schema.
@@ -619,11 +623,12 @@ Displays the dialog for modifying fields of the selected topic.
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
-Displays a confirmation dialog, clicking on the `DROP` button drops this fileset.
+Displays a confirmation dialog, clicking on the `DROP` button drops this topic.
 
 ![delete-topic](./assets/webui/delete-topic.png)
 
 ### Model
+
 Click the model schema tree node on the left sidebar or the schema name link in the table cell.
 
 Displays the list model of the schema.
@@ -659,6 +664,7 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this model.
 ![delete-model](./assets/webui/delete-model.png)
 
 ### Version
+
 Click the model tree node on the left sidebar or the model name link in the table cell.
 
 Displays the list versions of the model.
@@ -690,7 +696,7 @@ You can see the detailed information of this version in the drawer component on 
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
-Displays a confirmation dialog, clicking on the `DROP` button drops this model.
+Displays a confirmation dialog, clicking on the `DROP` button drops this version.
 
 ![delete-version](./assets/webui/delete-version.png)
 
