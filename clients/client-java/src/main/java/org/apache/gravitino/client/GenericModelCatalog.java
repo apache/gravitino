@@ -201,8 +201,6 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     checkModelNameIdentifier(ident);
 
     ModelVersionLinkRequest req = new ModelVersionLinkRequest(uri, aliases, comment, properties);
-    req.validate();
-
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
     BaseResponse resp =
         restClient.post(
