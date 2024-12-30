@@ -19,10 +19,13 @@
 package org.apache.gravitino.iceberg.service.provider;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
@@ -112,5 +115,45 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> provider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG));
+  }
+
+  @Test
+  public void testCustomProperties() {
+    String customCatalogName = "custom_backend";
+    String customKey1 = "custom-k1";
+    String customValue1 = "custom-v1";
+    String customKey2 = "custom-k2";
+    String customValue2 = "custom-v2";
+
+    Catalog customMockCatalog = Mockito.mock(Catalog.class);
+
+    GravitinoMetalake gravitinoMetalake = Mockito.mock(GravitinoMetalake.class);
+    Mockito.when(gravitinoMetalake.loadCatalog(customCatalogName)).thenReturn(customMockCatalog);
+
+    Mockito.when(customMockCatalog.provider()).thenReturn("lakehouse-iceberg");
+
+    Mockito.when(customMockCatalog.properties())
+        .thenReturn(
+            new HashMap<String, String>() {
+              {
+                put(IcebergConstants.CATALOG_BACKEND, "custom");
+                put(IcebergConstants.CATALOG_BACKEND_NAME, customCatalogName);
+                put("gravitino.bypass." + customKey1, customValue1);
+                put(customKey2, customValue2);
+              }
+            });
+    GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
+    Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.setClient(client);
+    Optional<IcebergConfig> icebergCatalogConfig =
+        provider.getIcebergCatalogConfig(customCatalogName);
+    Assertions.assertTrue(icebergCatalogConfig.isPresent());
+    Map<String, String> icebergCatalogProperties =
+        icebergCatalogConfig.get().getIcebergCatalogProperties();
+    Assertions.assertEquals(icebergCatalogProperties.get(customKey1), customValue1);
+    Assertions.assertFalse(icebergCatalogProperties.containsKey(customKey2));
+    Assertions.assertEquals(
+        icebergCatalogProperties.get(IcebergConstants.CATALOG_BACKEND_NAME), customCatalogName);
   }
 }

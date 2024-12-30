@@ -14,3 +14,31 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from dataclasses import dataclass, field
+from typing import List
+
+from dataclasses_json import config
+
+from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
+
+
+@dataclass
+class ModelVersionListResponse(BaseResponse):
+    """Represents a response for a list of model versions."""
+
+    _versions: List[int] = field(metadata=config(field_name="versions"))
+
+    def versions(self) -> List[int]:
+        return self._versions
+
+    def validate(self):
+        """Validates the response data.
+
+        Raises:
+            IllegalArgumentException if versions are not set.
+        """
+        super().validate()
+
+        if self._versions is None:
+            raise IllegalArgumentException("versions must not be null")
