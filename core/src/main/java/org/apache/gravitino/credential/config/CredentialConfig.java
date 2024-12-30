@@ -20,6 +20,8 @@
 package org.apache.gravitino.credential.config;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -67,12 +69,13 @@ public class CredentialConfig extends Config {
                   false /* reserved */))
           .build();
 
-  public static final ConfigEntry<String> CREDENTIAL_PROVIDERS =
+  public static final ConfigEntry<List<String>> CREDENTIAL_PROVIDERS =
       new ConfigBuilder(CredentialConstants.CREDENTIAL_PROVIDERS)
           .doc("Credential providers, separated by comma.")
           .version(ConfigConstants.VERSION_0_8_0)
           .stringConf()
-          .create();
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
 
   public static final ConfigEntry<Double> CREDENTIAL_CACHE_EXPIRE_RATIO =
       new ConfigBuilder(CredentialConstants.CREDENTIAL_CACHE_EXPIRE_RATIO)
