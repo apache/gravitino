@@ -58,17 +58,8 @@ class ModelVersionLinkRequest(RESTRequest):
             )
 
         for alias in self._aliases or []:
-            if self._is_a_number(alias):
-                raise IllegalArgumentException(f'Alias "{alias}" must not be a number')
+            if not self._is_not_blank(alias):
+                raise IllegalArgumentException('Alias must not be null or empty')
 
     def _is_not_blank(self, string: str) -> bool:
         return string is not None and string.strip()
-
-    def _is_a_number(self, string: str) -> bool:
-        if string is None or not string.strip():
-            return False
-        try:
-            float(string)
-            return True
-        except ValueError:
-            return False
