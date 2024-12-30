@@ -46,7 +46,7 @@ class CredentialFactory:
             credential = OSSTokenCredential(credential_info, expire_time_in_ms)
         elif credential_type == OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE:
             credential = OSSSecretKeyCredential(credential_info, expire_time_in_ms)
-        elif credential_type == ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE:
+        elif credential_type == ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE:
             credential = ADLSTokenCredential(credential_info, expire_time_in_ms)
         elif (
             credential_type

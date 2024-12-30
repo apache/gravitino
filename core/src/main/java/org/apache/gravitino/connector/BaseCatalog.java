@@ -31,6 +31,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
@@ -51,6 +52,7 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata, Closeable {
+
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // This variable is used as a key in properties of catalogs to inject custom operation to
@@ -71,6 +73,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private volatile Capability capability;
 
   private volatile Map<String, String> properties;
+
+  private volatile CatalogCredentialManager catalogCredentialManager;
 
   private static String ENTITY_IS_NOT_SET = "entity is not set";
 
@@ -225,6 +229,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       authorizationPlugin.close();
       authorizationPlugin = null;
     }
+    if (catalogCredentialManager != null) {
+      catalogCredentialManager.close();
+      catalogCredentialManager = null;
+    }
   }
 
   public Capability capability() {
@@ -237,6 +245,17 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return capability;
+  }
+
+  public CatalogCredentialManager catalogCredentialManager() {
+    if (catalogCredentialManager == null) {
+      synchronized (this) {
+        if (catalogCredentialManager == null) {
+          this.catalogCredentialManager = new CatalogCredentialManager(name(), properties());
+        }
+      }
+    }
+    return catalogCredentialManager;
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {

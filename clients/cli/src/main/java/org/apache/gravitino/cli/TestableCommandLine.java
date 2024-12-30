@@ -363,13 +363,13 @@ public class TestableCommandLine {
     return new RoleAudit(url, ignore, metalake, role);
   }
 
-  protected CreateRole newCreateRole(String url, boolean ignore, String metalake, String role) {
-    return new CreateRole(url, ignore, metalake, role);
+  protected CreateRole newCreateRole(String url, boolean ignore, String metalake, String[] roles) {
+    return new CreateRole(url, ignore, metalake, roles);
   }
 
   protected DeleteRole newDeleteRole(
-      String url, boolean ignore, boolean force, String metalake, String role) {
-    return new DeleteRole(url, ignore, force, metalake, role);
+      String url, boolean ignore, boolean force, String metalake, String[] roles) {
+    return new DeleteRole(url, ignore, force, metalake, roles);
   }
 
   protected TagDetails newTagDetails(String url, boolean ignore, String metalake, String tag) {

@@ -38,7 +38,10 @@ import {
   setLoadedNodes,
   getTableDetails,
   getFilesetDetails,
-  getTopicDetails
+  getTopicDetails,
+  getModelDetails,
+  fetchModelVersions,
+  getVersionDetails
 } from '@/lib/store/metalakes'
 
 import { extractPlaceholder } from '@/lib/utils'
@@ -81,6 +84,8 @@ const MetalakeTree = props => {
         return 'skill-icons:kafka'
       case 'fileset':
         return 'twemoji:file-folder'
+      case 'model':
+        return 'carbon:machine-learning-model'
       default:
         return 'bx:book'
     }
@@ -112,6 +117,23 @@ const MetalakeTree = props => {
           const pathArr = extractPlaceholder(nodeProps.data.key)
           const [metalake, catalog, type, schema, topic] = pathArr
           dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+        }
+        break
+      }
+      case 'model': {
+        if (store.selectedNodes.includes(nodeProps.data.key)) {
+          const pathArr = extractPlaceholder(nodeProps.data.key)
+          const [metalake, catalog, type, schema, model] = pathArr
+          dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
+          dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
+        }
+        break
+      }
+      case 'version': {
+        if (store.selectedNodes.includes(nodeProps.data.key)) {
+          const pathArr = extractPlaceholder(nodeProps.data.key)
+          const [metalake, catalog, type, schema, model, version] = pathArr
+          dispatch(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
         }
         break
       }
@@ -254,6 +276,20 @@ const MetalakeTree = props => {
               icon={isHover !== nodeProps.data.key ? 'material-symbols:topic-outline' : 'mdi:reload'}
               fontSize='inherit'
             />
+          </IconButton>
+        )
+
+      case 'model':
+        return (
+          <IconButton
+            disableRipple={!store.selectedNodes.includes(nodeProps.data.key)}
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'mdi:globe-model' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
 

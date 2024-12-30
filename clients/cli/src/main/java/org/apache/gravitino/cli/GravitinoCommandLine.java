@@ -31,8 +31,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -257,6 +255,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     Command.setAuthenticationMode(auth, userName);
+    List<String> missingEntities = Lists.newArrayList();
 
     // Handle the CommandActions.LIST action separately as it doesn't use `catalog`
     if (CommandActions.LIST.equals(command)) {
@@ -265,6 +264,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
 
     String catalog = name.getCatalogName();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    checkEntities(missingEntities);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -345,29 +346,21 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String catalog = name.getCatalogName();
 
     Command.setAuthenticationMode(auth, userName);
+
     List<String> missingEntities = Lists.newArrayList();
     if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
 
     // Handle the CommandActions.LIST action separately as it doesn't use `schema`
     if (CommandActions.LIST.equals(command)) {
-      if (!missingEntities.isEmpty()) {
-        System.err.println("Missing required argument(s): " + COMMA_JOINER.join(missingEntities));
-        Main.exit(-1);
-      }
+      checkEntities(missingEntities);
       newListSchema(url, ignore, metalake, catalog).handle();
       return;
     }
 
     String schema = name.getSchemaName();
-    if (schema == null) {
-      missingEntities.add(CommandEntities.SCHEMA);
-    }
-
-    if (!missingEntities.isEmpty()) {
-      System.err.println("Missing required argument(s): " + COMMA_JOINER.join(missingEntities));
-      Main.exit(-1);
-    }
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
+    checkEntities(missingEntities);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -423,33 +416,20 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String schema = name.getSchemaName();
 
     Command.setAuthenticationMode(auth, userName);
-    List<String> missingEntities =
-        Stream.of(
-                catalog == null ? CommandEntities.CATALOG : null,
-                schema == null ? CommandEntities.SCHEMA : null)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
+    List<String> missingEntities = Lists.newArrayList();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
 
     // Handle CommandActions.LIST action separately as it doesn't require the `table`
     if (CommandActions.LIST.equals(command)) {
-      if (!missingEntities.isEmpty()) {
-        System.err.println(
-            "Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
-        Main.exit(-1);
-      }
+      checkEntities(missingEntities);
       newListTables(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
     String table = name.getTableName();
-    if (table == null) {
-      missingEntities.add(CommandEntities.TABLE);
-    }
-
-    if (!missingEntities.isEmpty()) {
-      System.err.println("Missing required argument(s): " + Joiner.on(", ").join(missingEntities));
-      Main.exit(-1);
-    }
+    if (table == null) missingEntities.add(CommandEntities.TABLE);
+    checkEntities(missingEntities);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -565,7 +545,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     if (user == null && !CommandActions.LIST.equals(command)) {
       System.err.println(ErrorMessages.MISSING_USER);
-      return;
+      Main.exit(-1);
     }
 
     switch (command) {
@@ -626,7 +606,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     if (group == null && !CommandActions.LIST.equals(command)) {
       System.err.println(ErrorMessages.MISSING_GROUP);
-      return;
+      Main.exit(-1);
     }
 
     switch (command) {
@@ -685,6 +665,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Command.setAuthenticationMode(auth, userName);
 
     String[] tags = line.getOptionValues(GravitinoOptions.TAG);
+    if (tags == null
+        && !((CommandActions.REMOVE.equals(command) && line.hasOption(GravitinoOptions.FORCE))
+            || CommandActions.LIST.equals(command))) {
+      System.err.println(ErrorMessages.MISSING_TAG);
+      Main.exit(-1);
+    }
+
     if (tags != null) {
       tags = Arrays.stream(tags).distinct().toArray(String[]::new);
     }
@@ -771,17 +758,26 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
-    String role = line.getOptionValue(GravitinoOptions.ROLE);
     String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
 
     Command.setAuthenticationMode(auth, userName);
 
+    String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
+    if (roles == null && !CommandActions.LIST.equals(command)) {
+      System.err.println(ErrorMessages.MISSING_ROLE);
+      Main.exit(-1);
+    }
+
+    if (roles != null) {
+      roles = Arrays.stream(roles).distinct().toArray(String[]::new);
+    }
+
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newRoleAudit(url, ignore, metalake, role).handle();
+          newRoleAudit(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
         } else {
-          newRoleDetails(url, ignore, metalake, role).handle();
+          newRoleDetails(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
         }
         break;
 
@@ -790,20 +786,24 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.CREATE:
-        newCreateRole(url, ignore, metalake, role).handle();
+        newCreateRole(url, ignore, metalake, roles).handle();
         break;
 
       case CommandActions.DELETE:
         boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteRole(url, ignore, forceDelete, metalake, role).handle();
+        newDeleteRole(url, ignore, forceDelete, metalake, roles).handle();
         break;
 
       case CommandActions.GRANT:
-        newGrantPrivilegesToRole(url, ignore, metalake, role, name, privileges).handle();
+        newGrantPrivilegesToRole(
+                url, ignore, metalake, getOneRole(roles, CommandActions.GRANT), name, privileges)
+            .handle();
         break;
 
       case CommandActions.REVOKE:
-        newRevokePrivilegesFromRole(url, ignore, metalake, role, name, privileges).handle();
+        newRevokePrivilegesFromRole(
+                url, ignore, metalake, getOneRole(roles, CommandActions.REMOVE), name, privileges)
+            .handle();
         break;
 
       default:
@@ -811,6 +811,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
         Main.exit(-1);
         break;
     }
+  }
+
+  private String getOneRole(String[] roles, String command) {
+    Preconditions.checkArgument(
+        roles.length == 1, command + " requires only one role, but multiple are currently passed.");
+    return roles[0];
   }
 
   /**
@@ -828,12 +834,20 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
+    List<String> missingEntities = Lists.newArrayList();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
+    if (table == null) missingEntities.add(CommandEntities.TABLE);
+
     if (CommandActions.LIST.equals(command)) {
+      checkEntities(missingEntities);
       newListColumns(url, ignore, metalake, catalog, schema, table).handle();
       return;
     }
 
     String column = name.getColumnName();
+    if (column == null) missingEntities.add(CommandEntities.COLUMN);
+    checkEntities(missingEntities);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -1003,12 +1017,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
+    List<String> missingEntities = Lists.newArrayList();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
+
     if (CommandActions.LIST.equals(command)) {
+      checkEntities(missingEntities);
       newListTopics(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
     String topic = name.getTopicName();
+    if (topic == null) missingEntities.add(CommandEntities.TOPIC);
+    checkEntities(missingEntities);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -1078,12 +1099,20 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     Command.setAuthenticationMode(auth, userName);
 
+    List<String> missingEntities = Lists.newArrayList();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
+
+    // Handle CommandActions.LIST action separately as it doesn't require the `fileset`
     if (CommandActions.LIST.equals(command)) {
+      checkEntities(missingEntities);
       newListFilesets(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
     String fileset = name.getFilesetName();
+    if (fileset == null) missingEntities.add(CommandEntities.FILESET);
+    checkEntities(missingEntities);
 
     switch (command) {
       case CommandActions.DETAILS:
@@ -1220,5 +1249,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
 
     return null;
+  }
+
+  private void checkEntities(List<String> entities) {
+    if (!entities.isEmpty()) {
+      System.err.println("Missing required argument(s): " + COMMA_JOINER.join(entities));
+      Main.exit(-1);
+    }
   }
 }
