@@ -168,9 +168,9 @@ public class GravitinoServer extends ResourceConfig {
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = loadConfig(confPath);
     GravitinoServer server = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
-    server.initialize();
 
     try {
+      server.initialize();
       // Instantiates GravitinoServer
       server.start();
     } catch (Exception e) {
