@@ -39,6 +39,7 @@ jobs:
               - meta/**
               - scripts/**
               - server/**
+              - bundles/**
               - server-common/**
               - build.gradle.kts
               - gradle.properties
