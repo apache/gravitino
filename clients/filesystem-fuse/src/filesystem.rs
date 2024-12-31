@@ -16,6 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::{
+    AppConfig, CONF_FILESYSTEM_BLOCK_SIZE, CONF_FUSE_DIR_MASK, CONF_FUSE_FILE_MASK,
+};
 use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -129,6 +132,8 @@ pub(crate) trait PathFileSystem: Send + Sync {
 
     /// Remove the directory by file path
     async fn remove_dir(&self, path: &Path) -> Result<()>;
+
+    fn get_capacity(&self) -> Result<FileSystemCapacity>;
 }
 
 // FileSystemContext is the system environment for the fuse file system.
@@ -150,16 +155,29 @@ pub(crate) struct FileSystemContext {
 }
 
 impl FileSystemContext {
-    pub(crate) fn new(uid: u32, gid: u32) -> Self {
+    pub(crate) fn new(uid: u32, gid: u32, config: &AppConfig) -> Self {
         FileSystemContext {
             uid,
             gid,
-            default_file_perm: 0o644,
-            default_dir_perm: 0o755,
-            block_size: 4 * 1024,
+            default_file_perm: config.fuse.file_mask as u16,
+            default_dir_perm: config.fuse.dir_mask as u16,
+            block_size: config.filesystem.block_size,
+        }
+    }
+
+    pub(crate) fn default() -> Self {
+        FileSystemContext {
+            uid: 0,
+            gid: 0,
+            default_file_perm: CONF_FUSE_FILE_MASK.default as u16,
+            default_dir_perm: CONF_FUSE_DIR_MASK.default as u16,
+            block_size: CONF_FILESYSTEM_BLOCK_SIZE.default,
         }
     }
 }
+
+// capacity of the file system
+pub struct FileSystemCapacity {}
 
 // FileStat is the file metadata of the file
 #[derive(Clone, Debug)]
@@ -336,7 +354,7 @@ pub(crate) mod tests {
             let opened_file = self.fs.create_file(path, OpenFileFlags(0)).await;
             assert!(opened_file.is_ok());
             let file = opened_file.unwrap();
-            self.assert_file_stat(&file.file_stat, path, FileType::RegularFile, 0);
+            self.assert_file_stat(&file.file_stat, path, RegularFile, 0);
             self.test_stat_file(path, RegularFile, 0).await;
         }
 
@@ -410,6 +428,9 @@ pub(crate) mod tests {
             // Test root dir
             self.test_root_dir().await;
 
+            // test read root dir
+            self.test_list_dir(ROOT_DIR_FILE_ID, false).await;
+
             let parent_file_id = ROOT_DIR_FILE_ID;
             // Test lookup file
             let file_id = self
@@ -445,7 +466,7 @@ pub(crate) mod tests {
             self.test_create_dir(parent_file_id, "dir1".as_ref()).await;
 
             // Test list dir
-            self.test_list_dir(parent_file_id).await;
+            self.test_list_dir(parent_file_id, true).await;
 
             // Test remove file
             self.test_remove_file(parent_file_id, "file1.txt".as_ref())
@@ -455,7 +476,7 @@ pub(crate) mod tests {
             self.test_remove_dir(parent_file_id, "dir1".as_ref()).await;
 
             // Test list dir again
-            self.test_list_dir(parent_file_id).await;
+            self.test_list_dir(parent_file_id, true).await;
 
             // Test file not found
             self.test_file_not_found(23).await;
@@ -465,12 +486,7 @@ pub(crate) mod tests {
             let root_file_stat = self.fs.stat(ROOT_DIR_FILE_ID).await;
             assert!(root_file_stat.is_ok());
             let root_file_stat = root_file_stat.unwrap();
-            self.assert_file_stat(
-                &root_file_stat,
-                Path::new(ROOT_DIR_PATH),
-                FileType::Directory,
-                0,
-            );
+            self.assert_file_stat(&root_file_stat, Path::new(ROOT_DIR_PATH), Directory, 0);
         }
 
         async fn test_lookup_file(
@@ -582,10 +598,14 @@ pub(crate) mod tests {
                 .await;
         }
 
-        async fn test_list_dir(&self, root_file_id: u64) {
+        async fn test_list_dir(&self, root_file_id: u64, check_child: bool) {
             let list_dir = self.fs.read_dir(root_file_id).await;
             assert!(list_dir.is_ok());
             let list_dir = list_dir.unwrap();
+
+            if !check_child {
+                return;
+            }
             assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
                 assert!(self.files.contains_key(&file_stat.file_id));
@@ -650,28 +670,28 @@ pub(crate) mod tests {
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
-        assert_eq!(file_stat.kind, FileType::RegularFile);
+        assert_eq!(file_stat.kind, RegularFile);
 
         //test new dir
         let file_stat = FileStat::new_dir_filestat("a".as_ref(), "b".as_ref());
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
-        assert_eq!(file_stat.kind, FileType::Directory);
+        assert_eq!(file_stat.kind, Directory);
 
         //test new file with path
         let file_stat = FileStat::new_file_filestat_with_path("a/b".as_ref(), 10);
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 10);
-        assert_eq!(file_stat.kind, FileType::RegularFile);
+        assert_eq!(file_stat.kind, RegularFile);
 
         //test new dir with path
         let file_stat = FileStat::new_dir_filestat_with_path("a/b".as_ref());
         assert_eq!(file_stat.name, "b");
         assert_eq!(file_stat.path, Path::new("a/b"));
         assert_eq!(file_stat.size, 0);
-        assert_eq!(file_stat.kind, FileType::Directory);
+        assert_eq!(file_stat.kind, Directory);
     }
 
     #[test]
