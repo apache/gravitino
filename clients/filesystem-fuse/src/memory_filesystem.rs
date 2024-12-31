@@ -42,8 +42,6 @@ pub struct MemoryFileSystem {
 }
 
 impl MemoryFileSystem {
-    const FS_META_FILE_NAME: &'static str = "/.gvfs_meta";
-
     pub(crate) async fn new() -> Self {
         Self {
             file_map: RwLock::new(Default::default()),
@@ -63,22 +61,6 @@ impl MemoryFileSystem {
 #[async_trait]
 impl PathFileSystem for MemoryFileSystem {
     async fn init(&self) -> Result<()> {
-        let root_file = MemoryFile {
-            kind: Directory,
-            data: Arc::new(Mutex::new(Vec::new())),
-        };
-        let root_path = PathBuf::from("/");
-        self.file_map.write().unwrap().insert(root_path, root_file);
-
-        let meta_file = MemoryFile {
-            kind: RegularFile,
-            data: Arc::new(Mutex::new(Vec::new())),
-        };
-        let meta_file_path = Path::new(Self::FS_META_FILE_NAME).to_path_buf();
-        self.file_map
-            .write()
-            .unwrap()
-            .insert(meta_file_path, meta_file);
         Ok(())
     }
 

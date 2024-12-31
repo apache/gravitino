@@ -35,6 +35,9 @@ pub(crate) const ROOT_DIR_FILE_ID: u64 = 1;
 pub(crate) const ROOT_DIR_NAME: &str = "";
 pub(crate) const ROOT_DIR_PATH: &str = "/";
 pub(crate) const INITIAL_FILE_ID: u64 = 10000;
+pub(crate) const FS_META_FILE_PATH: &str = "/.gvfs_meta";
+pub(crate) const FS_META_FILE_NAME: &str = ".gvfs_meta";
+pub(crate) const FS_META_FILE_ID: u64 = 10;
 
 /// RawFileSystem interface for the file system implementation. it use by FuseApiHandle,
 /// it ues the file id to operate the file system apis
@@ -305,13 +308,6 @@ pub(crate) mod tests {
         }
 
         pub(crate) async fn test_path_file_system(&mut self) {
-            // Test root dir
-            self.test_root_dir().await;
-
-            // Test stat file
-            self.test_stat_file(Path::new("/.gvfs_meta"), RegularFile, 0)
-                .await;
-
             // Test create file
             self.test_create_file(Path::new("/file1.txt")).await;
 
@@ -332,14 +328,6 @@ pub(crate) mod tests {
 
             // Test list dir
             self.test_list_dir(Path::new("/")).await;
-        }
-
-        async fn test_root_dir(&mut self) {
-            let root_dir_path = Path::new("/");
-            let root_file_stat = self.fs.stat(root_dir_path).await;
-            assert!(root_file_stat.is_ok());
-            let root_file_stat = root_file_stat.unwrap();
-            self.assert_file_stat(&root_file_stat, root_dir_path, Directory, 0);
         }
 
         async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
@@ -652,7 +640,7 @@ pub(crate) mod tests {
             assert_eq!(file_stat.path, path);
             assert_eq!(file_stat.kind, kind);
             assert_eq!(file_stat.size, size);
-            if file_stat.file_id == 1 {
+            if file_stat.file_id == ROOT_DIR_FILE_ID || file_stat.file_id == FS_META_FILE_ID {
                 assert_eq!(file_stat.parent_file_id, 1);
             } else {
                 assert!(file_stat.file_id >= INITIAL_FILE_ID);
