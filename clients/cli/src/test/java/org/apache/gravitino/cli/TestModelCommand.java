@@ -37,8 +37,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.GetModel;
 import org.apache.gravitino.cli.commands.ListModel;
+import org.apache.gravitino.cli.commands.ModelDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -150,8 +150,8 @@ public class TestModelCommand {
   }
 
   @Test
-  void testGetCommand() {
-    GetModel mockList = mock(GetModel.class);
+  void testModelDetailsCommand() {
+    ModelDetails mockList = mock(ModelDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -159,11 +159,11 @@ public class TestModelCommand {
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.GET));
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
 
     doReturn(mockList)
         .when(commandLine)
-        .newGetModel(
+        .newModelDetails(
             eq(GravitinoCommandLine.DEFAULT_URL),
             eq(false),
             eq("metalake_demo"),
@@ -175,7 +175,7 @@ public class TestModelCommand {
   }
 
   @Test
-  void testGetModelCommandWithoutCatalog() {
+  void testModelDetailsCommandWithoutCatalog() {
     Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -183,12 +183,12 @@ public class TestModelCommand {
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.GET));
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
 
     verify(commandLine, never())
-        .newGetModel(
+        .newModelDetails(
             eq(GravitinoCommandLine.DEFAULT_URL),
             eq(false),
             eq("metalake_demo"),
@@ -207,7 +207,7 @@ public class TestModelCommand {
   }
 
   @Test
-  void testGetModelCommandWithoutSchema() {
+  void testModelDetailsCommandWithoutSchema() {
     Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -216,12 +216,12 @@ public class TestModelCommand {
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.GET));
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
 
     verify(commandLine, never())
-        .newGetModel(
+        .newModelDetails(
             eq(GravitinoCommandLine.DEFAULT_URL),
             eq(false),
             eq("metalake_demo"),
@@ -238,7 +238,7 @@ public class TestModelCommand {
   }
 
   @Test
-  void testGetModelCommandWithoutModel() {
+  void testModelDetailsCommandWithoutModel() {
     Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -247,12 +247,12 @@ public class TestModelCommand {
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.GET));
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
 
     verify(commandLine, never())
-        .newGetModel(
+        .newModelDetails(
             eq(GravitinoCommandLine.DEFAULT_URL),
             eq(false),
             eq("metalake_demo"),

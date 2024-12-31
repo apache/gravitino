@@ -30,15 +30,15 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
 
-/** Get model information */
-public class GetModel extends Command {
+/** Displays the details of a model. */
+public class ModelDetails extends Command {
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String model;
 
   /**
-   * Get model information
+   * Displays the details of a model.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -47,7 +47,7 @@ public class GetModel extends Command {
    * @param schema The name of schema.
    * @param model The name of model.
    */
-  public GetModel(
+  public ModelDetails(
       String url,
       boolean ignoreVersions,
       String metalake,
@@ -61,7 +61,7 @@ public class GetModel extends Command {
     this.model = model;
   }
 
-  /** Get model information */
+  /** Displays the details of a model. */
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, model);

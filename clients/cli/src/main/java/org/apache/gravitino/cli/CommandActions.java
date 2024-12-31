@@ -37,7 +37,6 @@ public class CommandActions {
   public static final String PROPERTIES = "properties";
   public static final String REVOKE = "revoke";
   public static final String GRANT = "grant";
-  public static final String GET = "get";
 
   private static final HashSet<String> VALID_COMMANDS = new HashSet<>();
 
@@ -53,7 +52,6 @@ public class CommandActions {
     VALID_COMMANDS.add(PROPERTIES);
     VALID_COMMANDS.add(REVOKE);
     VALID_COMMANDS.add(GRANT);
-    VALID_COMMANDS.add(GET);
   }
 
   /**

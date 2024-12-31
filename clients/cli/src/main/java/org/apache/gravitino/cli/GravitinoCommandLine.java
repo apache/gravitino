@@ -1168,8 +1168,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
     checkEntities(missingEntities);
 
     switch (command) {
-      case CommandActions.GET:
-        newGetModel(url, ignore, metalake, catalog, schema, model).handle();
+      case CommandActions.DETAILS:
+        newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
         break;
 
       default:
