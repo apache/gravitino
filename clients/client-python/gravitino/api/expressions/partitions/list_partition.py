@@ -18,7 +18,9 @@
 from abc import abstractmethod
 from typing import List, Any
 
+from gravitino.api.expressions.literals.literal import Literal
 from gravitino.api.expressions.partitions.partition import Partition
+
 
 class ListPartition(Partition):
     """
@@ -35,9 +37,9 @@ class ListPartition(Partition):
     """
 
     @abstractmethod
-    def lists(self) -> List[List[Any]]:
+    def lists(self) -> List[List[Literal[Any]]]:
         """
         Returns:
-            List[List[Any]]: The values of the list partition.
+            List[List[Literal[Any]]]: The values of the list partition.
         """
         pass

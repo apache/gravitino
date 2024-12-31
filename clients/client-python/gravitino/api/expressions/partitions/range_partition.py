@@ -21,6 +21,7 @@ from typing import Any
 from gravitino.api.expressions.literals.literal import Literal
 from gravitino.api.expressions.partitions.partition import Partition
 
+
 class RangePartition(Partition):
     """
     A range partition represents a result of range partitioning. For example, for range partition
