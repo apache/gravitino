@@ -60,25 +60,23 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn stat(&self, path: &Path) -> Result<FileStat> {
-        let mut file_name = path.to_string_lossy().to_string();
-        let meta_result = self
-            .op
-            .stat(&file_name)
-            .await
-            .map_err(opendal_error_to_errno);
+        let file_name = path.to_string_lossy().to_string();
+        let meta_result = self.op.stat(&file_name).await;
 
-        let meta = if let Err(err) = meta_result {
-            if err == Errno::from(libc::ENOENT) {
-                file_name += "/";
-                self.op
-                    .stat(&file_name)
-                    .await
-                    .map_err(opendal_error_to_errno)?
-            } else {
-                return Err(err);
+        // path may be a directory, so try to stat it as a directory
+        let meta = match meta_result {
+            Ok(meta) => meta,
+            Err(err) => {
+                if err.kind() == ErrorKind::NotFound {
+                    let dir_name = format!("{}/", file_name);
+                    self.op
+                        .stat(&dir_name)
+                        .await
+                        .map_err(opendal_error_to_errno)?
+                } else {
+                    return Err(opendal_error_to_errno(err));
+                }
             }
-        } else {
-            meta_result?
         };
 
         let mut file_stat = FileStat::new_file_filestat_with_path(path, 0);
