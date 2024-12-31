@@ -30,6 +30,7 @@ public class ErrorMessages {
   public static final String UNKNOWN_TABLE = "Unknown table name.";
   public static final String MALFORMED_NAME = "Malformed entity name.";
   public static final String MISSING_NAME = "Missing --name option.";
+  public static final String MISSING_METALAKE = "Missing --metalake option.";
   public static final String MISSING_GROUP = "Missing --group option.";
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_ROLE = "Missing --role option.";
