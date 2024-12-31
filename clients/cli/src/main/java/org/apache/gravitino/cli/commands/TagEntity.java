@@ -20,9 +20,6 @@
 package org.apache.gravitino.cli.commands;
 
 import com.google.common.base.Joiner;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -33,6 +30,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.rel.Table;
 
 public class TagEntity extends Command {
@@ -77,20 +75,17 @@ public class TagEntity extends Command {
                 .loadCatalog(catalog)
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
-        checkTags(gTable);
         tagsToAdd = gTable.supportsTags().associateTags(tags, null);
         entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
-        checkTags(gSchema);
         tagsToAdd = gSchema.supportsTags().associateTags(tags, null);
         entity = schema;
       } else if (name.hasCatalogName()) {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
-        checkTags(gCatalog);
         tagsToAdd = gCatalog.supportsTags().associateTags(tags, null);
         entity = catalog;
       }
@@ -102,6 +97,9 @@ public class TagEntity extends Command {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
       exitWithError(ErrorMessages.UNKNOWN_TABLE);
+    } catch (TagAlreadyAssociatedException tagAlreadyAssociatedException) {
+      exitWithError(
+          "[" + COMMA_JOINER.join(tags) + "]" + " are already associated with " + name.getName());
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
@@ -109,34 +107,5 @@ public class TagEntity extends Command {
     String all = tagsToAdd.length == 0 ? "nothing" : String.join(",", tagsToAdd);
 
     System.out.println(entity + " now tagged with " + all);
-  }
-
-  private void checkTags(Table gTable) {
-    String[] associatedTags = gTable.supportsTags().listTags();
-    checkRedundantTags(associatedTags);
-  }
-
-  private void checkTags(Schema gSchema) {
-    String[] associatedTags = gSchema.supportsTags().listTags();
-    checkRedundantTags(associatedTags);
-  }
-
-  private void checkTags(Catalog gCatalog) {
-    String[] associatedTags = gCatalog.supportsTags().listTags();
-    checkRedundantTags(associatedTags);
-  }
-
-  private void checkRedundantTags(String[] associatedTags) {
-    List<String> redundantTags =
-        Arrays.stream(associatedTags)
-            .filter(x -> Arrays.asList(tags).contains(x))
-            .collect(Collectors.toList());
-    if (!redundantTags.isEmpty())
-      exitWithError(
-          "["
-              + COMMA_JOINER.join(redundantTags)
-              + "]"
-              + " are(is) already associated with "
-              + name.getName());
   }
 }
