@@ -412,14 +412,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 // https://github.com/apache/gravitino/issues/5609
                 resetFileSystemServiceLoader(scheme);
 
-                Map<String, String> maps = getConfigMap(getConf());
+                Map<String, String> catalogProperty = catalog.properties();
+                Map<String, String> totalProperty = Maps.newHashMap(catalogProperty);
+
+                totalProperty.putAll(getConfigMap(getConf()));
                 // If enable the cloud store credential, we should pass the configuration here.
-                maps.put(GVFS_FILESET_IDENTIFIER, identifier.toString());
+                totalProperty.put(GVFS_FILESET_IDENTIFIER, identifier.toString());
 
-                // Should add catalog properties to the configuration
-                maps.putAll(catalog.properties());
-
-                return provider.getFileSystem(filePath, maps);
+                return provider.getFileSystem(filePath, totalProperty);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
                     "Exception occurs when create new FileSystem for actual uri: %s, msg: %s",

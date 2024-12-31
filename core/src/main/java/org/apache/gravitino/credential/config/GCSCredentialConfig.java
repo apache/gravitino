@@ -30,7 +30,7 @@ import org.apache.gravitino.config.ConfigEntry;
 public class GCSCredentialConfig extends Config {
 
   @VisibleForTesting
-  public static final String GRAVITINO_GCS_CREDENTIAL_FILE_PATH = "gcs-credential-file-path";
+  public static final String GRAVITINO_GCS_CREDENTIAL_FILE_PATH = "gcs-service-account-file";
 
   public static final ConfigEntry<String> GCS_CREDENTIAL_FILE_PATH =
       new ConfigBuilder(GRAVITINO_GCS_CREDENTIAL_FILE_PATH)

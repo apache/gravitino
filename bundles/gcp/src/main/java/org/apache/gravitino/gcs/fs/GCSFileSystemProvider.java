@@ -18,13 +18,11 @@
  */
 package org.apache.gravitino.gcs.fs;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
@@ -56,10 +54,6 @@ public class GCSFileSystemProvider implements FileSystemProvider {
         configuration.set(
             "fs.gs.auth.access.token.provider.impl", GCSCredentialProvider.class.getName());
       }
-    }
-
-    if (StringUtils.isBlank(configuration.get("fs.gs.impl"))) {
-      configuration.set("fs.gs.impl", GoogleHadoopFileSystem.class.getName());
     }
 
     return FileSystem.newInstance(path.toUri(), configuration);

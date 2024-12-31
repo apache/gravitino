@@ -20,6 +20,7 @@
 package org.apache.gravitino.abs.fs;
 
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_IS_HNS_ENABLED;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -91,6 +92,7 @@ public class AzureFileSystemProvider implements FileSystemProvider {
           configuration.set(
               FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
               AzureSasCredentialProvider.class.getName());
+          configuration.set(FS_AZURE_ACCOUNT_IS_HNS_ENABLED, "true");
         } else if (azureSasCredentialProvider.getAzureStorageAccountKey() != null
             && azureSasCredentialProvider.getAzureStorageAccountName() != null) {
           configuration.set(
