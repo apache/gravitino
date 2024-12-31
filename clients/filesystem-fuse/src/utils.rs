@@ -36,20 +36,10 @@ pub(crate) fn extract_root_path(location: &str) -> GvfsResult<PathBuf> {
     Ok(PathBuf::from(url.path()))
 }
 
-pub(crate) fn extract_bucket(location: &str) -> GvfsResult<String> {
-    let url = parse_location(location)?;
-    match url.host_str() {
-        Some(host) => Ok(host.to_string()),
-        None => Err(InvalidConfig.to_error(format!(
-            "Invalid fileset location without bucket: {}",
-            location
-        ))),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::utils::extract_root_path;
+    use std::path::PathBuf;
 
     #[test]
     fn test_extract_root_path() {
@@ -57,13 +47,5 @@ mod tests {
         let result = extract_root_path(location);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), PathBuf::from("/path/to/file"));
-    }
-
-    #[test]
-    fn test_extract_bucket() {
-        let location = "s3://bucket/path/to/file";
-        let result = extract_bucket(location);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "bucket");
     }
 }

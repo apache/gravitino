@@ -51,13 +51,20 @@ impl GvfsFilesetFs {
     }
 
     fn map_fileset_path_to_raw_path(&self, path: &Path) -> PathBuf {
-        self.target_path.join(path)
+        let relation_path = path.strip_prefix("/").unwrap();
+        if relation_path == Path::new("") {
+            return self.target_path.clone();
+        }
+        self.target_path.join(relation_path)
     }
 
     fn map_raw_path_to_fileset_path(&self, path: &Path) -> Result<PathBuf> {
-        path.strip_prefix(&self.target_path)
+        let stripped_path = path
+            .strip_prefix(&self.target_path)
             .map_err(|_| Errno::from(libc::EBADF))?;
-        Ok(path.into())
+        let mut result_path = PathBuf::from("/");
+        result_path.push(stripped_path);
+        Ok(result_path)
     }
 }
 
@@ -131,5 +138,42 @@ impl PathFileSystem for GvfsFilesetFs {
 
     fn get_capacity(&self) -> Result<FileSystemCapacity> {
         self.fs.get_capacity()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::GravitinoConfig;
+    use crate::memory_filesystem::MemoryFileSystem;
+    use std::path::Path;
+
+    #[tokio::test]
+    async fn test_map_fileset_path_to_raw_path() {
+        let fs = super::GvfsFilesetFs {
+            fs: Box::new(MemoryFileSystem::new().await),
+            client: super::GravitinoClient::new(&GravitinoConfig::default()),
+            target_path: "/c1/fileset1".into(),
+        };
+        let path = fs.map_fileset_path_to_raw_path(Path::new("/a"));
+        assert_eq!(path, Path::new("/c1/fileset1/a"));
+        let path = fs.map_fileset_path_to_raw_path(Path::new("/"));
+        assert_eq!(path, Path::new("/c1/fileset1"));
+    }
+
+    #[tokio::test]
+    async fn test_map_raw_path_to_fileset_path() {
+        let fs = super::GvfsFilesetFs {
+            fs: Box::new(MemoryFileSystem::new().await),
+            client: super::GravitinoClient::new(&GravitinoConfig::default()),
+            target_path: "/c1/fileset1".into(),
+        };
+        let path = fs
+            .map_raw_path_to_fileset_path(Path::new("/c1/fileset1/a"))
+            .unwrap();
+        assert_eq!(path, Path::new("/a"));
+        let path = fs
+            .map_raw_path_to_fileset_path(Path::new("/c1/fileset1"))
+            .unwrap();
+        assert_eq!(path, Path::new("/"));
     }
 }

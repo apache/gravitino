@@ -17,12 +17,12 @@
  * under the License.
  */
 use crate::config::AppConfig;
-use crate::error::ErrorCode::OpenDalError;
+use crate::error::ErrorCode::{InvalidConfig, OpenDalError};
 use crate::filesystem::{FileStat, FileSystemCapacity, FileSystemContext, PathFileSystem, Result};
 use crate::gravitino_client::{Catalog, Fileset};
 use crate::open_dal_filesystem::OpenDalFileSystem;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
-use crate::utils::{extract_bucket, GvfsResult};
+use crate::utils::{parse_location, GvfsResult};
 use async_trait::async_trait;
 use log::error;
 use opendal::layers::LoggingLayer;
@@ -48,12 +48,13 @@ impl S3FileSystem {
         let bucket = extract_bucket(&fileset.storage_location)?;
         opendal_config.insert("bucket".to_string(), bucket);
 
-        let region = catalog.properties.get("s3-endpoint");
-        if region.is_none() {
+        let endpoint = catalog.properties.get("s3-endpoint");
+        if endpoint.is_none() {
             return Err(OpenDalError.to_error("s3-endpoint is not found in catalog"));
         }
-        let region = region.unwrap();
-        opendal_config.insert("region".to_string(), region.to_string());
+        let endpoint = endpoint.unwrap();
+        let region = extract_region(endpoint)?;
+        opendal_config.insert("region".to_string(), region);
 
         let builder = S3::from_map(opendal_config.clone());
 
@@ -117,5 +118,55 @@ impl PathFileSystem for S3FileSystem {
     }
 }
 
+pub(crate) fn extract_bucket(location: &str) -> GvfsResult<String> {
+    let url = parse_location(location)?;
+    match url.host_str() {
+        Some(host) => Ok(host.to_string()),
+        None => Err(InvalidConfig.to_error(format!(
+            "Invalid fileset location without bucket: {}",
+            location
+        ))),
+    }
+}
+
+pub(crate) fn extract_region(location: &str) -> GvfsResult<String> {
+    let url = parse_location(location)?;
+    match url.host_str() {
+        Some(host) => {
+            let parts: Vec<&str> = host.split('.').collect();
+            if parts.len() > 1 {
+                Ok(parts[1].to_string())
+            } else {
+                Err(InvalidConfig.to_error(format!(
+                    "Invalid location: expected region in host, got {}",
+                    location
+                )))
+            }
+        }
+        None => Err(InvalidConfig.to_error(format!(
+            "Invalid fileset location without bucket: {}",
+            location
+        ))),
+    }
+}
+
 #[cfg(test)]
-mod test {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_bucket() {
+        let location = "s3://bucket/path/to/file";
+        let result = extract_bucket(location);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "bucket");
+    }
+
+    #[test]
+    fn test_extract_region() {
+        let location = "http://s3.ap-southeast-2.amazonaws.com";
+        let result = extract_region(location);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "ap-southeast-2");
+    }
+}

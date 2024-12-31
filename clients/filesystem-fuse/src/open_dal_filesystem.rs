@@ -27,7 +27,7 @@ use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
 use log::{debug, error};
 use opendal::{EntryMode, ErrorKind, Metadata, Operator};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub(crate) struct OpenDalFileSystem {
@@ -60,30 +60,47 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn stat(&self, path: &Path) -> Result<FileStat> {
-        let file_name = path.to_string_lossy().to_string();
-        let meta = self
+        let mut file_name = path.to_string_lossy().to_string();
+        let meta_result = self
             .op
-            .stat_with(&file_name)
+            .stat(&file_name)
             .await
-            .map_err(opendal_error_to_errno)?;
+            .map_err(opendal_error_to_errno);
+
+        let meta = if let Err(err) = meta_result {
+            if err == Errno::from(libc::ENOENT) {
+                file_name += "/";
+                self.op
+                    .stat(&file_name)
+                    .await
+                    .map_err(opendal_error_to_errno)?
+            } else {
+                return Err(err);
+            }
+        } else {
+            meta_result?
+        };
 
         let mut file_stat = FileStat::new_file_filestat_with_path(path, 0);
         self.opendal_meta_to_file_stat(&meta, &mut file_stat);
+
         Ok(file_stat)
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
-        let file_name = path.to_string_lossy().to_string();
+        let dir_name = path.to_string_lossy().to_string() + "/";
         let entries = self
             .op
-            .list(&file_name)
+            .list(&dir_name)
             .await
             .map_err(opendal_error_to_errno)?;
         entries
             .iter()
             .map(|entry| {
-                let path = Path::new(entry.path());
-                let mut file_stat = FileStat::new_file_filestat_with_path(path, 0);
+                let mut path = PathBuf::from(path);
+                path.push(entry.name());
+
+                let mut file_stat = FileStat::new_file_filestat_with_path(&path, 0);
                 self.opendal_meta_to_file_stat(entry.metadata(), &mut file_stat);
                 debug!("read dir file stat: {:?}", file_stat);
                 Ok(file_stat)
@@ -222,15 +239,24 @@ fn opendal_filemode_to_filetype(mode: EntryMode) -> FileType {
 #[cfg(test)]
 mod test {
     use opendal::layers::LoggingLayer;
-    use opendal::{services, Operator};
+    use opendal::{services, Builder, Operator};
+    use std::collections::HashMap;
 
+    #[tokio::test]
     async fn test_s3_stat() {
-        let mut builder = services::S3::default();
-        builder
-            .access_key_id("<Your AWS Access Key>") // Replace with your AWS access key
-            .secret_access_key("<Your AWS Secret Key>") // Replace with your AWS secret key
-            .region("<Your AWS region") // Replace with your S3 bucket region
-            .bucket("<Your S3 bucket name>"); // Replace with your S3 bucket name
+        let mut opendal_config: HashMap<String, String> = HashMap::default();
+        opendal_config.insert(
+            "access_key_id".to_string(),
+            "<YOUR_ACCESS_KEY_ID>".to_string(),
+        );
+        opendal_config.insert(
+            "secret_access_key".to_string(),
+            "<YOUR_SECRET_ACCESS_KEY>".to_string(),
+        );
+        opendal_config.insert("region".to_string(), "<YOUR_REGION>".to_string());
+        opendal_config.insert("bucket".to_string(), "YOUR_BUCKET".to_string());
+
+        let builder = services::S3::from_map(opendal_config);
 
         // Init an operator
         let op = Operator::new(builder)
@@ -238,7 +264,20 @@ mod test {
             .layer(LoggingLayer::default())
             .finish();
 
-        let meta = op.stat_with("s1/fileset1/");
-        println!("{:?}", meta.await);
+        let list = op.list("/s1/fileset1").await;
+        if let Ok(l) = list {
+            for i in l {
+                println!("list result: {:?}", i);
+            }
+        } else {
+            println!("list error: {:?}", list.err());
+        }
+
+        let meta = op.stat_with("/s1/fileset1").await;
+        if let Ok(m) = meta {
+            println!("stat result: {:?}", m);
+        } else {
+            println!("stat error: {:?}", meta.err());
+        }
     }
 }
