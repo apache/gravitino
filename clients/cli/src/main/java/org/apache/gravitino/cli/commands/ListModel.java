@@ -33,8 +33,6 @@ public class ListModel extends Command {
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
-  protected final String model;
-  protected final boolean listVersions;
 
   /**
    * List the names of all models in a schema.
@@ -44,38 +42,21 @@ public class ListModel extends Command {
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of schema.
-   * @param model The name of model.
-   * @param listVersions If true list the version of the model.
    */
   public ListModel(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema, String model,
-      boolean listVersions) {
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
-    this.model = model;
-    this.listVersions = listVersions;
   }
 
   /** List the names of all models in a schema. */
   @Override
   public void handle() {
-    if (listVersions){
-     listVersions();
-    }else{
-      listModels();
-    }
-
-  }
-
-  public void listVersions(){
-
-  }
-
-  public void listModels(){
     NameIdentifier[] models = new NameIdentifier[0];
     Namespace name = Namespace.of(schema);
+
     try {
       GravitinoClient client = buildClient(metalake);
       models = client.loadCatalog(catalog).asModelCatalog().listModels(name);
@@ -96,5 +77,4 @@ public class ListModel extends Command {
 
     System.out.println(output);
   }
-
 }

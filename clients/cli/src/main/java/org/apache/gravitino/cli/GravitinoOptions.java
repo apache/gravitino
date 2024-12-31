@@ -62,7 +62,6 @@ public class GravitinoOptions {
   public static final String ALL = "all";
   public static final String ENABLE = "enable";
   public static final String DISABLE = "disable";
-  public static final String ALIAS = "alias";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -90,9 +89,6 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
     options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
     options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
-
-    // model options
-    options.addOption(createSimpleOption(null, ALIAS, "alias of model"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));

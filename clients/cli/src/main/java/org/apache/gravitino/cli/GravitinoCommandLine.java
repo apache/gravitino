@@ -1154,11 +1154,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     List<String> missingEntities = Lists.newArrayList();
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
 
     // Handle CommandActions.LIST action separately as it doesn't require the `model`
-    if (CommandActions.LIST.equals(command) && !line.hasOption(GravitinoOptions.VERSION)) {
+    if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListModel(url, ignore, metalake, catalog, schema, null).handle();
+      newListModel(url, ignore, metalake, catalog, schema).handle();
       return;
     }
 
@@ -1168,14 +1169,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.GET:
-        String version = line.getOptionValue(GravitinoOptions.VERSION);
-        newGetModel(url, ignore, metalake, catalog, schema, model, version).handle();
+        newGetModel(url, ignore, metalake, catalog, schema, model).handle();
         break;
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
         break;
-
     }
   }
 

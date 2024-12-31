@@ -911,12 +911,12 @@ public class TestableCommandLine {
   }
 
   protected ListModel newListModel(
-      String url, boolean ignore, String metalake, String catalog, String schema, String model, boolean listVersions) {
-    return new ListModel(url, ignore, metalake, catalog, schema, model, listVersions);
+      String url, boolean ignore, String metalake, String catalog, String schema) {
+    return new ListModel(url, ignore, metalake, catalog, schema);
   }
 
-  protected GetModel newGetModel( String url, boolean ignore, String metalake, String catalog, String schema,
-      String model, String version){
-    return new GetModel(url, ignore, metalake, catalog, schema, model, version);
+  protected GetModel newGetModel(
+      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
+    return new GetModel(url, ignore, metalake, catalog, schema, model);
   }
 }

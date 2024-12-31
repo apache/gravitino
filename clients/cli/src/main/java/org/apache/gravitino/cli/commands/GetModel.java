@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -27,45 +28,65 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelCatalog;
 
-public class GetModel extends Command{
+/** Get model information */
+public class GetModel extends Command {
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String model;
-  protected final String alias;
 
-  public GetModel(String url, boolean ignoreVersions, String metalake, String catalog, String schema, String model,
-      String alias) {
+  /**
+   * Get model information
+   *
+   * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param schema The name of schema.
+   * @param model The name of model.
+   */
+  public GetModel(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String model) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.model = model;
-    this.alias = alias;
   }
 
+  /** Get model information */
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, model);
-    Model model = null;
+    Model gModel = null;
+    int[] versions = new int[0];
 
     try {
       GravitinoClient client = buildClient(metalake);
-      model = client.loadCatalog(catalog).asModelCatalog().getModel(name);
-    } catch (NoSuchMetalakeException noSuchMetalakeException){
+      ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
+      gModel = modelCatalog.getModel(name);
+      versions = modelCatalog.listModelVersions(name);
+    } catch (NoSuchMetalakeException noSuchMetalakeException) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException noSuchCatalogException){
+    } catch (NoSuchCatalogException noSuchCatalogException) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (NoSuchSchemaException noSuchSchemaException){
+    } catch (NoSuchSchemaException noSuchSchemaException) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchModelException noSuchModelException){
+    } catch (NoSuchModelException noSuchModelException) {
       exitWithError(ErrorMessages.UNKNOWN_MODEL);
-    } catch (Exception err){
+    } catch (Exception err) {
       exitWithError(err.getMessage());
     }
-
-    System.out.printf("Model name %s, latest version: %s%n", model.name(), model.latestVersion());
-
+    String basicInfo =
+        String.format("Model name %s, latest version: %s%n", gModel.name(), gModel.latestVersion());
+    String versionInfo = Arrays.toString(versions);
+    System.out.printf(basicInfo + "versions: " + versionInfo);
   }
 }
