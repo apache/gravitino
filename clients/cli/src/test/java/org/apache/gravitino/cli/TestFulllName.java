@@ -112,6 +112,21 @@ public class TestFulllName {
   }
 
   @Test
+  public void hasPartName() throws ParseException {
+    String[] argsWithoutName = {"catalog", "details", "--metalake", "metalake"};
+    CommandLine commandLineWithoutName = new DefaultParser().parse(options, argsWithoutName);
+    FullName fullNameWithoutName = new FullName(commandLineWithoutName);
+    assertFalse(fullNameWithoutName.hasName());
+
+    String[] argsWithName = {
+      "catalog", "details", "--metalake", "metalake", "--name", "Hive_catalog"
+    };
+    CommandLine commandLineWithName = new DefaultParser().parse(options, argsWithName);
+    FullName fullNameWithName = new FullName(commandLineWithName);
+    assertTrue(fullNameWithName.hasName());
+  }
+
+  @Test
   public void hasPartNameMetalake() throws Exception {
     String[] args = {"metalake", "details", "--metalake", "metalake"};
     CommandLine commandLine = new DefaultParser().parse(options, args);

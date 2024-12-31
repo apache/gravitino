@@ -149,6 +149,15 @@ public class FullName {
   }
 
   /**
+   * Are there any names that can be retrieved?
+   *
+   * @return True if the name exists, or false if it does not.
+   */
+  public Boolean hasName() {
+    return line.hasOption(GravitinoOptions.NAME);
+  }
+
+  /**
    * Helper method to retrieve a specific part of the full name based on the position of the part.
    *
    * @param position The position of the name part in the full name string.
