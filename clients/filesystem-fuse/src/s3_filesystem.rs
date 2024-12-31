@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(result.unwrap(), "ap-southeast-2");
     }
 
-    fn create_s3_fs() -> S3FileSystem {
+    async fn create_s3_fs(cwd: &Path) -> S3FileSystem {
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
         let opendal_config = config.extend_config.clone();
 
@@ -182,6 +182,12 @@ mod tests {
         let builder = S3::from_map(opendal_config);
         let op = Operator::new(builder).expect("opendal create failed");
         let op = op.layer(LoggingLayer::default()).finish();
+        let file_name = cwd.to_string_lossy().to_string();
+
+        // clean up the test directory
+        let _ = op.delete(&file_name).await;
+        let _ = op.create_dir(&file_name).await;
+
         let opend_dal_fs = OpenDalFileSystem::new(op, &config, &fs_context);
         S3FileSystem {
             open_dal_fs: opend_dal_fs,
@@ -193,9 +199,9 @@ mod tests {
         if std::env::var("RUN_S3_TESTS").is_err() {
             return;
         }
-        let fs = create_s3_fs();
-        let _ = fs.init().await;
         let cwd = Path::new("/gvfs_test");
+        let fs = create_s3_fs(cwd).await;
+        let _ = fs.init().await;
         let mut tester = TestPathFileSystem::new(cwd, fs);
         tester.test_path_file_system().await;
     }
@@ -206,11 +212,12 @@ mod tests {
             return;
         }
 
-        let s3_fs = create_s3_fs();
+        let cwd = Path::new("/gvfs_test");
+        let s3_fs = create_s3_fs(cwd).await;
         let raw_fs =
             DefaultRawFileSystem::new(s3_fs, &AppConfig::default(), &FileSystemContext::default());
         let _ = raw_fs.init().await;
-        let mut tester = TestRawFileSystem::new(Path::new("/"), raw_fs);
+        let mut tester = TestRawFileSystem::new(Path::new("/fuse_test"), raw_fs);
         tester.test_raw_file_system().await;
     }
 }
