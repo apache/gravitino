@@ -20,12 +20,12 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.model.Model;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.model.Model;
 
 /** Displays the audit information of a model. */
 public class ModelAudit extends AuditCommand {
@@ -43,7 +43,8 @@ public class ModelAudit extends AuditCommand {
    * @param catalog The name of the catalog.
    * @param model The name of the model.
    */
-  public ModelAudit(String url, boolean ignoreVersions, String metalake, String catalog, String model) {
+  public ModelAudit(
+      String url, boolean ignoreVersions, String metalake, String catalog, String model) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
@@ -54,7 +55,7 @@ public class ModelAudit extends AuditCommand {
   @Override
   public void handle() {
     Model result;
-    
+
     try (GravitinoClient client = buildClient(this.metalake)) {
       NameIdentifier name = NameIdentifier.of(this.metalake, this.catalog, this.model);
       result = client.loadCatalog(this.catalog).asModelCatalog().getModel(name);
@@ -76,5 +77,4 @@ public class ModelAudit extends AuditCommand {
       displayAuditInfo(result.auditInfo());
     }
   }
-
 }

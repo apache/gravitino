@@ -496,7 +496,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
-  /** Handles the command execution for Models based on command type and the command line options. */
+  /**
+   * Handles the command execution for Models based on command type and the command line options.
+   */
   private void handleModelCommand() {
     String url = getUrl();
     String auth = getAuth();
@@ -525,7 +527,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (line.hasOption(GravitinoOptions.AUDIT)) {
           newModelAudit(url, ignore, metalake, catalog, model).handle();
         } else {
-//          newModelDetails(url, ignore, metalake, catalog, model).handle()
+          //          newModelDetails(url, ignore, metalake, catalog, model).handle()
         }
         break;
     }

@@ -19,6 +19,13 @@
 
 package org.apache.gravitino.cli;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.PrintStream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.ModelAudit;
@@ -26,10 +33,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.org.apache.commons.io.output.ByteArrayOutputStream;
-
-import java.io.PrintStream;
-
-import static org.mockito.Mockito.*;
 
 class TestModelCommands {
   private CommandLine mockCommandLine;
@@ -42,16 +45,16 @@ class TestModelCommands {
 
   @BeforeEach
   void setUp() {
-      mockCommandLine = mock(CommandLine.class);
-      mockOptions = mock(Options.class);
-      System.setOut(new PrintStream(outContent));
-      System.setErr(new PrintStream(errContent));
+    mockCommandLine = mock(CommandLine.class);
+    mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
   }
 
   @AfterEach
   public void restoreStreams() {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -64,13 +67,13 @@ class TestModelCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
 
     GravitinoCommandLine commandLine =
-            spy(
-                    new GravitinoCommandLine(
-                            mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
     doReturn(mockAudit)
-            .when(commandLine)
-            .newModelAudit(
-                    GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "model");
+        .when(commandLine)
+        .newModelAudit(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "model");
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
