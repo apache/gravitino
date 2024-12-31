@@ -36,7 +36,7 @@ const FILESET_PREFIX: &str = "gvfs://fileset/";
 
 static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(None));
 
-pub(crate) enum CreateFsResult {
+pub(crate) enum CreateFileSystemResult {
     Memory(MemoryFileSystem),
     Gvfs(GravitinoFilesetFileSystem),
     FuseMemoryFs(FuseApiHandle<DefaultRawFileSystem<MemoryFileSystem>>),
@@ -57,8 +57,8 @@ pub async fn mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> Gvfs
     }
     let fs = create_fuse_fs(mount_from, config).await?;
     match fs {
-        CreateFsResult::FuseMemoryFs(vfs) => svr.start(vfs).await?,
-        CreateFsResult::FuseGvfs(vfs) => svr.start(vfs).await?,
+        CreateFileSystemResult::FuseMemoryFs(vfs) => svr.start(vfs).await?,
+        CreateFileSystemResult::FuseGvfs(vfs) => svr.start(vfs).await?,
         _ => return Err(UnSupportedFilesystem.to_error("Unsupported filesystem type".to_string())),
     }
     Ok(())
@@ -80,7 +80,7 @@ pub async fn unmount() -> GvfsResult<()> {
 pub(crate) async fn create_fuse_fs(
     mount_from: &str,
     config: &AppConfig,
-) -> GvfsResult<CreateFsResult> {
+) -> GvfsResult<CreateFileSystemResult> {
     let uid = unsafe { libc::getuid() };
     let gid = unsafe { libc::getgid() };
     let fs_context = FileSystemContext::new(uid, gid, config);
@@ -89,26 +89,26 @@ pub(crate) async fn create_fuse_fs(
 }
 
 pub async fn create_raw_fs(
-    path_fs: CreateFsResult,
+    path_fs: CreateFileSystemResult,
     config: &AppConfig,
     fs_context: FileSystemContext,
-) -> GvfsResult<CreateFsResult> {
+) -> GvfsResult<CreateFileSystemResult> {
     match path_fs {
-        CreateFsResult::Memory(fs) => {
+        CreateFileSystemResult::Memory(fs) => {
             let fs = FuseApiHandle::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
                 fs_context,
             );
-            Ok(CreateFsResult::FuseMemoryFs(fs))
+            Ok(CreateFileSystemResult::FuseMemoryFs(fs))
         }
-        CreateFsResult::Gvfs(fs) => {
+        CreateFileSystemResult::Gvfs(fs) => {
             let fs = FuseApiHandle::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
                 fs_context,
             );
-            Ok(CreateFsResult::FuseGvfs(fs))
+            Ok(CreateFileSystemResult::FuseGvfs(fs))
         }
         _ => Err(UnSupportedFilesystem.to_error("Unsupported filesystem type".to_string())),
     }
@@ -118,9 +118,11 @@ pub async fn create_path_fs(
     mount_from: &str,
     config: &AppConfig,
     fs_context: &FileSystemContext,
-) -> GvfsResult<CreateFsResult> {
+) -> GvfsResult<CreateFileSystemResult> {
     if config.fuse.fs_type == "memory" {
-        Ok(CreateFsResult::Memory(MemoryFileSystem::new().await))
+        Ok(CreateFileSystemResult::Memory(
+            MemoryFileSystem::new().await,
+        ))
     } else {
         create_gvfs_filesystem(mount_from, config, fs_context).await
     }
@@ -130,7 +132,7 @@ pub async fn create_gvfs_filesystem(
     mount_from: &str,
     config: &AppConfig,
     fs_context: &FileSystemContext,
-) -> GvfsResult<CreateFsResult> {
+) -> GvfsResult<CreateFileSystemResult> {
     // Gvfs-fuse filesystem structure:
     // FuseApiHandle
     // ├─ DefaultRawFileSystem (RawFileSystem)
@@ -195,7 +197,7 @@ pub async fn create_gvfs_filesystem(
         fs_context,
     )
     .await;
-    Ok(CreateFsResult::Gvfs(fs))
+    Ok(CreateFileSystemResult::Gvfs(fs))
 }
 
 pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
