@@ -255,7 +255,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.put(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             updatesRequest,
             CatalogResponse.class,
             Collections.emptyMap(),
@@ -289,7 +292,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     DropResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             params,
             DropResponse.class,
             Collections.emptyMap(),
@@ -304,7 +310,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     ErrorResponse resp =
         restClient.patch(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             req,
             ErrorResponse.class,
             Collections.emptyMap(),
@@ -323,7 +332,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     ErrorResponse resp =
         restClient.patch(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             req,
             ErrorResponse.class,
             Collections.emptyMap(),
@@ -364,7 +376,8 @@ public class GravitinoMetalake extends MetalakeDTO
     // only)
     ErrorResponse resp =
         restClient.post(
-            String.format("api/metalakes/%s/catalogs/testConnection", this.name()),
+            String.format(
+                "api/metalakes/%s/catalogs/testConnection", RESTUtils.encodeString(this.name())),
             req,
             ErrorResponse.class,
             Collections.emptyMap(),
@@ -393,7 +406,7 @@ public class GravitinoMetalake extends MetalakeDTO
   public String[] listTags() throws NoSuchMetalakeException {
     NameListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_TAGS_PATH, this.name()),
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name())),
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
@@ -412,7 +425,7 @@ public class GravitinoMetalake extends MetalakeDTO
     Map<String, String> params = ImmutableMap.of("details", "true");
     TagListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_TAGS_PATH, this.name()),
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name())),
             params,
             TagListResponse.class,
             Collections.emptyMap(),
@@ -437,7 +450,9 @@ public class GravitinoMetalake extends MetalakeDTO
 
     TagResponse resp =
         restClient.get(
-            String.format(API_METALAKES_TAGS_PATH, this.name()) + "/" + name,
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(name),
             TagResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
@@ -464,7 +479,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     TagResponse resp =
         restClient.post(
-            String.format(API_METALAKES_TAGS_PATH, this.name()),
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name())),
             req,
             TagResponse.class,
             Collections.emptyMap(),
@@ -494,7 +509,9 @@ public class GravitinoMetalake extends MetalakeDTO
 
     TagResponse resp =
         restClient.put(
-            String.format(API_METALAKES_TAGS_PATH, this.name()) + "/" + name,
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(name),
             req,
             TagResponse.class,
             Collections.emptyMap(),
@@ -516,7 +533,9 @@ public class GravitinoMetalake extends MetalakeDTO
 
     DropResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_TAGS_PATH, this.name()) + "/" + name,
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(name),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
@@ -539,7 +558,8 @@ public class GravitinoMetalake extends MetalakeDTO
 
     UserResponse resp =
         restClient.post(
-            String.format(API_METALAKES_USERS_PATH, this.name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             req,
             UserResponse.class,
             Collections.emptyMap(),
@@ -561,7 +581,10 @@ public class GravitinoMetalake extends MetalakeDTO
   public boolean removeUser(String user) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_USERS_PATH, this.name(), RESTUtils.encodeString(user)),
+            String.format(
+                API_METALAKES_USERS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(user)),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -582,7 +605,10 @@ public class GravitinoMetalake extends MetalakeDTO
   public User getUser(String user) throws NoSuchUserException, NoSuchMetalakeException {
     UserResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, this.name(), RESTUtils.encodeString(user)),
+            String.format(
+                API_METALAKES_USERS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(user)),
             UserResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -603,7 +629,8 @@ public class GravitinoMetalake extends MetalakeDTO
 
     UserListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             params,
             UserListResponse.class,
             Collections.emptyMap(),
@@ -622,7 +649,8 @@ public class GravitinoMetalake extends MetalakeDTO
   public String[] listUserNames() throws NoSuchMetalakeException {
     NameListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -646,7 +674,8 @@ public class GravitinoMetalake extends MetalakeDTO
 
     GroupResponse resp =
         restClient.post(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             req,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -668,7 +697,10 @@ public class GravitinoMetalake extends MetalakeDTO
   public boolean removeGroup(String group) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), RESTUtils.encodeString(group)),
+            String.format(
+                API_METALAKES_GROUPS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(group)),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -689,7 +721,10 @@ public class GravitinoMetalake extends MetalakeDTO
   public Group getGroup(String group) throws NoSuchGroupException, NoSuchMetalakeException {
     GroupResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), RESTUtils.encodeString(group)),
+            String.format(
+                API_METALAKES_GROUPS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(group)),
             GroupResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -710,7 +745,8 @@ public class GravitinoMetalake extends MetalakeDTO
 
     GroupListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             params,
             GroupListResponse.class,
             Collections.emptyMap(),
@@ -728,7 +764,8 @@ public class GravitinoMetalake extends MetalakeDTO
   public String[] listGroupNames() throws NoSuchMetalakeException {
     NameListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -748,7 +785,10 @@ public class GravitinoMetalake extends MetalakeDTO
   public Role getRole(String role) throws NoSuchRoleException, NoSuchMetalakeException {
     RoleResponse resp =
         restClient.get(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), RESTUtils.encodeString(role)),
+            String.format(
+                API_METALAKES_ROLES_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(role)),
             RoleResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -769,7 +809,10 @@ public class GravitinoMetalake extends MetalakeDTO
   public boolean deleteRole(String role) throws NoSuchMetalakeException {
     DeleteResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), RESTUtils.encodeString(role)),
+            String.format(
+                API_METALAKES_ROLES_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(role)),
             DeleteResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -804,7 +847,8 @@ public class GravitinoMetalake extends MetalakeDTO
 
     RoleResponse resp =
         restClient.post(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_ROLES_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             req,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -823,7 +867,8 @@ public class GravitinoMetalake extends MetalakeDTO
   public String[] listRoleNames() {
     NameListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACEHOLDER),
+            String.format(
+                API_METALAKES_ROLES_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -852,7 +897,7 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_PERMISSION_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format("users/%s/grant", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
@@ -883,7 +928,7 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_PERMISSION_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format("groups/%s/grant", RESTUtils.encodeString(group))),
             request,
             GroupResponse.class,
@@ -914,7 +959,7 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_PERMISSION_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format("users/%s/revoke", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
@@ -945,7 +990,7 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_PERMISSION_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format("groups/%s/revoke", RESTUtils.encodeString(group))),
             request,
             GroupResponse.class,
@@ -981,12 +1026,12 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_PERMISSION_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format(
                     "roles/%s/%s/%s/grant",
                     RESTUtils.encodeString(role),
                     object.type().name().toLowerCase(Locale.ROOT),
-                    object.fullName())),
+                    RESTUtils.encodeString(object.fullName()))),
             request,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -1023,12 +1068,12 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_PERMISSION_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format(
                     "roles/%s/%s/%s/revoke",
                     RESTUtils.encodeString(role),
                     object.type().name().toLowerCase(Locale.ROOT),
-                    object.fullName())),
+                    RESTUtils.encodeString(object.fullName()))),
             request,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -1052,7 +1097,7 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.get(
             String.format(
                 API_METALAKES_OWNERS_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format(
                     "%s/%s",
                     object.type().name().toLowerCase(Locale.ROOT),
@@ -1080,7 +1125,7 @@ public class GravitinoMetalake extends MetalakeDTO
         restClient.put(
             String.format(
                 API_METALAKES_OWNERS_PATH,
-                this.name(),
+                RESTUtils.encodeString(this.name()),
                 String.format(
                     "%s/%s",
                     object.type().name().toLowerCase(Locale.ROOT),
