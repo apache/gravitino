@@ -59,10 +59,10 @@ pub(crate) const CONF_FILESYSTEM_BLOCK_SIZE: ConfigEntity<u32> = ConfigEntity::n
     4096,
 );
 
-pub(crate) const CONF_GRAVITINO_URL: ConfigEntity<&'static str> = ConfigEntity::new(
+pub(crate) const CONF_GRAVITINO_URI: ConfigEntity<&'static str> = ConfigEntity::new(
     GravitinoConfig::MODULE_NAME,
-    "gravitino_url",
-    "The URL of the Gravitino server",
+    "uri",
+    "The URI of the Gravitino server",
     "http://localhost:8090",
 );
 
@@ -129,8 +129,8 @@ impl Default for DefaultConfig {
             ConfigValue::String(CONF_FUSE_CONFIG_PATH),
         );
         configs.insert(
-            Self::compose_key(CONF_GRAVITINO_URL),
-            ConfigValue::String(CONF_GRAVITINO_URL),
+            Self::compose_key(CONF_GRAVITINO_URI),
+            ConfigValue::String(CONF_GRAVITINO_URI),
         );
         configs.insert(
             Self::compose_key(CONF_GRAVITINO_METALAKE),
@@ -287,7 +287,7 @@ impl FilesystemConfig {
 #[derive(Debug, Deserialize, Default)]
 pub struct GravitinoConfig {
     #[serde(default)]
-    pub gravitino_url: String,
+    pub uri: String,
     #[serde(default)]
     pub metalake: String,
 }
@@ -306,7 +306,7 @@ mod test {
         assert_eq!(config.fuse.file_mask, 0o644);
         assert_eq!(config.fuse.dir_mask, 0o755);
         assert_eq!(config.filesystem.block_size, 8192);
-        assert_eq!(config.gravitino.gravitino_url, "http://localhost:8090");
+        assert_eq!(config.gravitino.uri, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "test");
         assert_eq!(
             config.extend_config.get("access_key_id"),
@@ -324,7 +324,7 @@ mod test {
         assert_eq!(config.fuse.file_mask, 0o600);
         assert_eq!(config.fuse.dir_mask, 0o700);
         assert_eq!(config.filesystem.block_size, 4096);
-        assert_eq!(config.gravitino.gravitino_url, "http://localhost:8090");
+        assert_eq!(config.gravitino.uri, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "");
     }
 }

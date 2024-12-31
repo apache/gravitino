@@ -20,8 +20,8 @@ use crate::config::AppConfig;
 use crate::error::ErrorCode::{InvalidConfig, UnSupportedFilesystem};
 use crate::filesystem::{FileSystemContext, PathFileSystem};
 use crate::gravitino_client::{Catalog, Fileset, GravitinoClient};
-use crate::gvfs_fileset_fs::GvfsFilesetFs;
-use crate::gvfs_fuse::{CreateFsResult, FileSystemSchema};
+use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
+use crate::gvfs_fuse::{CreateFileSystemResult, FileSystemSchema};
 use crate::s3_filesystem::S3FileSystem;
 use crate::utils::{extract_root_path, parse_location, GvfsResult};
 
@@ -31,7 +31,7 @@ pub async fn create_gvfs_filesystem(
     mount_from: &str,
     config: &AppConfig,
     fs_context: &FileSystemContext,
-) -> GvfsResult<CreateFsResult> {
+) -> GvfsResult<CreateFileSystemResult> {
     // Gvfs-fuse filesystem structure:
     // FuseApiHandle
     // ├─ DefaultRawFileSystem (RawFileSystem)
@@ -90,8 +90,9 @@ pub async fn create_gvfs_filesystem(
     let inner_fs = create_fs_with_fileset(&catalog, &fileset, config, fs_context)?;
 
     let target_path = extract_root_path(fileset.storage_location.as_str())?;
-    let fs = GvfsFilesetFs::new(inner_fs, &target_path, client, config, fs_context).await;
-    Ok(CreateFsResult::Gvfs(fs))
+    let fs =
+        GravitinoFilesetFileSystem::new(inner_fs, &target_path, client, config, fs_context).await;
+    Ok(CreateFileSystemResult::Gvfs(fs))
 }
 
 fn create_fs_with_fileset(

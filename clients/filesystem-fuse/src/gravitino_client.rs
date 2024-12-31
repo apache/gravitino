@@ -74,7 +74,7 @@ pub(crate) struct GravitinoClient {
 impl GravitinoClient {
     pub fn new(config: &GravitinoConfig) -> Self {
         Self {
-            gravitino_uri: config.gravitino_url.clone(),
+            gravitino_uri: config.uri.clone(),
             metalake: config.metalake.clone(),
             client: Client::new(),
         }
@@ -233,7 +233,7 @@ mod tests {
             .create();
 
         let config = GravitinoConfig {
-            gravitino_url: mock_server_url.to_string(),
+            uri: mock_server_url.to_string(),
             metalake: "test".to_string(),
         };
         let client = GravitinoClient::new(&config);
@@ -276,7 +276,7 @@ mod tests {
             .create();
 
         let config = GravitinoConfig {
-            gravitino_url: mock_server_url.to_string(),
+            uri: mock_server_url.to_string(),
             metalake: "test".to_string(),
         };
         let client = GravitinoClient::new(&config);
@@ -320,7 +320,7 @@ mod tests {
             .create();
 
         let config = GravitinoConfig {
-            gravitino_url: mock_server_url.to_string(),
+            uri: mock_server_url.to_string(),
             metalake: "test".to_string(),
         };
         let client = GravitinoClient::new(&config);
@@ -336,7 +336,7 @@ mod tests {
     async fn get_fileset_example() {
         tracing_subscriber::fmt::init();
         let config = GravitinoConfig {
-            gravitino_url: "http://localhost:8090".to_string(),
+            uri: "http://localhost:8090".to_string(),
             metalake: "test".to_string(),
         };
         let client = GravitinoClient::new(&config);

@@ -24,18 +24,16 @@ use async_trait::async_trait;
 use fuse3::Errno;
 use std::path::{Path, PathBuf};
 
-pub(crate) struct GravitinoFileSystemConfig {}
-
 /// GravitinoFileSystem is a filesystem that is associated with a fileset in Gravitino.
 /// It mapping the fileset path to the original data storage path. and delegate the operation
 /// to the inner filesystem like S3 GCS, JuiceFS.
-pub(crate) struct GvfsFilesetFs {
-    fs: Box<dyn PathFileSystem>,
+pub(crate) struct GravitinoFilesetFileSystem {
+    physical_fs: Box<dyn PathFileSystem>,
     client: GravitinoClient,
     target_path: PathBuf,
 }
 
-impl GvfsFilesetFs {
+impl GravitinoFilesetFileSystem {
     pub async fn new(
         fs: Box<dyn PathFileSystem>,
         target_path: &Path,
@@ -44,13 +42,13 @@ impl GvfsFilesetFs {
         _context: &FileSystemContext,
     ) -> Self {
         Self {
-            fs: fs,
+            physical_fs: fs,
             client: client,
             target_path: target_path.into(),
         }
     }
 
-    fn map_fileset_path_to_raw_path(&self, path: &Path) -> PathBuf {
+    fn gvfs_path_to_raw_path(&self, path: &Path) -> PathBuf {
         let relation_path = path.strip_prefix("/").unwrap();
         if relation_path == Path::new("") {
             return self.target_path.clone();
@@ -58,7 +56,7 @@ impl GvfsFilesetFs {
         self.target_path.join(relation_path)
     }
 
-    fn map_raw_path_to_fileset_path(&self, path: &Path) -> Result<PathBuf> {
+    fn raw_path_to_gvfs_path(&self, path: &Path) -> Result<PathBuf> {
         let stripped_path = path
             .strip_prefix(&self.target_path)
             .map_err(|_| Errno::from(libc::EBADF))?;
@@ -69,111 +67,107 @@ impl GvfsFilesetFs {
 }
 
 #[async_trait]
-impl PathFileSystem for GvfsFilesetFs {
+impl PathFileSystem for GravitinoFilesetFileSystem {
     async fn init(&self) -> Result<()> {
-        self.fs.init().await
+        self.physical_fs.init().await
     }
 
     async fn stat(&self, path: &Path) -> Result<FileStat> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        let mut file_stat = self.fs.stat(&raw_path).await?;
-        file_stat.path = self.map_raw_path_to_fileset_path(&file_stat.path)?;
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut file_stat = self.physical_fs.stat(&raw_path).await?;
+        file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         Ok(file_stat)
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        let mut child_filestats = self.fs.read_dir(&raw_path).await?;
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut child_filestats = self.physical_fs.read_dir(&raw_path).await?;
         for file_stat in child_filestats.iter_mut() {
-            file_stat.path = self.map_raw_path_to_fileset_path(&file_stat.path)?;
+            file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         }
         Ok(child_filestats)
     }
 
     async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        let mut opened_file = self.fs.open_file(&raw_path, flags).await?;
-        opened_file.file_stat.path =
-            self.map_raw_path_to_fileset_path(&opened_file.file_stat.path)?;
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut opened_file = self.physical_fs.open_file(&raw_path, flags).await?;
+        opened_file.file_stat.path = self.raw_path_to_gvfs_path(&opened_file.file_stat.path)?;
         Ok(opened_file)
     }
 
     async fn open_dir(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        let mut opened_file = self.fs.open_dir(&raw_path, flags).await?;
-        opened_file.file_stat.path =
-            self.map_raw_path_to_fileset_path(&opened_file.file_stat.path)?;
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut opened_file = self.physical_fs.open_dir(&raw_path, flags).await?;
+        opened_file.file_stat.path = self.raw_path_to_gvfs_path(&opened_file.file_stat.path)?;
         Ok(opened_file)
     }
 
     async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        let mut opened_file = self.fs.create_file(&raw_path, flags).await?;
-        opened_file.file_stat.path =
-            self.map_raw_path_to_fileset_path(&opened_file.file_stat.path)?;
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut opened_file = self.physical_fs.create_file(&raw_path, flags).await?;
+        opened_file.file_stat.path = self.raw_path_to_gvfs_path(&opened_file.file_stat.path)?;
         Ok(opened_file)
     }
 
     async fn create_dir(&self, path: &Path) -> Result<FileStat> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        let mut file_stat = self.fs.create_dir(&raw_path).await?;
-        file_stat.path = self.map_raw_path_to_fileset_path(&file_stat.path)?;
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut file_stat = self.physical_fs.create_dir(&raw_path).await?;
+        file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         Ok(file_stat)
     }
 
     async fn set_attr(&self, path: &Path, file_stat: &FileStat, flush: bool) -> Result<()> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        self.fs.set_attr(&raw_path, file_stat, flush).await
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        self.physical_fs.set_attr(&raw_path, file_stat, flush).await
     }
 
     async fn remove_file(&self, path: &Path) -> Result<()> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        self.fs.remove_file(&raw_path).await
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        self.physical_fs.remove_file(&raw_path).await
     }
 
     async fn remove_dir(&self, path: &Path) -> Result<()> {
-        let raw_path = self.map_fileset_path_to_raw_path(path);
-        self.fs.remove_dir(&raw_path).await
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        self.physical_fs.remove_dir(&raw_path).await
     }
 
     fn get_capacity(&self) -> Result<FileSystemCapacity> {
-        self.fs.get_capacity()
+        self.physical_fs.get_capacity()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::config::GravitinoConfig;
+    use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
     use crate::memory_filesystem::MemoryFileSystem;
     use std::path::Path;
 
     #[tokio::test]
     async fn test_map_fileset_path_to_raw_path() {
-        let fs = super::GvfsFilesetFs {
-            fs: Box::new(MemoryFileSystem::new().await),
+        let fs = GravitinoFilesetFileSystem {
+            physical_fs: Box::new(MemoryFileSystem::new().await),
             client: super::GravitinoClient::new(&GravitinoConfig::default()),
             target_path: "/c1/fileset1".into(),
         };
-        let path = fs.map_fileset_path_to_raw_path(Path::new("/a"));
+        let path = fs.gvfs_path_to_raw_path(Path::new("/a"));
         assert_eq!(path, Path::new("/c1/fileset1/a"));
-        let path = fs.map_fileset_path_to_raw_path(Path::new("/"));
+        let path = fs.gvfs_path_to_raw_path(Path::new("/"));
         assert_eq!(path, Path::new("/c1/fileset1"));
     }
 
     #[tokio::test]
     async fn test_map_raw_path_to_fileset_path() {
-        let fs = super::GvfsFilesetFs {
-            fs: Box::new(MemoryFileSystem::new().await),
+        let fs = GravitinoFilesetFileSystem {
+            physical_fs: Box::new(MemoryFileSystem::new().await),
             client: super::GravitinoClient::new(&GravitinoConfig::default()),
             target_path: "/c1/fileset1".into(),
         };
         let path = fs
-            .map_raw_path_to_fileset_path(Path::new("/c1/fileset1/a"))
+            .raw_path_to_gvfs_path(Path::new("/c1/fileset1/a"))
             .unwrap();
         assert_eq!(path, Path::new("/a"));
-        let path = fs
-            .map_raw_path_to_fileset_path(Path::new("/c1/fileset1"))
-            .unwrap();
+        let path = fs.raw_path_to_gvfs_path(Path::new("/c1/fileset1")).unwrap();
         assert_eq!(path, Path::new("/"));
     }
 }
