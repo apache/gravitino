@@ -141,7 +141,7 @@ public class OSSTokenProvider implements CredentialProvider {
 
     // Add support for bucket-level policies
     Map<String, Statement.Builder> bucketListStatementBuilder = new HashMap<>();
-    Map<String, Statement.Builder> bucketGetLocationStatementBuilder = new HashMap<>();
+    Map<String, Statement.Builder> bucketMetadataStatementBuilder = new HashMap<>();
 
     String arnPrefix = getArnPrefix();
     Stream.concat(readLocations.stream(), writeLocations.stream())
@@ -160,14 +160,14 @@ public class OSSTokenProvider implements CredentialProvider {
                           .addAction("oss:ListObjects")
                           .addResource(key)
                           .condition(getCondition(uri)));
-              // GetBucketLocation
-              bucketGetLocationStatementBuilder.computeIfAbsent(
+              // Add get bucket location and bucket info action.
+              bucketMetadataStatementBuilder.computeIfAbsent(
                   bucketArn,
                   key ->
                       Statement.builder()
                           .effect(Effect.ALLOW)
                           .addAction("oss:GetBucketLocation")
-                          // OSS Hadoop connector need to get bucket information
+                          // Required for OSS Hadoop connector to get bucket information
                           .addAction("oss:GetBucketInfo")
                           .addResource(key));
             });
@@ -195,7 +195,7 @@ public class OSSTokenProvider implements CredentialProvider {
       policyBuilder.addStatement(
           Statement.builder().effect(Effect.ALLOW).addAction("oss:ListBucket").build());
     }
-    bucketGetLocationStatementBuilder
+    bucketMetadataStatementBuilder
         .values()
         .forEach(statementBuilder -> policyBuilder.addStatement(statementBuilder.build()));
 
