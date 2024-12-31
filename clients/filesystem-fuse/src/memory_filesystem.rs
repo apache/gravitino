@@ -230,7 +230,10 @@ fn path_in_dir(dir: &Path, path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::filesystem::tests::TestPathFileSystem;
+    use crate::config::AppConfig;
+    use crate::default_raw_filesystem::DefaultRawFileSystem;
+    use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
+    use crate::filesystem::{FileSystemContext, RawFileSystem};
 
     #[test]
     fn test_path_in_dir() {
@@ -265,5 +268,18 @@ mod tests {
         let _ = fs.init().await;
         let mut tester = TestPathFileSystem::new(fs);
         tester.test_path_file_system().await;
+    }
+
+    #[tokio::test]
+    async fn test_memory_file_system_with_raw_file_system() {
+        let memory_fs = MemoryFileSystem::new().await;
+        let raw_fs = DefaultRawFileSystem::new(
+            memory_fs,
+            &AppConfig::default(),
+            &FileSystemContext::default(),
+        );
+        let _ = raw_fs.init().await;
+        let mut tester = TestRawFileSystem::new(raw_fs);
+        tester.test_raw_file_system().await;
     }
 }
