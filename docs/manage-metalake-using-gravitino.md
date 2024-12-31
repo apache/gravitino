@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 This page introduces how to create, modify, view, and delete [metalakes](./glossary.md#metalake) by using Gravitino. 
 
-## Prerequsites
+## Prerequisites
 
 You have installed and launched Gravitino. For more details, see [Get started](./getting-started.md).
 

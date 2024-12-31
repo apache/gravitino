@@ -56,6 +56,8 @@ REST API and the Java SDK. You can use either to manage metadata. See
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
   messaging metadata.
+* [Manage model metadata using Gravitino](./manage-model-metadata-using-gravitino.md) to learn how to manage
+  model metadata.
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
@@ -88,6 +90,10 @@ Gravitino currently supports the following catalogs:
 
 * [**Kafka catalog**](./kafka-catalog.md)
 
+**Model catalogs:**
+
+* [**Model catalog**](./model-catalog.md)
+
 ## Apache Gravitino playground
 
 To experience Gravitino with other components easily, Gravitino provides a playground to run. It
@@ -119,6 +125,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 * [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
 * [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
+* [Model catalog](./model-catalog.md): a complete guide to using Gravitino to manage model metadata.
 
 ### Governance
 
