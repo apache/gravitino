@@ -195,7 +195,8 @@ mod tests {
         }
         let fs = create_s3_fs();
         let _ = fs.init().await;
-        let mut tester = TestPathFileSystem::new(fs);
+        let cwd = Path::new("/gvfs_test");
+        let mut tester = TestPathFileSystem::new(cwd, fs);
         tester.test_path_file_system().await;
     }
 
@@ -209,7 +210,7 @@ mod tests {
         let raw_fs =
             DefaultRawFileSystem::new(s3_fs, &AppConfig::default(), &FileSystemContext::default());
         let _ = raw_fs.init().await;
-        let mut tester = TestRawFileSystem::new(raw_fs);
+        let mut tester = TestRawFileSystem::new(Path::new("/"), raw_fs);
         tester.test_raw_file_system().await;
     }
 }

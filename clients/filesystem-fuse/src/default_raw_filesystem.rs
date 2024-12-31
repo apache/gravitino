@@ -141,12 +141,6 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         meta_file_stat.set_file_id(ROOT_DIR_FILE_ID, FS_META_FILE_ID);
         meta_file_stat
     }
-
-    fn root_file_stat(&self) -> FileStat {
-        let mut root_file_stat = FileStat::new_dir_filestat_with_path(Path::new(ROOT_DIR_PATH));
-        root_file_stat.set_file_id(ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_FILE_ID);
-        root_file_stat
-    }
 }
 
 #[async_trait]
@@ -190,9 +184,6 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn stat(&self, file_id: u64) -> Result<FileStat> {
-        if file_id == ROOT_DIR_FILE_ID {
-            return Ok(self.root_file_stat());
-        }
         if file_id == FS_META_FILE_ID {
             return Ok(self.meta_file_stat());
         }
@@ -294,7 +285,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
-        if file_id == ROOT_DIR_FILE_ID || file_id == FS_META_FILE_ID {
+        if file_id == FS_META_FILE_ID {
             return Ok(());
         }
 

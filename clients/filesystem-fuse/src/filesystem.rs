@@ -293,41 +293,47 @@ pub trait FileWriter: Sync + Send {
 pub(crate) mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::path::Component;
 
     pub(crate) struct TestPathFileSystem<F: PathFileSystem> {
         files: HashMap<PathBuf, FileStat>,
         fs: F,
+        cwd: PathBuf,
     }
 
     impl<F: PathFileSystem> TestPathFileSystem<F> {
-        pub(crate) fn new(fs: F) -> Self {
+        pub(crate) fn new(cwd: &Path, fs: F) -> Self {
             Self {
                 files: HashMap::new(),
                 fs,
+                cwd: cwd.into(),
             }
         }
 
         pub(crate) async fn test_path_file_system(&mut self) {
+            // test root dir
+            self.test_stat_file(Path::new("/"), Directory, 0).await;
+
+            // test list root dir
+            self.test_list_dir(Path::new("/")).await;
+
             // Test create file
-            self.test_create_file(Path::new("/file1.txt")).await;
+            self.test_create_file(&self.cwd.join("file1.txt")).await;
 
             // Test create dir
-            self.test_create_dir(Path::new("/dir1")).await;
+            self.test_create_dir(&self.cwd.join("dir1")).await;
 
             // Test list dir
-            self.test_list_dir(Path::new("/")).await;
+            self.test_list_dir(&self.cwd).await;
 
             // Test remove file
-            self.test_remove_file(Path::new("/file1.txt")).await;
+            self.test_remove_file(&self.cwd.join("file1.txt")).await;
 
             // Test remove dir
-            self.test_remove_dir(Path::new("/dir1")).await;
+            self.test_remove_dir(&self.cwd.join("dir1")).await;
 
             // Test file not found
-            self.test_file_not_found(Path::new("unknown")).await;
-
-            // Test list dir
-            self.test_list_dir(Path::new("/")).await;
+            self.test_file_not_found(&self.cwd.join("unknown")).await;
         }
 
         async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
@@ -358,7 +364,6 @@ pub(crate) mod tests {
             let list_dir = self.fs.read_dir(path).await;
             assert!(list_dir.is_ok());
             let list_dir = list_dir.unwrap();
-            assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
                 assert!(self.files.contains_key(&file_stat.path));
                 let actual_file_stat = self.files.get(&file_stat.path).unwrap();
@@ -402,13 +407,15 @@ pub(crate) mod tests {
     pub(crate) struct TestRawFileSystem<F: RawFileSystem> {
         fs: F,
         files: HashMap<u64, FileStat>,
+        cwd: PathBuf,
     }
 
     impl<F: RawFileSystem> TestRawFileSystem<F> {
-        pub(crate) fn new(fs: F) -> Self {
+        pub(crate) fn new(cwd: &Path, fs: F) -> Self {
             Self {
                 fs,
                 files: HashMap::new(),
+                cwd: cwd.into(),
             }
         }
 
@@ -419,18 +426,28 @@ pub(crate) mod tests {
             // test read root dir
             self.test_list_dir(ROOT_DIR_FILE_ID, false).await;
 
-            let parent_file_id = ROOT_DIR_FILE_ID;
-            // Test lookup file
+            // Test lookup meta file
             let file_id = self
-                .test_lookup_file(parent_file_id, ".gvfs_meta".as_ref(), RegularFile, 0)
+                .test_lookup_file(ROOT_DIR_FILE_ID, ".gvfs_meta".as_ref(), RegularFile, 0)
                 .await;
 
-            // Test get file stat
+            // Test get meta file stat
             self.test_stat_file(file_id, Path::new("/.gvfs_meta"), RegularFile, 0)
                 .await;
 
             // Test get file path
             self.test_get_file_path(file_id, "/.gvfs_meta").await;
+
+            // get cwd file id
+            let mut parent_file_id = ROOT_DIR_FILE_ID;
+            for child in self.cwd.components() {
+                if child == Component::RootDir {
+                    continue;
+                }
+                let file_id = self.fs.create_dir(parent_file_id, child.as_os_str()).await;
+                assert!(file_id.is_ok());
+                parent_file_id = file_id.unwrap();
+            }
 
             // Test create file
             self.test_create_file(parent_file_id, "file1.txt".as_ref())
@@ -594,7 +611,6 @@ pub(crate) mod tests {
             if !check_child {
                 return;
             }
-            assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
                 assert!(self.files.contains_key(&file_stat.file_id));
                 let actual_file_stat = self.files.get(&file_stat.file_id).unwrap();

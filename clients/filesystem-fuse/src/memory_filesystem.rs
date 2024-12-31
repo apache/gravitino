@@ -61,6 +61,12 @@ impl MemoryFileSystem {
 #[async_trait]
 impl PathFileSystem for MemoryFileSystem {
     async fn init(&self) -> Result<()> {
+        let root_file = MemoryFile {
+            kind: Directory,
+            data: Arc::new(Mutex::new(Vec::new())),
+        };
+        let root_path = PathBuf::from("/");
+        self.file_map.write().unwrap().insert(root_path, root_file);
         Ok(())
     }
 
@@ -266,7 +272,7 @@ mod tests {
     async fn test_memory_file_system() {
         let fs = MemoryFileSystem::new().await;
         let _ = fs.init().await;
-        let mut tester = TestPathFileSystem::new(fs);
+        let mut tester = TestPathFileSystem::new(Path::new("/ab"), fs);
         tester.test_path_file_system().await;
     }
 
@@ -279,7 +285,7 @@ mod tests {
             &FileSystemContext::default(),
         );
         let _ = raw_fs.init().await;
-        let mut tester = TestRawFileSystem::new(raw_fs);
+        let mut tester = TestRawFileSystem::new(Path::new("/ab"), raw_fs);
         tester.test_raw_file_system().await;
     }
 }
