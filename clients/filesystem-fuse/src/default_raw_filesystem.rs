@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::config::AppConfig;
 use crate::filesystem::{
-    FileStat, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID, ROOT_DIR_FILE_ID,
-    ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
+    FileStat, FileSystemContext, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID,
+    ROOT_DIR_FILE_ID, ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
 };
 use crate::opened_file::{FileHandle, OpenFileFlags};
 use crate::opened_file_manager::OpenedFileManager;
@@ -47,7 +48,7 @@ pub struct DefaultRawFileSystem<T: PathFileSystem> {
 }
 
 impl<T: PathFileSystem> DefaultRawFileSystem<T> {
-    pub(crate) fn new(fs: T) -> Self {
+    pub(crate) fn new(fs: T, _config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
         Self {
             file_entry_manager: RwLock::new(FileEntryManager::new()),
             opened_file_manager: OpenedFileManager::new(),
@@ -189,8 +190,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         let file_entry = self.get_file_entry(file_id).await?;
         let mut child_filestats = self.fs.read_dir(&file_entry.path).await?;
         for file_stat in child_filestats.iter_mut() {
-            self.resolve_file_id_to_filestat(file_stat, file_stat.file_id)
-                .await;
+            self.resolve_file_id_to_filestat(file_stat, file_id).await;
         }
         Ok(child_filestats)
     }
@@ -280,13 +280,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         file.close().await
     }
 
-    async fn read(
-        &self,
-        _file_id: u64,
-        fh: u64,
-        offset: u64,
-        size: u32,
-    ) -> crate::filesystem::Result<Bytes> {
+    async fn read(&self, _file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
         let (data, file_stat) = {
             let opened_file = self
                 .opened_file_manager
@@ -303,13 +297,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         data
     }
 
-    async fn write(
-        &self,
-        _file_id: u64,
-        fh: u64,
-        offset: u64,
-        data: &[u8],
-    ) -> crate::filesystem::Result<u32> {
+    async fn write(&self, _file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
         let (len, file_stat) = {
             let opened_file = self
                 .opened_file_manager
@@ -405,7 +393,11 @@ mod tests {
     #[tokio::test]
     async fn test_default_raw_file_system() {
         let memory_fs = MemoryFileSystem::new().await;
-        let raw_fs = DefaultRawFileSystem::new(memory_fs);
+        let raw_fs = DefaultRawFileSystem::new(
+            memory_fs,
+            &AppConfig::default(),
+            &FileSystemContext::default(),
+        );
         let _ = raw_fs.init().await;
         let mut tester = TestRawFileSystem::new(raw_fs);
         tester.test_raw_file_system().await;
