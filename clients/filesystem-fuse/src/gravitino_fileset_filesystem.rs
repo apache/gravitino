@@ -49,7 +49,7 @@ impl GravitinoFilesetFileSystem {
     }
 
     fn gvfs_path_to_raw_path(&self, path: &Path) -> PathBuf {
-        let relation_path = path.strip_prefix("/").unwrap();
+        let relation_path = path.strip_prefix("/").expect("path should start with /");
         if relation_path == Path::new("") {
             return self.target_path.clone();
         }
