@@ -18,6 +18,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict
 
+
 class Partition(ABC):
     """
     A partition represents a result of partitioning a table. The partition can be either a

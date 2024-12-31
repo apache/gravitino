@@ -17,7 +17,10 @@
 
 from abc import abstractmethod
 from typing import List, Any
+
 from .partition import Partition
+from ..literals.literal import Literal
+
 
 class IdentityPartition(Partition):
     """
@@ -41,9 +44,9 @@ class IdentityPartition(Partition):
         pass
 
     @abstractmethod
-    def values(self) -> List[Any]:
+    def values(self) -> List[Literal[Any]]:
         """
         Returns:
-            List[Any]: The values of the identity partition.
+            List[Literal[Any]]: The values of the identity partition.
         """
         pass
