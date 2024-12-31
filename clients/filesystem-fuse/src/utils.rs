@@ -16,6 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use crate::error::GvfsError;
+
+pub type GvfsResult<T> = Result<T, GvfsError>;
 
 #[cfg(test)]
 mod tests {}
