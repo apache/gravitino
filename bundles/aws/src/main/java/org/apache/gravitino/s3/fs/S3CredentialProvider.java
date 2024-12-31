@@ -94,7 +94,7 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
       return;
     }
 
-    Credential credential = credentials[0];
+    Credential credential = getCredential(credentials);
     Map<String, String> credentialMap = credential.toProperties();
 
     String accessKeyId = credentialMap.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
@@ -113,5 +113,23 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
     if (expirationTime <= 0) {
       expirationTime = Long.MAX_VALUE;
     }
+  }
+
+  /**
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
+   *
+   * @param credentials The credential array.
+   * @return The credential.
+   */
+  private Credential getCredential(Credential[] credentials) {
+    for (Credential credential : credentials) {
+      if (S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE.equals(credential.credentialType())) {
+        return credential;
+      }
+    }
+
+    // Not found, use the first one.
+    return credentials[0];
   }
 }

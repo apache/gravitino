@@ -106,8 +106,7 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
       return;
     }
 
-    // Use the first one.
-    Credential credential = credentials[0];
+    Credential credential = getCredential(credentials);
     Map<String, String> credentialMap = credential.toProperties();
 
     if (ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE.equals(
@@ -122,5 +121,23 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
     if (expirationTime <= 0) {
       expirationTime = Long.MAX_VALUE;
     }
+  }
+
+  /**
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
+   *
+   * @param credentials The credential array.
+   * @return The credential.
+   */
+  private Credential getCredential(Credential[] credentials) {
+    for (Credential credential : credentials) {
+      if (ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE.equals(credential.credentialType())) {
+        return credential;
+      }
+    }
+
+    // Not found, use the first one.
+    return credentials[0];
   }
 }

@@ -27,6 +27,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -36,11 +37,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -55,6 +58,9 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -93,6 +99,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+
+  private static final Set<String> CATALOG_NECESSARY_PROPERTIES_FOR_CREDENTIAL =
+      Sets.newHashSet(
+          OSSProperties.GRAVITINO_OSS_ENDPOINT,
+          OSSProperties.GRAVITINO_OSS_ENDPOINT,
+          S3Properties.GRAVITINO_S3_ENDPOINT,
+          S3Properties.GRAVITINO_S3_ENDPOINT,
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -412,8 +426,15 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 // https://github.com/apache/gravitino/issues/5609
                 resetFileSystemServiceLoader(scheme);
 
-                Map<String, String> catalogProperty = catalog.properties();
-                Map<String, String> totalProperty = Maps.newHashMap(catalogProperty);
+                Map<String, String> necessaryPropertyFromCatalog =
+                    catalog.properties().entrySet().stream()
+                        .filter(
+                            property ->
+                                CATALOG_NECESSARY_PROPERTIES_FOR_CREDENTIAL.contains(
+                                    property.getKey()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+                Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
 
                 totalProperty.putAll(getConfigMap(getConf()));
                 // If enable the cloud store credential, we should pass the configuration here.
