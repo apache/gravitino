@@ -150,9 +150,8 @@ public class OSSTokenProvider implements CredentialProvider {
             location -> {
               URI uri = URI.create(location);
               allowGetObjectStatementBuilder.addResource(getOssUriWithArn(arnPrefix, uri));
-
               String bucketArn = arnPrefix + getBucketName(uri);
-              // ListBucket
+              // OSS use 'oss:ListObjects' to list objects in a bucket while s3 use 's3:ListBucket'
               bucketListStatementBuilder.computeIfAbsent(
                   bucketArn,
                   key ->
@@ -168,6 +167,7 @@ public class OSSTokenProvider implements CredentialProvider {
                       Statement.builder()
                           .effect(Effect.ALLOW)
                           .addAction("oss:GetBucketLocation")
+                          // OSS Hadoop connector need to get bucket information
                           .addAction("oss:GetBucketInfo")
                           .addResource(key));
             });
