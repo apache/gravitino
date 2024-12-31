@@ -510,7 +510,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
     if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
 
-    // TODO: Add remaining commands to TestableCommandLine
     String model = name.getModelName();
     if (model == null) {
       missingEntities.add(CommandEntities.MODEL);

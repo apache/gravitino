@@ -1,0 +1,6 @@
+Error: Could not find or load main class org.apache.gravitino.server.GravitinoServer
+Caused by: java.lang.ClassNotFoundException: org.apache.gravitino.server.GravitinoServer
+Error: Could not find or load main class org.apache.gravitino.server.GravitinoServer
+Caused by: java.lang.ClassNotFoundException: org.apache.gravitino.server.GravitinoServer
+Error: Could not find or load main class org.apache.gravitino.server.GravitinoServer
+Caused by: java.lang.ClassNotFoundException: org.apache.gravitino.server.GravitinoServer
