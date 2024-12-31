@@ -49,7 +49,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
 public class ModelCatalogOperationsIT extends BaseIT {
 
   private String metalakeName = GravitinoITUtils.genRandomName("model_it_metalake");
