@@ -205,7 +205,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         req.validate()
 
         resp = self.rest_client.put(
-            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}",
             req,
             error_handler=FILESET_ERROR_HANDLER,
         )
@@ -231,7 +231,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         resp = self.rest_client.delete(
-            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}",
             error_handler=FILESET_ERROR_HANDLER,
         )
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
