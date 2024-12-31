@@ -704,7 +704,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (propertySet != null && valueSet != null) {
           newSetTagProperty(url, ignore, metalake, getOneTag(tags), propertySet, valueSet).handle();
         } else if (propertySet == null && valueSet == null) {
+          if (!name.hasName()) {
+            System.err.println(ErrorMessages.MISSING_NAME);
+            Main.exit(-1);
+          }
           newTagEntity(url, ignore, metalake, name, tags).handle();
+        } else {
+          System.err.println("The set command only supports tag properties or attaching tags.");
+          Main.exit(-1);
         }
         break;
 
@@ -718,6 +725,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
           if (propertyRemove != null) {
             newRemoveTagProperty(url, ignore, metalake, getOneTag(tags), propertyRemove).handle();
           } else {
+            if (!name.hasName()) {
+              System.err.println(ErrorMessages.MISSING_NAME);
+              Main.exit(-1);
+            }
             newUntagEntity(url, ignore, metalake, name, tags).handle();
           }
         }
