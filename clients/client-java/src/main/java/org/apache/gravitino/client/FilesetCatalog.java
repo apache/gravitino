@@ -197,7 +197,7 @@ class FilesetCatalog extends BaseSchemaCatalog
 
     FilesetResponse resp =
         restClient.put(
-            formatFilesetRequestPath(fullNamespace) + "/" + ident.name(),
+            formatFilesetRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             req,
             FilesetResponse.class,
             Collections.emptyMap(),
@@ -223,7 +223,7 @@ class FilesetCatalog extends BaseSchemaCatalog
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     DropResponse resp =
         restClient.delete(
-            formatFilesetRequestPath(fullNamespace) + "/" + ident.name(),
+            formatFilesetRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());

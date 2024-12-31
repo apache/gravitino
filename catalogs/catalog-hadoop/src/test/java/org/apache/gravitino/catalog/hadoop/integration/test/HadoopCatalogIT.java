@@ -297,6 +297,13 @@ public class HadoopCatalogIT extends BaseIT {
             () -> metalake.createCatalog(illegalName, Catalog.Type.FILESET, provider, null, null));
     Assertions.assertTrue(exception.getMessage().contains("The catalog name 'ok/test' is illegal"));
 
+    // test rename catalog to illegal name
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> metalake.alterCatalog(catalog.name(), CatalogChange.rename(illegalName)));
+    Assertions.assertTrue(exception.getMessage().contains("The catalog name 'ok/test' is illegal"));
+
     // test illegal schema name
     exception =
         Assertions.assertThrows(
@@ -314,6 +321,17 @@ public class HadoopCatalogIT extends BaseIT {
                 catalog
                     .asFilesetCatalog()
                     .createFileset(nameIdentifier, null, MANAGED, null, null));
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not support '/' in the name for FILESET"));
+
+    // test rename fileset to illegal name
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asFilesetCatalog()
+                    .alterFileset(nameIdentifier, FilesetChange.rename(illegalName)));
     Assertions.assertTrue(
         exception.getMessage().contains("does not support '/' in the name for FILESET"));
   }
