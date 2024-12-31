@@ -258,7 +258,8 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         model_full_ident = self._model_full_identifier(model_ident)
         resp = self.rest_client.get(
-            f"{self._format_model_version_request_path(model_full_ident)}/aliases/{alias}",
+            f"{self._format_model_version_request_path(model_full_ident)}/aliases/"
+            f"{encode_string(alias)}",
             error_handler=MODEL_ERROR_HANDLER,
         )
         model_version_resp = ModelVersionResponse.from_json(
@@ -349,7 +350,8 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         model_full_ident = self._model_full_identifier(model_ident)
         resp = self.rest_client.delete(
-            f"{self._format_model_version_request_path(model_full_ident)}/aliases/{alias}",
+            f"{self._format_model_version_request_path(model_full_ident)}/aliases/"
+            f"{encode_string(alias)}",
             error_handler=MODEL_ERROR_HANDLER,
         )
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
