@@ -41,6 +41,7 @@ pub(crate) enum CreateFileSystemResult {
     None,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum FileSystemSchema {
     S3,
 }

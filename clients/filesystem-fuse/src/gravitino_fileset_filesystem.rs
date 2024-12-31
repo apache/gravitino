@@ -30,6 +30,8 @@ use std::path::{Path, PathBuf};
 pub(crate) struct GravitinoFilesetFileSystem {
     physical_fs: Box<dyn PathFileSystem>,
     client: GravitinoClient,
+    // target_path is a absolute path in the physical filesystem that is associated with the fileset.
+    // e.g. fileset location : s3://bucket/path/to/file the target_path is /path/to/file
     target_path: PathBuf,
 }
 

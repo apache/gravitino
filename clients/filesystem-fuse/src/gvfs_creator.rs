@@ -146,6 +146,7 @@ pub fn extract_filesystem_scheme(path: &str) -> GvfsResult<FileSystemSchema> {
 #[cfg(test)]
 mod tests {
     use crate::gvfs_creator::extract_fileset;
+    use crate::gvfs_fuse::FileSystemSchema;
 
     #[test]
     fn test_extract_fileset() {
@@ -154,5 +155,12 @@ mod tests {
         assert_eq!(catalog, "c1");
         assert_eq!(schema, "s1");
         assert_eq!(fileset, "fileset1");
+    }
+
+    #[test]
+    fn test_extract_schema() {
+        let location = "s3://bucket/path/to/file";
+        let schema = super::extract_filesystem_scheme(location).unwrap();
+        assert_eq!(schema, FileSystemSchema::S3);
     }
 }
