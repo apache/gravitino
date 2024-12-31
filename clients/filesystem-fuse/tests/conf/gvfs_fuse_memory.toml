@@ -36,5 +36,5 @@ metalake = "test"
 
 # extend settings
 [extend_config]
-access_key = "XXX_access_key"
-secret_key = "XXX_secret_key"
+access_key_id = "XXX_access_key"
+secret_access_key = "XXX_secret_key"
