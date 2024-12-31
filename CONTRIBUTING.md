@@ -27,7 +27,7 @@ To ensure a smooth and productive collaboration, please take a moment to review 
 
 - [Getting Started](#getting-started)
   - [Fork the Repository](#fork-the-repository)
-  - [Development Set tup](#development-setup)
+  - [Development Setup](#development-setup)
   - [Using IntelliJ (Optional)](#using-intellij-optional)
   - [Using VS Code (Optional)](#using-vs-code-optional)
   - [Handling Memory Issues in WSL](#handling-memory-issues-in-wsl)
