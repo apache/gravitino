@@ -56,7 +56,7 @@ impl S3FileSystem {
         let region = extract_region(endpoint)?;
         opendal_config.insert("region".to_string(), region);
 
-        let builder = S3::from_map(opendal_config.clone());
+        let builder = S3::from_map(opendal_config);
 
         let op = Operator::new(builder);
         if let Err(e) = op {
@@ -153,6 +153,9 @@ pub(crate) fn extract_region(location: &str) -> GvfsResult<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::default_raw_filesystem::DefaultRawFileSystem;
+    use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
+    use crate::filesystem::RawFileSystem;
 
     #[test]
     fn test_extract_bucket() {
@@ -168,5 +171,45 @@ mod tests {
         let result = extract_region(location);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "ap-southeast-2");
+    }
+
+    fn create_s3_fs() -> S3FileSystem {
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
+        let opendal_config = config.extend_config.clone();
+
+        let fs_context = FileSystemContext::default();
+
+        let builder = S3::from_map(opendal_config);
+        let op = Operator::new(builder).expect("opendal create failed");
+        let op = op.layer(LoggingLayer::default()).finish();
+        let opend_dal_fs = OpenDalFileSystem::new(op, &config, &fs_context);
+        S3FileSystem {
+            open_dal_fs: opend_dal_fs,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_s3_file_system() {
+        if std::env::var("RUN_S3_TESTS").is_err() {
+            return;
+        }
+        let fs = create_s3_fs();
+        let _ = fs.init().await;
+        let mut tester = TestPathFileSystem::new(fs);
+        tester.test_path_file_system().await;
+    }
+
+    #[tokio::test]
+    async fn test_s3_file_system_with_raw_file_system() {
+        if std::env::var("RUN_S3_TESTS").is_err() {
+            return;
+        }
+
+        let s3_fs = create_s3_fs();
+        let raw_fs =
+            DefaultRawFileSystem::new(s3_fs, &AppConfig::default(), &FileSystemContext::default());
+        let _ = raw_fs.init().await;
+        let mut tester = TestRawFileSystem::new(raw_fs);
+        tester.test_raw_file_system().await;
     }
 }
