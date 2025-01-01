@@ -50,10 +50,10 @@ public class MetadataObjectService {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
     }
 
-    List<String> names = DOT_SPLITTER.splitToList(fullName);
     if (type == MetadataObject.Type.ROLE) {
       return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, fullName);
     }
+    List<String> names = DOT_SPLITTER.splitToList(fullName);
 
     long catalogId =
         CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
