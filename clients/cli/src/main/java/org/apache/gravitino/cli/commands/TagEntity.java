@@ -34,7 +34,6 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.rel.Table;
 
 public class TagEntity extends Command {
-  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
   protected final String metalake;
   protected final FullName name;
   protected final String[] tags;
