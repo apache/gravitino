@@ -52,7 +52,7 @@ public class MetadataObjectService {
 
     List<String> names = DOT_SPLITTER.splitToList(fullName);
     if (type == MetadataObject.Type.ROLE) {
-      return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, names.get(0));
+      return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, fullName);
     }
 
     long catalogId =
