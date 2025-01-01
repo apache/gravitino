@@ -71,11 +71,11 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 
 #### S3 fileset
 
-| Configuration item             | Description                                                                                                                                                                            | Default value | Required                 | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------|------------------|
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                            | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| Configuration item     | Description                   | Default value | Required                  | Since version    |
+|------------------------|-------------------------------|---------------|---------------------------|------------------|
+| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
 At the same time, you need to add the corresponding bundle jar
 1. [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if no hadoop environment is available, or
@@ -84,9 +84,9 @@ At the same time, you need to add the corresponding bundle jar
 
 #### GCS fileset
 
-| Configuration item             | Description                                                                                                                                                                              | Default value | Required                  | Since version    |
-|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
+| Configuration item         | Description                                | Default value | Required                   | Since version    |
+|----------------------------|--------------------------------------------|---------------|----------------------------|------------------|
+| `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes if it's a GCS fileset. | 0.7.0-incubating |
 
 In the meantime, you need to add the corresponding bundle jar
 1. [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if no hadoop environment is available, or
