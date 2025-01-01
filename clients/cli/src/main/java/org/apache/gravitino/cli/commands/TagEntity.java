@@ -97,9 +97,8 @@ public class TagEntity extends Command {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
       exitWithError(ErrorMessages.UNKNOWN_TABLE);
-    } catch (TagAlreadyAssociatedException tagAlreadyAssociatedException) {
-      exitWithError(
-          "[" + COMMA_JOINER.join(tags) + "]" + " are already associated with " + name.getName());
+    } catch (TagAlreadyAssociatedException err) {
+      exitWithError("Tags are already associated with " + name.getName());
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
