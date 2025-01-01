@@ -28,6 +28,10 @@ public class Indexes {
   public static final String DEFAULT_MYSQL_PRIMARY_KEY_NAME = "PRIMARY";
 
   /**
+   * ClickHouse does not support setting the name of the primary key, so the default name is used.
+   */
+  public static final String DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME = "PRIMARY";
+  /**
    * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
    *
    * @param name The name of the index
