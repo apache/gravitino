@@ -68,8 +68,7 @@ public class RangerAuthorizationHDFSPluginIT {
     MetadataObject schema =
         MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
-        PathBasedMetadataObject.Type.PATH,
-        rangerAuthPlugin.translateMetadataObject(schema).type());
+        PathBasedMetadataObject.Type.PATH, rangerAuthPlugin.translateMetadataObject(schema).type());
 
     MetadataObject table =
         MetadataObjects.parse(String.format("catalog1.schema1.tab1"), MetadataObject.Type.TABLE);
