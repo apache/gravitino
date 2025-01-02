@@ -143,7 +143,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
                 catalog.asSchemas().dropSchema(schema, false);
               }));
 
-      // This code will call the catalog metadata object remove privileges
+      // The `dropCatalog` call will invoke the catalog metadata object to remove privileges
       Arrays.stream(metalake.listCatalogs())
           .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
       client.disableMetalake(metalakeName);
