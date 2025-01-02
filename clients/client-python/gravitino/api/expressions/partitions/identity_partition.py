@@ -33,6 +33,8 @@ class IdentityPartition(Partition):
 
     its partition name is "dt=2008-08-08/country=us", field names are [["dt"], ["country"]] and
     values are ["2008-08-08", "us"].
+
+    APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod

@@ -34,6 +34,8 @@ class ListPartition(Partition):
     ```
 
     its name is "p202204_California" and lists are [["2022-04-01","Los Angeles"], ["2022-04-01", "San Francisco"]].
+
+    APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod

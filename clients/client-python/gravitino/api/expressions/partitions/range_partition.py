@@ -31,6 +31,8 @@ class RangePartition(Partition):
     ```
 
     its upper bound is "2020-03-22" and its lower bound is null.
+
+    APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod
