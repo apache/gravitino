@@ -54,6 +54,7 @@ dependencies {
     exclude("org.fusesource.leveldbjni")
   }
   implementation(libs.slf4j.api)
+  implementation(libs.awaitility)
 
   compileOnly(libs.guava)
 
