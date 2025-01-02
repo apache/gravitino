@@ -15,12 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 import unittest
-from datetime import date, time, datetime
-from decimal import Decimal
+from datetime import date
 
 from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.partitions.partitions import Partitions
-from gravitino.api.types.types import Types
 
 
 class TestPartitions(unittest.TestCase):
