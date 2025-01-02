@@ -29,6 +29,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -257,30 +258,18 @@ public class AuthorizationUtils {
     }
   }
 
-  public static Runnable createRemovePrivilegesCallback(
-      NameIdentifier ident, Entity.EntityType type) {
+  public static void removeCatalogPrivileges(Catalog catalog) {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
-      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
-      MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject);
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, catalog.name(), MetadataObject.Type.CATALOG);
+    MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject);
 
-      String metalake =
-          type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
-
-      List<Catalog> catalogs = loadMetadataObjectCatalog(metalake, metadataObject);
-
-      return () -> {
-        for (Catalog catalog : catalogs) {
-          callAuthorizationPluginImpl(
-              authorizationPlugin -> {
-                authorizationPlugin.onMetadataUpdated(removeObject);
-              },
-              catalog);
-        }
-      };
-    }
-    return null;
+    callAuthorizationPluginImpl(
+        authorizationPlugin -> {
+          authorizationPlugin.onMetadataUpdated(removeObject);
+        },
+        catalog);
   }
 
   public static void authorizationPluginRenamePrivileges(

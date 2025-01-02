@@ -128,16 +128,15 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       throws NonEmptyEntityException, CatalogInUseException {
     // If we call the authorization plugin after dropping catalog, we can't load the plugin of the
     // catalog
-    Runnable removePrivilegesCallback = null;
+    Catalog catalog = null;
     if (dispatcher.catalogExists(ident)) {
-      removePrivilegesCallback =
-          AuthorizationUtils.createRemovePrivilegesCallback(ident, Entity.EntityType.CATALOG);
+      catalog = dispatcher.loadCatalog(ident);
     }
 
     boolean dropped = dispatcher.dropCatalog(ident, force);
 
-    if (dropped && removePrivilegesCallback != null) {
-      removePrivilegesCallback.run();
+    if (dropped && catalog != null) {
+      AuthorizationUtils.removeCatalogPrivileges(catalog);
     }
     return dropped;
   }
