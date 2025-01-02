@@ -8,9 +8,9 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Model catalog is a metadata catalog that offers the unified interfaces to manage the metadata of
+A Model catalog is a metadata catalog that provides the unified interface to manage the metadata of
 machine learning models in a centralized way. It follows the typical Gravitino 3-level namespace
-(catalog, schema, and model) to manage the ML models metadata. In additional, it supports
+(catalog, schema, and model) to manage the ML models metadata. In addition, it supports
 managing the versions for each model.
 
 The advantages of using model catalog are:
@@ -26,19 +26,19 @@ relation between the model name and the storage path. In the meantime, with the 
 extensible properties of model metadata, users can define the model metadata with more detailed information
 rather than just the storage path.
 
-* **Model**: The model is a metadata defined in the model catalog, to manage the ML models. Each
+* **Model**: A model is a metadata object defined in the model catalog, to manage a ML model. Each
   model can have many **Model Versions**, and each version can have its own properties. Models
   can be retrieved by the name.
-* **Model Version**: The model version is a metadata defined in the model catalog, to manage each
+* **ModelVersion**: The model version is a metadata defined in the model catalog, to manage each
   version of the ML model. Each version has a unique version number, and can have its own
-  properties and storage path. Model version can be retrieved by the model name and version
+  properties and storage path. ModelVersion can be retrieved by the model name and version
   number. Also, each version can have a list of aliases, which can also be used to retrieve.
 
 ## Catalog
 
 ### Catalog properties
 
-Model catalog doesn't have specific properties. It uses the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration).
+A Model catalog doesn't have specific properties. It uses the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration).
 
 ### Catalog operations
 
@@ -72,16 +72,16 @@ Model doesn't have predefined properties. Users can define the properties for ea
 
 Refer to [Model operation](./manage-model-metadata-using-gravitino.md#model-operations) for more details.
 
-## Model version
+## ModelVersion
 
-### Model version capabilities
+### ModelVersion capabilities
 
 The Model catalog supports linking, listing and deleting model versions.
 
-### Model version properties
+### ModelVersion properties
 
-Model version doesn't have predefined properties. Users can define the properties for each model version.
+ModelVersion doesn't have predefined properties. Users can define the properties for each version.
 
-### Model version operations
+### ModelVersion operations
 
-Refer to [Model version operation](./manage-model-metadata-using-gravitino.md#model-version-operations) for more details.
+Refer to [ModelVersion operation](./manage-model-metadata-using-gravitino.md#model-version-operations) for more details.
