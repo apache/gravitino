@@ -127,6 +127,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            request.validate();
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
               MetadataObject metadataObject =
