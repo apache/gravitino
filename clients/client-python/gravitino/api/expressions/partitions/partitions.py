@@ -16,7 +16,6 @@
 # under the License.
 
 from typing import List, Dict, Any, Optional
-from abc import ABC, abstractmethod
 
 from gravitino.api.expressions.literals.literal import Literal
 from gravitino.api.expressions.partitions.identity_partition import IdentityPartition
@@ -57,8 +56,8 @@ class Partitions:
     @staticmethod
     def list(
         name: str,
-        lists: List[List[Literal]],
-        properties: Optional[Dict[str, str]] = None,
+        lists: List[List[Literal[Any]]],
+        properties: Optional[Dict[str, str]],
     ) -> ListPartition:
         """
         Creates a list partition.
@@ -77,7 +76,7 @@ class Partitions:
     def identity(
         name: Optional[str],
         field_names: List[List[str]],
-        values: List[Literal],
+        values: List[Literal[Any]],
         properties: Optional[Dict[str, str]] = None,
     ) -> IdentityPartition:
         """
@@ -98,11 +97,15 @@ class Partitions:
 
 
 class RangePartitionImpl(RangePartition):
+    """
+    Represents a result of range partitioning.
+    """
+
     def __init__(
         self,
         name: str,
-        upper: Literal,
-        lower: Literal,
+        upper: Literal[Any],
+        lower: Literal[Any],
         properties: Optional[Dict[str, str]],
     ):
         self._name = name
@@ -110,18 +113,18 @@ class RangePartitionImpl(RangePartition):
         self._lower = lower
         self._properties = properties
 
-    def upper(self) -> Literal:
+    def upper(self) -> Literal[Any]:
         """Returns the upper bound of the partition."""
         return self._upper
 
-    def lower(self) -> Literal:
+    def lower(self) -> Literal[Any]:
         """Returns the lower bound of the partition."""
         return self._lower
 
     def name(self) -> str:
         return self._name
 
-    def properties(self) -> Optional[Dict[str, str]]:
+    def properties(self) -> Dict[str, str]:
         return self._properties
 
     def __eq__(self, other: Any) -> bool:
@@ -144,14 +147,14 @@ class ListPartitionImpl(ListPartition):
     def __init__(
         self,
         name: str,
-        lists: List[List[Literal]],
+        lists: List[List[Literal[Any]]],
         properties: Optional[Dict[str, str]],
     ):
         self._name = name
         self._lists = lists
         self._properties = properties
 
-    def lists(self) -> List[List[Literal]]:
+    def lists(self) -> List[List[Literal[Any]]]:
         """Returns the values of the list partition."""
         return self._lists
 
@@ -183,9 +186,9 @@ class ListPartitionImpl(ListPartition):
 class IdentityPartitionImpl(IdentityPartition):
     def __init__(
         self,
-        name: Optional[str],
+        name: str,
         field_names: List[List[str]],
-        values: List[Literal],
+        values: List[Literal[Any]],
         properties: Dict[str, str],
     ):
         self._name = name
@@ -197,7 +200,7 @@ class IdentityPartitionImpl(IdentityPartition):
         """Returns the field names of the identity partition."""
         return self._field_names
 
-    def values(self) -> List[Literal]:
+    def values(self) -> List[Literal[Any]]:
         """Returns the values of the identity partition."""
         return self._values
 

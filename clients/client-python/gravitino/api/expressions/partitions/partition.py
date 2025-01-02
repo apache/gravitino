@@ -23,6 +23,8 @@ class Partition(ABC):
     """
     A partition represents a result of partitioning a table. The partition can be either a
     `IdentityPartition`, `ListPartition`, or `RangePartition`. It depends on the `Table.partitioning()`.
+
+    APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod
