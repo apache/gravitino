@@ -67,7 +67,10 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if os.environ.get("START_EXTERNAL_GRAVITINO") is not None:
+        if (
+            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
+            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
+        ):
             # Maybe Gravitino server already startup by Gradle test command or developer manual startup.
             if not check_gravitino_server_status():
                 logger.error("ERROR: Can't find online Gravitino server!")
@@ -112,7 +115,10 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if os.environ.get("START_EXTERNAL_GRAVITINO") is not None:
+        if (
+            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
+            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
+        ):
             return
 
         logger.info("Stop integration test environment...")

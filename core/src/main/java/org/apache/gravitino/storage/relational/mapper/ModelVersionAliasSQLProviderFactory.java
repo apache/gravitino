@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionAliasRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.ModelVersionAliasRelH2SQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.ModelVersionAliasRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -32,13 +33,11 @@ public class ModelVersionAliasSQLProviderFactory {
 
   static class ModelVersionAliasRelMySQLProvider extends ModelVersionAliasRelBaseSQLProvider {}
 
-  static class ModelVersionAliasRelH2Provider extends ModelVersionAliasRelBaseSQLProvider {}
-
   private static final Map<JDBCBackendType, ModelVersionAliasRelBaseSQLProvider>
       MODEL_VERSION_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new ModelVersionAliasRelMySQLProvider(),
-              JDBCBackendType.H2, new ModelVersionAliasRelH2Provider(),
+              JDBCBackendType.H2, new ModelVersionAliasRelH2SQLProvider(),
               JDBCBackendType.POSTGRESQL, new ModelVersionAliasRelPostgreSQLProvider());
 
   public static ModelVersionAliasRelBaseSQLProvider getProvider() {

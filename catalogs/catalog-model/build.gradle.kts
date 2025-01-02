@@ -29,17 +29,15 @@ dependencies {
     exclude(group = "*")
   }
 
-  implementation(project(":core")) {
+  implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
   implementation(project(":common")) {
     exclude(group = "*")
   }
-
-  implementation(project(":catalogs:catalog-common")) {
+  implementation(project(":core")) {
     exclude(group = "*")
   }
-
   implementation(libs.guava)
   implementation(libs.slf4j.api)
 
@@ -47,14 +45,17 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.io)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -68,8 +69,9 @@ tasks {
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
     from("build/libs") {
-      exclude("slf4j-*.jar")
       exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/model/libs")
   }

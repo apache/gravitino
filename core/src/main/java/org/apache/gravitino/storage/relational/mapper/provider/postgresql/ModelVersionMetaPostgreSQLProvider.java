@@ -47,7 +47,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
-        + " WHERE model_id = #{modelId} AND version = #{version} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
   }
 
   @Override
