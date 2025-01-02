@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
