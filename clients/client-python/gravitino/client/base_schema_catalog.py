@@ -227,7 +227,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
 
     @staticmethod
     def format_schema_request_path(ns: Namespace):
-        return "api/metalakes/" + ns.level(0) + "/catalogs/" + ns.level(1) + "/schemas"
+        return (
+            "api/metalakes/"
+            + encode_string(ns.level(0))
+            + "/catalogs/"
+            + encode_string(ns.level(1))
+            + "/schemas"
+        )
 
     @staticmethod
     def to_schema_update_request(change: SchemaChange):

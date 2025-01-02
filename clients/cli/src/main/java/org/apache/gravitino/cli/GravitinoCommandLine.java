@@ -152,6 +152,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleTagCommand();
     } else if (entity.equals(CommandEntities.ROLE)) {
       handleRoleCommand();
+    } else if (entity.equals(CommandEntities.MODEL)) {
+      handleModelCommand();
     }
   }
 
@@ -667,7 +669,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (propertySet != null && valueSet != null) {
           newSetTagProperty(url, ignore, metalake, getOneTag(tags), propertySet, valueSet).handle();
         } else if (propertySet == null && valueSet == null) {
+          if (!name.hasName()) {
+            System.err.println(ErrorMessages.MISSING_NAME);
+            Main.exit(-1);
+          }
           newTagEntity(url, ignore, metalake, name, tags).handle();
+        } else {
+          System.err.println("The set command only supports tag properties or attaching tags.");
+          Main.exit(-1);
         }
         break;
 
@@ -681,6 +690,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
           if (propertyRemove != null) {
             newRemoveTagProperty(url, ignore, metalake, getOneTag(tags), propertyRemove).handle();
           } else {
+            if (!name.hasName()) {
+              System.err.println(ErrorMessages.MISSING_NAME);
+              Main.exit(-1);
+            }
             newUntagEntity(url, ignore, metalake, name, tags).handle();
           }
         }
@@ -1132,6 +1145,43 @@ public class GravitinoCommandLine extends TestableCommandLine {
           }
           break;
         }
+
+      default:
+        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
+        break;
+    }
+  }
+
+  private void handleModelCommand() {
+    String url = getUrl();
+    String auth = getAuth();
+    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+
+    Command.setAuthenticationMode(auth, userName);
+
+    List<String> missingEntities = Lists.newArrayList();
+    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
+    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
+
+    // Handle CommandActions.LIST action separately as it doesn't require the `model`
+    if (CommandActions.LIST.equals(command)) {
+      checkEntities(missingEntities);
+      newListModel(url, ignore, metalake, catalog, schema).handle();
+      return;
+    }
+
+    String model = name.getModelName();
+    if (model == null) missingEntities.add(CommandEntities.MODEL);
+    checkEntities(missingEntities);
+
+    switch (command) {
+      case CommandActions.DETAILS:
+        newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
+        break;
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);

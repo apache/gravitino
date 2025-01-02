@@ -50,6 +50,7 @@ import software.amazon.awssdk.services.sts.model.Credentials;
 
 /** Generates S3 token to access S3 data. */
 public class S3TokenProvider implements CredentialProvider {
+
   private StsClient stsClient;
   private String roleArn;
   private String externalID;

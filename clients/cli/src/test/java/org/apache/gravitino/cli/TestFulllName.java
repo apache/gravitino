@@ -112,6 +112,21 @@ public class TestFulllName {
   }
 
   @Test
+  public void hasPartName() throws ParseException {
+    String[] argsWithoutName = {"catalog", "details", "--metalake", "metalake"};
+    CommandLine commandLineWithoutName = new DefaultParser().parse(options, argsWithoutName);
+    FullName fullNameWithoutName = new FullName(commandLineWithoutName);
+    assertFalse(fullNameWithoutName.hasName());
+
+    String[] argsWithName = {
+      "catalog", "details", "--metalake", "metalake", "--name", "Hive_catalog"
+    };
+    CommandLine commandLineWithName = new DefaultParser().parse(options, argsWithName);
+    FullName fullNameWithName = new FullName(commandLineWithName);
+    assertTrue(fullNameWithName.hasName());
+  }
+
+  @Test
   public void hasPartNameMetalake() throws Exception {
     String[] args = {"metalake", "details", "--metalake", "metalake"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
@@ -196,5 +211,29 @@ public class TestFulllName {
     fullName.getColumnName();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.MALFORMED_NAME);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalake() throws ParseException {
+    String[] args = {
+      "table", "list", "-i", "-m", "demo_metalake", "--name", "Hive_catalog.default"
+    };
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    String metalakeName = fullName.getMetalakeName();
+    assertEquals(metalakeName, "demo_metalake");
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalakeWithoutMetalakeOption() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    String metalakeName = fullName.getMetalakeName();
+    assertNull(metalakeName);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(errOutput, ErrorMessages.MISSING_METALAKE);
   }
 }
