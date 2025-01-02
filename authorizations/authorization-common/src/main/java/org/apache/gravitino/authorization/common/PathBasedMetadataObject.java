@@ -33,7 +33,6 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
   public enum Type implements AuthorizationMetadataObject.Type {
     /** A path is mapped the path of storages like HDFS, S3 etc. */
     PATH(MetadataObject.Type.FILESET);
-
     private final MetadataObject.Type metadataType;
 
     Type(MetadataObject.Type type) {
