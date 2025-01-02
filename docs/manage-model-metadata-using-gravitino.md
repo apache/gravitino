@@ -11,14 +11,14 @@ import TabItem from '@theme/TabItem';
 
 This page introduces how to manage model metadata in Apache Gravitino. Gravitino model catalog
 is a kind of model registry, which provides the ability to manage machine learning models'
-versioning metadata. It follows the typical Gravitino 3-level namespace (catalog, schema, and
+versioned metadata. It follows the typical Gravitino 3-level namespace (catalog, schema, and
 model) and supports managing the versions for each model.
 
 Currently, it supports model and model version registering, listing, loading, and deleting.
 
-To use model catalog, please make sure that:
+To use the model catalog, please make sure that:
 
- - Gravitino server has started, and assume the host and port [http://localhost:8090](http://localhost:8090).
+ - The Gravitino server has started, and is serving at, e.g. [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)
 
 ## Catalog operations
@@ -380,18 +380,18 @@ model_list = catalog.as_model_catalog().list_models(namespace=Namespace.of("mode
 </TabItem>
 </Tabs>
 
-## Model version operations
+## ModelVersion operations
 
 :::tip
  - Users should create a metalake, a catalog, a schema, and a model before link a model version
    to the model.
 :::
 
-### Link a model version
+### Link a ModelVersion
 
-You can link a model version by sending a `POST` request to the `/api/metalakes/{metalake_name}
+You can link a ModelVersion by sending a `POST` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or by using
-the Gravitino Java/Python client. The following is an example of linking a model version:
+the Gravitino Java/Python client. The following is an example of linking a ModelVersion:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -439,14 +439,14 @@ catalog.as_model_catalog().link_model_version(model_ident=NameIdentifier.of("mod
 </TabItem>
 </Tabs>
 
-The comment and properties of model version can be different from the model.
+The comment and properties of ModelVersion can be different from the model.
 
-### Get a model version
+### Get a ModelVersion
 
-You can get a model version by sending a `GET` request to the `/api/metalakes/{metalake_name}
+You can get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
-a model version:
+a ModelVersion:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -480,11 +480,11 @@ catalog.as_model_catalog().get_model_version(model_ident=NameIdentifier.of("mode
 </TabItem>
 </Tabs>
 
-### Get a model version by alias
+### Get a ModelVersion by alias
 
-You can also get a model version by sending a `GET` request to the `/api/metalakes/{metalake_name}
+You can also get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
-by using the Gravitino Java/Python client. The following is an example of getting a model version
+by using the Gravitino Java/Python client. The following is an example of getting a ModelVersion
 by alias:
 
 <Tabs groupId="language" queryString>
@@ -519,12 +519,12 @@ model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_al
 </TabItem>
 </Tabs>
 
-### Delete a model version
+### Delete a ModelVersion
 
-You can delete a model version by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
+You can delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of deleting
-a model version:
+a ModelVersion:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -558,11 +558,11 @@ catalog.as_model_catalog().delete_model_version(model_ident=NameIdentifier.of("m
 </TabItem>
 </Tabs>
 
-### Delete a model version by alias
+### Delete a ModelVersion by alias
 
-You can also delete a model version by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
-by using the Gravitino Java/Python client. The following is an example of deleting a model version
+You can also delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/
+{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
+by using the Gravitino Java/Python client. The following is an example of deleting a ModelVersion
 by alias:
 
 <Tabs groupId="language" queryString>
@@ -597,12 +597,12 @@ catalog.as_model_catalog().delete_model_version_by_alias(model_ident=NameIdentif
 </TabItem>
 </Tabs>
 
-### List model versions
+### List ModelVersions
 
-You can list all the model versions in a model by sending a `GET` request to the `/api/metalakes/
+You can list all the ModelVersions in a model by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions` endpoint
-or by using the Gravitino Java/Python client. The following is an example of listing all the model
-versions in a model:
+or by using the Gravitino Java/Python client. The following is an example of listing all the 
+ModelVersions in a model:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
