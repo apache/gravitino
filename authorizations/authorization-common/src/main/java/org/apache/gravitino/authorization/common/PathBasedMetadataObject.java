@@ -32,7 +32,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
    */
   public enum Type implements AuthorizationMetadataObject.Type {
     /** A path is mapped the path of storages like HDFS, S3 etc. */
-    FILESET(MetadataObject.Type.FILESET);
+    PATH(MetadataObject.Type.FILESET);
 
     private final MetadataObject.Type metadataType;
 
@@ -88,7 +88,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         type != null, "Cannot create a path based metadata object with no type");
 
     Preconditions.checkArgument(
-        type == PathBasedMetadataObject.Type.FILESET, "it must be the PATH type");
+        type == PathBasedMetadataObject.Type.PATH, "it must be the PATH type");
 
     for (String name : names) {
       Preconditions.checkArgument(
