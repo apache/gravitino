@@ -302,7 +302,7 @@ mod test {
 
     #[test]
     fn test_config_from_file() {
-        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_test.toml")).unwrap();
+        let config = AppConfig::from_file(Some("tests/conf/config_test.toml")).unwrap();
         assert_eq!(config.fuse.file_mask, 0o644);
         assert_eq!(config.fuse.dir_mask, 0o755);
         assert_eq!(config.filesystem.block_size, 8192);
