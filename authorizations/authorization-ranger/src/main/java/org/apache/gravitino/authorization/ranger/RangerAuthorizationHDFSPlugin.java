@@ -193,11 +193,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                         if (locationPath != null && !locationPath.isEmpty()) {
                           PathBasedMetadataObject rangerPathBaseMetadataObject =
                               new PathBasedMetadataObject(
-                                  locationPath, PathBasedMetadataObject.Type.FILESET_PATH);
+                                  locationPath, PathBasedMetadataObject.Type.FILESET);
                           rangerSecurableObjects.add(
                               generateAuthorizationSecurableObject(
                                   rangerPathBaseMetadataObject.names(),
-                                  PathBasedMetadataObject.Type.FILESET_PATH,
+                                  PathBasedMetadataObject.Type.FILESET,
                                   rangerPrivileges));
                         }
                       }
@@ -206,7 +206,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               translateMetadataObject(securableObject).names(),
-                              PathBasedMetadataObject.Type.FILESET_PATH,
+                              PathBasedMetadataObject.Type.FILESET,
                               rangerPrivileges));
                       break;
                     default:
@@ -234,7 +234,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               translateMetadataObject(securableObject).names(),
-                              PathBasedMetadataObject.Type.FILESET_PATH,
+                              PathBasedMetadataObject.Type.FILESET,
                               rangerPrivileges));
                       break;
                     default:
@@ -265,7 +265,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 translateMetadataObject(gravitinoMetadataObject).names(),
-                PathBasedMetadataObject.Type.FILESET_PATH,
+                PathBasedMetadataObject.Type.FILESET,
                 ownerMappingRule()));
         break;
       default:
@@ -294,17 +294,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       case METALAKE:
       case CATALOG:
         rangerPathBaseMetadataObject =
-            new PathBasedMetadataObject("", PathBasedMetadataObject.Type.FILESET_PATH);
+            new PathBasedMetadataObject("", PathBasedMetadataObject.Type.FILESET);
         break;
       case SCHEMA:
         rangerPathBaseMetadataObject =
             new PathBasedMetadataObject(
-                metadataObject.fullName(), PathBasedMetadataObject.Type.FILESET_PATH);
+                metadataObject.fullName(), PathBasedMetadataObject.Type.FILESET);
         break;
       case FILESET:
         rangerPathBaseMetadataObject =
             new PathBasedMetadataObject(
-                getLocationPath(metadataObject), PathBasedMetadataObject.Type.FILESET_PATH);
+                getLocationPath(metadataObject), PathBasedMetadataObject.Type.FILESET);
         break;
       default:
         throw new AuthorizationPluginException(
