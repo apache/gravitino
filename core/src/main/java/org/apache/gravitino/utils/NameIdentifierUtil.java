@@ -266,6 +266,33 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Try to get the schema {@link NameIdentifier} from the given {@link NameIdentifier}.
+   *
+   * @param ident The {@link NameIdentifier} to check.
+   * @return The schema {@link NameIdentifier}
+   * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
+   *     schema name
+   */
+  public static NameIdentifier getSchemaIdentifier(NameIdentifier ident)
+      throws IllegalNameIdentifierException {
+    NameIdentifier.check(
+        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+    Namespace.check(
+        ident.namespace() != null && !ident.namespace().isEmpty(),
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 3) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a schema NameIdentifier less than three elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2));
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a metalake identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
