@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -38,9 +37,9 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -50,9 +49,9 @@ import org.junit.jupiter.api.Test;
 
 public class ModelCatalogOperationsIT extends BaseIT {
 
-  private String metalakeName = GravitinoITUtils.genRandomName("model_it_metalake");
-  private String catalogName = GravitinoITUtils.genRandomName("model_it_catalog");
-  private String schemaName = GravitinoITUtils.genRandomName("model_it_schema");
+  private final String metalakeName = RandomNameUtils.genRandomName("model_it_metalake");
+  private final String catalogName = RandomNameUtils.genRandomName("model_it_catalog");
+  private final String schemaName = RandomNameUtils.genRandomName("model_it_schema");
 
   private GravitinoMetalake gravitinoMetalake;
   private Catalog gravitinoCatalog;
@@ -81,7 +80,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   @Test
   public void testRegisterAndGetModel() {
-    String modelName = genRandomName("model");
+    String modelName = RandomNameUtils.genRandomName("model1");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     String comment = "comment";
     Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
@@ -127,8 +126,8 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   @Test
   public void testRegisterAndListModels() {
-    String modelName1 = genRandomName("model1");
-    String modelName2 = genRandomName("model2");
+    String modelName1 = RandomNameUtils.genRandomName("model1");
+    String modelName2 = RandomNameUtils.genRandomName("model2");
     NameIdentifier modelIdent1 = NameIdentifier.of(schemaName, modelName1);
     NameIdentifier modelIdent2 = NameIdentifier.of(schemaName, modelName2);
 
@@ -165,7 +164,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   @Test
   public void testRegisterAndDeleteModel() {
-    String modelName = genRandomName("model1");
+    String modelName = RandomNameUtils.genRandomName("model1");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
 
@@ -184,7 +183,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   @Test
   public void testLinkAndGerModelVersion() {
-    String modelName = genRandomName("model1");
+    String modelName = RandomNameUtils.genRandomName("model1");
     Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
@@ -245,7 +244,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   @Test
   public void testLinkAndDeleteModelVersions() {
-    String modelName = genRandomName("model1");
+    String modelName = RandomNameUtils.genRandomName("model1");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
 
@@ -284,7 +283,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   @Test
   public void testLinkAndListModelVersions() {
-    String modelName = genRandomName("model1");
+    String modelName = RandomNameUtils.genRandomName("model1");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
 
@@ -361,9 +360,5 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   private void dropSchema() {
     gravitinoCatalog.asSchemas().dropSchema(schemaName, true);
-  }
-
-  private String genRandomName(String prefix) {
-    return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
   }
 }
