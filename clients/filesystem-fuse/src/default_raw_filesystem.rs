@@ -317,6 +317,15 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(())
     }
 
+    async fn flush_file(&self, _file_id: u64, fh: u64) -> Result<()> {
+        let opened_file = self
+            .opened_file_manager
+            .get(fh)
+            .ok_or(Errno::from(libc::EBADF))?;
+        let mut file = opened_file.lock().await;
+        file.flush().await
+    }
+
     async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
         let opened_file = self
             .opened_file_manager

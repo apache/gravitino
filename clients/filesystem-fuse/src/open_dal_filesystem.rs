@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
-use log::{debug, error};
+use log::error;
 use opendal::{EntryMode, ErrorKind, Metadata, Operator};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -68,7 +68,7 @@ impl PathFileSystem for OpenDalFileSystem {
             Ok(meta) => meta,
             Err(err) => {
                 if err.kind() == ErrorKind::NotFound {
-                    let dir_name = format!("{}/", file_name);
+                    let dir_name = build_dir_path(path);
                     self.op
                         .stat(&dir_name)
                         .await
@@ -86,8 +86,8 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
-        // The path is not end with "/" of the interfaces ,but dir name should end with '/' in s3.
-        let dir_name = path.to_string_lossy().to_string() + "/";
+        // dir name should end with '/' in opendal.
+        let dir_name = build_dir_path(path);
         let entries = self
             .op
             .list(&dir_name)
@@ -101,7 +101,6 @@ impl PathFileSystem for OpenDalFileSystem {
 
                 let mut file_stat = FileStat::new_file_filestat_with_path(&path, 0);
                 self.opendal_meta_to_file_stat(entry.metadata(), &mut file_stat);
-                debug!("read dir file stat: {:?}", file_stat);
                 Ok(file_stat)
             })
             .collect()
@@ -121,7 +120,7 @@ impl PathFileSystem for OpenDalFileSystem {
                 .map_err(opendal_error_to_errno)?;
             file.reader = Some(Box::new(FileReaderImpl { reader }));
         }
-        if flags.is_write() {
+        if flags.is_write() || flags.is_create() || flags.is_append() || flags.is_truncate() {
             let writer = self
                 .op
                 .writer_with(&file_name)
@@ -141,13 +140,24 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        self.open_file(path, flags).await
+        let file_name = path.to_string_lossy().to_string();
+
+        let mut writer = self
+            .op
+            .writer_with(&file_name)
+            .await
+            .map_err(opendal_error_to_errno)?;
+
+        writer.close().await.map_err(opendal_error_to_errno)?;
+
+        let file = self.open_file(path, flags).await?;
+        Ok(file)
     }
 
     async fn create_dir(&self, path: &Path) -> Result<FileStat> {
-        let file_name = path.to_string_lossy().to_string();
+        let dir_name = build_dir_path(path);
         self.op
-            .create_dir(&file_name)
+            .create_dir(&dir_name)
             .await
             .map_err(opendal_error_to_errno)?;
         let file_stat = self.stat(path).await?;
@@ -169,7 +179,11 @@ impl PathFileSystem for OpenDalFileSystem {
 
     async fn remove_dir(&self, path: &Path) -> Result<()> {
         //todo:: need to consider keeping the behavior of posix remove dir when the dir is not empty
-        self.remove_file(path).await
+        let dir_name = build_dir_path(path);
+        self.op
+            .remove(vec![dir_name])
+            .await
+            .map_err(opendal_error_to_errno)
     }
 
     fn get_capacity(&self) -> Result<FileSystemCapacity> {
@@ -214,6 +228,14 @@ impl FileWriter for FileWriterImpl {
     }
 }
 
+fn build_dir_path(path: &Path) -> String {
+    let mut dir_path = path.to_string_lossy().to_string();
+    if !dir_path.ends_with('/') {
+        dir_path.push('/');
+    }
+    dir_path
+}
+
 fn opendal_error_to_errno(err: opendal::Error) -> Errno {
     error!("opendal operator error {:?}", err);
     match err.kind() {
@@ -237,23 +259,15 @@ fn opendal_filemode_to_filetype(mode: EntryMode) -> FileType {
 
 #[cfg(test)]
 mod test {
+    use crate::config::AppConfig;
+    use crate::s3_filesystem::extract_s3_config;
     use opendal::layers::LoggingLayer;
     use opendal::{services, Builder, Operator};
-    use std::collections::HashMap;
 
     #[tokio::test]
     async fn test_s3_stat() {
-        let mut opendal_config: HashMap<String, String> = HashMap::default();
-        opendal_config.insert(
-            "access_key_id".to_string(),
-            "<YOUR_ACCESS_KEY_ID>".to_string(),
-        );
-        opendal_config.insert(
-            "secret_access_key".to_string(),
-            "<YOUR_SECRET_ACCESS_KEY>".to_string(),
-        );
-        opendal_config.insert("region".to_string(), "<YOUR_REGION>".to_string());
-        opendal_config.insert("bucket".to_string(), "YOUR_BUCKET".to_string());
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
+        let opendal_config = extract_s3_config(&config);
 
         let builder = services::S3::from_map(opendal_config);
 
@@ -263,7 +277,8 @@ mod test {
             .layer(LoggingLayer::default())
             .finish();
 
-        let list = op.list("/s1/fileset1").await;
+        let path = "/";
+        let list = op.list(path).await;
         if let Ok(l) = list {
             for i in l {
                 println!("list result: {:?}", i);
@@ -272,7 +287,7 @@ mod test {
             println!("list error: {:?}", list.err());
         }
 
-        let meta = op.stat_with("/s1/fileset1").await;
+        let meta = op.stat_with(path).await;
         if let Ok(m) = meta {
             println!("stat result: {:?}", m);
         } else {

@@ -92,6 +92,9 @@ pub(crate) trait RawFileSystem: Send + Sync {
     /// Remove the directory by parent file id and file name
     async fn remove_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<()>;
 
+    /// flush the file with file id and file handle, if successful return Ok
+    async fn flush_file(&self, file_id: u64, fh: u64) -> Result<()>;
+
     /// Close the file by file id and file handle, if successful
     async fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
 
@@ -292,6 +295,7 @@ pub trait FileWriter: Sync + Send {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use libc::{O_APPEND, O_CREAT, O_RDONLY};
     use std::collections::HashMap;
     use std::path::Component;
 
@@ -312,10 +316,14 @@ pub(crate) mod tests {
 
         pub(crate) async fn test_path_file_system(&mut self) {
             // test root dir
-            self.test_stat_file(Path::new("/"), Directory, 0).await;
+            let resutl = self.fs.stat(Path::new("/")).await;
+            assert!(resutl.is_ok());
+            let root_file_stat = resutl.unwrap();
+            self.assert_file_stat(&root_file_stat, Path::new("/"), Directory, 0);
 
             // test list root dir
-            self.test_list_dir(Path::new("/")).await;
+            let result = self.fs.read_dir(Path::new("/")).await;
+            assert!(result.is_ok());
 
             // Test create file
             self.test_create_file(&self.cwd.join("file1.txt")).await;
@@ -450,16 +458,20 @@ pub(crate) mod tests {
             }
 
             // Test create file
-            self.test_create_file(parent_file_id, "file1.txt".as_ref())
-                .await;
-
-            // Test open file
             let file_handle = self
-                .test_open_file(parent_file_id, "file1.txt".as_ref())
+                .test_create_file(parent_file_id, "file1.txt".as_ref())
                 .await;
 
             // Test write file
             self.test_write_file(&file_handle, "test").await;
+
+            // Test close file
+            self.test_close_file(&file_handle).await;
+
+            // Test open file with read
+            let file_handle = self
+                .test_open_file(parent_file_id, "file1.txt".as_ref(), O_RDONLY as u32)
+                .await;
 
             // Test read file
             self.test_read_file(&file_handle, "test").await;
@@ -531,8 +543,11 @@ pub(crate) mod tests {
             self.files.insert(file_stat.file_id, file_stat);
         }
 
-        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) {
-            let file = self.fs.create_file(root_file_id, name, 0).await;
+        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) -> FileHandle {
+            let file = self
+                .fs
+                .create_file(root_file_id, name, (O_CREAT | O_APPEND) as u32)
+                .await;
             assert!(file.is_ok());
             let file = file.unwrap();
             assert!(file.handle_id > 0);
@@ -542,11 +557,12 @@ pub(crate) mod tests {
 
             self.test_stat_file(file.file_id, &file_stat.unwrap().path, RegularFile, 0)
                 .await;
+            file
         }
 
-        async fn test_open_file(&self, root_file_id: u64, name: &OsStr) -> FileHandle {
+        async fn test_open_file(&self, root_file_id: u64, name: &OsStr, flags: u32) -> FileHandle {
             let file = self.fs.lookup(root_file_id, name).await.unwrap();
-            let file_handle = self.fs.open_file(file.file_id, 0).await;
+            let file_handle = self.fs.open_file(file.file_id, flags).await;
             assert!(file_handle.is_ok());
             let file_handle = file_handle.unwrap();
             assert_eq!(file_handle.file_id, file.file_id);
@@ -563,8 +579,15 @@ pub(crate) mod tests {
                     content.as_bytes(),
                 )
                 .await;
+
             assert!(write_size.is_ok());
             assert_eq!(write_size.unwrap(), content.len() as u32);
+
+            let result = self
+                .fs
+                .flush_file(file_handle.file_id, file_handle.handle_id)
+                .await;
+            assert!(result.is_ok());
 
             self.files.get_mut(&file_handle.file_id).unwrap().size = content.len() as u64;
         }

@@ -46,19 +46,7 @@ impl S3FileSystem {
         config: &AppConfig,
         _fs_context: &FileSystemContext,
     ) -> GvfsResult<Self> {
-        let mut opendal_config: HashMap<String, String> = config
-            .extend_config
-            .clone()
-            .into_iter()
-            .filter_map(|(k, v)| {
-                if k.starts_with(Self::S3_CONFIG_PREFIX) {
-                    Some((k.to_string(), v.to_string()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
+        let mut opendal_config = extract_s3_config(config);
         let bucket = extract_bucket(&fileset.storage_location)?;
         opendal_config.insert("bucket".to_string(), bucket);
 
@@ -124,7 +112,7 @@ impl PathFileSystem for S3FileSystem {
     }
 
     async fn remove_dir(&self, path: &Path) -> Result<()> {
-        self.open_dal_fs.remove_file(path).await
+        self.open_dal_fs.remove_dir(path).await
     }
 
     fn get_capacity(&self) -> Result<FileSystemCapacity> {
@@ -164,12 +152,34 @@ pub(crate) fn extract_region(location: &str) -> GvfsResult<String> {
     }
 }
 
+pub fn extract_s3_config(config: &AppConfig) -> HashMap<String, String> {
+    config
+        .extend_config
+        .clone()
+        .into_iter()
+        .filter_map(|(k, v)| {
+            if k.starts_with(S3FileSystem::S3_CONFIG_PREFIX) {
+                Some((
+                    k.strip_prefix(S3FileSystem::S3_CONFIG_PREFIX)
+                        .unwrap()
+                        .to_string(),
+                    v,
+                ))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::default_raw_filesystem::DefaultRawFileSystem;
     use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
     use crate::filesystem::RawFileSystem;
+    use opendal::layers::TimeoutLayer;
+    use std::time::Duration;
 
     #[test]
     fn test_extract_bucket() {
@@ -187,25 +197,45 @@ mod tests {
         assert_eq!(result.unwrap(), "ap-southeast-2");
     }
 
+    async fn delete_dir(op: &Operator, dir_name: &str) {
+        let childs = op.list(dir_name).await.expect("list dir failed");
+        for child in childs {
+            let child_name = dir_name.to_string() + child.name();
+            if child.metadata().is_dir() {
+                Box::pin(delete_dir(op, &child_name)).await;
+            } else {
+                op.delete(&child_name).await.expect("delete file failed");
+            }
+        }
+        op.delete(dir_name).await.expect("delete dir failed");
+    }
+
     async fn create_s3_fs(cwd: &Path) -> S3FileSystem {
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
-        let opendal_config = config.extend_config.clone();
+        let opendal_config = extract_s3_config(&config);
 
         let fs_context = FileSystemContext::default();
 
         let builder = S3::from_map(opendal_config);
-        let op = Operator::new(builder).expect("opendal create failed");
-        let op = op.layer(LoggingLayer::default()).finish();
-        let file_name = cwd.to_string_lossy().to_string();
+        let op = Operator::new(builder)
+            .expect("opendal create failed")
+            .layer(LoggingLayer::default())
+            .layer(
+                TimeoutLayer::new()
+                    .with_timeout(Duration::from_secs(300))
+                    .with_io_timeout(Duration::from_secs(300)),
+            )
+            .finish();
 
         // clean up the test directory
-        let _ = op.delete(&file_name).await;
-        let _ = op.create_dir(&file_name).await;
+        let file_name = cwd.to_string_lossy().to_string() + "/";
+        delete_dir(&op, &file_name).await;
+        op.create_dir(&file_name)
+            .await
+            .expect("create test dir failed");
 
-        let opend_dal_fs = OpenDalFileSystem::new(op, &config, &fs_context);
-        S3FileSystem {
-            open_dal_fs: opend_dal_fs,
-        }
+        let open_dal_fs = OpenDalFileSystem::new(op, &config, &fs_context);
+        S3FileSystem { open_dal_fs }
     }
 
     #[tokio::test]
@@ -213,8 +243,9 @@ mod tests {
         if std::env::var("RUN_S3_TESTS").is_err() {
             return;
         }
-        let cwd = Path::new("/gvfs_test");
+        let cwd = Path::new("/gvfs_test1");
         let fs = create_s3_fs(cwd).await;
+
         let _ = fs.init().await;
         let mut tester = TestPathFileSystem::new(cwd, fs);
         tester.test_path_file_system().await;
@@ -226,12 +257,12 @@ mod tests {
             return;
         }
 
-        let cwd = Path::new("/gvfs_test");
+        let cwd = Path::new("/gvfs_test2");
         let s3_fs = create_s3_fs(cwd).await;
         let raw_fs =
             DefaultRawFileSystem::new(s3_fs, &AppConfig::default(), &FileSystemContext::default());
         let _ = raw_fs.init().await;
-        let mut tester = TestRawFileSystem::new(Path::new("/fuse_test"), raw_fs);
+        let mut tester = TestRawFileSystem::new(cwd, raw_fs);
         tester.test_raw_file_system().await;
     }
 }
