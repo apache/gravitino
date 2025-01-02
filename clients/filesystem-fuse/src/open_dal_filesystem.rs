@@ -86,6 +86,7 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
+        // The path is not end with "/" of the interfaces ,but dir name should end with '/' in s3.
         let dir_name = path.to_string_lossy().to_string() + "/";
         let entries = self
             .op
