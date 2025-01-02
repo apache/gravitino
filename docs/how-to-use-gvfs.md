@@ -43,7 +43,7 @@ the path mapping and convert automatically.
 ### Prerequisites
 
 + A Hadoop environment with HDFS running. GVFS has been tested against
-  Hadoop 3.3.0. It is recommended to use Hadoop 3.3.0 or later, but it should work with Hadoop 2.
+  Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.
   x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
   compatibility issues.
 
@@ -451,9 +451,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 ### Prerequisites
 
-+ A Hadoop environment with HDFS running. Now we only supports Fileset on HDFS.
-  GVFS in Python has been tested against Hadoop 2.7.3. It is recommended to use Hadoop 2.7.3 or later,
-  it should work with Hadoop 3.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
++ A Hadoop environment with HDFS or other Hadoop Compatible File System (HCFS) implementations like S3, GCS, etc. GVFS has been tested against Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
   if you find any compatibility issues.
 + Python version >= 3.8. It has been tested GVFS works well with Python 3.8 and Python 3.9.
   Your Python version should be at least higher than Python 3.8.
