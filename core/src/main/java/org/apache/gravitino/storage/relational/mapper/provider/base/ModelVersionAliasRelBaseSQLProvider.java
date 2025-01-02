@@ -100,13 +100,14 @@ public class ModelVersionAliasRelBaseSQLProvider {
       @Param("modelId") Long modelId, @Param("alias") String alias) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE model_id = #{modelId} AND model_version = ("
+        + " mvar JOIN ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0"
+        + ") subquery ON mvar.model_version = subquery.model_version"
+        + " SET mvar.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE mvar.model_id = #{modelId} AND mvar.deleted_at = 0";
   }
 
   public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
