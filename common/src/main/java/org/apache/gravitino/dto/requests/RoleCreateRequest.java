@@ -86,7 +86,7 @@ public class RoleCreateRequest implements RESTRequest {
           objectDTO.type() != null, "\" securable object type\" can't be null");
       Preconditions.checkArgument(
           objectDTO.privileges() != null && !objectDTO.privileges().isEmpty(),
-          "\" securable object privileges\" can't be null or empty");
+          "\"securable object privileges\" can't be null or empty");
     }
   }
 }
