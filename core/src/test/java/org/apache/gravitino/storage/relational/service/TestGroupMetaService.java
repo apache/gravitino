@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -189,6 +190,33 @@ class TestGroupMetaService extends TestJDBCBackend {
         }
       }
     }
+
+    // ISSUE-6061: Test listGroupsByNamespace with revoked users
+    Function<GroupEntity, GroupEntity> revokeUpdater =
+        group -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(group.auditInfo().creator())
+                  .withCreateTime(group.auditInfo().createTime())
+                  .withLastModifier("revokeGroup")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          return GroupEntity.builder()
+              .withNamespace(group.namespace())
+              .withId(group.id())
+              .withName(group.name())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+
+    Assertions.assertNotNull(groupMetaService.updateGroup(group2.nameIdentifier(), revokeUpdater));
+    actualGroups =
+        groupMetaService.listGroupsByNamespace(
+            AuthorizationUtils.ofGroupNamespace(metalakeName), true);
+    Assertions.assertEquals(expectGroups.size(), actualGroups.size());
   }
 
   @Test
