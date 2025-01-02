@@ -128,7 +128,9 @@ class GravitinoMetalake(MetalakeDTO):
         Args:
             name: The name of the catalog.
             catalog_type: The type of the catalog.
-            provider: The provider of the catalog.
+            provider: The provider of the catalog. This parameter can be None if the catalog
+            provides a managed implementation. Currently, only the model catalog supports None
+            provider. For the details, please refer to the Catalog.Type.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
 

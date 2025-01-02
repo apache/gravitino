@@ -199,7 +199,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         model_full_ident = self._model_full_identifier(model_ident)
         resp = self.rest_client.get(
-            self._format_model_version_request_path(model_full_ident),
+            f"{self._format_model_version_request_path(model_full_ident)}/versions",
             error_handler=MODEL_ERROR_HANDLER,
         )
         model_version_list_resp = ModelVersionListResponse.from_json(
