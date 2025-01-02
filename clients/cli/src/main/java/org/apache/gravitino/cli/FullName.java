@@ -73,10 +73,7 @@ public class FullName {
       }
     }
 
-    // Extract the metalake name from the full name option
-    if (line.hasOption(GravitinoOptions.NAME)) {
-      return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
-    }
+    System.err.println(ErrorMessages.MISSING_METALAKE);
 
     return null;
   }
