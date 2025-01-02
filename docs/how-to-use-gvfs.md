@@ -43,7 +43,7 @@ the path mapping and convert automatically.
 ### Prerequisites
 
 + A Hadoop environment with HDFS running. GVFS has been tested against
-  Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
+  Hadoop 3.3.0. It is recommended to use Hadoop 3.3.0 or later, but it should work with Hadoop 2.
   x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
   compatibility issues.
 
@@ -71,51 +71,51 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 
 #### S3 fileset
 
-| Configuration item             | Description                                                                                                                                                                            | Default value | Required                 | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------|------------------|
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                            | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| Configuration item     | Description                   | Default value | Required                 | Since version    |
+|------------------------|-------------------------------|---------------|--------------------------|------------------|
+| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
 
 At the same time, you need to add the corresponding bundle jar
-1. [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if no hadoop environment is available, or
-2. [`gravitino-aws-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws/) and hadoop-aws jar and other necessary dependencies in the classpath.
+1. [`gravitino-aws-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if no Hadoop environment is available, or
+2. [`gravitino-aws-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws/) and `hadoop-aws-${hadoop-version}.jar` and other necessary dependencies (They are usually located at `${HADOOP_HOME}/share/hadoop/tools/lib`) in the classpath.
 
 
 #### GCS fileset
 
-| Configuration item             | Description                                                                                                                                                                              | Default value | Required                  | Since version    |
-|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
+| Configuration item         | Description                                | Default value | Required                  | Since version    |
+|----------------------------|--------------------------------------------|---------------|---------------------------|------------------|
+| `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
 
 In the meantime, you need to add the corresponding bundle jar
-1. [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if no hadoop environment is available, or
-2. or [`gravitino-gcp-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp/) and [gcs-connector jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and other necessary dependencies in the classpath.
+1. [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if no hadoop environment is available, or
+2. [`gravitino-gcp-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp/) and [gcs-connector jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and other necessary dependencies in the classpath.
 
 
 #### OSS fileset
 
-| Configuration item              | Description                                                                                                                                                                                    | Default value | Required                  | Since version    |
-|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `oss-endpoint`                  | The endpoint of the Aliyun OSS.                                                                                                                                                                | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-| `oss-access-key-id`             | The access key of the Aliyun OSS.                                                                                                                                                              | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-| `oss-secret-access-key`         | The secret key of the Aliyun OSS.                                                                                                                                                              | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
+| Configuration item      | Description                       | Default value | Required                  | Since version    |
+|-------------------------|-----------------------------------|---------------|---------------------------|------------------|
+| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
+| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
+| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
 
 
 In the meantime, you need to place the corresponding bundle jar
-1. [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the classpath if no hadoop environment is available, or
-2. [`gravitino-aliyun-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun/) and hadoop-aliyun jar and other necessary dependencies in the classpath.
+1. [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the classpath if no hadoop environment is available, or
+2. [`gravitino-aliyun-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun/) and `hadoop-aliyun-${hadoop-version}.jar` and other necessary dependencies (They are usually located at `${HADOOP_HOME}/share/hadoop/tools/lib`) in the classpath.
 
 #### Azure Blob Storage fileset
 
-| Configuration item                | Description                                                                                                                                                                                                     | Default value | Required                                  | Since version    |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------|------------------|
-| `azure-storage-account-name`      | The account name of Azure Blob Storage.                                                                                                                                                                         | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                          | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
+| Configuration item           | Description                             | Default value | Required                                  | Since version    |
+|------------------------------|-----------------------------------------|---------------|-------------------------------------------|------------------|
+| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
+| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
 
 Similar to the above, you need to place the corresponding bundle jar
-1. [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the classpath if no hadoop environment is available, or 
-2. [`gravitino-azure-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure/) and hadoop-azure jar and other necessary dependencies in the classpath.
+1. [`gravitino-azure-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the classpath if no hadoop environment is available, or 
+2. [`gravitino-azure-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure/) and `hadoop-azure-${hadoop-version}.jar` and other necessary dependencies (They are usually located at `${HADOOP_HOME}/share/hadoop/tools/lib) in the classpath.
 
 #### Custom fileset 
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
@@ -146,13 +146,8 @@ You can configure these properties in two ways:
     ```
    
 :::note
-If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jars in the Hadoop environment. 
-For example, if you want to access the S3 fileset, you need to place
-1. The aws hadoop bundle jar [`gravitino-aws-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/)
-2. or [`gravitino-aws-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws/), and hadoop-aws jar and other necessary dependencies
-
-to the classpath, it typically locates in `${HADOOP_HOME}/share/hadoop/common/lib/`). 
-
+If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jars in the Hadoop environment, For bundles jar and
+cloud storage fileset configuration example, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 :::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
@@ -209,6 +204,10 @@ two ways:
     ```shell
        ./gradlew :clients:filesystem-hadoop3-runtime:build -x test
     ```
+:::note
+For cloud storage fileset, some extra steps should be added, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
+:::
+
 
 #### Via Hadoop shell command
 
@@ -226,7 +225,6 @@ cp gravitino-filesystem-hadoop3-runtime-{version}.jar ${HADOOP_HOME}/share/hadoo
 # You need to ensure that the Kerberos has permission on the HDFS directory.
 kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
-
 # 4. Copy other dependencies to the Hadoop environment if you want to access the S3 fileset via GVFS
 cp bundles/aws-bundle/build/libs/gravitino-aws-bundle-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/ 
 cp clients/filesystem-hadoop3-runtime/build/libs/gravitino-filesystem-hadoop3-runtime-{version}-SNAPSHOT.jar ${HADOOP_HOME}/share/hadoop/common/lib/ 
@@ -235,6 +233,8 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/* ${HADOOP_HOME}/share/hadoop/common/li
 # 4. Try to list the fileset
 ./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/test_catalog/test_schema/test_fileset_1
 ```
+
+Full example to access S3, GCS, OSS fileset via Hadoop shell command, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 
 #### Via Java code
 
@@ -285,6 +285,9 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 fs.getFileStatus(filesetPath);
 ```
 
+Full example to access S3, GCS, OSS fileset via Hadoop shell command, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
+
+
 #### Via Apache Spark
 
 1. Add the GVFS runtime jar to the Spark environment.
@@ -324,6 +327,7 @@ fs.getFileStatus(filesetPath);
     rdd.foreach(println)
     ```
 
+Full example to access S3, GCS, OSS fileset via Spark, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 
 #### Via Tensorflow
 
@@ -520,6 +524,8 @@ options = {
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 ```
+
+Full Python example to access S3, GCS, OSS fileset via GVFS, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 
 :::note
 
