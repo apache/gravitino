@@ -498,43 +498,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
-  /**
-   * Handles the command execution for Models based on command type and the command line options.
-   */
-  private void handleModelCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-
-    Command.setAuthenticationMode(auth, userName);
-    List<String> missingEntities = Lists.newArrayList();
-    if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-
-    String model = name.getModelName();
-    if (model == null) {
-      missingEntities.add(CommandEntities.MODEL);
-    }
-
-    if (!missingEntities.isEmpty()) {
-      System.err.println("Missing required argument(s): " + COMMA_JOINER.join(missingEntities));
-      Main.exit(-1);
-    }
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newModelAudit(url, ignore, metalake, catalog, model).handle();
-        } else {
-          //          newModelDetails(url, ignore, metalake, catalog, model).handle()
-        }
-        break;
-    }
-  }
-
   /** Handles the command execution for Users based on command type and the command line options. */
   protected void handleUserCommand() {
     String url = getUrl();
@@ -1191,6 +1154,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
+  /**
+   * Handles the command execution for Models based on command type and the command line options.
+   */
   private void handleModelCommand() {
     String url = getUrl();
     String auth = getAuth();
@@ -1219,7 +1185,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newModelAudit(url, ignore, metalake, catalog, schema, model).handle();
+        } else {
+          newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
+        }
         break;
 
       default:
