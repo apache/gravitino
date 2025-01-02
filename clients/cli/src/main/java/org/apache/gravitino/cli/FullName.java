@@ -105,7 +105,7 @@ public class FullName {
    * @return The model name, or null if not found.
    */
   public String getModelName() {
-    return getNamePart(1);
+    return getNamePart(2);
   }
 
   /**

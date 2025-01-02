@@ -300,8 +300,8 @@ public class TestableCommandLine {
   }
 
   protected ModelAudit newModelAudit(
-      String url, boolean ignore, String metalake, String catalog, String model) {
-    return new ModelAudit(url, ignore, metalake, catalog, model);
+      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
+    return new ModelAudit(url, ignore, metalake, catalog, schema, model);
   }
 
   protected TableAudit newTableAudit(

@@ -26,12 +26,14 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelCatalog;
 
 /** Displays the audit information of a model. */
 public class ModelAudit extends AuditCommand {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String schema;
   protected final String model;
 
   /**
@@ -41,24 +43,32 @@ public class ModelAudit extends AuditCommand {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
    * @param model The name of the model.
    */
   public ModelAudit(
-      String url, boolean ignoreVersions, String metalake, String catalog, String model) {
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String model) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.schema = schema;
     this.model = model;
   }
 
   /** Displays the audit information of a model. */
   @Override
   public void handle() {
+    NameIdentifier name = NameIdentifier.of(schema, model);
     Model result;
 
     try (GravitinoClient client = buildClient(this.metalake)) {
-      NameIdentifier name = NameIdentifier.of(this.metalake, this.catalog, this.model);
-      result = client.loadCatalog(this.catalog).asModelCatalog().getModel(name);
+      ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
+      result = modelCatalog.getModel(name);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
