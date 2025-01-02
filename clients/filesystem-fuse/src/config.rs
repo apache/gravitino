@@ -309,11 +309,11 @@ mod test {
         assert_eq!(config.gravitino.uri, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "test");
         assert_eq!(
-            config.extend_config.get("access_key_id"),
+            config.extend_config.get("s3-access_key_id"),
             Some(&"XXX_access_key".to_string())
         );
         assert_eq!(
-            config.extend_config.get("secret_access_key"),
+            config.extend_config.get("s3-secret_access_key"),
             Some(&"XXX_secret_key".to_string())
         );
     }

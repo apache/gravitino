@@ -28,6 +28,7 @@ use log::error;
 use opendal::layers::LoggingLayer;
 use opendal::services::S3;
 use opendal::{Builder, Operator};
+use std::collections::HashMap;
 use std::path::Path;
 
 pub(crate) struct S3FileSystem {
@@ -37,13 +38,26 @@ pub(crate) struct S3FileSystem {
 impl S3FileSystem {}
 
 impl S3FileSystem {
+    const S3_CONFIG_PREFIX: &'static str = "s3-";
+
     pub(crate) fn new(
         catalog: &Catalog,
         fileset: &Fileset,
         config: &AppConfig,
         _fs_context: &FileSystemContext,
     ) -> GvfsResult<Self> {
-        let mut opendal_config = config.extend_config.clone();
+        let mut opendal_config: HashMap<String, String> = config
+            .extend_config
+            .clone()
+            .into_iter()
+            .filter_map(|(k, v)| {
+                if k.starts_with(Self::S3_CONFIG_PREFIX) {
+                    Some((k.to_string(), v.to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let bucket = extract_bucket(&fileset.storage_location)?;
         opendal_config.insert("bucket".to_string(), bucket);
