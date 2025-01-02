@@ -34,8 +34,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GCSCredentialProvider implements AccessTokenProvider {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GCSCredentialProvider.class);
+public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(GravitinoGCSCredentialProvider.class);
   private Configuration configuration;
   private GravitinoClient client;
   private String filesetIdentifier;
