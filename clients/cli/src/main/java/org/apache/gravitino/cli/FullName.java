@@ -73,10 +73,7 @@ public class FullName {
       }
     }
 
-    // Extract the metalake name from the full name option
-    if (line.hasOption(GravitinoOptions.NAME)) {
-      return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
-    }
+    System.err.println(ErrorMessages.MISSING_METALAKE);
 
     return null;
   }
@@ -97,6 +94,15 @@ public class FullName {
    */
   public String getSchemaName() {
     return getNamePart(1);
+  }
+
+  /**
+   * Retrieves the model name from the second part of the full name option.
+   *
+   * @return The model name, or null if not found
+   */
+  public String getModelName() {
+    return getNamePart(2);
   }
 
   /**
