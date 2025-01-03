@@ -36,7 +36,7 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 logger = logging.getLogger(__name__)
 
 
-def oss_is_configured():
+def gcs_is_configured():
     return all(
         [
             os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH") is not None,
@@ -45,7 +45,7 @@ def oss_is_configured():
     )
 
 
-@unittest.skipUnless(oss_is_configured(), "GCS is not configured.")
+@unittest.skipUnless(gcs_is_configured(), "GCS is not configured.")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure gcp-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
@@ -254,11 +254,10 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         new_bucket = self.bucket_name + "1"
         mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
-        fs.mkdir(mkdir_dir, create_parents=True)
 
+        with self.assertRaises(OSError):
+            fs.mkdir(mkdir_dir, create_parents=True)
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
-        self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(self.fs.exists("gs://" + new_bucket))
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"

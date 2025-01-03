@@ -33,8 +33,6 @@ from gravitino import (
 )
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
-from gravitino.filesystem.gvfs import StorageType
-
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +279,7 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
         self.assertFalse(fs.exists(mkdir_dir))
 
-        self.assertFalse(self.fs.exists(f"{StorageType.ABS.value}://{new_bucket}"))
+        self.assertFalse(self.fs.exists("abfss://{new_bucket}"))
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
@@ -309,7 +307,7 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
 
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(self.fs.exists(f"{StorageType.ABS.value}://{new_bucket}"))
+        self.assertFalse(self.fs.exists(f"abfss://{new_bucket}"))
 
     def test_ls(self):
         ls_dir = self.fileset_gvfs_location + "/test_ls"

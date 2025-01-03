@@ -48,7 +48,7 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
         metadata_object_type = metadata_object.type().value
         metadata_object_name = metadata_object.name()
         self._request_path = (
-            f"api/metalakes/{metalake_name}objects/{metadata_object_type}/"
+            f"api/metalakes/{metalake_name}/objects/{metadata_object_type}/"
             f"{metadata_object_name}/credentials"
         )
 
