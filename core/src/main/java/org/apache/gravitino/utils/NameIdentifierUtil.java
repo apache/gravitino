@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -437,7 +438,8 @@ public class NameIdentifierUtil {
 
       case ROLE:
         AuthorizationUtils.checkRole(ident);
-        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
+        return MetadataObjects.of(
+            Collections.singletonList(ident.name()), MetadataObject.Type.ROLE);
 
       default:
         throw new IllegalArgumentException(

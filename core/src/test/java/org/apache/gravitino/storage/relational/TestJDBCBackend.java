@@ -1003,6 +1003,48 @@ public class TestJDBCBackend {
     assertEquals(roleWithoutDot.id(), roleIdWithoutDot);
   }
 
+  @Test
+  public void testInsertRelationWithDotInRoleName() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    String metalakeName = "testMetalake";
+    String catalogName = "catalog";
+    String roleNameWithDot = "role.with.dot";
+
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            catalogName,
+            auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            roleNameWithDot,
+            auditInfo,
+            catalogName);
+    backend.insert(role, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user",
+            auditInfo);
+    backend.insert(user, false);
+
+    backend.insertRelation(
+        OWNER_REL, role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type(), true);
+    assertEquals(1, countActiveOwnerRel(user.id()));
+  }
+
   private boolean legacyRecordExistsInDB(Long id, Entity.EntityType entityType) {
     String tableName;
     String idColumnName;
