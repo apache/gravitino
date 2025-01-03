@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.abs.fs;
 
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_IS_HNS_ENABLED;
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -26,12 +30,18 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.azurebfs.services.AuthType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AzureFileSystemProvider implements FileSystemProvider {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(AzureFileSystemProvider.class);
 
   @VisibleForTesting public static final String ABS_PROVIDER_SCHEME = "abfss";
 
@@ -63,6 +73,41 @@ public class AzureFileSystemProvider implements FileSystemProvider {
     }
 
     hadoopConfMap.forEach(configuration::set);
+
+    // Check whether this is from GVFS client.
+    if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
+      // Test whether SAS works
+      try {
+        AzureSasCredentialProvider azureSasCredentialProvider = new AzureSasCredentialProvider();
+        azureSasCredentialProvider.initialize(configuration, null);
+        String sas = azureSasCredentialProvider.getSASToken(null, null, null, null);
+        if (sas != null) {
+          String accountName =
+              String.format(
+                  "%s.dfs.core.windows.net",
+                  config.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+
+          configuration.set(
+              FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
+          configuration.set(
+              FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
+              AzureSasCredentialProvider.class.getName());
+          configuration.set(FS_AZURE_ACCOUNT_IS_HNS_ENABLED, "true");
+        } else if (azureSasCredentialProvider.getAzureStorageAccountKey() != null
+            && azureSasCredentialProvider.getAzureStorageAccountName() != null) {
+          configuration.set(
+              String.format(
+                  "fs.azure.account.key.%s.dfs.core.windows.net",
+                  azureSasCredentialProvider.getAzureStorageAccountName()),
+              azureSasCredentialProvider.getAzureStorageAccountKey());
+        }
+      } catch (Exception e) {
+        // Can't use SAS, use account key and account key instead
+        LOGGER.warn(
+            "Failed to use SAS token and user account from credential provider, use default conf. ",
+            e);
+      }
+    }
 
     return FileSystem.get(path.toUri(), configuration);
   }

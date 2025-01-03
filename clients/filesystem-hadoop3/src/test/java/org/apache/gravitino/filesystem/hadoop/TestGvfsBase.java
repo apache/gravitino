@@ -41,6 +41,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -149,7 +150,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           Objects.requireNonNull(
               ((GravitinoVirtualFileSystem) gravitinoFileSystem)
                   .internalFileSystemCache()
-                  .getIfPresent("file"));
+                  .getIfPresent(
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache")));
 
       String anotherFilesetName = "test_new_fs";
       Path diffLocalPath =
@@ -199,7 +201,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                       0,
                       ((GravitinoVirtualFileSystem) fs).internalFileSystemCache().asMap().size()));
 
-      assertNull(((GravitinoVirtualFileSystem) fs).internalFileSystemCache().getIfPresent("file"));
+      assertNull(
+          ((GravitinoVirtualFileSystem) fs)
+              .internalFileSystemCache()
+              .getIfPresent(NameIdentifier.of("file")));
     }
   }
 

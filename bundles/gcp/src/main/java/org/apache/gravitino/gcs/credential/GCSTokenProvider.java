@@ -146,6 +146,12 @@ public class GCSTokenProvider implements CredentialProvider {
         CredentialAccessBoundary.newBuilder();
     readBuckets.forEach(
         bucket -> {
+          AccessBoundaryRule rule1 =
+              AccessBoundaryRule.newBuilder()
+                  .setAvailableResource(toGCSBucketResource(bucket))
+                  .setAvailablePermissions(Arrays.asList("inRole:roles/storage.legacyBucketReader"))
+                  .build();
+          credentialAccessBoundaryBuilder.addRule(rule1);
           List<String> readConditions = readExpressions.get(bucket);
           AccessBoundaryRule rule =
               getAccessBoundaryRule(

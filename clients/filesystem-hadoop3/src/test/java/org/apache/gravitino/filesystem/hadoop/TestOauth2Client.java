@@ -51,6 +51,7 @@ import org.apache.gravitino.dto.responses.OAuth2TokenResponse;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authentication.OAuthConfig;

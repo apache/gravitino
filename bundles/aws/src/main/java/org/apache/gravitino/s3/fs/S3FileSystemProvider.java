@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -41,7 +42,7 @@ import org.slf4j.LoggerFactory;
 
 public class S3FileSystemProvider implements FileSystemProvider {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(S3FileSystemProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(S3FileSystemProvider.class);
 
   @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
@@ -61,11 +62,18 @@ public class S3FileSystemProvider implements FileSystemProvider {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
+    hadoopConfMap.forEach(configuration::set);
     if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
-      hadoopConfMap.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+      configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
 
-    hadoopConfMap.forEach(configuration::set);
+    // Only call from GVFS client will have this key and support GravitinoS3CredentialProvider as
+    // the file system provider will be used by GVFS client and Gravitino server, only GVFS client
+    // will have this key.
+    if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
+      configuration.set(
+          Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialProvider.class.getCanonicalName());
+    }
 
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
     checkAndSetCredentialProvider(configuration);
@@ -91,12 +99,12 @@ public class S3FileSystemProvider implements FileSystemProvider {
         if (AWSCredentialsProvider.class.isAssignableFrom(c)) {
           validProviders.add(provider);
         } else {
-          LOGGER.warn(
+          LOG.warn(
               "Credential provider {} is not a subclass of AWSCredentialsProvider, skipping",
               provider);
         }
       } catch (Exception e) {
-        LOGGER.warn(
+        LOG.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
             provider);
         configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);

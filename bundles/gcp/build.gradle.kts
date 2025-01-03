@@ -32,6 +32,7 @@ dependencies {
 
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
+  compileOnly(libs.hadoop3.gcs)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
@@ -39,6 +40,11 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":clients:filesystem-hadoop3-common")) {
+    exclude("*")
+  }
+
   implementation(libs.commons.lang3)
   // runtime used
   implementation(libs.commons.logging)
