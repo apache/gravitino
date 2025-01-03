@@ -5,7 +5,7 @@ keyword: fileset S3 GCS ADLS OSS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document aims to provide a comprehensive guide on how to use cloud storage fileset created by Gravitino, it usually contains the following sections:
+This document aims to provide a comprehensive guide on how to use cloud storage fileset created by Gravitino, it usually contains the following sections.
 
 ## Necessary steps in Gravitino server
 
@@ -31,24 +31,31 @@ bin/gravitino.sh start
 
 ### Bundle jars
 
-Gravitino bundles jars are jars that are used to access the cloud storage, they are divided into two categories:
+Gravitino bundles jars are used to access the cloud storage. They are divided into two categories:
 
 - `gravitino-${aws,gcp,aliyun,azure}-bundle-{gravitino-version}.jar` are the jars that contain all the necessary dependencies to access the corresponding cloud storages. For instance, `gravitino-aws-bundle-${gravitino-version}.jar` contains the all necessary classes including `hadoop-common`(hadoop-3.3.1) and `hadoop-aws` to access the S3 storage.
 They are used in the scenario where there is no hadoop environment in the runtime.
 
 - If there is already hadoop environment in the runtime, you can use the `gravitino-${aws,gcp,aliyun,azure}-${gravitino-version}.jar` that does not contain the cloud storage classes (like hadoop-aws) and hadoop environment. Alternatively, you can manually add the necessary jars to the classpath.
 
-The following table demonstrates which jars are necessary for different cloud storage filesets:
+If the Hadoop environment is available, you can use the following jars to access the cloud storage fileset:
 
-| Hadoop runtime version | S3                                                                                                                                       | GCS                                                                                                          | OSS                                                                                                                                        | ABS                                                                                                                |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| No Hadoop environment  | `gravitino-aws-bundle-${gravitino-version}.jar`                                                                                          | `gravitino-gcp-bundle-${gravitino-version}.jar`                                                              | `gravitino-aliyun-bundle-${gravitino-version}.jar`                                                                                         | `gravitino-azure-bundle-${gravitino-version}.jar`                                                                  |
-| 2.x, 3.x               | `gravitino-aws-${gravitino-version}.jar`, `hadoop-aws-${hadoop-version}.jar`, `aws-sdk-java-${version}` and other necessary dependencies | `gravitino-gcp-{gravitino-version}.jar`, `gcs-connector-${hadoop-version}`.jar, other necessary dependencies | `gravitino-aliyun-{gravitino-version}.jar`, hadoop-aliyun-{hadoop-version}.jar, aliyun-sdk-java-{version} and other necessary dependencies | `gravitino-azure-${gravitino-version}.jar`, `hadoop-azure-${hadoop-version}.jar`, and other necessary dependencies |
+- S3: `gravitino-aws-${gravitino-version}.jar`, `hadoop-aws-${hadoop-version}.jar`, `aws-sdk-java-${version}` and other necessary dependencies
+- GCS: `gravitino-gcp-{gravitino-version}.jar`, `gcs-connector-${hadoop-version}`.jar, other necessary dependencies
+- OSS: `gravitino-aliyun-{gravitino-version}.jar`, hadoop-aliyun-{hadoop-version}.jar, aliyun-sdk-java-{version} and other necessary dependencies
+- ABS: `gravitino-azure-${gravitino-version}.jar`, `hadoop-azure-${hadoop-version}.jar`, and other necessary dependencies
+
+If there is no Hadoop environment, you can use the following jars to access the cloud storage fileset:
+
+- S3: `gravitino-aws-bundle-${gravitino-version}.jar`
+- GCS: `gravitino-gcp-bundle-${gravitino-version}.jar`
+- OSS: `gravitino-aliyun-bundle-${gravitino-version}.jar`
+- ABS: `gravitino-azure-bundle-${gravitino-version}.jar`
 
 For `hadoop-aws-${hadoop-version}.jar`, `hadoop-azure-${hadoop-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` and related dependencies, you can get them from `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 For `gcs-connector`, you can download it from the [GCS connector](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) for hadoop2 or hadoop3. 
 
-If there still have some issues, please report it to the Gravitino community and create an issue. 
+If there are some issues, please consider [fill in an issue](https://github.com/apache/gravitino/issues/new/choose).
 
 ## Create fileset catalogs
 
@@ -197,7 +204,7 @@ s3_catalog = gravitino_client.create_catalog(name="catalog",
 </Tabs>
 
 :::note
-The prefix of a GCS location should always start with `gs` for instance, `gs://bucket/root`.
+The prefix of a GCS location should always start with `gs`, for instance, `gs://bucket/root`.
 :::
 
 ### Create an OSS fileset catalog
@@ -389,7 +396,7 @@ Schema schema = supportsSchemas.createSchema("schema",
 </TabItem>
 <TabItem value="python" label="Python">
 
-You can change the value of property `location` according to which catalog you are using, moreover, if we have set the `location` property in the catalog, we can omit the `location` property in the schema.
+You can change `location` value based on the catalog you are using. If the `location` property is specified in the catalog, we can omit it in the schema.
 
 ## Create filesets
 
@@ -562,7 +569,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gra
 ```
 
 :::note
-**In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.**
+In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
 :::
 
 ## Using fileset with hadoop fs command
