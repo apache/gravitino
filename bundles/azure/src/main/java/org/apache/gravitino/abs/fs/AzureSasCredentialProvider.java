@@ -42,10 +42,9 @@ import org.apache.hadoop.fs.azurebfs.extensions.SASTokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Configurable {
+public class AzureSasCredentialProvider implements SASTokenProvider, Configurable {
 
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(GravitinoAzureSasCredentialProvider.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AzureSasCredentialProvider.class);
 
   private Configuration configuration;
 
@@ -58,7 +57,8 @@ public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Co
   private String azureStorageAccountName;
   private String azureStorageAccountKey;
 
-  private long expirationTime;
+  private long expirationTime = Long.MAX_VALUE;
+  private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public String getAzureStorageAccountName() {
     return azureStorageAccountName;
@@ -88,7 +88,7 @@ public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Co
   @Override
   public String getSASToken(String account, String fileSystem, String path, String operation) {
     // Refresh credentials if they are null or about to expire in 5 minutes
-    if (sasToken == null || System.currentTimeMillis() > expirationTime - 5 * 60 * 1000) {
+    if (sasToken == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
         refresh();
       }
@@ -121,9 +121,12 @@ public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Co
       azureStorageAccountKey = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
     }
 
-    this.expirationTime = credential.expireTimeInMs();
-    if (expirationTime <= 0) {
-      expirationTime = Long.MAX_VALUE;
+    if (credential.expireTimeInMs() > 0) {
+      expirationTime =
+          System.currentTimeMillis()
+              + (long)
+                  ((credential.expireTimeInMs() - System.currentTimeMillis())
+                      * EXPIRATION_TIME_FACTOR);
     }
   }
 

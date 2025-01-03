@@ -21,7 +21,9 @@ package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
@@ -34,18 +36,19 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoGCSCredentialProvider.class);
+public class GCSCredentialProvider implements AccessTokenProvider {
+  private static final Logger LOG = LoggerFactory.getLogger(GCSCredentialProvider.class);
   private Configuration configuration;
   private GravitinoClient client;
   private String filesetIdentifier;
 
   private AccessToken accessToken;
-  private long expirationTime;
+  private long expirationTime = Long.MAX_VALUE;
+  private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   @Override
   public AccessToken getAccessToken() {
-    if (accessToken == null || expirationTime < System.currentTimeMillis() + 5 * 60 * 1000) {
+    if (accessToken == null || System.currentTimeMillis() >= expirationTime) {
       try {
         refresh();
       } catch (IOException e) {
@@ -67,24 +70,28 @@ public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
 
+    Optional<Credential> optionalCredential = getCredential(credentials);
     // Can't find any credential, use the default one.
-    if (credentials.length == 0) {
+    if (!optionalCredential.isPresent()) {
       LOG.warn(
           "No credential found for fileset: {}, try to use static JSON file", filesetIdentifier);
       return;
     }
 
-    Credential credential = credentials[0];
+    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
 
     if (GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE.equals(
         credentialMap.get(Credential.CREDENTIAL_TYPE))) {
       String sessionToken = credentialMap.get(GCSTokenCredential.GCS_TOKEN_NAME);
-      accessToken = new AccessToken(sessionToken, expirationTime);
+      accessToken = new AccessToken(sessionToken, credential.expireTimeInMs());
 
-      expirationTime = credential.expireTimeInMs();
-      if (expirationTime <= 0) {
-        expirationTime = Long.MAX_VALUE;
+      if (credential.expireTimeInMs() > 0) {
+        expirationTime =
+            System.currentTimeMillis()
+                + (long)
+                    ((credential.expireTimeInMs() - System.currentTimeMillis())
+                        * EXPIRATION_TIME_FACTOR);
       }
     }
   }
@@ -100,5 +107,21 @@ public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
   @Override
   public Configuration getConf() {
     return this.configuration;
+  }
+
+  /**
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
+   *
+   * @param credentials The credential array.
+   * @return An optional credential.
+   */
+  private Optional<Credential> getCredential(Credential[] credentials) {
+    // Use dynamic credential if found.
+    return Arrays.stream(credentials)
+        .filter(
+            credential ->
+                credential.credentialType().equals(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE))
+        .findFirst();
   }
 }
