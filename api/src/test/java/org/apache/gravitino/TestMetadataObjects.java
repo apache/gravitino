@@ -88,13 +88,12 @@ public class TestMetadataObjects {
   @Test
   public void testRoleObject() {
     // Test legal name
-    MetadataObject roleObject =
-        MetadataObjects.of(Lists.newArrayList("role"), MetadataObject.Type.ROLE);
+    MetadataObject roleObject = MetadataObjects.of(null, "role", MetadataObject.Type.ROLE);
     Assertions.assertEquals("role", roleObject.fullName());
 
     // Test illegal name
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> MetadataObjects.of(Lists.newArrayList("role", "test"), MetadataObject.Type.ROLE));
+        () -> MetadataObjects.of(null, "role.test", MetadataObject.Type.ROLE));
   }
 }

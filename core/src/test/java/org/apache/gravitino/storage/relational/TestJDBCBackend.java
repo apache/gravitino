@@ -952,6 +952,57 @@ public class TestJDBCBackend {
     assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
   }
 
+  @Test
+  public void testInsertRelationWithDotInRoleName() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog("metalake"),
+            "catalog",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity roleWithDot =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("metalake"),
+            "role.with.dot",
+            auditInfo,
+            "catalog");
+
+    backend.insert(roleWithDot, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace("metalake"),
+            "user",
+            auditInfo,
+            Lists.newArrayList(roleWithDot.name()),
+            Lists.newArrayList(roleWithDot.id()));
+
+    backend.insert(user, false);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          backend.insertRelation(
+              OWNER_REL,
+              roleWithDot.nameIdentifier(),
+              roleWithDot.type(),
+              user.nameIdentifier(),
+              user.type(),
+              true);
+        });
+  }
+
   private boolean legacyRecordExistsInDB(Long id, Entity.EntityType entityType) {
     String tableName;
     String idColumnName;
