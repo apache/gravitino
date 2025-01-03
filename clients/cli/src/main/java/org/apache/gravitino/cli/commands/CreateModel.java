@@ -27,6 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
+import java.util.Map;
+
 /** Creates a new model. */
 public class CreateModel extends Command {
 
@@ -35,6 +37,7 @@ public class CreateModel extends Command {
   protected final String schema;
   protected final String model;
   protected final String comment;
+  protected final Map<String, String> properties;
 
   /**
    *
@@ -47,6 +50,7 @@ public class CreateModel extends Command {
    * @param schema The name of the schema.
    * @param model The name of the model.
    * @param comment The comment for the model.
+   * @param properties The model's properties.
    */
   public CreateModel(
       String url,
@@ -55,20 +59,22 @@ public class CreateModel extends Command {
       String catalog,
       String schema,
       String model,
-      String comment) {
+      String comment,
+      Map<String, String> properties) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.model = model;
     this.comment = comment;
+    this.properties = properties;
   }
 
   /** Creates a new model. */
   public void handle() {
     try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, model);
-      client.loadCatalog(catalog).asModelCatalog().registerModel(name, comment, null);
+      client.loadCatalog(catalog).asModelCatalog().registerModel(name, comment, properties);
     } catch (NoSuchMetalakeException noSuchMetalakeException) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException noSuchCatalogException) {

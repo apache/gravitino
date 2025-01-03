@@ -65,7 +65,7 @@ public class DeleteModel extends Command {
     this.model = model;
   }
 
-  /** Deletes and existing model. */
+  /** Deletes an existing model. */
   public void handle() {
     boolean deleted = false;
 

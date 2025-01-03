@@ -21,121 +21,8 @@
 package org.apache.gravitino.cli;
 
 import java.util.Map;
-import org.apache.gravitino.cli.commands.AddColumn;
-import org.apache.gravitino.cli.commands.AddRoleToGroup;
-import org.apache.gravitino.cli.commands.AddRoleToUser;
-import org.apache.gravitino.cli.commands.CatalogAudit;
-import org.apache.gravitino.cli.commands.CatalogDetails;
-import org.apache.gravitino.cli.commands.CatalogDisable;
-import org.apache.gravitino.cli.commands.CatalogEnable;
-import org.apache.gravitino.cli.commands.ClientVersion;
-import org.apache.gravitino.cli.commands.ColumnAudit;
-import org.apache.gravitino.cli.commands.CreateCatalog;
-import org.apache.gravitino.cli.commands.CreateFileset;
-import org.apache.gravitino.cli.commands.CreateGroup;
-import org.apache.gravitino.cli.commands.CreateMetalake;
-import org.apache.gravitino.cli.commands.CreateRole;
-import org.apache.gravitino.cli.commands.CreateSchema;
-import org.apache.gravitino.cli.commands.CreateTable;
-import org.apache.gravitino.cli.commands.CreateTag;
-import org.apache.gravitino.cli.commands.CreateTopic;
-import org.apache.gravitino.cli.commands.CreateUser;
-import org.apache.gravitino.cli.commands.DeleteCatalog;
-import org.apache.gravitino.cli.commands.DeleteColumn;
-import org.apache.gravitino.cli.commands.DeleteFileset;
-import org.apache.gravitino.cli.commands.DeleteGroup;
-import org.apache.gravitino.cli.commands.DeleteMetalake;
-import org.apache.gravitino.cli.commands.DeleteRole;
-import org.apache.gravitino.cli.commands.DeleteSchema;
-import org.apache.gravitino.cli.commands.DeleteTable;
-import org.apache.gravitino.cli.commands.DeleteTag;
-import org.apache.gravitino.cli.commands.DeleteTopic;
-import org.apache.gravitino.cli.commands.DeleteUser;
-import org.apache.gravitino.cli.commands.FilesetDetails;
-import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
-import org.apache.gravitino.cli.commands.GroupAudit;
-import org.apache.gravitino.cli.commands.GroupDetails;
-import org.apache.gravitino.cli.commands.ListAllTags;
-import org.apache.gravitino.cli.commands.ListCatalogProperties;
-import org.apache.gravitino.cli.commands.ListCatalogs;
-import org.apache.gravitino.cli.commands.ListColumns;
-import org.apache.gravitino.cli.commands.ListEntityTags;
-import org.apache.gravitino.cli.commands.ListFilesetProperties;
-import org.apache.gravitino.cli.commands.ListFilesets;
-import org.apache.gravitino.cli.commands.ListGroups;
-import org.apache.gravitino.cli.commands.ListIndexes;
-import org.apache.gravitino.cli.commands.ListMetalakeProperties;
-import org.apache.gravitino.cli.commands.ListMetalakes;
-import org.apache.gravitino.cli.commands.ListModel;
-import org.apache.gravitino.cli.commands.ListRoles;
-import org.apache.gravitino.cli.commands.ListSchema;
-import org.apache.gravitino.cli.commands.ListSchemaProperties;
-import org.apache.gravitino.cli.commands.ListTableProperties;
-import org.apache.gravitino.cli.commands.ListTables;
-import org.apache.gravitino.cli.commands.ListTagProperties;
-import org.apache.gravitino.cli.commands.ListTopicProperties;
-import org.apache.gravitino.cli.commands.ListTopics;
-import org.apache.gravitino.cli.commands.ListUsers;
-import org.apache.gravitino.cli.commands.MetalakeAudit;
-import org.apache.gravitino.cli.commands.MetalakeDetails;
-import org.apache.gravitino.cli.commands.MetalakeDisable;
-import org.apache.gravitino.cli.commands.MetalakeEnable;
-import org.apache.gravitino.cli.commands.ModelAudit;
-import org.apache.gravitino.cli.commands.ModelDetails;
-import org.apache.gravitino.cli.commands.OwnerDetails;
-import org.apache.gravitino.cli.commands.RemoveAllTags;
-import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
-import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
-import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
-import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
-import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
-import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
-import org.apache.gravitino.cli.commands.RemoveTableProperty;
-import org.apache.gravitino.cli.commands.RemoveTagProperty;
-import org.apache.gravitino.cli.commands.RemoveTopicProperty;
-import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
-import org.apache.gravitino.cli.commands.RoleAudit;
-import org.apache.gravitino.cli.commands.RoleDetails;
-import org.apache.gravitino.cli.commands.SchemaAudit;
-import org.apache.gravitino.cli.commands.SchemaDetails;
-import org.apache.gravitino.cli.commands.ServerVersion;
-import org.apache.gravitino.cli.commands.SetCatalogProperty;
-import org.apache.gravitino.cli.commands.SetFilesetProperty;
-import org.apache.gravitino.cli.commands.SetMetalakeProperty;
-import org.apache.gravitino.cli.commands.SetOwner;
-import org.apache.gravitino.cli.commands.SetSchemaProperty;
-import org.apache.gravitino.cli.commands.SetTableProperty;
-import org.apache.gravitino.cli.commands.SetTagProperty;
-import org.apache.gravitino.cli.commands.SetTopicProperty;
-import org.apache.gravitino.cli.commands.TableAudit;
-import org.apache.gravitino.cli.commands.TableDetails;
-import org.apache.gravitino.cli.commands.TableDistribution;
-import org.apache.gravitino.cli.commands.TablePartition;
-import org.apache.gravitino.cli.commands.TableSortOrder;
-import org.apache.gravitino.cli.commands.TagDetails;
-import org.apache.gravitino.cli.commands.TagEntity;
-import org.apache.gravitino.cli.commands.TopicDetails;
-import org.apache.gravitino.cli.commands.UntagEntity;
-import org.apache.gravitino.cli.commands.UpdateCatalogComment;
-import org.apache.gravitino.cli.commands.UpdateCatalogName;
-import org.apache.gravitino.cli.commands.UpdateColumnAutoIncrement;
-import org.apache.gravitino.cli.commands.UpdateColumnComment;
-import org.apache.gravitino.cli.commands.UpdateColumnDatatype;
-import org.apache.gravitino.cli.commands.UpdateColumnDefault;
-import org.apache.gravitino.cli.commands.UpdateColumnName;
-import org.apache.gravitino.cli.commands.UpdateColumnNullability;
-import org.apache.gravitino.cli.commands.UpdateColumnPosition;
-import org.apache.gravitino.cli.commands.UpdateFilesetComment;
-import org.apache.gravitino.cli.commands.UpdateFilesetName;
-import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
-import org.apache.gravitino.cli.commands.UpdateMetalakeName;
-import org.apache.gravitino.cli.commands.UpdateTableComment;
-import org.apache.gravitino.cli.commands.UpdateTableName;
-import org.apache.gravitino.cli.commands.UpdateTagComment;
-import org.apache.gravitino.cli.commands.UpdateTagName;
-import org.apache.gravitino.cli.commands.UpdateTopicComment;
-import org.apache.gravitino.cli.commands.UserAudit;
-import org.apache.gravitino.cli.commands.UserDetails;
+
+import org.apache.gravitino.cli.commands.*;
 
 /*
  * Methods used for testing
@@ -924,5 +811,15 @@ public class TestableCommandLine {
   protected ModelDetails newModelDetails(
       String url, boolean ignore, String metalake, String catalog, String schema, String model) {
     return new ModelDetails(url, ignore, metalake, catalog, schema, model);
+  }
+
+  protected CreateModel newCreateModel(
+      String url, boolean ignore, String metalake, String catalog, String schema, String model, String comment, Map<String, String> properties) {
+    return new CreateModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+  }
+
+  protected DeleteModel newDeleteModel(
+          String url, boolean ignore, boolean force, String metalake, String catalog, String schema, String model) {
+    return new DeleteModel(url, ignore, force, metalake, catalog, schema, model);
   }
 }
