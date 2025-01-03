@@ -42,7 +42,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
   relocate("com.google.common", "org.apache.gravitino.azure.shaded.com.google.common")
   relocate("org.eclipse.jetty", "org.apache.gravitino.azure.shaded.org.eclipse.jetty")
-
   mergeServiceFiles()
 }
 
