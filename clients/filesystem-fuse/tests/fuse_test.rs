@@ -21,7 +21,9 @@ use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::RUN_TEST_WITH_FUSE;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
-use log::{error, info};
+use tracing::{error, info};
+use std::sync::Arc;
+use std::thread::sleep;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
@@ -482,7 +484,7 @@ fn fuse_it_test_fuse() {
 
 #[test]
 fn test_fuse_with_memory_fs() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
 
     let mount_point = "target/gvfs";
     let _ = fs::create_dir_all(mount_point);
@@ -497,3 +499,5 @@ fn test_fuse_with_memory_fs() {
     let test_dir = Path::new(&test.mount_point).join("test_dir");
     run_tests(&test_dir);
 }
+
+

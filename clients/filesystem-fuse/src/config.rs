@@ -19,7 +19,7 @@
 use crate::error::ErrorCode::{ConfigNotFound, InvalidConfig};
 use crate::utils::GvfsResult;
 use config::{builder, Config};
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -292,6 +292,8 @@ pub struct FuseConfig {
     pub dir_mask: u32,
     #[serde(default)]
     pub fs_type: String,
+    #[serde(default)]
+    pub fuse_debug: bool,
     #[serde(default)]
     pub config_file_path: String,
     #[serde(default)]

@@ -19,7 +19,7 @@
 use crate::utils::GvfsResult;
 use fuse3::raw::{Filesystem, Session};
 use fuse3::MountOptions;
-use log::{error, info};
+use tracing::{error, info};
 use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
