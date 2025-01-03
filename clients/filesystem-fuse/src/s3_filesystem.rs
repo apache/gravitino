@@ -50,24 +50,8 @@ impl S3FileSystem {
         let bucket = extract_bucket(&fileset.storage_location)?;
         opendal_config.insert("bucket".to_string(), bucket);
 
-        let region = {
-            if let Some(region) = catalog.properties.get("s3-region") {
-                Some(region.clone())
-            } else if let Some(endpoint) = catalog.properties.get("s3-endpoint") {
-                extract_region(endpoint).ok()
-            } else {
-                None
-            }
-        };
-        match region {
-            Some(region) => opendal_config.insert("region".to_string(), region),
-            None => {
-                return Err(InvalidConfig.to_error(format!(
-                    "Cant not retrieve region in the Catalog {}",
-                    catalog.name
-                )));
-            }
-        };
+        let region = Self::get_s3_region(catalog)?;
+        opendal_config.insert("region".to_string(), region);
 
         let builder = S3::from_map(opendal_config);
 
@@ -81,6 +65,19 @@ impl S3FileSystem {
         Ok(Self {
             open_dal_fs: open_dal_fs,
         })
+    }
+
+    fn get_s3_region(catalog: &Catalog) -> GvfsResult<String> {
+        if let Some(region) = catalog.properties.get("s3-region") {
+            Ok(region.clone())
+        } else if let Some(endpoint) = catalog.properties.get("s3-endpoint") {
+            extract_region(endpoint)
+        } else {
+            Err(InvalidConfig.to_error(format!(
+                "Cant not retrieve region in the Catalog {}",
+                catalog.name
+            )))
+        }
     }
 }
 
