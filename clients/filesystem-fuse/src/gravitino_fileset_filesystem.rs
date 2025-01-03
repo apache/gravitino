@@ -30,9 +30,9 @@ use std::path::{Path, PathBuf};
 pub(crate) struct GravitinoFilesetFileSystem {
     physical_fs: Box<dyn PathFileSystem>,
     client: GravitinoClient,
-    // target_path is a absolute path in the physical filesystem that is associated with the fileset.
-    // e.g. fileset location : s3://bucket/path/to/file the target_path is /path/to/file
-    target_path: PathBuf,
+    // location is a absolute path in the physical filesystem that is associated with the fileset.
+    // e.g. fileset location : s3://bucket/path/to/file the location is /path/to/file
+    location: PathBuf,
 }
 
 impl GravitinoFilesetFileSystem {
@@ -46,21 +46,21 @@ impl GravitinoFilesetFileSystem {
         Self {
             physical_fs: fs,
             client: client,
-            target_path: target_path.into(),
+            location: target_path.into(),
         }
     }
 
     fn gvfs_path_to_raw_path(&self, path: &Path) -> PathBuf {
         let relation_path = path.strip_prefix("/").expect("path should start with /");
         if relation_path == Path::new("") {
-            return self.target_path.clone();
+            return self.location.clone();
         }
-        self.target_path.join(relation_path)
+        self.location.join(relation_path)
     }
 
     fn raw_path_to_gvfs_path(&self, path: &Path) -> Result<PathBuf> {
         let stripped_path = path
-            .strip_prefix(&self.target_path)
+            .strip_prefix(&self.location)
             .map_err(|_| Errno::from(libc::EBADF))?;
         let mut result_path = PathBuf::from("/");
         result_path.push(stripped_path);
@@ -150,7 +150,7 @@ mod tests {
         let fs = GravitinoFilesetFileSystem {
             physical_fs: Box::new(MemoryFileSystem::new().await),
             client: super::GravitinoClient::new(&GravitinoConfig::default()),
-            target_path: "/c1/fileset1".into(),
+            location: "/c1/fileset1".into(),
         };
         let path = fs.gvfs_path_to_raw_path(Path::new("/a"));
         assert_eq!(path, Path::new("/c1/fileset1/a"));
@@ -163,7 +163,7 @@ mod tests {
         let fs = GravitinoFilesetFileSystem {
             physical_fs: Box::new(MemoryFileSystem::new().await),
             client: super::GravitinoClient::new(&GravitinoConfig::default()),
-            target_path: "/c1/fileset1".into(),
+            location: "/c1/fileset1".into(),
         };
         let path = fs
             .raw_path_to_gvfs_path(Path::new("/c1/fileset1/a"))
