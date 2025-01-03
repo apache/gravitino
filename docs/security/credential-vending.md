@@ -114,11 +114,11 @@ A credential with a subscope privileged token, to use ADLS token credential, you
 
 A credential with a subscope privileged token, to use GCS token credential, you should create an GCS service account and grant proper privilege to it to access the OSS data.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                       | Default value                       | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|-----------------------------------------------------------------------------------|-------------------------------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `gcs-token` for GCS token credential.                                             | (none)                              | Yes      | 0.8.0-incubating |
-| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated, please use `gravitino.iceberg-rest.gcs-service-account-file` instead. | GCS Application default credential. | No       | 0.7.0-incubating |
-| `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                                              | GCS Application default credential. | No       | 0.7.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                | Default value                       | Required | Since Version    |
+|-------------------------------------|---------------------------------------------------|------------------------------------------------------------|-------------------------------------|----------|------------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `gcs-token` for GCS token credential.                      | (none)                              | Yes      | 0.8.0-incubating |
+| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated, please use `gcs-service-account-file` instead. | GCS Application default credential. | No       | 0.7.0-incubating |
+| `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                       | GCS Application default credential. | No       | 0.8.0-incubating |
 
 :::note
 For Gravitino Iceberg REST server, please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even `gcs-service-account-file` is setting.
@@ -126,7 +126,7 @@ For Gravitino Iceberg REST server, please make sure the credential file is acces
 
 ## Custom credentials
 
-Gravitino supports custom credentials, you can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar to the classpath of Iceberg catalog server or hadoop catalog.
+Gravitino supports custom credentials, you can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar to the classpath of Iceberg catalog server or Hadoop catalog.
 
 ## Deployment
 
