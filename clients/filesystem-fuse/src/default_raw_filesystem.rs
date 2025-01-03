@@ -135,11 +135,19 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         file_manager.insert(parent_file_id, file_id, path);
     }
 
-    fn meta_file_stat(&self) -> FileStat {
+    fn get_meta_file_stat(&self) -> FileStat {
         let mut meta_file_stat =
             FileStat::new_file_filestat_with_path(Path::new(FS_META_FILE_PATH), 0);
         meta_file_stat.set_file_id(ROOT_DIR_FILE_ID, FS_META_FILE_ID);
         meta_file_stat
+    }
+
+    fn is_meta_file(&self, file_id: u64) -> bool {
+        file_id == FS_META_FILE_ID
+    }
+
+    fn is_meta_file_name(&self, parent_file_id: u64, name: &OsStr) -> bool {
+        parent_file_id == ROOT_DIR_FILE_ID && name == OsStr::new(FS_META_FILE_NAME)
     }
 }
 
@@ -184,8 +192,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn stat(&self, file_id: u64) -> Result<FileStat> {
-        if file_id == FS_META_FILE_ID {
-            return Ok(self.meta_file_stat());
+        if self.is_meta_file(file_id) {
+            return Ok(self.get_meta_file_stat());
         }
 
         let file_entry = self.get_file_entry(file_id).await?;
@@ -195,8 +203,8 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn lookup(&self, parent_file_id: u64, name: &OsStr) -> Result<FileStat> {
-        if parent_file_id == ROOT_DIR_FILE_ID && name == OsStr::new(FS_META_FILE_NAME) {
-            return Ok(self.meta_file_stat());
+        if self.is_meta_file_name(parent_file_id, name) {
+            return Ok(self.get_meta_file_stat());
         }
 
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
@@ -217,14 +225,14 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         }
 
         if file_id == ROOT_DIR_FILE_ID {
-            child_filestats.push(self.meta_file_stat());
+            child_filestats.push(self.get_meta_file_stat());
         }
         Ok(child_filestats)
     }
 
     async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
-        if file_id == FS_META_FILE_ID {
-            let meta_file = OpenedFile::new(self.meta_file_stat());
+        if self.is_meta_file(file_id) {
+            let meta_file = OpenedFile::new(self.get_meta_file_stat());
             let resutl = self.opened_file_manager.put(meta_file);
             let file = resutl.lock().await;
             return Ok(file.file_handle());
@@ -245,7 +253,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         name: &OsStr,
         flags: u32,
     ) -> Result<FileHandle> {
-        if parent_file_id == ROOT_DIR_FILE_ID && name == OsStr::new(FS_META_FILE_NAME) {
+        if self.is_meta_file_name(parent_file_id, name) {
             return Err(Errno::from(libc::EEXIST));
         }
 
@@ -285,7 +293,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
-        if file_id == FS_META_FILE_ID {
+        if self.is_meta_file(file_id) {
             return Ok(());
         }
 
@@ -294,7 +302,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn remove_file(&self, parent_file_id: u64, name: &OsStr) -> Result<()> {
-        if parent_file_id == ROOT_DIR_FILE_ID && name == OsStr::new(FS_META_FILE_NAME) {
+        if self.is_meta_file_name(parent_file_id, name) {
             return Err(Errno::from(libc::EPERM));
         }
 
@@ -336,7 +344,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn read(&self, file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
-        if file_id == FS_META_FILE_ID {
+        if self.is_meta_file(file_id) {
             return Ok(Bytes::new());
         }
 
@@ -357,7 +365,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn write(&self, file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
-        if file_id == FS_META_FILE_ID {
+        if self.is_meta_file(file_id) {
             return Err(Errno::from(libc::EPERM));
         }
 
