@@ -99,7 +99,7 @@ public class FullName {
   /**
    * Retrieves the model name from the second part of the full name option.
    *
-   * @return The model name, or null if not found
+   * @return The model name, or null if not found.
    */
   public String getModelName() {
     return getNamePart(2);

@@ -80,6 +80,7 @@ import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.MetalakeDisable;
 import org.apache.gravitino.cli.commands.MetalakeEnable;
+import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveAllTags;
@@ -913,6 +914,11 @@ public class TestableCommandLine {
   protected ListModel newListModel(
       String url, boolean ignore, String metalake, String catalog, String schema) {
     return new ListModel(url, ignore, metalake, catalog, schema);
+  }
+
+  protected ModelAudit newModelAudit(
+      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
+    return new ModelAudit(url, ignore, metalake, catalog, schema, model);
   }
 
   protected ModelDetails newModelDetails(

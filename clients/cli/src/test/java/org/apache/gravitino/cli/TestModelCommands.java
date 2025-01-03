@@ -38,13 +38,14 @@ import java.util.Collections;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.ListModel;
+import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Joiner;
 
-public class TestModelCommand {
+public class TestModelCommands {
   private final Joiner joiner = Joiner.on(", ").skipNulls();
   private CommandLine mockCommandLine;
   private Options mockOptions;
@@ -266,5 +267,26 @@ public class TestModelCommand {
             + "Missing required argument(s): "
             + joiner.join(Collections.singletonList(CommandEntities.MODEL)),
         output);
+  }
+
+  @Test
+  void testModelAuditCommand() {
+    ModelAudit mockAudit = mock(ModelAudit.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.AUDIT)).thenReturn(true);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DETAILS));
+    doReturn(mockAudit)
+        .when(commandLine)
+        .newModelAudit(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "model");
+    commandLine.handleCommandLine();
+    verify(mockAudit).handle();
   }
 }
