@@ -27,7 +27,7 @@ except FileNotFoundError:
 setup(
     name="apache-gravitino",
     description="Python lib/client for Apache Gravitino",
-    version="0.8.0.dev0",
+    version="0.9.0-SNAPSHOT",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Apache Software Foundation",
