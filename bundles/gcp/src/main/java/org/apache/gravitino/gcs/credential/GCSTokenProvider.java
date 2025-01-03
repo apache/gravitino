@@ -146,12 +146,13 @@ public class GCSTokenProvider implements CredentialProvider {
         CredentialAccessBoundary.newBuilder();
     readBuckets.forEach(
         bucket -> {
-          AccessBoundaryRule rule1 =
+          // Hadoop GCS connector needs to get bucket info
+          AccessBoundaryRule bucketInfoRule =
               AccessBoundaryRule.newBuilder()
                   .setAvailableResource(toGCSBucketResource(bucket))
                   .setAvailablePermissions(Arrays.asList("inRole:roles/storage.legacyBucketReader"))
                   .build();
-          credentialAccessBoundaryBuilder.addRule(rule1);
+          credentialAccessBoundaryBuilder.addRule(bucketInfoRule);
           List<String> readConditions = readExpressions.get(bucket);
           AccessBoundaryRule rule =
               getAccessBoundaryRule(
