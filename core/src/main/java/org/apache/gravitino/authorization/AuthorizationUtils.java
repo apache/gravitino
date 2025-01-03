@@ -29,6 +29,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -174,19 +175,8 @@ public class AuthorizationUtils {
 
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
-      NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
-      // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
-      // call authorization plugin method.
-      for (NameIdentifier catalog : catalogs) {
-        callAuthorizationPluginImpl(consumer, catalogManager.loadCatalog(catalog));
-      }
-    } else if (needApplyAuthorization(metadataObject.type())) {
-      NameIdentifier catalogIdent =
-          NameIdentifierUtil.getCatalogIdentifier(
-              MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+    List<Catalog> loadedCatalogs = loadMetadataObjectCatalog(metalake, metadataObject);
+    for (Catalog catalog : loadedCatalogs) {
       callAuthorizationPluginImpl(consumer, catalog);
     }
   }
@@ -255,13 +245,31 @@ public class AuthorizationUtils {
     if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
       MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject);
+
+      String metalake =
+          type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
+
       callAuthorizationPluginForMetadataObject(
-          ident.namespace().level(0),
+          metalake,
           metadataObject,
           authorizationPlugin -> {
             authorizationPlugin.onMetadataUpdated(removeObject);
           });
     }
+  }
+
+  public static void removeCatalogPrivileges(Catalog catalog) {
+    // If we enable authorization, we should remove the privileges about the entity in the
+    // authorization plugin.
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, catalog.name(), MetadataObject.Type.CATALOG);
+    MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject);
+
+    callAuthorizationPluginImpl(
+        authorizationPlugin -> {
+          authorizationPlugin.onMetadataUpdated(removeObject);
+        },
+        catalog);
   }
 
   public static void authorizationPluginRenamePrivileges(
@@ -363,5 +371,27 @@ public class AuthorizationUtils {
           "Catalog %s type %s doesn't support privilege %s",
           catalogIdent, catalog.type(), privilege);
     }
+  }
+
+  private static List<Catalog> loadMetadataObjectCatalog(
+      String metalake, MetadataObject metadataObject) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    List<Catalog> loadedCatalogs = Lists.newArrayList();
+    if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
+      NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
+      // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
+      // call authorization plugin method.
+      for (NameIdentifier catalog : catalogs) {
+        loadedCatalogs.add(catalogManager.loadCatalog(catalog));
+      }
+    } else if (needApplyAuthorization(metadataObject.type())) {
+      NameIdentifier catalogIdent =
+          NameIdentifierUtil.getCatalogIdentifier(
+              MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+      loadedCatalogs.add(catalog);
+    }
+
+    return loadedCatalogs;
   }
 }
