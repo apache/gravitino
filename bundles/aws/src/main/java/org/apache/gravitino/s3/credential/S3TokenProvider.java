@@ -121,7 +121,6 @@ public class S3TokenProvider implements CredentialProvider {
         IamStatement.builder()
             .effect(IamEffect.ALLOW)
             .addAction("s3:GetObject")
-            .addAction("s3:GetObjectAttributes")
             .addAction("s3:GetObjectVersion");
     Map<String, IamStatement.Builder> bucketListStatmentBuilder = new HashMap<>();
     Map<String, IamStatement.Builder> bucketGetLocationStatmentBuilder = new HashMap<>();
