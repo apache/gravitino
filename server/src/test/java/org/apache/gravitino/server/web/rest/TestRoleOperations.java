@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,6 +53,7 @@ import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
@@ -142,7 +144,7 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateRole() {
+  public void testCreateRole() throws IllegalAccessException, NoSuchFieldException {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     SecurableObject anotherSecurableObject =
@@ -160,6 +162,33 @@ public class TestRoleOperations extends JerseyTest {
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
+
+    // Test with IllegalRequest
+    RoleCreateRequest illegalRequest = new RoleCreateRequest("role", Collections.emptyMap(), null);
+    Response illegalResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
+    SecurableObjectDTO illegalObject =
+        DTOConverters.toDTO(
+            SecurableObjects.ofCatalog(
+                "illegal_catalog", Lists.newArrayList(Privileges.CreateSchema.deny())));
+    Field field = illegalObject.getClass().getDeclaredField("privileges");
+    field.setAccessible(true);
+    field.set(illegalObject, new PrivilegeDTO[] {});
+
+    illegalRequest =
+        new RoleCreateRequest(
+            "role", Collections.emptyMap(), new SecurableObjectDTO[] {illegalObject});
+    illegalResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
 
     Response resp =
         target("/metalakes/metalake1/roles")

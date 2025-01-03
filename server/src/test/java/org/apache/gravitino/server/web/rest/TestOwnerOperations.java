@@ -202,6 +202,14 @@ class TestOwnerOperations extends JerseyTest {
   @Test
   void testSetOwnerForObject() {
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    OwnerSetRequest invalidRequest = new OwnerSetRequest(null, Owner.Type.USER);
+    Response invalidResp =
+        target("/metalakes/metalake1/owners/metalake/metalake1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(invalidRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidResp.getStatus());
+
     OwnerSetRequest request = new OwnerSetRequest("test", Owner.Type.USER);
     Response resp =
         target("/metalakes/metalake1/owners/metalake/metalake1")
