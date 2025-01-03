@@ -50,13 +50,24 @@ impl S3FileSystem {
         let bucket = extract_bucket(&fileset.storage_location)?;
         opendal_config.insert("bucket".to_string(), bucket);
 
-        let endpoint = catalog.properties.get("s3-endpoint");
-        if endpoint.is_none() {
-            return Err(OpenDalError.to_error("s3-endpoint is not found in catalog"));
-        }
-        let endpoint = endpoint.unwrap();
-        let region = extract_region(endpoint)?;
-        opendal_config.insert("region".to_string(), region);
+        let region = {
+            if let Some(region) = catalog.properties.get("region") {
+                Some(region.clone())
+            } else if let Some(endpoint) = catalog.properties.get("s3-endpoint") {
+                extract_region(endpoint).ok()
+            } else {
+                None
+            }
+        };
+        match region {
+            Some(region) => opendal_config.insert("region".to_string(), region),
+            None => {
+                return Err(InvalidConfig.to_error(format!(
+                    "Cant not retrieve region in the Catalog {}",
+                    catalog.name
+                )));
+            }
+        };
 
         let builder = S3::from_map(opendal_config);
 

@@ -35,6 +35,8 @@ pub(crate) const ROOT_DIR_FILE_ID: u64 = 1;
 pub(crate) const ROOT_DIR_NAME: &str = "";
 pub(crate) const ROOT_DIR_PATH: &str = "/";
 pub(crate) const INITIAL_FILE_ID: u64 = 10000;
+
+// File system meta file is indicated the fuse filesystem is active.
 pub(crate) const FS_META_FILE_PATH: &str = "/.gvfs_meta";
 pub(crate) const FS_META_FILE_NAME: &str = ".gvfs_meta";
 pub(crate) const FS_META_FILE_ID: u64 = 10;
