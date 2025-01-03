@@ -22,7 +22,7 @@ import sys
 import time
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 import re
 import importlib
 import fsspec
@@ -36,6 +36,7 @@ from fsspec.utils import infer_storage_options
 from readerwriterlock import rwlock
 
 from gravitino.api.catalog import Catalog
+from gravitino.api.credential.credential import Credential
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
@@ -910,10 +911,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
             if cache_value is not None:
                 # if the cache value is not expired, return the cache value
-                if (
-                    cache_value[0] == 0
-                    or cache_value[0] > time.time() * 1000 + 60 * 5 * 1000
-                ):
+                if cache_value[0] > time.time() * 1000:
                     return cache_value[1]
         finally:
             read_lock.release()
@@ -927,10 +925,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
             if cache_value is not None:
                 # if the cache value is not expired, return the cache value
-                if (
-                    cache_value[0] == 0
-                    or cache_value[0] > time.time() * 1000 + 60 * 5 * 1000
-                ):
+                if cache_value[0] > time.time() * 1000:
                     return cache_value[1]
 
             new_cache_value: Tuple[int, AbstractFileSystem]
@@ -977,20 +972,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
-        if len(credentials) != 0:
-            credential = credentials[0]
-            credential_info = credential.credential_info()
-            expire_time = (
-                credential.expire_time_in_ms()
-                if credential.expire_time_in_ms() > 0
-                else sys.maxsize
-            )
-            if (
-                credential.credential_type()
-                == GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE
-            ):
+        credential = self._get_most_suitable_gcs_credential(credentials)
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, GCSTokenCredential):
                 fs = importlib.import_module("gcsfs").GCSFileSystem(
-                    token=credential_info[GCSTokenCredential.GCS_TOKEN_NAME]
+                    token=credential.token()
                 )
                 return (expire_time, fs)
 
@@ -1009,8 +996,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             ),
         )
 
-    # Disable Too many branches (13/12) (too-many-branches)
-    # pylint: disable=R0912
     def _get_s3_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
         try:
             fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
@@ -1021,30 +1006,22 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
-        if len(credentials) != 0:
-            credential = credentials[0]
-            credential_info = credential.credential_info()
-            expire_time = (
-                credential.expire_time_in_ms()
-                if credential.expire_time_in_ms() > 0
-                else sys.maxsize
-            )
-            if (
-                credential.credential_type()
-                == S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE
-            ):
+        credential = self._get_most_suitable_s3_credential(credentials)
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, S3TokenCredential):
                 fs = importlib.import_module("s3fs").S3FileSystem(
-                    key=credential_info[S3TokenCredential.SESSION_ACCESS_KEY_ID],
-                    secret=credential_info[S3TokenCredential.SESSION_SECRET_ACCESS_KEY],
-                    token=credential_info[S3TokenCredential.SESSION_TOKEN],
+                    key=credential.access_key_id(),
+                    secret=credential.secret_access_key(),
+                    token=credential.session_token(),
                 )
                 return (expire_time, fs)
-
-            fs = importlib.import_module("s3fs").S3FileSystem(
-                key=credential_info[S3SecretKeyCredential.STATIC_ACCESS_KEY_ID],
-                secret=credential_info[S3SecretKeyCredential.STATIC_SECRET_ACCESS_KEY],
-            )
-            return (expire_time, fs)
+            if isinstance(credential, S3SecretKeyCredential):
+                fs = importlib.import_module("s3fs").S3FileSystem(
+                    key=credential.access_key_id(),
+                    secret=credential.secret_access_key(),
+                )
+                return (expire_time, fs)
 
         # this is the old way to get the s3 file system
         # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception
@@ -1090,39 +1067,27 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
-        if len(credentials) != 0:
-            credential = credentials[0]
-            credential_info = credential.credential_info()
+        credential = self._get_most_suitable_oss_credential(credentials)
+        if credential is not None:
             oss_endpoint = fileset_catalog.properties()["oss-endpoint"]
-            expire_time = (
-                credential.expire_time_in_ms()
-                if credential.expire_time_in_ms() > 0
-                else sys.maxsize
-            )
-
-            if (
-                credential.credential_type()
-                == OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE
-            ):
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, OSSTokenCredential):
                 fs = importlib.import_module("ossfs").OSSFileSystem(
-                    key=credential_info[OSSTokenCredential.STATIC_ACCESS_KEY_ID],
-                    secret=credential_info[OSSTokenCredential.STATIC_SECRET_ACCESS_KEY],
-                    token=credential_info[OSSTokenCredential.OSS_TOKEN],
+                    key=credential.access_key_id(),
+                    secret=credential.secret_access_key(),
+                    token=credential.security_token(),
                     endpoint=oss_endpoint,
                 )
-
                 return (expire_time, fs)
-
-            return (
-                expire_time,
-                importlib.import_module("ossfs").OSSFileSystem(
-                    key=credential_info[OSSSecretKeyCredential.STATIC_ACCESS_KEY_ID],
-                    secret=credential_info[
-                        OSSSecretKeyCredential.STATIC_SECRET_ACCESS_KEY
-                    ],
-                    endpoint=oss_endpoint,
-                ),
-            )
+            if isinstance(credential, OSSSecretKeyCredential):
+                return (
+                    expire_time,
+                    importlib.import_module("ossfs").OSSFileSystem(
+                        key=credential.access_key_id(),
+                        secret=credential.secret_access_key(),
+                        endpoint=oss_endpoint,
+                    ),
+                )
 
         oss_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
         if oss_endpoint_url is None:
@@ -1172,33 +1137,22 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
-        if len(credentials) != 0:
-            credential = credentials[0]
-            credential_type = credential.credential_type()
-            credential_info = credential.credential_info()
-            expire_time = (
-                credential.expire_time_in_ms()
-                if credential.expire_time_in_ms() > 0
-                else sys.maxsize
-            )
-            if credential_type == ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE:
+        credential = self._get_most_suitable_abs_credential(credentials)
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, ADLSTokenCredential):
                 fs = importlib.import_module("adlfs").AzureBlobFileSystem(
-                    account_name=credential_info[
-                        ADLSTokenCredential.STORAGE_ACCOUNT_NAME
-                    ],
-                    sas_token=credential_info[ADLSTokenCredential.SAS_TOKEN],
+                    account_name=credential.account_name(),
+                    sas_token=credential.sas_token(),
                 )
                 return (expire_time, fs)
 
-            fs = importlib.import_module("adlfs").AzureBlobFileSystem(
-                account_name=credential_info[
-                    AzureAccountKeyCredential.STORAGE_ACCOUNT_NAME
-                ],
-                account_key=credential_info[
-                    AzureAccountKeyCredential.STORAGE_ACCOUNT_KEY
-                ],
-            )
-            return (expire_time, fs)
+            if isinstance(credential, AzureAccountKeyCredential):
+                fs = importlib.import_module("adlfs").AzureBlobFileSystem(
+                    account_name=credential.account_name(),
+                    account_key=credential.account_key(),
+                )
+                return (expire_time, fs)
 
         # get 'abs_account_name' from abs options, if the key is not found, throw an exception
         abs_account_name = self._options.get(
@@ -1225,6 +1179,51 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 account_key=abs_account_key,
             ),
         )
+
+    def _get_most_suitable_s3_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if
+            if isinstance(credential, S3TokenCredential):
+                return credential
+
+        for credential in credentials:
+            if isinstance(credential, S3SecretKeyCredential):
+                return credential
+        return None
+
+    def _get_most_suitable_oss_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if
+            if isinstance(credential, OSSTokenCredential):
+                return credential
+
+        for credential in credentials:
+            if isinstance(credential, OSSSecretKeyCredential):
+                return credential
+        return None
+
+    def _get_most_suitable_gcs_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if
+            if isinstance(credential, GCSTokenCredential):
+                return credential
+        return None
+
+    def _get_most_suitable_abs_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if
+            if isinstance(credential, ADLSTokenCredential):
+                return credential
+
+        for credential in credentials:
+            if isinstance(credential, AzureAccountKeyCredential):
+                return credential
+        return None
+
+    def _get_expire_time_by_ratio(self, expire_time: int):
+        if expire_time <= 0:
+            return sys.maxsize
+        return time.time() * 1000 + (expire_time - time.time() * 1000) * 0.9
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)

@@ -26,9 +26,9 @@ class S3TokenCredential(Credential, ABC):
     """Represents the S3 token credential."""
 
     S3_TOKEN_CREDENTIAL_TYPE: str = "s3-token"
-    SESSION_ACCESS_KEY_ID: str = "s3-access-key-id"
-    SESSION_SECRET_ACCESS_KEY: str = "s3-secret-access-key"
-    SESSION_TOKEN: str = "s3-session-token"
+    _SESSION_ACCESS_KEY_ID: str = "s3-access-key-id"
+    _SESSION_SECRET_ACCESS_KEY: str = "s3-secret-access-key"
+    _SESSION_TOKEN: str = "s3-session-token"
 
     _expire_time_in_ms: int = 0
     _access_key_id: str = None
@@ -36,11 +36,11 @@ class S3TokenCredential(Credential, ABC):
     _session_token: str = None
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._access_key_id = credential_info.get(self.SESSION_ACCESS_KEY_ID, None)
+        self._access_key_id = credential_info.get(self._SESSION_ACCESS_KEY_ID, None)
         self._secret_access_key = credential_info.get(
-            self.SESSION_SECRET_ACCESS_KEY, None
+            self._SESSION_SECRET_ACCESS_KEY, None
         )
-        self._session_token = credential_info.get(self.SESSION_TOKEN, None)
+        self._session_token = credential_info.get(self._SESSION_TOKEN, None)
         self._expire_time_in_ms = expire_time_in_ms
         Precondition.check_string_not_empty(
             self._access_key_id, "The S3 access key ID should not be empty"
@@ -80,9 +80,9 @@ class S3TokenCredential(Credential, ABC):
              The credential information.
         """
         return {
-            self.SESSION_ACCESS_KEY_ID: self._access_key_id,
-            self.SESSION_SECRET_ACCESS_KEY: self._secret_access_key,
-            self.SESSION_TOKEN: self._session_token,
+            self._SESSION_ACCESS_KEY_ID: self._access_key_id,
+            self._SESSION_SECRET_ACCESS_KEY: self._secret_access_key,
+            self._SESSION_TOKEN: self._session_token,
         }
 
     def access_key_id(self) -> str:

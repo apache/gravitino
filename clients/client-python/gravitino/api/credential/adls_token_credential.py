@@ -27,12 +27,12 @@ class ADLSTokenCredential(Credential, ABC):
 
     ADLS_TOKEN_CREDENTIAL_TYPE: str = "adls-token"
     ADLS_DOMAIN: str = "dfs.core.windows.net"
-    STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
-    SAS_TOKEN: str = "adls-sas-token"
+    _STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
+    _SAS_TOKEN: str = "adls-sas-token"
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._account_name = credential_info.get(self.STORAGE_ACCOUNT_NAME, None)
-        self._sas_token = credential_info.get(self.SAS_TOKEN, None)
+        self._account_name = credential_info.get(self._STORAGE_ACCOUNT_NAME, None)
+        self._sas_token = credential_info.get(self._SAS_TOKEN, None)
         self._expire_time_in_ms = expire_time_in_ms
         Precondition.check_string_not_empty(
             self._account_name, "The ADLS account name should not be empty."
@@ -69,8 +69,8 @@ class ADLSTokenCredential(Credential, ABC):
              The credential information.
         """
         return {
-            self.STORAGE_ACCOUNT_NAME: self._account_name,
-            self.SAS_TOKEN: self._sas_token,
+            self._STORAGE_ACCOUNT_NAME: self._account_name,
+            self._SAS_TOKEN: self._sas_token,
         }
 
     def account_name(self) -> str:

@@ -26,12 +26,12 @@ class GCSTokenCredential(Credential, ABC):
     """Represents the GCS token credential."""
 
     GCS_TOKEN_CREDENTIAL_TYPE: str = "gcs-token"
-    GCS_TOKEN_NAME: str = "token"
+    _GCS_TOKEN_NAME: str = "token"
 
     _expire_time_in_ms: int = 0
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._token = credential_info.get(self.GCS_TOKEN_NAME, None)
+        self._token = credential_info.get(self._GCS_TOKEN_NAME, None)
         self._expire_time_in_ms = expire_time_in_ms
         Precondition.check_string_not_empty(
             self._token, "GCS token should not be empty"
@@ -64,7 +64,7 @@ class GCSTokenCredential(Credential, ABC):
         Returns:
              The credential information.
         """
-        return {self.GCS_TOKEN_NAME: self._token}
+        return {self._GCS_TOKEN_NAME: self._token}
 
     def token(self) -> str:
         """The GCS token.

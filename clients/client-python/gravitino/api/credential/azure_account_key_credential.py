@@ -26,12 +26,12 @@ class AzureAccountKeyCredential(Credential, ABC):
     """Represents Azure account key credential."""
 
     AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE: str = "azure-account-key"
-    STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
-    STORAGE_ACCOUNT_KEY: str = "azure-storage-account-key"
+    _STORAGE_ACCOUNT_NAME: str = "azure-storage-account-name"
+    _STORAGE_ACCOUNT_KEY: str = "azure-storage-account-key"
 
     def __init__(self, credential_info: Dict[str, str], expire_time_in_ms: int):
-        self._account_name = credential_info.get(self.STORAGE_ACCOUNT_NAME, None)
-        self._account_key = credential_info.get(self.STORAGE_ACCOUNT_KEY, None)
+        self._account_name = credential_info.get(self._STORAGE_ACCOUNT_NAME, None)
+        self._account_key = credential_info.get(self._STORAGE_ACCOUNT_KEY, None)
         Precondition.check_string_not_empty(
             self._account_name, "The Azure account name should not be empty"
         )
@@ -67,8 +67,8 @@ class AzureAccountKeyCredential(Credential, ABC):
             The credential information.
         """
         return {
-            self.STORAGE_ACCOUNT_NAME: self._account_name,
-            self.STORAGE_ACCOUNT_KEY: self._account_key,
+            self._STORAGE_ACCOUNT_NAME: self._account_name,
+            self._STORAGE_ACCOUNT_KEY: self._account_key,
         }
 
     def account_name(self) -> str:
