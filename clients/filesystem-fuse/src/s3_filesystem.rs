@@ -51,7 +51,7 @@ impl S3FileSystem {
         opendal_config.insert("bucket".to_string(), bucket);
 
         let region = {
-            if let Some(region) = catalog.properties.get("region") {
+            if let Some(region) = catalog.properties.get("s3-region") {
                 Some(region.clone())
             } else if let Some(endpoint) = catalog.properties.get("s3-endpoint") {
                 extract_region(endpoint).ok()
