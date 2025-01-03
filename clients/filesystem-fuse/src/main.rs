@@ -24,7 +24,7 @@ use tokio::signal;
 
 #[tokio::main]
 async fn main() -> fuse3::Result<()> {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
 
     //todo(read config file from args)
     let config = AppConfig::from_file(Some("conf/gvfs_fuse.toml"));
