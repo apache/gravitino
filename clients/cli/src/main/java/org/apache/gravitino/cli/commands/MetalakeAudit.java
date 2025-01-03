@@ -54,4 +54,10 @@ public class MetalakeAudit extends AuditCommand {
 
     displayAuditInfo(audit);
   }
+
+  @Override
+  public Command verify() {
+    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+    return super.verify();
+  }
 }

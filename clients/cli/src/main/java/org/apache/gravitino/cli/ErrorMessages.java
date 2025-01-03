@@ -36,6 +36,9 @@ public class ErrorMessages {
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_ROLE = "Missing --role option.";
   public static final String MISSING_TAG = "Missing --tag option.";
+  public static final String MISSING_PROPERTY = "Missing --property option.";
+  public static final String MISSING_VALUE = "Missing --value option.";
+  public static final String MISSING_COMMENT = "Missing --comment option.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String SCHEMA_EXISTS = "Schema already exists.";
@@ -57,7 +60,6 @@ public class ErrorMessages {
   public static final String UNKNOWN_ROLE = "Unknown role.";
   public static final String ROLE_EXISTS = "Role already exists.";
   public static final String TABLE_EXISTS = "Table already exists.";
-  public static final String MODEL_EXISTS = "Model already exists.";
   public static final String INVALID_SET_COMMAND =
       "Unsupported combination of options either use --name, --user, --group or --property and --value.";
   public static final String INVALID_REMOVE_COMMAND =
