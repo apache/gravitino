@@ -20,67 +20,78 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchModelException;
 
-/** Creates a new model. */
-public class CreateModel extends Command {
+/** Deletes an existing model. */
+public class DeleteModel extends Command {
 
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String model;
-  protected final String comment;
+  protected final boolean force;
 
   /**
    *
-   * Creates a new model.
+   * Deletes an existing model.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param model The name of the model.
-   * @param comment The comment for the model.
    */
-  public CreateModel(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String model,
-      String comment) {
+  public DeleteModel(
+          String url,
+          boolean ignoreVersions,
+          boolean force,
+          String metalake,
+          String catalog,
+          String schema,
+          String model) {
     super(url, ignoreVersions);
+    this.force = force;
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.model = model;
-    this.comment = comment;
   }
 
-  /** Creates a new model. */
+  /** Deletes and existing model. */
   public void handle() {
+    boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
+
     try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, model);
-      client.loadCatalog(catalog).asModelCatalog().registerModel(name, comment, null);
+      deleted = client.loadCatalog(catalog).asModelCatalog().deleteModel(name);
     } catch (NoSuchMetalakeException noSuchMetalakeException) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException noSuchCatalogException) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException noSuchSchemaException) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (ModelAlreadyExistsException modelAlreadyExistsException) {
-      exitWithError(ErrorMessages.MODEL_EXISTS);
+    } catch (NoSuchModelException noSuchModelException) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
     } catch (Exception err) {
       exitWithError(err.getMessage());
     }
 
-    System.out.println(model + " created");
+    if (deleted) {
+      System.out.println(model + " deleted.");
+    } else {
+      System.out.println(model + " not deleted.");
+    }
   }
 }
