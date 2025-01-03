@@ -82,6 +82,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)

@@ -110,8 +110,13 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void useCatalog() throws InterruptedException {
+  protected void useCatalog() {
     // Do nothing, default catalog is ok for Hive.
+  }
+
+  @Override
+  protected String testUserName() {
+    return System.getenv(HADOOP_USER_NAME);
   }
 
   @Override

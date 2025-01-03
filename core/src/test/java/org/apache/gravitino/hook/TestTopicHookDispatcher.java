@@ -72,8 +72,9 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topicNAME");
     topicHookDispatcher.createTopic(topicIdent, "comment", null, props);
 
-    Mockito.reset(authorizationPlugin);
-    topicHookDispatcher.dropTopic(topicIdent);
-    Mockito.verify(authorizationPlugin).onMetadataUpdated(any());
+    withMockedAuthorizationUtils(
+        () -> {
+          topicHookDispatcher.dropTopic(topicIdent);
+        });
   }
 }

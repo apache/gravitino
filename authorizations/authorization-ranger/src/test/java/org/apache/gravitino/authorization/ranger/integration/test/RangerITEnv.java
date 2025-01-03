@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
-import static org.mockito.Mockito.doReturn;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -64,7 +63,7 @@ public class RangerITEnv {
   private static final String RANGER_HIVE_TYPE = "hive";
   public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
-  protected static RangerClient rangerClient;
+  public static RangerClient rangerClient;
   public static final String HADOOP_USER_NAME = "gravitino";
   private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -139,7 +138,6 @@ public class RangerITEnv {
                     "HDFS",
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME)));
-    doReturn("/test").when(spyRangerAuthorizationHDFSPlugin).getLocationPath(Mockito.any());
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =

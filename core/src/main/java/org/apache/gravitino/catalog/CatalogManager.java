@@ -745,6 +745,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         // PostgreSQL catalog includes the "public" schema, see
         // https://github.com/apache/gravitino/issues/2314
         return !schemaEntities.get(0).name().equals("public");
+      } else if ("hive".equals(catalogEntity.getProvider())) {
+        return !schemaEntities.get(0).name().equals("default");
       }
     }
 

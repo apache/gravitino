@@ -110,7 +110,12 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void useCatalog() throws InterruptedException {
+  protected String testUserName() {
+    return System.getenv(HADOOP_USER_NAME);
+  }
+
+  @Override
+  protected void useCatalog() {
     String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
