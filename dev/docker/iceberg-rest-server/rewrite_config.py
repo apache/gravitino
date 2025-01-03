@@ -34,6 +34,9 @@ env_map = {
   "GRAVITINO_AZURE_TENANT_ID" : "azure-tenant-id",
   "GRAVITINO_AZURE_CLIENT_ID" : "azure-client-id",
   "GRAVITINO_AZURE_CLIENT_SECRET" : "azure-client-secret",
+  "GRAVITINO_OSS_ACCESS_KEY": "oss-access-key-id",
+  "GRAVITINO_OSS_SECRET_KEY": "oss-secret-access-key",
+  "GRAVITINO_OSS_ENDPOINT": "oss-endpoint"
 }
 
 init_config = {

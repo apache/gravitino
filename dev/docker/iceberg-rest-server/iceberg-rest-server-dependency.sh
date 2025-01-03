@@ -38,6 +38,8 @@ cd ${gravitino_home}
 ./gradlew :bundles:gcp-bundle:jar
 ./gradlew :bundles:aws-bundle:jar
 ./gradlew :bundles:azure-bundle:jar
+./gradlew :bundles:aliyun-bundle:jar
+
 
 # prepare bundle jar
 cd ${iceberg_rest_server_dir}
@@ -45,6 +47,8 @@ mkdir -p bundles
 cp ${gravitino_home}/bundles/gcp-bundle/build/libs/gravitino-gcp-bundle-*.jar bundles/
 cp ${gravitino_home}/bundles/aws-bundle/build/libs/gravitino-aws-bundle-*.jar bundles/
 cp ${gravitino_home}/bundles/azure-bundle/build/libs/gravitino-azure-bundle-*.jar bundles/
+cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-*.jar bundles/
+
 
 iceberg_gcp_bundle="iceberg-gcp-bundle-1.5.2.jar"
 if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then
@@ -60,6 +64,13 @@ iceberg_azure_bundle="iceberg-azure-bundle-1.5.2.jar"
 if [ ! -f "bundles/${iceberg_azure_bundle}" ]; then
   curl -L -s -o bundles/${iceberg_azure_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-azure-bundle/1.5.2/${iceberg_azure_bundle}
 fi
+
+iceberg_aliyun_bundle="iceberg-aliyun-bundle-1.5.2.jar"
+if [ ! -f "bundles/${iceberg_aliyun_bundle}" ]; then
+  curl -L -s -o bundles/${iceberg_aliyun_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aliyun-bundle/1.5.2/${iceberg_aliyun_bundle}
+fi
+
+
 
 # download jdbc driver
 curl -L -s -o bundles/sqlite-jdbc-3.42.0.0.jar https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar
