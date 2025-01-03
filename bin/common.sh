@@ -42,6 +42,11 @@ if [[ -f "${GRAVITINO_CONF_DIR}/gravitino-env.sh" ]]; then
   . "${GRAVITINO_CONF_DIR}/gravitino-env.sh"
 fi
 
+if [[ -z "${GRAVITINO_VERSION}" ]]; then
+  echo -e "No GRAVITINO_VERSION was found, you may need to:\n1. Run the gravitino.sh script on the compiled Gravitino.\n2. Run the gravitino.sh script in the release package."
+  exit 1
+fi
+
 GRAVITINO_CLASSPATH+=":${GRAVITINO_CONF_DIR}"
 
 JVM_VERSION=8
