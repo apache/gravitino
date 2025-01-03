@@ -27,10 +27,13 @@ mod fuse_api_handle;
 mod fuse_server;
 mod gravitino_client;
 mod gravitino_fileset_filesystem;
+mod gvfs_creator;
 mod gvfs_fuse;
 mod memory_filesystem;
+mod open_dal_filesystem;
 mod opened_file;
 mod opened_file_manager;
+mod s3_filesystem;
 mod utils;
 
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {

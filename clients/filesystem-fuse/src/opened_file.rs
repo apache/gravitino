@@ -122,6 +122,32 @@ pub(crate) struct FileHandle {
 // OpenFileFlags is the open file flags for the file system.
 pub(crate) struct OpenFileFlags(pub(crate) u32);
 
+impl OpenFileFlags {
+    pub fn is_read(&self) -> bool {
+        (self.0 & libc::O_WRONLY as u32) == 0
+    }
+
+    pub fn is_write(&self) -> bool {
+        (self.0 & libc::O_WRONLY as u32) != 0 || (self.0 & libc::O_RDWR as u32) != 0
+    }
+
+    pub fn is_append(&self) -> bool {
+        (self.0 & libc::O_APPEND as u32) != 0
+    }
+
+    pub fn is_create(&self) -> bool {
+        (self.0 & libc::O_CREAT as u32) != 0
+    }
+
+    pub fn is_truncate(&self) -> bool {
+        (self.0 & libc::O_TRUNC as u32) != 0
+    }
+
+    pub fn is_exclusive(&self) -> bool {
+        (self.0 & libc::O_EXCL as u32) != 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

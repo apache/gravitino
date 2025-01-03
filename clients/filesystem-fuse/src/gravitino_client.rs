@@ -48,6 +48,22 @@ struct FileLocationResponse {
     location: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct Catalog {
+    pub(crate) name: String,
+    #[serde(rename = "type")]
+    pub(crate) catalog_type: String,
+    provider: String,
+    comment: String,
+    pub(crate) properties: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CatalogResponse {
+    code: u32,
+    catalog: Catalog,
+}
+
 pub(crate) struct GravitinoClient {
     gravitino_uri: String,
     metalake: String,
@@ -103,6 +119,26 @@ impl GravitinoClient {
         })?;
 
         Ok(res)
+    }
+
+    pub async fn get_catalog_url(&self, catalog_name: &str) -> String {
+        format!(
+            "{}/api/metalakes/{}/catalogs/{}",
+            self.gravitino_uri, self.metalake, catalog_name
+        )
+    }
+
+    pub async fn get_catalog(&self, catalog_name: &str) -> Result<Catalog, GvfsError> {
+        let url = self.get_catalog_url(catalog_name).await;
+        let res = self.do_get::<CatalogResponse>(&url).await?;
+
+        if res.code != 0 {
+            return Err(GvfsError::Error(
+                ErrorCode::GravitinoClientError,
+                "Failed to get catalog".to_string(),
+            ));
+        }
+        Ok(res.catalog)
     }
 
     pub async fn get_fileset(
@@ -253,6 +289,46 @@ mod tests {
             Ok(location) => {
                 assert_eq!(location, "/mybucket/a");
             }
+            Err(e) => panic!("Expected Ok, but got Err: {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_catalog_success() {
+        let catalog_response = r#"
+        {
+            "code": 0,
+            "catalog": {
+                "name": "example_catalog",
+                "type": "example_type",
+                "provider": "example_provider",
+                "comment": "This is a test catalog",
+                "properties": {
+                    "key1": "value1",
+                    "key2": "value2"
+                }
+            }
+        }"#;
+
+        let mock_server_url = &mockito::server_url();
+
+        let url = format!("/api/metalakes/{}/catalogs/{}", "test", "catalog1");
+        let _m = mock("GET", url.as_str())
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(catalog_response)
+            .create();
+
+        let config = GravitinoConfig {
+            uri: mock_server_url.to_string(),
+            metalake: "test".to_string(),
+        };
+        let client = GravitinoClient::new(&config);
+
+        let result = client.get_catalog("catalog1").await;
+
+        match result {
+            Ok(_) => {}
             Err(e) => panic!("Expected Ok, but got Err: {:?}", e),
         }
     }

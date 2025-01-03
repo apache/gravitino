@@ -36,6 +36,11 @@ pub(crate) const ROOT_DIR_NAME: &str = "";
 pub(crate) const ROOT_DIR_PATH: &str = "/";
 pub(crate) const INITIAL_FILE_ID: u64 = 10000;
 
+// File system meta file is indicated the fuse filesystem is active.
+pub(crate) const FS_META_FILE_PATH: &str = "/.gvfs_meta";
+pub(crate) const FS_META_FILE_NAME: &str = ".gvfs_meta";
+pub(crate) const FS_META_FILE_ID: u64 = 10;
+
 /// RawFileSystem interface for the file system implementation. it use by FuseApiHandle,
 /// it ues the file id to operate the file system apis
 /// the `file_id` and `parent_file_id` it is the unique identifier for the file system,
@@ -88,6 +93,9 @@ pub(crate) trait RawFileSystem: Send + Sync {
 
     /// Remove the directory by parent file id and file name
     async fn remove_dir(&self, parent_file_id: u64, name: &OsStr) -> Result<()>;
+
+    /// flush the file with file id and file handle, if successful return Ok
+    async fn flush_file(&self, file_id: u64, fh: u64) -> Result<()>;
 
     /// Close the file by file id and file handle, if successful
     async fn close_file(&self, file_id: u64, fh: u64) -> Result<()>;
@@ -289,57 +297,53 @@ pub trait FileWriter: Sync + Send {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use libc::{O_APPEND, O_CREAT, O_RDONLY};
     use std::collections::HashMap;
+    use std::path::Component;
 
     pub(crate) struct TestPathFileSystem<F: PathFileSystem> {
         files: HashMap<PathBuf, FileStat>,
         fs: F,
+        cwd: PathBuf,
     }
 
     impl<F: PathFileSystem> TestPathFileSystem<F> {
-        pub(crate) fn new(fs: F) -> Self {
+        pub(crate) fn new(cwd: &Path, fs: F) -> Self {
             Self {
                 files: HashMap::new(),
                 fs,
+                cwd: cwd.into(),
             }
         }
 
         pub(crate) async fn test_path_file_system(&mut self) {
-            // Test root dir
-            self.test_root_dir().await;
+            // test root dir
+            let resutl = self.fs.stat(Path::new("/")).await;
+            assert!(resutl.is_ok());
+            let root_file_stat = resutl.unwrap();
+            self.assert_file_stat(&root_file_stat, Path::new("/"), Directory, 0);
 
-            // Test stat file
-            self.test_stat_file(Path::new("/.gvfs_meta"), RegularFile, 0)
-                .await;
+            // test list root dir
+            let result = self.fs.read_dir(Path::new("/")).await;
+            assert!(result.is_ok());
 
             // Test create file
-            self.test_create_file(Path::new("/file1.txt")).await;
+            self.test_create_file(&self.cwd.join("file1.txt")).await;
 
             // Test create dir
-            self.test_create_dir(Path::new("/dir1")).await;
+            self.test_create_dir(&self.cwd.join("dir1")).await;
 
             // Test list dir
-            self.test_list_dir(Path::new("/")).await;
+            self.test_list_dir(&self.cwd).await;
 
             // Test remove file
-            self.test_remove_file(Path::new("/file1.txt")).await;
+            self.test_remove_file(&self.cwd.join("file1.txt")).await;
 
             // Test remove dir
-            self.test_remove_dir(Path::new("/dir1")).await;
+            self.test_remove_dir(&self.cwd.join("dir1")).await;
 
             // Test file not found
-            self.test_file_not_found(Path::new("unknown")).await;
-
-            // Test list dir
-            self.test_list_dir(Path::new("/")).await;
-        }
-
-        async fn test_root_dir(&mut self) {
-            let root_dir_path = Path::new("/");
-            let root_file_stat = self.fs.stat(root_dir_path).await;
-            assert!(root_file_stat.is_ok());
-            let root_file_stat = root_file_stat.unwrap();
-            self.assert_file_stat(&root_file_stat, root_dir_path, Directory, 0);
+            self.test_file_not_found(&self.cwd.join("unknown")).await;
         }
 
         async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
@@ -370,7 +374,6 @@ pub(crate) mod tests {
             let list_dir = self.fs.read_dir(path).await;
             assert!(list_dir.is_ok());
             let list_dir = list_dir.unwrap();
-            assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
                 assert!(self.files.contains_key(&file_stat.path));
                 let actual_file_stat = self.files.get(&file_stat.path).unwrap();
@@ -414,13 +417,15 @@ pub(crate) mod tests {
     pub(crate) struct TestRawFileSystem<F: RawFileSystem> {
         fs: F,
         files: HashMap<u64, FileStat>,
+        cwd: PathBuf,
     }
 
     impl<F: RawFileSystem> TestRawFileSystem<F> {
-        pub(crate) fn new(fs: F) -> Self {
+        pub(crate) fn new(cwd: &Path, fs: F) -> Self {
             Self {
                 fs,
                 files: HashMap::new(),
+                cwd: cwd.into(),
             }
         }
 
@@ -431,30 +436,44 @@ pub(crate) mod tests {
             // test read root dir
             self.test_list_dir(ROOT_DIR_FILE_ID, false).await;
 
-            let parent_file_id = ROOT_DIR_FILE_ID;
-            // Test lookup file
+            // Test lookup meta file
             let file_id = self
-                .test_lookup_file(parent_file_id, ".gvfs_meta".as_ref(), RegularFile, 0)
+                .test_lookup_file(ROOT_DIR_FILE_ID, ".gvfs_meta".as_ref(), RegularFile, 0)
                 .await;
 
-            // Test get file stat
+            // Test get meta file stat
             self.test_stat_file(file_id, Path::new("/.gvfs_meta"), RegularFile, 0)
                 .await;
 
             // Test get file path
             self.test_get_file_path(file_id, "/.gvfs_meta").await;
 
-            // Test create file
-            self.test_create_file(parent_file_id, "file1.txt".as_ref())
-                .await;
+            // get cwd file id
+            let mut parent_file_id = ROOT_DIR_FILE_ID;
+            for child in self.cwd.components() {
+                if child == Component::RootDir {
+                    continue;
+                }
+                let file_id = self.fs.create_dir(parent_file_id, child.as_os_str()).await;
+                assert!(file_id.is_ok());
+                parent_file_id = file_id.unwrap();
+            }
 
-            // Test open file
+            // Test create file
             let file_handle = self
-                .test_open_file(parent_file_id, "file1.txt".as_ref())
+                .test_create_file(parent_file_id, "file1.txt".as_ref())
                 .await;
 
             // Test write file
             self.test_write_file(&file_handle, "test").await;
+
+            // Test close file
+            self.test_close_file(&file_handle).await;
+
+            // Test open file with read
+            let file_handle = self
+                .test_open_file(parent_file_id, "file1.txt".as_ref(), O_RDONLY as u32)
+                .await;
 
             // Test read file
             self.test_read_file(&file_handle, "test").await;
@@ -526,8 +545,11 @@ pub(crate) mod tests {
             self.files.insert(file_stat.file_id, file_stat);
         }
 
-        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) {
-            let file = self.fs.create_file(root_file_id, name, 0).await;
+        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) -> FileHandle {
+            let file = self
+                .fs
+                .create_file(root_file_id, name, (O_CREAT | O_APPEND) as u32)
+                .await;
             assert!(file.is_ok());
             let file = file.unwrap();
             assert!(file.handle_id > 0);
@@ -537,11 +559,12 @@ pub(crate) mod tests {
 
             self.test_stat_file(file.file_id, &file_stat.unwrap().path, RegularFile, 0)
                 .await;
+            file
         }
 
-        async fn test_open_file(&self, root_file_id: u64, name: &OsStr) -> FileHandle {
+        async fn test_open_file(&self, root_file_id: u64, name: &OsStr, flags: u32) -> FileHandle {
             let file = self.fs.lookup(root_file_id, name).await.unwrap();
-            let file_handle = self.fs.open_file(file.file_id, 0).await;
+            let file_handle = self.fs.open_file(file.file_id, flags).await;
             assert!(file_handle.is_ok());
             let file_handle = file_handle.unwrap();
             assert_eq!(file_handle.file_id, file.file_id);
@@ -558,8 +581,15 @@ pub(crate) mod tests {
                     content.as_bytes(),
                 )
                 .await;
+
             assert!(write_size.is_ok());
             assert_eq!(write_size.unwrap(), content.len() as u32);
+
+            let result = self
+                .fs
+                .flush_file(file_handle.file_id, file_handle.handle_id)
+                .await;
+            assert!(result.is_ok());
 
             self.files.get_mut(&file_handle.file_id).unwrap().size = content.len() as u64;
         }
@@ -606,7 +636,6 @@ pub(crate) mod tests {
             if !check_child {
                 return;
             }
-            assert_eq!(list_dir.len(), self.files.len());
             for file_stat in list_dir {
                 assert!(self.files.contains_key(&file_stat.file_id));
                 let actual_file_stat = self.files.get(&file_stat.file_id).unwrap();
@@ -652,7 +681,7 @@ pub(crate) mod tests {
             assert_eq!(file_stat.path, path);
             assert_eq!(file_stat.kind, kind);
             assert_eq!(file_stat.size, size);
-            if file_stat.file_id == 1 {
+            if file_stat.file_id == ROOT_DIR_FILE_ID || file_stat.file_id == FS_META_FILE_ID {
                 assert_eq!(file_stat.parent_file_id, 1);
             } else {
                 assert!(file_stat.file_id >= INITIAL_FILE_ID);

@@ -302,18 +302,18 @@ mod test {
 
     #[test]
     fn test_config_from_file() {
-        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_test.toml")).unwrap();
+        let config = AppConfig::from_file(Some("tests/conf/config_test.toml")).unwrap();
         assert_eq!(config.fuse.file_mask, 0o644);
         assert_eq!(config.fuse.dir_mask, 0o755);
         assert_eq!(config.filesystem.block_size, 8192);
         assert_eq!(config.gravitino.uri, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "test");
         assert_eq!(
-            config.extend_config.get("access_key"),
+            config.extend_config.get("s3-access_key_id"),
             Some(&"XXX_access_key".to_string())
         );
         assert_eq!(
-            config.extend_config.get("secret_key"),
+            config.extend_config.get("s3-secret_access_key"),
             Some(&"XXX_secret_key".to_string())
         );
     }
