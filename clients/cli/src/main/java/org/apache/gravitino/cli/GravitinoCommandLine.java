@@ -1180,8 +1180,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
 
     String model = name.getModelName();
-    String[] alias = line.getOptionValues(GravitinoOptions.ALIAS);
-    String uri = line.getOptionValue(GravitinoOptions.URI);
     if (model == null) missingEntities.add(CommandEntities.MODEL);
     checkEntities(missingEntities);
 
@@ -1204,6 +1202,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.UPDATE:
+        String[] alias = line.getOptionValues(GravitinoOptions.ALIAS);
+        String uri = line.getOptionValue(GravitinoOptions.URI);
         if (uri == null) {
           System.err.println(ErrorMessages.MISSING_URI);
           Main.exit(-1);
