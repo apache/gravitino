@@ -280,8 +280,8 @@ public class NameIdentifierUtil {
         ident.name() != null && !ident.name().isEmpty(),
         "The name variable in the NameIdentifier must have value.");
     Namespace.check(
-        ident.namespace() != null && !ident.namespace().isEmpty(),
-        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        ident.namespace() != null && !ident.namespace().isEmpty() && ident.namespace().length() > 1,
+        "Schema namespace must be non-null and at least 1 level, the input namespace is %s",
         ident.namespace());
 
     List<String> allElems =
