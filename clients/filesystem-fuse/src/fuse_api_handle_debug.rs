@@ -17,7 +17,10 @@
  * under the License.
  */
 
+use crate::config::AppConfig;
 use crate::filesystem::{FileStat, FileSystemContext, RawFileSystem};
+use crate::fuse_api_handle::FuseApiHandle;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use fuse3::path::prelude::{ReplyData, ReplyOpen, ReplyStatFs, ReplyWrite};
 use fuse3::path::Request;
 use fuse3::raw::prelude::{
@@ -33,27 +36,11 @@ use futures_util::StreamExt;
 use log::debug;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
+use std::fmt::Debug;
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
-use crate::config::AppConfig;
-use crate::fuse_api_handle::FuseApiHandle;
-
-/// Wrapper Struct for `Timestamp` to enable custom Display implementation
-pub struct TimestampDebug(pub Timestamp);
-
-impl fmt::Display for TimestampDebug {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ts = &self.0; // Access the inner `Timestamp`
-        write!(f, "{}.{:09}", ts.sec, ts.nsec) // Nanoseconds padded to 9 digits
-    }
-}
-
-// Optional Debug implementation for `TimestampDebug`
-impl fmt::Debug for TimestampDebug {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Timestamp({})", self) // Reuses `Display` formatting
-    }
-}
+use tokio::fs::remove_dir_all;
+use tracing_subscriber::fmt::format;
 
 pub struct FileAttrDebug<'a> {
     pub file_attr: &'a FileAttr,
@@ -68,14 +55,14 @@ impl<'a> std::fmt::Debug for FileAttrDebug<'a> {
             .field("ino", &attr.ino)
             .field("size", &attr.size)
             .field("blocks", &attr.blocks)
-            .field("atime", &TimestampDebug(attr.atime))
-            .field("mtime", &TimestampDebug(attr.mtime))
-            .field("ctime", &TimestampDebug(attr.ctime));
+            .field("atime", &timestamp_to_readable_time_string(attr.atime))
+            .field("mtime", &timestamp_to_readable_time_string(attr.mtime))
+            .field("ctime", &timestamp_to_readable_time_string(attr.ctime));
 
         // Conditionally add the "crtime" field only for macOS
         #[cfg(target_os = "macos")]
         {
-            struc.field("crtime", &TimestampDebug(attr.crtime));
+            struc.field("crtime", &timestamp_to_readable_time_string(attr.crtime));
         }
 
         struc
@@ -89,12 +76,19 @@ impl<'a> std::fmt::Debug for FileAttrDebug<'a> {
     }
 }
 
+fn timestamp_to_readable_time_string(tstmp: Timestamp) -> String {
+    DateTime::from_timestamp(tstmp.sec, tstmp.nsec)
+        .unwrap()
+        .naive_utc()
+        .to_string()
+}
+
 pub(crate) struct FuseApiHandleDebug<T: RawFileSystem> {
     inner: FuseApiHandle<T>,
 }
 
 impl<T: RawFileSystem> FuseApiHandleDebug<T> {
-    pub fn new(fs: T, _config: &AppConfig, context: FileSystemContext,) -> Self {
+    pub fn new(fs: T, _config: &AppConfig, context: FileSystemContext) -> Self {
         Self {
             inner: FuseApiHandle::new(fs, _config, context),
         }
@@ -405,14 +399,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: u64,
         offset: i64,
     ) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
-        let stat = self.inner.get_modified_file_stat(parent, Option::None, Option::None, Option::None).await?;
+        let stat = self
+            .inner
+            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
+            .await?;
         debug!(
             "readdir [id={}]: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}",
-            req.unique,
-            req,
-            stat,
-            fh,
-            offset
+            req.unique, req, stat, fh, offset
         );
         let result = self.inner.readdir(req, parent, fh, offset).await;
         match result {
