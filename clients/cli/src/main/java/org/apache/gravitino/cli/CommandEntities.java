@@ -47,6 +47,7 @@ public class CommandEntities {
     VALID_ENTITIES.add(SCHEMA);
     VALID_ENTITIES.add(TABLE);
     VALID_ENTITIES.add(COLUMN);
+    VALID_ENTITIES.add(MODEL);
     VALID_ENTITIES.add(USER);
     VALID_ENTITIES.add(GROUP);
     VALID_ENTITIES.add(TAG);

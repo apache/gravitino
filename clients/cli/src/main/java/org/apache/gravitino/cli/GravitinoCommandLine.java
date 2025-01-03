@@ -140,6 +140,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.MODEL)) {
+      handleModelCommand();
     } else if (entity.equals(CommandEntities.TOPIC)) {
       handleTopicCommand();
     } else if (entity.equals(CommandEntities.FILESET)) {
@@ -1152,6 +1154,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
+  /**
+   * Handles the command execution for Models based on command type and the command line options.
+   */
   private void handleModelCommand() {
     String url = getUrl();
     String auth = getAuth();
@@ -1180,7 +1185,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
+        if (line.hasOption(GravitinoOptions.AUDIT)) {
+          newModelAudit(url, ignore, metalake, catalog, schema, model).handle();
+        } else {
+          newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
+        }
         break;
 
       default:

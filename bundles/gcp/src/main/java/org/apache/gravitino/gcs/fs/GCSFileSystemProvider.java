@@ -37,7 +37,8 @@ public class GCSFileSystemProvider implements FileSystemProvider {
 
   @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
-      ImmutableMap.of(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, GCS_SERVICE_ACCOUNT_JSON_FILE);
+      ImmutableMap.of(
+          GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, GCS_SERVICE_ACCOUNT_JSON_FILE);
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {

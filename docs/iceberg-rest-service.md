@@ -162,7 +162,8 @@ Supports using static GCS credential file or generating GCS token to access GCS 
 | `gravitino.iceberg-rest.io-impl`                  | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0-incubating |
 | `gravitino.iceberg-rest.credential-provider-type`  | Deprecated, please use `gravitino.iceberg-rest.credential-providers` instead.                      | (none)        | No                                                 | 0.7.0-incubating |
 | `gravitino.iceberg-rest.credential-providers`     | Supports `gcs-token`, generates a temporary token according to the query data path.                | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.gcs-credential-file-path` | The location of GCS credential file, only used when `credential-providers` is `gcs-token`.         | (none)        | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated, please use `gravitino.iceberg-rest.gcs-service-account-file` instead.                  | (none)        | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file, only used when `credential-provider-type` is `gcs-token`.     | (none)        | No       | 0.8.0-incubating |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
@@ -450,9 +451,8 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_IO_IMPL`                    | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating |
 | `GRAVITINO_URI`                        | `gravitino.iceberg-rest.uri`                        | 0.7.0-incubating |
 | `GRAVITINO_WAREHOUSE`                  | `gravitino.iceberg-rest.warehouse`                  | 0.7.0-incubating |
-| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE`   | `gravitino.iceberg-rest.credential-providers`       | 0.8.0-incubating |
 | `GRAVITINO_CREDENTIAL_PROVIDERS`       | `gravitino.iceberg-rest.credential-providers`       | 0.8.0-incubating |
-| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH`   | `gravitino.iceberg-rest.gcs-credential-file-path`   | 0.7.0-incubating |
+| `GRAVITINO_GCS_SERVICE_ACCOUNT_FILE`   | `gravitino.iceberg-rest.gcs-service-account-file`   | 0.8.0-incubating |
 | `GRAVITINO_S3_ACCESS_KEY`              | `gravitino.iceberg-rest.s3-access-key-id`           | 0.7.0-incubating |
 | `GRAVITINO_S3_SECRET_KEY`              | `gravitino.iceberg-rest.s3-secret-access-key`       | 0.7.0-incubating |
 | `GRAVITINO_S3_REGION`                  | `gravitino.iceberg-rest.s3-region`                  | 0.7.0-incubating |
@@ -464,6 +464,13 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_AZURE_TENANT_ID`            | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
 | `GRAVITINO_AZURE_CLIENT_ID`            | `gravitino.iceberg-rest.azure-client-id`            | 0.8.0-incubating |
 | `GRAVITINO_AZURE_CLIENT_SECRET`        | `gravitino.iceberg-rest.azure-client-secret`        | 0.8.0-incubating |
+
+The below environment is deprecated, please use the corresponding configuration items instead.
+
+| Deprecated Environment variables     | New environment variables            | Since version    | Deprecated version |
+|--------------------------------------|--------------------------------------|------------------|--------------------|
+| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` | `GRAVITINO_CREDENTIAL_PROVIDERS`     | 0.7.0-incubating | 0.8.0-incubating   |
+| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` | `GRAVITINO_GCS_SERVICE_ACCOUNT_FILE` | 0.7.0-incubating | 0.8.0-incubating   |
 
 Or build it manually to add custom configuration or logics:
 
