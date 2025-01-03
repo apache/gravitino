@@ -101,6 +101,6 @@ public class LinkModel extends Command {
     }
 
     System.out.println(
-        "Link model " + model + " to " + uri + " with alias " + Arrays.toString(alias));
+        "Linked model " + model + " to " + uri + " with aliases " + Arrays.toString(alias));
   }
 }

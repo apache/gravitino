@@ -293,6 +293,7 @@ public class TestModelCommands {
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
+
   @Test
   void testRegisterModelCommand() {
     RegisterModel mockCreate = mock(RegisterModel.class);

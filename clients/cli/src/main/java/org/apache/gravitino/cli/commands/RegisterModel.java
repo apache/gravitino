@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -96,6 +97,7 @@ public class RegisterModel extends Command {
       System.out.println("Successful register " + registeredModel.name() + ".");
     } else {
       System.err.println("Failed to register model: " + model + ".");
+      Main.exit(-1);
     }
   }
 }
