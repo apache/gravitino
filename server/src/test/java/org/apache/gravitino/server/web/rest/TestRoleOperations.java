@@ -63,6 +63,7 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -199,8 +200,31 @@ public class TestRoleOperations extends JerseyTest {
         Privileges.UseCatalog.allow().condition(),
         roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
+    // Test with a wrong metalake name
+    RoleCreateRequest reqWithWrongMetalake =
+        new RoleCreateRequest(
+            "role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {
+              DTOConverters.toDTO(
+                  SecurableObjects.ofMetalake(
+                      "unknown", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            });
+    Response respWithWrongMetalake =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(reqWithWrongMetalake, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), respWithWrongMetalake.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, respWithWrongMetalake.getMediaType());
+    ErrorResponse withWrongMetalakeResponse = respWithWrongMetalake.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE, withWrongMetalakeResponse.getCode());
+
     // Test to a catalog which doesn't exist
-    when(catalogDispatcher.catalogExists(any())).thenReturn(false);
+    reset(catalogDispatcher);
+    when(catalogDispatcher.loadCatalog(any())).thenThrow(new NoSuchCatalogException("mock error"));
     Response respNotExist =
         target("/metalakes/metalake1/roles")
             .request(MediaType.APPLICATION_JSON_TYPE)
