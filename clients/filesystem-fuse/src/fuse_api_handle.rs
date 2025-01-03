@@ -227,7 +227,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
 
     async fn release(
         &self,
-        _eq: Request,
+        _req: Request,
         inode: Inode,
         fh: u64,
         _flags: u32,
@@ -235,6 +235,16 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         _flush: bool,
     ) -> fuse3::Result<()> {
         self.fs.close_file(inode, fh).await
+    }
+
+    async fn flush(
+        &self,
+        _req: Request,
+        inode: Inode,
+        fh: u64,
+        _lock_owner: u64,
+    ) -> fuse3::Result<()> {
+        self.fs.flush_file(inode, fh).await
     }
 
     async fn opendir(&self, _req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {

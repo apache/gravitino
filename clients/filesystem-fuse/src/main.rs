@@ -26,21 +26,37 @@ use tokio::signal;
 async fn main() -> fuse3::Result<()> {
     tracing_subscriber::fmt().init();
 
+    // todo need inmprove the args parsing
+    let args: Vec<String> = std::env::args().collect();
+    let (mount_point, mount_from, config_path) = match args.len() {
+        4 => (args[1].clone(), args[2].clone(), args[3].clone()),
+        _ => {
+            error!("Usage: {} <mount_point> <mount_from> <config>", args[0]);
+            return Err(Errno::from(libc::EINVAL));
+        }
+    };
+
     //todo(read config file from args)
-    let config = AppConfig::from_file(Some("conf/gvfs_fuse.toml"));
+    let config = AppConfig::from_file(Some(&config_path));
     if let Err(e) = &config {
         error!("Failed to load config: {:?}", e);
         return Err(Errno::from(libc::EINVAL));
     }
     let config = config.unwrap();
-    let handle = tokio::spawn(async move { gvfs_mount("gvfs", "", &config).await });
+    let handle = tokio::spawn(async move {
+        let result = gvfs_mount(&mount_point, &mount_from, &config).await;
+        if let Err(e) = result {
+            error!("Failed to mount gvfs: {:?}", e);
+            return Err(Errno::from(libc::EINVAL));
+        }
+        Ok(())
+    });
 
-    let _ = signal::ctrl_c().await;
-    info!("Received Ctrl+C, Unmounting gvfs...");
-
-    if let Err(e) = handle.await {
-        error!("Failed to mount gvfs: {:?}", e);
-        return Err(Errno::from(libc::EINVAL));
+    tokio::select! {
+        _ = handle => {}
+        _ = signal::ctrl_c() => {
+            info!("Received Ctrl+C, unmounting gvfs...");
+        }
     }
 
     let _ = gvfs_unmount().await;

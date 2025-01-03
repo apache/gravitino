@@ -34,7 +34,7 @@ block_size = 8192
 uri = "http://localhost:8090"
 metalake = "test"
 
-# extent settings
+# extend settings
 [extend_config]
-access_key = "XXX_access_key"
-secret_key = "XXX_secret_key"
+s3-access_key_id = "XXX_access_key"
+s3-secret_access_key = "XXX_secret_key"
