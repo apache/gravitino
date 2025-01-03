@@ -31,7 +31,9 @@ use fuse3::{Errno, FileType, Inode, SetAttr, Timestamp};
 use futures_util::stream;
 use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
+use log::debug;
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
 
@@ -53,7 +55,7 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         }
     }
 
-    async fn get_modified_file_stat(
+    pub async fn get_modified_file_stat(
         &self,
         file_id: u64,
         size: Option<u64>,
@@ -74,8 +76,20 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
             file_stat.mtime = mtime;
         };
 
+        debug!(
+            "get_modified_file_stat: file_name: {:?}, size: {:?}, atime: {}, mtime: {}",
+            file_stat.name,
+            size,
+            to_readable_timestamp_string(file_stat.atime),
+            to_readable_timestamp_string(file_stat.mtime)
+        );
+
         Ok(file_stat)
     }
+}
+
+fn to_readable_timestamp_string(tstmp: Timestamp) -> String {
+    "".to_string()
 }
 
 impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
@@ -117,6 +131,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         }
 
         let file_stat = self.fs.stat(inode).await?;
+
+        debug!("getattr[id={}]: file_stat: {:?}", _req.unique, file_stat);
+
         Ok(ReplyAttr {
             ttl: self.default_ttl,
             attr: fstat_to_file_attr(&file_stat, &self.fs_context),
@@ -256,7 +273,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     type DirEntryStream<'a>
-        = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+    = BoxStream<'a, fuse3::Result<DirectoryEntry>>
     where
         T: 'a;
 
@@ -336,7 +353,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     type DirEntryPlusStream<'a>
-        = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
+    = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
     where
         T: 'a;
 
