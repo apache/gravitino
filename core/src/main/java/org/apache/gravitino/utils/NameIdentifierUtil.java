@@ -94,6 +94,16 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the tag {@link NameIdentifier} with the given metalake and tag name.
+   *
+   * @param metalake The metalake name
+   * @param tagName The tag name
+   * @return The created tag {@link NameIdentifier}
+   */
+  public static NameIdentifier ofTag(String metalake, String tagName) {
+    return NameIdentifier.of(NamespaceUtil.ofTag(metalake), tagName);
+  }
+  /**
    * Create the column {@link NameIdentifier} with the given metalake, catalog, schema, table and
    * column name.
    *

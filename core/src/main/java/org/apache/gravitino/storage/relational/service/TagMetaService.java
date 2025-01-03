@@ -44,8 +44,8 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 
 public class TagMetaService {
 
@@ -179,7 +179,7 @@ public class TagMetaService {
     }
 
     return tagPOs.stream()
-        .map(tagPO -> POConverters.fromTagPO(tagPO, TagManager.ofTagNamespace(metalake)))
+        .map(tagPO -> POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalake)))
         .collect(Collectors.toList());
   }
 
@@ -214,7 +214,7 @@ public class TagMetaService {
           tagIdent.name());
     }
 
-    return POConverters.fromTagPO(tagPO, TagManager.ofTagNamespace(metalake));
+    return POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalake));
   }
 
   public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
@@ -327,7 +327,7 @@ public class TagMetaService {
                       metadataObjectId, metadataObject.type().toString()));
 
       return tagPOs.stream()
-          .map(tagPO -> POConverters.fromTagPO(tagPO, TagManager.ofTagNamespace(metalake)))
+          .map(tagPO -> POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalake)))
           .collect(Collectors.toList());
 
     } catch (RuntimeException e) {
