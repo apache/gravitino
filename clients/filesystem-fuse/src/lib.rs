@@ -24,6 +24,7 @@ mod default_raw_filesystem;
 mod error;
 mod filesystem;
 mod fuse_api_handle;
+mod fuse_api_handle_debug;
 mod fuse_server;
 mod gravitino_client;
 mod gravitino_fileset_filesystem;

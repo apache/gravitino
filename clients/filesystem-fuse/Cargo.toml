@@ -48,6 +48,7 @@ opendal = { version = "0.46.0", features = ["services-s3"] }
 reqwest = { version = "0.12.9", features = ["json"] }
 serde = { version = "1.0.216", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
+tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 urlencoding = "2.1.3"
 

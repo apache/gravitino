@@ -23,12 +23,12 @@ use clap::Parser;
 use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, LOG_FILE_NAME, PID_FILE_NAME};
-use log::{error, info};
 use std::fs::{create_dir, OpenOptions};
 use std::io;
 use std::path::Path;
 use std::process::Command;
 use tokio::runtime::Runtime;
+use tracing::{error, info};
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 
