@@ -42,8 +42,6 @@ pub struct MemoryFileSystem {
 }
 
 impl MemoryFileSystem {
-    const FS_META_FILE_NAME: &'static str = "/.gvfs_meta";
-
     pub(crate) async fn new() -> Self {
         Self {
             file_map: RwLock::new(Default::default()),
@@ -69,16 +67,6 @@ impl PathFileSystem for MemoryFileSystem {
         };
         let root_path = PathBuf::from("/");
         self.file_map.write().unwrap().insert(root_path, root_file);
-
-        let meta_file = MemoryFile {
-            kind: RegularFile,
-            data: Arc::new(Mutex::new(Vec::new())),
-        };
-        let meta_file_path = Path::new(Self::FS_META_FILE_NAME).to_path_buf();
-        self.file_map
-            .write()
-            .unwrap()
-            .insert(meta_file_path, meta_file);
         Ok(())
     }
 
@@ -248,7 +236,10 @@ fn path_in_dir(dir: &Path, path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::filesystem::tests::TestPathFileSystem;
+    use crate::config::AppConfig;
+    use crate::default_raw_filesystem::DefaultRawFileSystem;
+    use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
+    use crate::filesystem::{FileSystemContext, RawFileSystem};
 
     #[test]
     fn test_path_in_dir() {
@@ -281,7 +272,20 @@ mod tests {
     async fn test_memory_file_system() {
         let fs = MemoryFileSystem::new().await;
         let _ = fs.init().await;
-        let mut tester = TestPathFileSystem::new(fs);
+        let mut tester = TestPathFileSystem::new(Path::new("/ab"), fs);
         tester.test_path_file_system().await;
+    }
+
+    #[tokio::test]
+    async fn test_memory_file_system_with_raw_file_system() {
+        let memory_fs = MemoryFileSystem::new().await;
+        let raw_fs = DefaultRawFileSystem::new(
+            memory_fs,
+            &AppConfig::default(),
+            &FileSystemContext::default(),
+        );
+        let _ = raw_fs.init().await;
+        let mut tester = TestRawFileSystem::new(Path::new("/ab"), raw_fs);
+        tester.test_raw_file_system().await;
     }
 }

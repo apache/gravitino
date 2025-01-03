@@ -32,7 +32,7 @@ block_size = 8192
 uri = "http://localhost:8090"
 metalake = "your_metalake"
 
-# extent settings
+# extend settings
 [extend_config]
-access_key = "your access_key"
-secret_key = "your_secret_key"
+s3-access_key_id = "your access_key"
+s3-secret_access_key = "your_secret_key"

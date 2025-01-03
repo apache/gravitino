@@ -24,6 +24,7 @@ pub enum ErrorCode {
     GravitinoClientError,
     InvalidConfig,
     ConfigNotFound,
+    OpenDalError,
 }
 
 impl ErrorCode {
@@ -39,6 +40,7 @@ impl std::fmt::Display for ErrorCode {
             ErrorCode::GravitinoClientError => write!(f, "Gravitino client error"),
             ErrorCode::InvalidConfig => write!(f, "Invalid config"),
             ErrorCode::ConfigNotFound => write!(f, "Config not found"),
+            ErrorCode::OpenDalError => write!(f, "OpenDal error"),
         }
     }
 }

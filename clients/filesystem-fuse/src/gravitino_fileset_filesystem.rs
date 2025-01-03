@@ -30,13 +30,15 @@ use std::path::{Path, PathBuf};
 pub(crate) struct GravitinoFilesetFileSystem {
     physical_fs: Box<dyn PathFileSystem>,
     client: GravitinoClient,
-    fileset_location: PathBuf,
+    // location is a absolute path in the physical filesystem that is associated with the fileset.
+    // e.g. fileset location : s3://bucket/path/to/file the location is /path/to/file
+    location: PathBuf,
 }
 
 impl GravitinoFilesetFileSystem {
     pub async fn new(
         fs: Box<dyn PathFileSystem>,
-        location: &Path,
+        target_path: &Path,
         client: GravitinoClient,
         _config: &AppConfig,
         _context: &FileSystemContext,
@@ -44,18 +46,25 @@ impl GravitinoFilesetFileSystem {
         Self {
             physical_fs: fs,
             client: client,
-            fileset_location: location.into(),
+            location: target_path.into(),
         }
     }
 
     fn gvfs_path_to_raw_path(&self, path: &Path) -> PathBuf {
-        self.fileset_location.join(path)
+        let relation_path = path.strip_prefix("/").expect("path should start with /");
+        if relation_path == Path::new("") {
+            return self.location.clone();
+        }
+        self.location.join(relation_path)
     }
 
     fn raw_path_to_gvfs_path(&self, path: &Path) -> Result<PathBuf> {
-        path.strip_prefix(&self.fileset_location)
+        let stripped_path = path
+            .strip_prefix(&self.location)
             .map_err(|_| Errno::from(libc::EBADF))?;
-        Ok(path.into())
+        let mut result_path = PathBuf::from("/");
+        result_path.push(stripped_path);
+        Ok(result_path)
     }
 }
 
@@ -126,5 +135,41 @@ impl PathFileSystem for GravitinoFilesetFileSystem {
 
     fn get_capacity(&self) -> Result<FileSystemCapacity> {
         self.physical_fs.get_capacity()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::GravitinoConfig;
+    use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
+    use crate::memory_filesystem::MemoryFileSystem;
+    use std::path::Path;
+
+    #[tokio::test]
+    async fn test_map_fileset_path_to_raw_path() {
+        let fs = GravitinoFilesetFileSystem {
+            physical_fs: Box::new(MemoryFileSystem::new().await),
+            client: super::GravitinoClient::new(&GravitinoConfig::default()),
+            location: "/c1/fileset1".into(),
+        };
+        let path = fs.gvfs_path_to_raw_path(Path::new("/a"));
+        assert_eq!(path, Path::new("/c1/fileset1/a"));
+        let path = fs.gvfs_path_to_raw_path(Path::new("/"));
+        assert_eq!(path, Path::new("/c1/fileset1"));
+    }
+
+    #[tokio::test]
+    async fn test_map_raw_path_to_fileset_path() {
+        let fs = GravitinoFilesetFileSystem {
+            physical_fs: Box::new(MemoryFileSystem::new().await),
+            client: super::GravitinoClient::new(&GravitinoConfig::default()),
+            location: "/c1/fileset1".into(),
+        };
+        let path = fs
+            .raw_path_to_gvfs_path(Path::new("/c1/fileset1/a"))
+            .unwrap();
+        assert_eq!(path, Path::new("/a"));
+        let path = fs.raw_path_to_gvfs_path(Path::new("/c1/fileset1")).unwrap();
+        assert_eq!(path, Path::new("/"));
     }
 }

@@ -18,21 +18,18 @@
  */
 use crate::config::AppConfig;
 use crate::default_raw_filesystem::DefaultRawFileSystem;
-use crate::error::ErrorCode::{InvalidConfig, UnSupportedFilesystem};
+use crate::error::ErrorCode::UnSupportedFilesystem;
 use crate::filesystem::FileSystemContext;
 use crate::fuse_api_handle::FuseApiHandle;
 use crate::fuse_server::FuseServer;
-use crate::gravitino_client::GravitinoClient;
 use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
+use crate::gvfs_creator::create_gvfs_filesystem;
 use crate::memory_filesystem::MemoryFileSystem;
 use crate::utils::GvfsResult;
 use log::info;
 use once_cell::sync::Lazy;
-use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
-const FILESET_PREFIX: &str = "gvfs://fileset/";
 
 static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(None));
 
@@ -44,6 +41,7 @@ pub(crate) enum CreateFileSystemResult {
     None,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum FileSystemSchema {
     S3,
 }
@@ -65,7 +63,7 @@ pub async fn mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> Gvfs
 }
 
 pub async fn unmount() -> GvfsResult<()> {
-    info!("Stop gvfs-fuse server...");
+    info!("Stopping gvfs-fuse server...");
     let svr = {
         let mut server = SERVER.lock().await;
         if server.is_none() {
@@ -125,122 +123,5 @@ pub async fn create_path_fs(
         ))
     } else {
         create_gvfs_filesystem(mount_from, config, fs_context).await
-    }
-}
-
-pub async fn create_gvfs_filesystem(
-    mount_from: &str,
-    config: &AppConfig,
-    fs_context: &FileSystemContext,
-) -> GvfsResult<CreateFileSystemResult> {
-    // Gvfs-fuse filesystem structure:
-    // FuseApiHandle
-    // ├─ DefaultRawFileSystem (RawFileSystem)
-    // │ └─ FileSystemLog (PathFileSystem)
-    // │    ├─ GravitinoComposedFileSystem (PathFileSystem)
-    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ S3FileSystem (PathFileSystem)
-    // │    │  │     └─ OpenDALFileSystem (PathFileSystem)
-    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ HDFSFileSystem (PathFileSystem)
-    // │    │  │     └─ OpenDALFileSystem (PathFileSystem)
-    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ JuiceFileSystem (PathFileSystem)
-    // │    │  │     └─ NasFileSystem (PathFileSystem)
-    // │    │  ├─ GravitinoFilesetFileSystem (PathFileSystem)
-    // │    │  │  └─ XXXFileSystem (PathFileSystem)
-    //
-    // `SimpleFileSystem` is a low-level filesystem designed to communicate with FUSE APIs.
-    // It manages file and directory relationships, as well as file mappings.
-    // It delegates file operations to the PathFileSystem
-    //
-    // `FileSystemLog` is a decorator that adds extra debug logging functionality to file system APIs.
-    // Similar implementations include permissions, caching, and metrics.
-    //
-    // `GravitinoComposeFileSystem` is a composite file system that can combine multiple `GravitinoFilesetFileSystem`.
-    // It use the part of catalog and schema of fileset path to a find actual GravitinoFilesetFileSystem. delegate the operation to the real storage.
-    // If the user only mounts a fileset, this layer is not present. There will only be one below layer.
-    //
-    // `GravitinoFilesetFileSystem` is a file system that can access a fileset.It translates the fileset path to the real storage path.
-    // and delegate the operation to the real storage.
-    //
-    // `OpenDALFileSystem` is a file system that use the OpenDAL to access real storage.
-    // it can assess the S3, HDFS, gcs, azblob and other storage.
-    //
-    // `S3FileSystem` is a file system that use `OpenDALFileSystem` to access S3 storage.
-    //
-    // `HDFSFileSystem` is a file system that use `OpenDALFileSystem` to access HDFS storage.
-    //
-    // `NasFileSystem` is a filesystem that uses a locally accessible path mounted by NAS tools, such as JuiceFS.
-    //
-    // `JuiceFileSystem` is a file that use `NasFileSystem` to access JuiceFS storage.
-    //
-    // `XXXFileSystem is a filesystem that allows you to implement file access through your own extensions.
-
-    let client = GravitinoClient::new(&config.gravitino);
-
-    let (catalog, schema, fileset) = extract_fileset(mount_from)?;
-    let location = client
-        .get_fileset(&catalog, &schema, &fileset)
-        .await?
-        .storage_location;
-    let (_schema, location) = extract_storage_filesystem(&location).unwrap();
-
-    // todo need to replace the inner filesystem with the real storage filesystem
-    let inner_fs = MemoryFileSystem::new().await;
-
-    let fs = GravitinoFilesetFileSystem::new(
-        Box::new(inner_fs),
-        Path::new(&location),
-        client,
-        config,
-        fs_context,
-    )
-    .await;
-    Ok(CreateFileSystemResult::Gvfs(fs))
-}
-
-pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
-    if !path.starts_with(FILESET_PREFIX) {
-        return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
-    }
-
-    let path_without_prefix = &path[FILESET_PREFIX.len()..];
-
-    let parts: Vec<&str> = path_without_prefix.split('/').collect();
-
-    if parts.len() != 3 {
-        return Err(InvalidConfig.to_error("Invalid fileset path".to_string()));
-    }
-    // todo handle mount catalog or schema
-
-    let catalog = parts[1].to_string();
-    let schema = parts[2].to_string();
-    let fileset = parts[3].to_string();
-
-    Ok((catalog, schema, fileset))
-}
-
-pub fn extract_storage_filesystem(path: &str) -> Option<(FileSystemSchema, String)> {
-    // todo need to improve the logic
-    if let Some(pos) = path.find("://") {
-        let protocol = &path[..pos];
-        let location = &path[pos + 3..];
-        let location = match location.find('/') {
-            Some(index) => &location[index + 1..],
-            None => "",
-        };
-        let location = match location.ends_with('/') {
-            true => location.to_string(),
-            false => format!("{}/", location),
-        };
-
-        match protocol {
-            "s3" => Some((FileSystemSchema::S3, location.to_string())),
-            "s3a" => Some((FileSystemSchema::S3, location.to_string())),
-            _ => None,
-        }
-    } else {
-        None
     }
 }
