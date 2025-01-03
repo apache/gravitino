@@ -23,9 +23,12 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 
 Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
 
-| Property Name | Description                                     | Default Value | Required | Since Version |
-|---------------|-------------------------------------------------|---------------|----------|---------------|
-| `location`    | The storage location managed by Hadoop catalog. | (none)        | No       | 0.5.0         |
+| Property Name          | Description                                        | Default Value | Required | Since Version    |
+|------------------------|----------------------------------------------------|---------------|----------|------------------|
+| `location`             | The storage location managed by Hadoop catalog.    | (none)        | No       | 0.5.0            |
+| `credential-providers` | The credential provider types, separated by comma. | (none)        | No       | 0.8.0-incubating |
+
+Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
 Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or custom fileset, you need to configure the following extra properties.
 
@@ -50,6 +53,8 @@ Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or cu
 | `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
 | `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
+Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
+
 At the same time, you need to place the corresponding bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
 #### GCS fileset
@@ -59,6 +64,8 @@ At the same time, you need to place the corresponding bundle jar [`gravitino-aws
 | `filesystem-providers`        | The file system providers to add. Set it to `gs` if it's a GCS fileset, a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`.                                        | (none)          | Yes                        | 0.7.0-incubating |
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a GCS fileset. | 0.7.0-incubating |
+
+Please refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
@@ -72,6 +79,8 @@ In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-
 | `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
 | `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
 
+Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
+
 In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
 
@@ -83,6 +92,8 @@ In the meantime, you need to place the corresponding bundle jar [`gravitino-aliy
 | `default-filesystem-provider`     | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location. | `builtin-local` | No                                        | 0.8.0-incubating |
 | `azure-storage-account-name `     | The account name of Azure Blob Storage.                                                                                                                                                                                                        | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
 | `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                                                         | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
+
+Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
 
 Similar to the above, you need to place the corresponding bundle jar [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
@@ -146,7 +157,8 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 | `authentication.impersonation-enable` | Whether to enable impersonation for this schema of the Hadoop catalog.                                         | The parent(catalog) value | No       | 0.6.0-incubating |
 | `authentication.type`                 | The type of authentication for this schema of Hadoop catalog , currently we only support `kerberos`, `simple`. | The parent(catalog) value | No       | 0.6.0-incubating |
 | `authentication.kerberos.principal`   | The principal of the Kerberos authentication for this schema.                                                  | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for this scheam.                                         | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for this schema.                                         | The parent(catalog) value | No       | 0.6.0-incubating |
+| `credential-providers`                | The credential provider types, separated by comma.                                                             | (none)                    | No       | 0.8.0-incubating |
 
 ### Schema operations
 
@@ -166,6 +178,9 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 | `authentication.type`                 | The type of authentication for Hadoop catalog fileset, currently we only support `kerberos`, `simple`. | The parent(schema) value | No       | 0.6.0-incubating |
 | `authentication.kerberos.principal`   | The principal of the Kerberos authentication for the fileset.                                          | The parent(schema) value | No       | 0.6.0-incubating |
 | `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
+| `credential-providers`                | The credential provider types, separated by comma.                                                     | (none)                   | No       | 0.8.0-incubating |
+
+The credential providers in fileset properties will overwrite the credential providers in schema properties and catalog properties, if not set, the credential providers in schema properties will be used, if the credential providers in schema properties are not set, will use the credential providers in catalog properties.
 
 ### Fileset operations
 
