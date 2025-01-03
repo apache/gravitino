@@ -21,9 +21,22 @@ package org.apache.gravitino.listener;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.listener.api.event.AlterTagEvent;
+import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.event.CreateTagEvent;
+import org.apache.gravitino.listener.api.event.DeleteTagEvent;
+import org.apache.gravitino.listener.api.event.GetTagEvent;
+import org.apache.gravitino.listener.api.event.GetTagForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagEvent;
+import org.apache.gravitino.listener.api.event.ListTagEvent;
+import org.apache.gravitino.listener.api.event.ListTagInfoEvent;
+import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * {@code TagEventDispatcher} is a decorator for {@link TagDispatcher} that not only delegates tag
@@ -32,10 +45,7 @@ import org.apache.gravitino.tag.TagDispatcher;
  * of tag operations.
  */
 public class TagEventDispatcher implements TagDispatcher {
-  @SuppressWarnings("unused")
   private final EventBus eventBus;
-
-  @SuppressWarnings("unused")
   private final TagDispatcher dispatcher;
 
   public TagEventDispatcher(EventBus eventBus, TagDispatcher dispatcher) {
@@ -47,8 +57,9 @@ public class TagEventDispatcher implements TagDispatcher {
   public String[] listTags(String metalake) {
     // TODO: listTagsPreEvent
     try {
-      // TODO: listTagsEvent
-      return dispatcher.listTags(metalake);
+      String[] tagNames = dispatcher.listTags(metalake);
+      eventBus.dispatchEvent(new ListTagEvent(PrincipalUtils.getCurrentUserName(), metalake));
+      return tagNames;
     } catch (Exception e) {
       // TODO: listTagFailureEvent
       throw e;
@@ -59,8 +70,10 @@ public class TagEventDispatcher implements TagDispatcher {
   public Tag[] listTagsInfo(String metalake) {
     // TODO: listTagsInfoPreEvent
     try {
-      // TODO: listTagsInfoEvent
-      return dispatcher.listTagsInfo(metalake);
+      Tag[] tags = dispatcher.listTagsInfo(metalake);
+      eventBus.dispatchEvent(
+          new ListTagInfoEvent(PrincipalUtils.getCurrentUserName(), metalake, tags));
+      return tags;
     } catch (Exception e) {
       // TODO: listTagsInfoFailureEvent
       throw e;
@@ -71,8 +84,10 @@ public class TagEventDispatcher implements TagDispatcher {
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
     // TODO: getTagPreEvent
     try {
-      // TODO: getTagEvent
-      return dispatcher.getTag(metalake, name);
+      Tag tag = dispatcher.getTag(metalake, name);
+      eventBus.dispatchEvent(
+          new GetTagEvent(PrincipalUtils.getCurrentUserName(), metalake, name, tag));
+      return tag;
     } catch (NoSuchTagException e) {
       // TODO: getTagFailureEvent
       throw e;
@@ -84,8 +99,13 @@ public class TagEventDispatcher implements TagDispatcher {
       String metalake, String name, String comment, Map<String, String> properties) {
     // TODO: createTagPreEvent
     try {
-      // TODO: createTagEvent
-      return dispatcher.createTag(metalake, name, comment, properties);
+      Tag tag = dispatcher.createTag(metalake, name, comment, properties);
+      eventBus.dispatchEvent(
+          new CreateTagEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              new TagInfo(tag.name(), tag.comment(), tag.properties())));
+      return tag;
     } catch (Exception e) {
       // TODO: createTagFailureEvent
       throw e;
@@ -96,8 +116,14 @@ public class TagEventDispatcher implements TagDispatcher {
   public Tag alterTag(String metalake, String name, TagChange... changes) {
     // TODO: alterTagPreEvent
     try {
-      // TODO: alterTagEvent
-      return dispatcher.alterTag(metalake, name, changes);
+      Tag tag = dispatcher.alterTag(metalake, name, changes);
+      eventBus.dispatchEvent(
+          new AlterTagEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              changes,
+              new TagInfo(tag.name(), tag.comment(), tag.properties())));
+      return tag;
     } catch (Exception e) {
       // TODO: alterTagFailureEvent
       throw e;
@@ -108,8 +134,10 @@ public class TagEventDispatcher implements TagDispatcher {
   public boolean deleteTag(String metalake, String name) {
     // TODO: deleteTagPreEvent
     try {
-      // TODO: deleteTagEvent
-      return dispatcher.deleteTag(metalake, name);
+      boolean isExists = dispatcher.deleteTag(metalake, name);
+      eventBus.dispatchEvent(
+          new DeleteTagEvent(PrincipalUtils.getCurrentUserName(), metalake, isExists));
+      return isExists;
     } catch (Exception e) {
       // TODO: deleteTagFailureEvent
       throw e;
@@ -120,8 +148,11 @@ public class TagEventDispatcher implements TagDispatcher {
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name) {
     // TODO: listMetadataObjectsForTagPreEvent
     try {
-      // TODO: listMetadataObjectsForTagEvent
-      return dispatcher.listMetadataObjectsForTag(metalake, name);
+      MetadataObject[] metadataObjects = dispatcher.listMetadataObjectsForTag(metalake, name);
+      eventBus.dispatchEvent(
+          new ListMetadataObjectsForTagEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, name, metadataObjects));
+      return metadataObjects;
     } catch (Exception e) {
       // TODO: listMetadataObjectsForTagFailureEvent
       throw e;
@@ -132,8 +163,11 @@ public class TagEventDispatcher implements TagDispatcher {
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
     // TODO: listTagsForMetadataObjectPreEvent
     try {
-      // TODO: listTagsForMetadataObjectEvent
-      return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
+      String[] tags = dispatcher.listTagsForMetadataObject(metalake, metadataObject);
+      eventBus.dispatchEvent(
+          new ListTagsForMetadataObjectEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, tags));
+      return tags;
     } catch (Exception e) {
       // TODO: listTagsForMetadataObjectFailureEvent
       throw e;
@@ -144,8 +178,11 @@ public class TagEventDispatcher implements TagDispatcher {
   public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject) {
     // TODO: listTagsInfoForMetadataObjectPreEvent
     try {
-      // TODO: listTagsInfoForMetadataObjectEvent
-      return dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
+      Tag[] tags = dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
+      eventBus.dispatchEvent(
+          new ListTagsInfoForMetadataObjectEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, tags));
+      return tags;
     } catch (Exception e) {
       // TODO: listTagsInfoForMetadataObjectFailureEvent
       throw e;
@@ -157,9 +194,18 @@ public class TagEventDispatcher implements TagDispatcher {
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
     // TODO: associateTagsForMetadataObjectPreEvent
     try {
-      // TODO: associateTagsForMetadataObjectEvent
-      return dispatcher.associateTagsForMetadataObject(
-          metalake, metadataObject, tagsToAdd, tagsToRemove);
+      String[] associatedTags =
+          dispatcher.associateTagsForMetadataObject(
+              metalake, metadataObject, tagsToAdd, tagsToRemove);
+      eventBus.dispatchEvent(
+          new AssociateTagsForMetadataObjectEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              metadataObject,
+              tagsToAdd,
+              tagsToRemove,
+              associatedTags));
+      return associatedTags;
     } catch (Exception e) {
       // TODO: associateTagsForMetadataObjectFailureEvent
       throw e;
@@ -170,8 +216,11 @@ public class TagEventDispatcher implements TagDispatcher {
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name) {
     // TODO: getTagForMetadataObjectPreEvent
     try {
-      // TODO: getTagForMetadataObjectEvent
-      return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
+      Tag tag = dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
+      eventBus.dispatchEvent(
+          new GetTagForMetadataObjectEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name, tag));
+      return tag;
     } catch (Exception e) {
       // TODO: getTagForMetadataObjectFailureEvent
       throw e;
