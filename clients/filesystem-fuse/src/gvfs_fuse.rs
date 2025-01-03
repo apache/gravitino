@@ -31,6 +31,7 @@ use once_cell::sync::Lazy;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::fuse_api_handle_debug::FuseApiHandleDebug;
 
 const FILESET_PREFIX: &str = "gvfs://fileset/";
 
@@ -39,8 +40,8 @@ static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(No
 pub(crate) enum CreateFileSystemResult {
     Memory(MemoryFileSystem),
     Gvfs(GravitinoFilesetFileSystem),
-    FuseMemoryFs(FuseApiHandle<DefaultRawFileSystem<MemoryFileSystem>>),
-    FuseGvfs(FuseApiHandle<DefaultRawFileSystem<GravitinoFilesetFileSystem>>),
+    FuseMemoryFs(FuseApiHandleDebug<DefaultRawFileSystem<MemoryFileSystem>>),
+    FuseGvfs(FuseApiHandleDebug<DefaultRawFileSystem<GravitinoFilesetFileSystem>>),
     None,
 }
 
@@ -95,7 +96,7 @@ pub async fn create_raw_fs(
 ) -> GvfsResult<CreateFileSystemResult> {
     match path_fs {
         CreateFileSystemResult::Memory(fs) => {
-            let fs = FuseApiHandle::new(
+            let fs = FuseApiHandleDebug::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
                 fs_context,
@@ -103,7 +104,7 @@ pub async fn create_raw_fs(
             Ok(CreateFileSystemResult::FuseMemoryFs(fs))
         }
         CreateFileSystemResult::Gvfs(fs) => {
-            let fs = FuseApiHandle::new(
+            let fs = FuseApiHandleDebug::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
                 fs_context,

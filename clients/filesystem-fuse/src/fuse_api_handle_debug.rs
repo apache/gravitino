@@ -35,6 +35,7 @@ use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::num::NonZeroU32;
 use std::time::{Duration, SystemTime};
+use crate::config::AppConfig;
 use crate::fuse_api_handle::FuseApiHandle;
 
 /// Wrapper Struct for `Timestamp` to enable custom Display implementation
@@ -93,9 +94,9 @@ pub(crate) struct FuseApiHandleDebug<T: RawFileSystem> {
 }
 
 impl<T: RawFileSystem> FuseApiHandleDebug<T> {
-    pub fn new(fs: T, context: FileSystemContext) -> Self {
+    pub fn new(fs: T, _config: &AppConfig, context: FileSystemContext,) -> Self {
         Self {
-            inner: FuseApiHandle::new(fs, context),
+            inner: FuseApiHandle::new(fs, _config, context),
         }
     }
 }
