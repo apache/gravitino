@@ -35,8 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(GravitinoGCSCredentialProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoGCSCredentialProvider.class);
   private Configuration configuration;
   private GravitinoClient client;
   private String filesetIdentifier;
@@ -50,7 +49,7 @@ public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
       try {
         refresh();
       } catch (IOException e) {
-        LOGGER.error("Failed to refresh the access token", e);
+        LOG.error("Failed to refresh the access token", e);
       }
     }
     return accessToken;
@@ -70,7 +69,7 @@ public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
 
     // Can't find any credential, use the default one.
     if (credentials.length == 0) {
-      LOGGER.warn(
+      LOG.warn(
           "No credential found for fileset: {}, try to use static JSON file", filesetIdentifier);
       return;
     }
@@ -82,11 +81,11 @@ public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
         credentialMap.get(Credential.CREDENTIAL_TYPE))) {
       String sessionToken = credentialMap.get(GCSTokenCredential.GCS_TOKEN_NAME);
       accessToken = new AccessToken(sessionToken, expirationTime);
-    }
 
-    this.expirationTime = credential.expireTimeInMs();
-    if (expirationTime <= 0) {
-      expirationTime = Long.MAX_VALUE;
+      expirationTime = credential.expireTimeInMs();
+      if (expirationTime <= 0) {
+        expirationTime = Long.MAX_VALUE;
+      }
     }
   }
 

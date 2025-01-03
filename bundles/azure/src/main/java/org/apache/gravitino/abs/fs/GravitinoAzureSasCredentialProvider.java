@@ -19,15 +19,18 @@
 
 package org.apache.gravitino.abs.fs;
 
+import static org.apache.gravitino.credential.ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE;
 import static org.apache.gravitino.credential.ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN;
 import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY;
 import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -102,20 +105,21 @@ public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Co
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
 
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    if (credentials.length == 0) {
+    Optional<Credential> optionalCredential = getCredential(credentials);
+
+    if (!optionalCredential.isPresent()) {
       LOGGER.warn("No credentials found for fileset {}", filesetIdentifier);
       return;
     }
 
-    Credential credential = getCredential(credentials);
+    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
 
-    if (ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE.equals(
-        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
-      this.sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
+    if (ADLS_TOKEN_CREDENTIAL_TYPE.equals(credentialMap.get(Credential.CREDENTIAL_TYPE))) {
+      sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
     } else {
-      this.azureStorageAccountName = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
-      this.azureStorageAccountKey = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+      azureStorageAccountName = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
+      azureStorageAccountKey = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
     }
 
     this.expirationTime = credential.expireTimeInMs();
@@ -129,16 +133,25 @@ public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Co
    * uses static credential.
    *
    * @param credentials The credential array.
-   * @return The credential.
+   * @return An optional credential.
    */
-  private Credential getCredential(Credential[] credentials) {
-    for (Credential credential : credentials) {
-      if (ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE.equals(credential.credentialType())) {
-        return credential;
-      }
+  private Optional<Credential> getCredential(Credential[] credentials) {
+    // Use dynamic credential if found.
+    Optional<Credential> dynamicCredential =
+        Arrays.stream(credentials)
+            .filter(credential -> credential.credentialType().equals(ADLS_TOKEN_CREDENTIAL_TYPE))
+            .findFirst();
+    if (dynamicCredential.isPresent()) {
+      return dynamicCredential;
     }
 
-    // Not found, use the first one.
-    return credentials[0];
+    // If dynamic credential not found, use the static one
+    return Arrays.stream(credentials)
+        .filter(
+            credential ->
+                credential
+                    .credentialType()
+                    .equals(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE))
+        .findFirst();
   }
 }
