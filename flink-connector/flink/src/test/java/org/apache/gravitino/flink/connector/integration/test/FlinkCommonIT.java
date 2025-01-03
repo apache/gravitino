@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,12 +54,30 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract Catalog currentCatalog();
 
+  protected boolean supportSchemaOperation() {
+    return true;
+  }
+
+  protected boolean supportTableOperation() {
+    return true;
+  }
+
+  protected boolean supportColumnOperation() {
+    return true;
+  }
+
+  protected boolean supportSchemaOperationWithCommentAndOptions() {
+    return true;
+  }
+
   @Test
+  @EnabledIf("supportSchemaOperation")
   public void testCreateSchema() {
     doWithCatalog(
         currentCatalog(),
@@ -76,7 +95,110 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportSchemaOperation")
   public void testGetSchema() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_get_schema";
+          try {
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(tableEnv.executeSql("USE " + schema), ResultKind.SUCCESS);
+
+            catalog.asSchemas().schemaExists(schema);
+            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, loadedSchema.name());
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+            Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperation")
+  public void testListSchema() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_list_schema";
+          String schema2 = "test_list_schema2";
+          String schema3 = "test_list_schema3";
+
+          try {
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema2), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema3), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("SHOW DATABASES"),
+                ResultKind.SUCCESS_WITH_CONTENT,
+                Row.of("default"),
+                Row.of(schema),
+                Row.of(schema2),
+                Row.of(schema3));
+
+            String[] schemas = catalog.asSchemas().listSchemas();
+            Arrays.sort(schemas);
+            Assertions.assertEquals(4, schemas.length);
+            Assertions.assertEquals("default", schemas[0]);
+            Assertions.assertEquals(schema, schemas[1]);
+            Assertions.assertEquals(schema2, schemas[2]);
+            Assertions.assertEquals(schema3, schemas[3]);
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+            catalog.asSchemas().dropSchema(schema2, true);
+            catalog.asSchemas().dropSchema(schema3, true);
+            Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testAlterSchemaWithCommentAndOptions() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_alter_schema";
+          try {
+            TestUtils.assertTableResult(
+                sql(
+                    "CREATE DATABASE IF NOT EXISTS %s "
+                        + "COMMENT 'test comment'"
+                        + "WITH ('key1' = 'value1', 'key2'='value2')",
+                    schema),
+                ResultKind.SUCCESS);
+
+            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, loadedSchema.name());
+            Assertions.assertEquals("test comment", loadedSchema.comment());
+            Assertions.assertEquals(3, loadedSchema.properties().size());
+            Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
+            Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
+            Assertions.assertNotNull(loadedSchema.properties().get("location"));
+
+            TestUtils.assertTableResult(
+                sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
+                ResultKind.SUCCESS);
+            Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, reloadedSchema.name());
+            Assertions.assertEquals("test comment", reloadedSchema.comment());
+            Assertions.assertEquals(4, reloadedSchema.properties().size());
+            Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
+            Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testGetSchemaWithCommentAndOptions() {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
@@ -110,7 +232,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  public void testListSchema() {
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testListSchemaWithCommentAndOptions() {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
@@ -150,44 +273,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  public void testAlterSchema() {
-    doWithCatalog(
-        currentCatalog(),
-        catalog -> {
-          String schema = "test_alter_schema";
-          try {
-            TestUtils.assertTableResult(
-                sql(
-                    "CREATE DATABASE IF NOT EXISTS %s "
-                        + "COMMENT 'test comment'"
-                        + "WITH ('key1' = 'value1', 'key2'='value2')",
-                    schema),
-                ResultKind.SUCCESS);
-
-            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
-            Assertions.assertEquals(schema, loadedSchema.name());
-            Assertions.assertEquals("test comment", loadedSchema.comment());
-            Assertions.assertEquals(3, loadedSchema.properties().size());
-            Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
-            Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
-            Assertions.assertNotNull(loadedSchema.properties().get("location"));
-
-            TestUtils.assertTableResult(
-                sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
-                ResultKind.SUCCESS);
-            Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
-            Assertions.assertEquals(schema, reloadedSchema.name());
-            Assertions.assertEquals("test comment", reloadedSchema.comment());
-            Assertions.assertEquals(4, reloadedSchema.properties().size());
-            Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
-            Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
-          } finally {
-            catalog.asSchemas().dropSchema(schema, true);
-          }
-        });
-  }
-
-  @Test
+  @EnabledIf("supportTableOperation")
   public void testCreateSimpleTable() {
     String databaseName = "test_create_no_partition_table_db";
     String tableName = "test_create_no_partition_table";
@@ -236,6 +322,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testListTables() {
     String newSchema = "test_list_table_catalog";
     Column[] columns = new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
@@ -268,6 +355,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testDropTable() {
     String databaseName = "test_drop_table_db";
     doWithSchema(
@@ -289,6 +377,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testGetSimpleTable() {
     String databaseName = "test_get_simple_table";
     Column[] columns =
@@ -342,6 +431,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testRenameColumn() {
     String databaseName = "test_rename_column_db";
     String tableName = "test_rename_column";
@@ -377,6 +467,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterTableComment() {
     String databaseName = "test_alter_table_comment_database";
     String tableName = "test_alter_table_comment";
@@ -436,6 +527,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterTableAddColumn() {
     String databaseName = "test_alter_table_add_column_db";
     String tableName = "test_alter_table_add_column";
@@ -471,6 +563,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterTableDropColumn() {
     String databaseName = "test_alter_table_drop_column_db";
     String tableName = "test_alter_table_drop_column";
@@ -501,6 +594,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterColumnTypeAndChangeOrder() {
     String databaseName = "test_alter_table_alter_column_db";
     String tableName = "test_alter_table_rename_column";
@@ -542,6 +636,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testRenameTable() {
     String databaseName = "test_rename_table_db";
     String tableName = "test_rename_table";
@@ -569,6 +664,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testAlterTableProperties() {
     String databaseName = "test_alter_table_properties_db";
     String tableName = "test_alter_table_properties";
