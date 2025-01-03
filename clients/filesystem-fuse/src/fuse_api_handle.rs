@@ -393,7 +393,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         }
     }
 
-    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>> where T: 'a;
+    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+    where
+        T: 'a;
 
     async fn readdir<'a>(
         &'a self,
@@ -402,9 +404,14 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: u64,
         offset: i64,
     ) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
+        let stat = self.inner.fs.stat(parent).await?;
         debug!(
             "readdir [id={}]: req: {:?}, parent: {:?}, fh: {:?}, offset: {:?}",
-            req.unique, req, parent, fh, offset
+            req.unique,
+            req,
+            stat,
+            fh,
+            offset
         );
         let result = self.inner.readdir(req, parent, fh, offset).await;
         match result {
@@ -468,7 +475,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         }
     }
 
-    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>> where T: 'a;
+    type DirEntryPlusStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
+    where
+        T: 'a;
 
     async fn readdirplus<'a>(
         &'a self,
@@ -721,7 +730,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     type DirEntryStream<'a>
-        = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+    = BoxStream<'a, fuse3::Result<DirectoryEntry>>
     where
         T: 'a;
 
@@ -801,7 +810,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     type DirEntryPlusStream<'a>
-        = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
+    = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
     where
         T: 'a;
 
