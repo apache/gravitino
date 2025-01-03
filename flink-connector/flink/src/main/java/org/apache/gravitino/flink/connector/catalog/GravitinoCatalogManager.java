@@ -35,12 +35,10 @@ public class GravitinoCatalogManager {
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
   private volatile boolean isClosed = false;
-  private final String metalakeName;
   private final GravitinoMetalake metalake;
   private final GravitinoAdminClient gravitinoClient;
 
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
-    this.metalakeName = metalakeName;
     this.gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
@@ -97,15 +95,6 @@ public class GravitinoCatalogManager {
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
     LOG.info("Load catalog {} from Gravitino successfully.", name);
     return catalog;
-  }
-
-  /**
-   * Get the metalake.
-   *
-   * @return the metalake name.
-   */
-  public String getMetalakeName() {
-    return metalakeName;
   }
 
   /**
