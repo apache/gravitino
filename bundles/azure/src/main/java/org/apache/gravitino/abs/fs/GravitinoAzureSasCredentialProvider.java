@@ -34,8 +34,8 @@ import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azurebfs.extensions.SASTokenProvider;
@@ -82,8 +82,7 @@ public class GravitinoAzureSasCredentialProvider implements SASTokenProvider, Co
   public void initialize(Configuration conf, String accountName) throws IOException {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
-    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
+    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
   }
 
   @Override

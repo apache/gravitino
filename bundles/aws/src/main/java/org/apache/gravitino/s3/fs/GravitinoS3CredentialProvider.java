@@ -38,8 +38,8 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.slf4j.Logger;
@@ -59,8 +59,7 @@ public class GravitinoS3CredentialProvider implements AWSCredentialsProvider {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
     this.configuration = conf;
-    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
-    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
+    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
   }
 
   @Override

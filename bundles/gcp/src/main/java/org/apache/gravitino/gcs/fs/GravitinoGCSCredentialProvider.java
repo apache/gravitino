@@ -28,8 +28,8 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,11 +92,9 @@ public class GravitinoGCSCredentialProvider implements AccessTokenProvider {
   @Override
   public void setConf(Configuration configuration) {
     this.configuration = configuration;
-
     this.filesetIdentifier =
         configuration.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
-    this.client = gravitinoVirtualFileSystem.initializeClient(configuration);
+    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
   }
 
   @Override

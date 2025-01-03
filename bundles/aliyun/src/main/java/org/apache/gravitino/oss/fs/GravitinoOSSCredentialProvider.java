@@ -38,8 +38,8 @@ import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.aliyun.oss.Constants;
 import org.slf4j.Logger;
@@ -57,8 +57,7 @@ public class GravitinoOSSCredentialProvider implements CredentialsProvider {
   public GravitinoOSSCredentialProvider(URI uri, Configuration conf) {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
-    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
+    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
     this.configuration = conf;
   }
 

@@ -41,7 +41,9 @@ dependencies {
     exclude("*")
   }
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(project(":clients:filesystem-hadoop3-runtime", configuration = "shadow"))
+  implementation(project(":clients:filesystem-hadoop3-common")) {
+    exclude("*")
+  }
 
   implementation(libs.commons.lang3)
   // runtime used
