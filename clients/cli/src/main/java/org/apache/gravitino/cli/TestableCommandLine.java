@@ -55,6 +55,7 @@ import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
+import org.apache.gravitino.cli.commands.LinkModel;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
@@ -83,6 +84,7 @@ import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
+import org.apache.gravitino.cli.commands.RegisterModel;
 import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
@@ -924,5 +926,32 @@ public class TestableCommandLine {
   protected ModelDetails newModelDetails(
       String url, boolean ignore, String metalake, String catalog, String schema, String model) {
     return new ModelDetails(url, ignore, metalake, catalog, schema, model);
+  }
+
+  protected RegisterModel newCreateModel(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      String comment,
+      Map<String, String> properties) {
+    return new RegisterModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+  }
+
+  protected LinkModel newLinkModel(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      String uri,
+      String[] alias,
+      String comment,
+      Map<String, String> properties) {
+    return new LinkModel(
+        url, ignore, metalake, catalog, schema, model, uri, alias, comment, properties);
   }
 }
