@@ -249,7 +249,8 @@ public class NameIdentifierUtil {
   public static NameIdentifier getCatalogIdentifier(NameIdentifier ident)
       throws IllegalNameIdentifierException {
     NameIdentifier.check(
-        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
     Namespace.check(
         ident.namespace() != null && !ident.namespace().isEmpty(),
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
@@ -276,7 +277,8 @@ public class NameIdentifierUtil {
   public static NameIdentifier getSchemaIdentifier(NameIdentifier ident)
       throws IllegalNameIdentifierException {
     NameIdentifier.check(
-        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
     Namespace.check(
         ident.namespace() != null && !ident.namespace().isEmpty(),
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
