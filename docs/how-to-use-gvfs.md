@@ -146,8 +146,7 @@ You can configure these properties in two ways:
     ```
    
 :::note
-If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jars in the Hadoop environment, For bundles jar and
-cloud storage fileset configuration example, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
+If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jars in the Hadoop environment.
 :::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
@@ -204,10 +203,6 @@ two ways:
     ```shell
        ./gradlew :clients:filesystem-hadoop3-runtime:build -x test
     ```
-:::note
-For cloud storage fileset, some extra steps should be added, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
-:::
-
 
 #### Via Hadoop shell command
 
@@ -233,8 +228,6 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/* ${HADOOP_HOME}/share/hadoop/common/li
 # 4. Try to list the fileset
 ./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/test_catalog/test_schema/test_fileset_1
 ```
-
-Full example to access S3, GCS, OSS fileset via Hadoop shell command, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 
 #### Via Java code
 
@@ -285,9 +278,6 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 fs.getFileStatus(filesetPath);
 ```
 
-Full example to access S3, GCS, OSS fileset via Hadoop shell command, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
-
-
 #### Via Apache Spark
 
 1. Add the GVFS runtime jar to the Spark environment.
@@ -326,8 +316,6 @@ Full example to access S3, GCS, OSS fileset via Hadoop shell command, please ref
 
     rdd.foreach(println)
     ```
-
-Full example to access S3, GCS, OSS fileset via Spark, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 
 #### Via Tensorflow
 
@@ -523,7 +511,6 @@ options = {
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 ```
 
-Full Python example to access S3, GCS, OSS fileset via GVFS, please refer to [cloud storage fileset example](./cloud-storage-fileset-example.md).
 
 :::note
 

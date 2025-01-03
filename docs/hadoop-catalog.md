@@ -9,9 +9,9 @@ license: "This software is licensed under the Apache License version 2."
 ## Introduction
 
 Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports S3, GCS, OSS and Azure Blob Storage fileset through Hadoop catalog. 
+the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports [S3](hadoop-catalog-with-S3.md), [GCS](hadoop-catalog-with-gcs.md), [OSS](hadoop-catalog-with-oss.md) and [Azure Blob Storage](hadoop-catalog-with-adls.md) through Hadoop catalog. 
 
-The rest of this document will use HDFS or local file as an example to illustrate how to use the Hadoop catalog. For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, but more properties need to be set. We will use [separate sections](./cloud-storage-fileset-example.md) to introduce how to use of S3, GCS, OSS and Azure Blob Storage.
+The rest of this document will use HDFS or local file as an example to illustrate how to use the Hadoop catalog. For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, please refer to the corresponding document for more details.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Hadoop catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
