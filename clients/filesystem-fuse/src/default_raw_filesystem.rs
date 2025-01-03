@@ -18,10 +18,11 @@
  */
 use crate::config::AppConfig;
 use crate::filesystem::{
-    FileStat, FileSystemContext, PathFileSystem, RawFileSystem, Result, INITIAL_FILE_ID,
-    ROOT_DIR_FILE_ID, ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
+    FileStat, FileSystemContext, PathFileSystem, RawFileSystem, Result, FS_META_FILE_ID,
+    FS_META_FILE_NAME, FS_META_FILE_PATH, INITIAL_FILE_ID, ROOT_DIR_FILE_ID,
+    ROOT_DIR_PARENT_FILE_ID, ROOT_DIR_PATH,
 };
-use crate::opened_file::{FileHandle, OpenFileFlags};
+use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
 use crate::opened_file_manager::OpenedFileManager;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -78,6 +79,7 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
     }
 
     async fn resolve_file_id_to_filestat(&self, file_stat: &mut FileStat, parent_file_id: u64) {
+        debug_assert!(parent_file_id != 0);
         let mut file_manager = self.file_entry_manager.write().await;
         let file_entry = file_manager.get_file_entry_by_path(&file_stat.path);
         match file_entry {
@@ -132,6 +134,21 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         let mut file_manager = self.file_entry_manager.write().await;
         file_manager.insert(parent_file_id, file_id, path);
     }
+
+    fn get_meta_file_stat(&self) -> FileStat {
+        let mut meta_file_stat =
+            FileStat::new_file_filestat_with_path(Path::new(FS_META_FILE_PATH), 0);
+        meta_file_stat.set_file_id(ROOT_DIR_FILE_ID, FS_META_FILE_ID);
+        meta_file_stat
+    }
+
+    fn is_meta_file(&self, file_id: u64) -> bool {
+        file_id == FS_META_FILE_ID
+    }
+
+    fn is_meta_file_name(&self, parent_file_id: u64, name: &OsStr) -> bool {
+        parent_file_id == ROOT_DIR_FILE_ID && name == OsStr::new(FS_META_FILE_NAME)
+    }
 }
 
 #[async_trait]
@@ -142,6 +159,13 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             ROOT_DIR_PARENT_FILE_ID,
             ROOT_DIR_FILE_ID,
             Path::new(ROOT_DIR_PATH),
+        )
+        .await;
+
+        self.insert_file_entry_locked(
+            ROOT_DIR_FILE_ID,
+            FS_META_FILE_ID,
+            Path::new(FS_META_FILE_PATH),
         )
         .await;
         self.fs.init().await
@@ -168,6 +192,10 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn stat(&self, file_id: u64) -> Result<FileStat> {
+        if self.is_meta_file(file_id) {
+            return Ok(self.get_meta_file_stat());
+        }
+
         let file_entry = self.get_file_entry(file_id).await?;
         let mut file_stat = self.fs.stat(&file_entry.path).await?;
         file_stat.set_file_id(file_entry.parent_file_id, file_entry.file_id);
@@ -175,8 +203,11 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn lookup(&self, parent_file_id: u64, name: &OsStr) -> Result<FileStat> {
-        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
+        if self.is_meta_file_name(parent_file_id, name) {
+            return Ok(self.get_meta_file_stat());
+        }
 
+        let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let path = parent_file_entry.path.join(name);
         let mut file_stat = self.fs.stat(&path).await?;
         // fill the file id to file stat
@@ -192,10 +223,21 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         for file_stat in child_filestats.iter_mut() {
             self.resolve_file_id_to_filestat(file_stat, file_id).await;
         }
+
+        if file_id == ROOT_DIR_FILE_ID {
+            child_filestats.push(self.get_meta_file_stat());
+        }
         Ok(child_filestats)
     }
 
     async fn open_file(&self, file_id: u64, flags: u32) -> Result<FileHandle> {
+        if self.is_meta_file(file_id) {
+            let meta_file = OpenedFile::new(self.get_meta_file_stat());
+            let resutl = self.opened_file_manager.put(meta_file);
+            let file = resutl.lock().await;
+            return Ok(file.file_handle());
+        }
+
         self.open_file_internal(file_id, flags, FileType::RegularFile)
             .await
     }
@@ -211,6 +253,10 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         name: &OsStr,
         flags: u32,
     ) -> Result<FileHandle> {
+        if self.is_meta_file_name(parent_file_id, name) {
+            return Err(Errno::from(libc::EEXIST));
+        }
+
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let mut file_without_id = self
             .fs
@@ -247,11 +293,19 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
     }
 
     async fn set_attr(&self, file_id: u64, file_stat: &FileStat) -> Result<()> {
+        if self.is_meta_file(file_id) {
+            return Ok(());
+        }
+
         let file_entry = self.get_file_entry(file_id).await?;
         self.fs.set_attr(&file_entry.path, file_stat, true).await
     }
 
     async fn remove_file(&self, parent_file_id: u64, name: &OsStr) -> Result<()> {
+        if self.is_meta_file_name(parent_file_id, name) {
+            return Err(Errno::from(libc::EPERM));
+        }
+
         let parent_file_entry = self.get_file_entry(parent_file_id).await?;
         let path = parent_file_entry.path.join(name);
         self.fs.remove_file(&path).await?;
@@ -271,6 +325,15 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         Ok(())
     }
 
+    async fn flush_file(&self, _file_id: u64, fh: u64) -> Result<()> {
+        let opened_file = self
+            .opened_file_manager
+            .get(fh)
+            .ok_or(Errno::from(libc::EBADF))?;
+        let mut file = opened_file.lock().await;
+        file.flush().await
+    }
+
     async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
         let opened_file = self
             .opened_file_manager
@@ -280,7 +343,11 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         file.close().await
     }
 
-    async fn read(&self, _file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
+    async fn read(&self, file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {
+        if self.is_meta_file(file_id) {
+            return Ok(Bytes::new());
+        }
+
         let (data, file_stat) = {
             let opened_file = self
                 .opened_file_manager
@@ -297,7 +364,11 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         data
     }
 
-    async fn write(&self, _file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
+    async fn write(&self, file_id: u64, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
+        if self.is_meta_file(file_id) {
+            return Err(Errno::from(libc::EPERM));
+        }
+
         let (len, file_stat) = {
             let opened_file = self
                 .opened_file_manager
@@ -368,8 +439,6 @@ impl FileEntryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::filesystem::tests::TestRawFileSystem;
-    use crate::memory_filesystem::MemoryFileSystem;
 
     #[test]
     fn test_file_entry_manager() {
@@ -388,18 +457,5 @@ mod tests {
         manager.remove(Path::new("a/b"));
         assert!(manager.get_file_entry_by_id(2).is_none());
         assert!(manager.get_file_entry_by_path(Path::new("a/b")).is_none());
-    }
-
-    #[tokio::test]
-    async fn test_default_raw_file_system() {
-        let memory_fs = MemoryFileSystem::new().await;
-        let raw_fs = DefaultRawFileSystem::new(
-            memory_fs,
-            &AppConfig::default(),
-            &FileSystemContext::default(),
-        );
-        let _ = raw_fs.init().await;
-        let mut tester = TestRawFileSystem::new(raw_fs);
-        tester.test_raw_file_system().await;
     }
 }

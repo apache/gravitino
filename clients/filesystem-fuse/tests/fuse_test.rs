@@ -17,15 +17,16 @@
  * under the License.
  */
 
+use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
-use log::info;
-use std::fs;
+use log::{error, info};
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use std::{fs, panic, process};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
@@ -42,8 +43,14 @@ impl FuseTest {
 
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_memory.toml"))
             .expect("Failed to load config");
-        self.runtime
-            .spawn(async move { gvfs_mount(&mount_point, "", &config).await });
+        self.runtime.spawn(async move {
+            let result = gvfs_mount(&mount_point, "", &config).await;
+            if let Err(e) = result {
+                error!("Failed to mount gvfs: {:?}", e);
+                return Err(Errno::from(libc::EINVAL));
+            }
+            Ok(())
+        });
         let success = Self::wait_for_fuse_server_ready(&self.mount_point, Duration::from_secs(15));
         assert!(success, "Fuse server cannot start up at 15 seconds");
     }
@@ -60,6 +67,7 @@ impl FuseTest {
 
         while start_time.elapsed() < timeout {
             if file_exists(&test_file) {
+                info!("Fuse server is ready",);
                 return true;
             }
             info!("Wait for fuse server ready",);
@@ -79,6 +87,11 @@ impl Drop for FuseTest {
 #[test]
 fn test_fuse_system_with_auto() {
     tracing_subscriber::fmt().init();
+
+    panic::set_hook(Box::new(|info| {
+        error!("A panic occurred: {:?}", info);
+        process::exit(1);
+    }));
 
     let mount_point = "target/gvfs";
     let _ = fs::create_dir_all(mount_point);
