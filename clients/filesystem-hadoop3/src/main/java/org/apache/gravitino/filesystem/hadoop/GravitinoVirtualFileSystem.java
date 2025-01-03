@@ -88,6 +88,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private String metalakeName;
   private Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private ScheduledThreadPoolExecutor catalogCleanScheduler;
+  // Fileset name identifier and its corresponding FileSystem cache, the name identifier has
+  // four levels, the first level is metalake name.
   private Cache<NameIdentifier, FileSystem> internalFileSystemCache;
   private ScheduledThreadPoolExecutor internalFileSystemCleanScheduler;
 
@@ -100,7 +102,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private static final String SLASH = "/";
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
 
-  private static final Set<String> CATALOG_NECESSARY_PROPERTIES_FOR_CREDENTIAL =
+  private static final Set<String> CATALOG_NECESSARY_PROPERTIES_TO_KEEP =
       Sets.newHashSet(
           OSSProperties.GRAVITINO_OSS_ENDPOINT,
           OSSProperties.GRAVITINO_OSS_ENDPOINT,
@@ -430,8 +432,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                     catalog.properties().entrySet().stream()
                         .filter(
                             property ->
-                                CATALOG_NECESSARY_PROPERTIES_FOR_CREDENTIAL.contains(
-                                    property.getKey()))
+                                CATALOG_NECESSARY_PROPERTIES_TO_KEEP.contains(property.getKey()))
                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
                 Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
