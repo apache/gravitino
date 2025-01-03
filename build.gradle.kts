@@ -625,7 +625,10 @@ tasks {
   }
 
   val compileIcebergRESTServer by registering {
-    dependsOn("iceberg:iceberg-rest-server:copyLibAndConfigsToStandalonePackage")
+    dependsOn(
+      "iceberg:iceberg-common:spotlessCheck",
+      "iceberg:iceberg-rest-server:copyLibAndConfigsToStandalonePackage"
+    )
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/${rootProject.name}-iceberg-rest-server"))
     doLast {
