@@ -1,0 +1,8 @@
+gcli model [details]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Show model audit information
+gcli model details --name catalog_postgres.hr --audit
