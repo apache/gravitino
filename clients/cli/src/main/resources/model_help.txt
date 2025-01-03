@@ -1,8 +1,20 @@
-gcli model [details]
+gcli model [list|details|create|delete]
 
 Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
 
 Example commands
 
+Create a model
+gcli model create --name hadoop.schema.model --comment new_comment --properties managed=true,location=file:/tmp/root/schema/example
+
+List models
+gcli model list --name hadoop.schema
+
+Show a model's details
+gcli model details --name hadoop.schema.model
+
 Show model audit information
-gcli model details --name catalog_postgres.hr --audit
+gcli model details --name hadoop.schema.model --audit
+
+Delete a model
+gcli model delete --name hadoop.schema.model

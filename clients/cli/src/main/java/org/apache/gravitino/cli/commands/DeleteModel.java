@@ -25,8 +25,8 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
 /** Deletes an existing model. */
 public class DeleteModel extends Command {
@@ -38,7 +38,6 @@ public class DeleteModel extends Command {
   protected final boolean force;
 
   /**
-   *
    * Deletes an existing model.
    *
    * @param url The URL of the Gravitino server.
@@ -50,13 +49,13 @@ public class DeleteModel extends Command {
    * @param model The name of the model.
    */
   public DeleteModel(
-          String url,
-          boolean ignoreVersions,
-          boolean force,
-          String metalake,
-          String catalog,
-          String schema,
-          String model) {
+      String url,
+      boolean ignoreVersions,
+      boolean force,
+      String metalake,
+      String catalog,
+      String schema,
+      String model) {
     super(url, ignoreVersions);
     this.force = force;
     this.metalake = metalake;

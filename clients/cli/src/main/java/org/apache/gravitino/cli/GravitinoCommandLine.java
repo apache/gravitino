@@ -1193,21 +1193,21 @@ public class GravitinoCommandLine extends TestableCommandLine {
         break;
 
       case CommandActions.CREATE:
-      {
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
-        Map<String, String> propertyMap = new Properties().parse(properties);
-        newCreateModel(url, ignore, metalake, catalog, schema, model, comment, propertyMap)
-                .handle();
-        break;
-      }
+        {
+          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+          String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
+          Map<String, String> propertyMap = new Properties().parse(properties);
+          newCreateModel(url, ignore, metalake, catalog, schema, model, comment, propertyMap)
+              .handle();
+          break;
+        }
 
       case CommandActions.DELETE:
-      {
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteModel(url, ignore, force, metalake, catalog, schema, model).handle();
-        break;
-      }
+        {
+          boolean force = line.hasOption(GravitinoOptions.FORCE);
+          newDeleteModel(url, ignore, force, metalake, catalog, schema, model).handle();
+          break;
+        }
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);

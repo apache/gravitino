@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -26,8 +27,6 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-
-import java.util.Map;
 
 /** Creates a new model. */
 public class CreateModel extends Command {
@@ -40,7 +39,6 @@ public class CreateModel extends Command {
   protected final Map<String, String> properties;
 
   /**
-   *
    * Creates a new model.
    *
    * @param url The URL of the Gravitino server.
