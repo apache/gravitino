@@ -55,4 +55,10 @@ public class CreateMetalake extends Command {
 
     System.out.println(metalake + " created");
   }
+
+  @Override
+  public Command verify() {
+    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+    return super.verify();
+  }
 }

@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateMetalake;
@@ -87,6 +90,7 @@ class TestMetalakeCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListMetalakes(GravitinoCommandLine.DEFAULT_URL, false, null);
+    doReturn(mockList).when(mockList).verify();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -104,8 +108,21 @@ class TestMetalakeCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newMetalakeDetails(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
+    doReturn(mockDetails).when(mockDetails).verify();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
+  }
+
+  @Test
+  void testMetalakeDetailsCommandWithoutMetalake() {
+    Main.useExit = false;
+    MetalakeDetails metalakeDetails =
+        spy(new MetalakeDetails(GravitinoCommandLine.DEFAULT_URL, false, "table", null));
+
+    assertThrows(RuntimeException.class, metalakeDetails::verify);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    verify(metalakeDetails, never()).handle();
+    assertEquals(ErrorMessages.MISSING_METALAKE, output);
   }
 
   @Test
@@ -121,8 +138,20 @@ class TestMetalakeCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newMetalakeAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
+    doReturn(mockAudit).when(mockAudit).verify();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
+  }
+
+  @Test
+  void testMetalakeAuditCommandWithoutMetalake() {
+    Main.useExit = false;
+    MetalakeAudit metalakeAudit =
+        spy(new MetalakeAudit(GravitinoCommandLine.DEFAULT_URL, false, null));
+
+    assertThrows(RuntimeException.class, metalakeAudit::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
   }
 
   @Test
@@ -139,8 +168,20 @@ class TestMetalakeCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateMetalake(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "comment");
+    doReturn(mockCreate).when(mockCreate).verify();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateMetalakeCommandWithoutMetalake() {
+    Main.useExit = false;
+    CreateMetalake metalakeCreate =
+        spy(new CreateMetalake(GravitinoCommandLine.DEFAULT_URL, false, null, null));
+
+    assertThrows(RuntimeException.class, metalakeCreate::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
   }
 
   @Test
@@ -155,6 +196,7 @@ class TestMetalakeCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateMetalake(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null);
+    doReturn(mockCreate).when(mockCreate).verify();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -171,8 +213,20 @@ class TestMetalakeCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteMetalake(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo");
+    doReturn(mockDelete).when(mockDelete).verify();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
+  }
+
+  @Test
+  void testDeleteMetalakeCommandWithoutMetalake() {
+    Main.useExit = false;
+    DeleteMetalake metalakeDelete =
+        spy(new DeleteMetalake(GravitinoCommandLine.DEFAULT_URL, false, true, null));
+
+    assertThrows(RuntimeException.class, metalakeDelete::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
   }
 
   @Test
@@ -188,6 +242,7 @@ class TestMetalakeCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteMetalake(GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo");
+    doReturn(mockDelete).when(mockDelete).verify();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -209,8 +264,59 @@ class TestMetalakeCommands {
         .when(commandLine)
         .newSetMetalakeProperty(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "property", "value");
+    doReturn(mockSetProperty).when(mockSetProperty).verify();
     commandLine.handleCommandLine();
     verify(mockSetProperty).handle();
+  }
+
+  @Test
+  void testSetMetalakePropertyCommandWithoutMetalake() {
+    Main.useExit = false;
+    SetMetalakeProperty metalakeProperty =
+        spy(new SetMetalakeProperty(GravitinoCommandLine.DEFAULT_URL, false, null, null, null));
+
+    assertThrows(RuntimeException.class, metalakeProperty::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
+  }
+
+  @Test
+  void testSetMetalakePropertyCommandWithoutPropertyAndValue() {
+    Main.useExit = false;
+    SetMetalakeProperty metalakeProperty =
+        spy(
+            new SetMetalakeProperty(
+                GravitinoCommandLine.DEFAULT_URL, false, "demo_metalake", null, null));
+
+    assertThrows(RuntimeException.class, metalakeProperty::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals("Missing --property and --value options.", errOutput);
+  }
+
+  @Test
+  void testSetMetalakePropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    SetMetalakeProperty metalakeProperty =
+        spy(
+            new SetMetalakeProperty(
+                GravitinoCommandLine.DEFAULT_URL, false, "demo_metalake", null, "val1"));
+
+    assertThrows(RuntimeException.class, metalakeProperty::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, errOutput);
+  }
+
+  @Test
+  void testSetMetalakePropertyCommandWithoutValue() {
+    Main.useExit = false;
+    SetMetalakeProperty metalakeProperty =
+        spy(
+            new SetMetalakeProperty(
+                GravitinoCommandLine.DEFAULT_URL, false, "demo_metalake", "property1", null));
+
+    assertThrows(RuntimeException.class, metalakeProperty::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_VALUE, errOutput);
   }
 
   @Test
@@ -228,8 +334,33 @@ class TestMetalakeCommands {
         .when(commandLine)
         .newRemoveMetalakeProperty(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "property");
+    doReturn(mockRemoveProperty).when(mockRemoveProperty).verify();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
+  }
+
+  @Test
+  void testRemoveMetalakePropertyCommandWithoutMetalake() {
+    Main.useExit = false;
+    RemoveMetalakeProperty mockRemoveProperty =
+        spy(new RemoveMetalakeProperty(GravitinoCommandLine.DEFAULT_URL, false, null, "property1"));
+
+    assertThrows(RuntimeException.class, mockRemoveProperty::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
+  }
+
+  @Test
+  void testRemoveMetalakePropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    RemoveMetalakeProperty mockRemoveProperty =
+        spy(
+            new RemoveMetalakeProperty(
+                GravitinoCommandLine.DEFAULT_URL, false, "demo_metalake", null));
+
+    assertThrows(RuntimeException.class, mockRemoveProperty::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, errOutput);
   }
 
   @Test
@@ -244,8 +375,20 @@ class TestMetalakeCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListMetalakeProperties(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
+    doReturn(mockListProperties).when(mockListProperties).verify();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
+  }
+
+  @Test
+  void testListMetalakePropertiesCommandWithoutMetalake() {
+    Main.useExit = false;
+    ListMetalakeProperties mockListProperties =
+        spy(new ListMetalakeProperties(GravitinoCommandLine.DEFAULT_URL, false, null));
+
+    assertThrows(RuntimeException.class, mockListProperties::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
   }
 
   @Test
@@ -263,8 +406,33 @@ class TestMetalakeCommands {
         .when(commandLine)
         .newUpdateMetalakeComment(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "new comment");
+    doReturn(mockUpdateComment).when(mockUpdateComment).verify();
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
+  }
+
+  @Test
+  void testUpdateMetalakeCommentCommandWithoutMetalake() {
+    Main.useExit = false;
+    UpdateMetalakeComment mockUpdateComment =
+        spy(new UpdateMetalakeComment(GravitinoCommandLine.DEFAULT_URL, false, null, "comment"));
+
+    assertThrows(RuntimeException.class, mockUpdateComment::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
+  }
+
+  @Test
+  void testUpdateMetalakeCommentCommandWithoutComment() {
+    Main.useExit = false;
+    UpdateMetalakeComment mockUpdateComment =
+        spy(
+            new UpdateMetalakeComment(
+                GravitinoCommandLine.DEFAULT_URL, false, "demo_metalake", null));
+
+    assertThrows(RuntimeException.class, mockUpdateComment::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_COMMENT, errOutput);
   }
 
   @Test
@@ -282,8 +450,22 @@ class TestMetalakeCommands {
         .when(commandLine)
         .newUpdateMetalakeName(
             GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "new_name");
+    doReturn(mockUpdateName).when(mockUpdateName).verify();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
+  }
+
+  @Test
+  void testUpdateMetalakeNameCommandWithoutName() {
+    Main.useExit = false;
+    UpdateMetalakeName mockUpdateName =
+        spy(
+            new UpdateMetalakeName(
+                GravitinoCommandLine.DEFAULT_URL, false, false, "demo_metalake", null));
+
+    assertThrows(RuntimeException.class, mockUpdateName::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_NAME, errOutput);
   }
 
   @Test
@@ -302,6 +484,7 @@ class TestMetalakeCommands {
         .when(commandLine)
         .newUpdateMetalakeName(
             GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "new_name");
+    doReturn(mockUpdateName).when(mockUpdateName).verify();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
   }
@@ -319,8 +502,20 @@ class TestMetalakeCommands {
     doReturn(mockEnable)
         .when(commandLine)
         .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", false);
+    doReturn(mockEnable).when(mockEnable).verify();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
+  }
+
+  @Test
+  void testEnableMetalakeCommandWithoutMetalake() {
+    Main.useExit = false;
+    MetalakeEnable mockEnable =
+        spy(new MetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, null, false));
+
+    assertThrows(RuntimeException.class, mockEnable::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
   }
 
   @Test
@@ -337,6 +532,7 @@ class TestMetalakeCommands {
     doReturn(mockEnable)
         .when(commandLine)
         .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", true);
+    doReturn(mockEnable).when(mockEnable).verify();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
   }
@@ -355,9 +551,20 @@ class TestMetalakeCommands {
     doReturn(mockDisable)
         .when(commandLine)
         .newMetalakeDisable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
-
+    doReturn(mockDisable).when(mockDisable).verify();
     commandLine.handleCommandLine();
     verify(mockDisable).handle();
+  }
+
+  @Test
+  void testDisableMetalakeCommandWithoutMetalake() {
+    Main.useExit = false;
+    MetalakeDisable mockDisable =
+        spy(new MetalakeDisable(GravitinoCommandLine.DEFAULT_URL, false, null));
+
+    assertThrows(RuntimeException.class, mockDisable::verify);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_METALAKE, errOutput);
   }
 
   @Test

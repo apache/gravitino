@@ -59,4 +59,10 @@ public class ListMetalakeProperties extends ListProperties {
 
     printProperties(properties);
   }
+
+  @Override
+  public Command verify() {
+    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+    return super.verify();
+  }
 }

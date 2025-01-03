@@ -69,4 +69,10 @@ public class MetalakeEnable extends Command {
 
     System.out.println(msgBuilder);
   }
+
+  @Override
+  public Command verify() {
+    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+    return super.verify();
+  }
 }

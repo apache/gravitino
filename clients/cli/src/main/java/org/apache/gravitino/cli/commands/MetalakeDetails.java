@@ -54,4 +54,10 @@ public class MetalakeDetails extends Command {
       exitWithError(exp.getMessage());
     }
   }
+
+  @Override
+  public Command verify() {
+    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+    return this;
+  }
 }

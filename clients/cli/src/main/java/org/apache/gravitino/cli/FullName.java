@@ -73,8 +73,6 @@ public class FullName {
       }
     }
 
-    System.err.println(ErrorMessages.MISSING_METALAKE);
-
     return null;
   }
 

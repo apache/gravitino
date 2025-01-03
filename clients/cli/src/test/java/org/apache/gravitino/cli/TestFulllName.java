@@ -233,7 +233,5 @@ public class TestFulllName {
     FullName fullName = new FullName(commandLine);
     String metalakeName = fullName.getMetalakeName();
     assertNull(metalakeName);
-    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals(errOutput, ErrorMessages.MISSING_METALAKE);
   }
 }

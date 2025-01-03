@@ -63,4 +63,13 @@ public class SetMetalakeProperty extends Command {
 
     System.out.println(metalake + " property set.");
   }
+
+  @Override
+  public Command verify() {
+    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+    if (property == null && value == null) exitWithError("Missing --property and --value options.");
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+    return this;
+  }
 }
