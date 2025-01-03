@@ -464,6 +464,9 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_AZURE_TENANT_ID`            | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
 | `GRAVITINO_AZURE_CLIENT_ID`            | `gravitino.iceberg-rest.azure-client-id`            | 0.8.0-incubating |
 | `GRAVITINO_AZURE_CLIENT_SECRET`        | `gravitino.iceberg-rest.azure-client-secret`        | 0.8.0-incubating |
+| `GRAVITINO_OSS_ACCESS_KEY`             | `gravitino.iceberg-rest.oss-access-key-id`          | 0.8.0-incubating |
+| `GRAVITINO_OSS_SECRET_KEY`             | `gravitino.iceberg-rest.oss-secret-access-key`      | 0.8.0-incubating |
+| `GRAVITINO_OSS_ENDPOINT`               | `gravitino.iceberg-rest.oss-endpoint`               | 0.8.0-incubating |
 
 The below environment is deprecated, please use the corresponding configuration items instead.
 
