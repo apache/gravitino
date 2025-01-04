@@ -283,6 +283,24 @@ Please choose the correct jar according to your environment.
 In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
 :::
 
+## Using Gravitino virual file system Java client to access the fileset
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("oss-endpoint", "http://localhost:9000");
+conf.set("oss-access-key-id", "minio");
+conf.set("oss-secret-access-key", "minio123"); 
+Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+FileSystem fs = filesetPath.getFileSystem(conf);
+fs.mkdirs(filesetPath);
+...
+```
+
+
 ## Using fileset with hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
@@ -339,6 +357,25 @@ hadoop dfs -ls gvfs://fileset/oss_catalog/schema/example
 hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/example
 ```
 
+
+## Using Gravitino virtual file system Python client
+
+```python
+from gravitino import gvfs
+options = {
+    "cache_size": 20,
+    "cache_expired_time": 3600,
+    "auth_type": "simple",
+    "oss_endpoint": "http://localhost:9000",
+    "oss_access_key_id": "minio",
+    "oss_secret_access_key": "minio123"
+}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+
+fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
+```
+
+
 ## Using fileset with pandas
 
 The following are examples of how to use the pandas library to access the OSS fileset
@@ -362,7 +399,46 @@ ds.head()
 
 ## Fileset with credential
 
-If the catalog has been configured with credential, you can access S3 fileset without setting `oss-access-key-id` and `oss-secret-access-key` in the properties via GVFS. More detail can be seen [here](./security/credential-vending.md#oss-credentials).
+Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been configured with credential, you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
+### How to create a OSS Hadoop catalog with credential enabled
+
+Apart from configuration method in [create-oss-hadoop-catalog](#catalog-a-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset.
+
+### How to access OSS fileset with credential
+
+If the catalog has been configured with credential, you can access OSS fileset without providing authentication information via GVFS. Let's see how to access OSS fileset with credential:
+
+GVFS Java client:
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+// No need to set oss-access-key-id and oss-secret-access-key
+Path filesetPath = new Path("gvfs://fileset/oss_test_catalog/test_schema/test_fileset/new_dir");
+FileSystem fs = filesetPath.getFileSystem(conf);
+fs.mkdirs(filesetPath);
+...
+```
+
+Spark:
+
+```python
+spark = SparkSession.builder
+  .appName("oss_fielset_test")
+  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+  # No need to set oss-access-key-id and oss-secret-access-key
+  .config("spark.driver.memory", "2g")
+  .config("spark.driver.port", "2048")
+  .getOrCreate()
+```
+
+Python client and Hadoop command are similar to the above examples.
 
 

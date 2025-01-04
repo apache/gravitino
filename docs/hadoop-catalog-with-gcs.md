@@ -273,6 +273,21 @@ Please choose the correct jar according to your environment.
 In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
 :::
 
+## Using Gravitino virual file system Java client to access the fileset
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("gcs-service-account-file", "/path/your-service-account-file.json");
+Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+FileSystem fs = filesetPath.getFileSystem(conf);
+fs.mkdirs(filesetPath);
+...
+```
+
 ## Using fileset with hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
@@ -319,6 +334,21 @@ hadoop dfs -ls gvfs://fileset/gcs_catalog/schema/example
 hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/schema/example
 ```
 
+
+## Using Gravitino virtual file system Python client
+
+```python
+from gravitino import gvfs
+options = {
+    "cache_size": 20,
+    "cache_expired_time": 3600,
+    "auth_type": "simple",
+    "gcs_service_account_file": "path_of_gcs_service_account_file.json",
+}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
+```
+
 ## Using fileset with pandas
 
 The following are examples of how to use the pandas library to access the GCS fileset
@@ -338,8 +368,46 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
 ds.head()
 ```
 
-
 ## Fileset with credential
 
-If the catalog has been configured with credential, you can access S3 fileset without setting `gcs-service-account-file` in the properties via GVFS. More detail can be seen [here](./security/credential-vending.md#gcs-credentials).
+Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been configured with credential, you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
 
+### How to create a GCS Hadoop catalog with credential enabled
+
+Apart from configuration method in [create-gcs-hadoop-catalog](#catalog-a-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset.
+
+### How to access GCS fileset with credential
+
+If the catalog has been configured with credential, you can access GCS fileset without providing authentication information via GVFS. Let's see how to access GCS fileset with credential:
+
+GVFS Java client:
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+// No need to set gcs-service-account-file
+Path filesetPath = new Path("gvfs://fileset/gcs_test_catalog/test_schema/test_fileset/new_dir");
+FileSystem fs = filesetPath.getFileSystem(conf);
+fs.mkdirs(filesetPath);
+...
+```
+
+Spark:
+
+```python
+spark = SparkSession.builder
+  .appName("gcs_fielset_test")
+  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+  # No need to set gcs-service-account-file
+  .config("spark.driver.memory", "2g")
+  .config("spark.driver.port", "2048")
+  .getOrCreate()
+```
+
+Python client and Hadoop command are similar to the above examples.
