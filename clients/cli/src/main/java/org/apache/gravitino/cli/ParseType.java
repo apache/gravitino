@@ -73,7 +73,7 @@ public class ParseType {
   }
 
   private static Type toListType(String datatype) {
-    Pattern pattern = Pattern.compile("^list<(.+)>$");
+    Pattern pattern = Pattern.compile("^list\\((.+)\\)$");
     Matcher matcher = pattern.matcher(datatype);
     if (matcher.matches()) {
       Type elementType = toBasicType(matcher.group(1));
@@ -83,7 +83,7 @@ public class ParseType {
   }
 
   private static Type toMapType(String datatype) {
-    Pattern pattern = Pattern.compile("^map<(.+),(.+)>$");
+    Pattern pattern = Pattern.compile("^map\\((.+),(.+)\\)$");
     Matcher matcher = pattern.matcher(datatype);
     if (matcher.matches()) {
       Type keyType = toBasicType(matcher.group(1));
