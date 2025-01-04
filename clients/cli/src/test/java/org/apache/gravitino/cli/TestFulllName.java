@@ -224,4 +224,15 @@ public class TestFulllName {
     String metalakeName = fullName.getMetalakeName();
     assertEquals(metalakeName, "demo_metalake");
   }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalakeWithoutMetalakeOption() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertThrows(RuntimeException.class, fullName::getMetalakeName);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(errOutput, ErrorMessages.MISSING_METALAKE);
+  }
 }

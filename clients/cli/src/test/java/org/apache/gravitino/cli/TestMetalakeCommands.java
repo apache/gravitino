@@ -375,21 +375,6 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void testUpdateNothing() {
-    Main.useExit = false;
-    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
-    GravitinoCommandLine commandLine =
-        spy(
-            new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
-
-    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
-    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals("The command does nothing.", output);
-  }
-
-  @Test
   void testEnableMetalakeCommand() {
     MetalakeEnable mockEnable = mock(MetalakeEnable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);

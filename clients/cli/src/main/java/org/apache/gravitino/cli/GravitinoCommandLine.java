@@ -238,8 +238,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           break;
         }
 
-        System.err.println("The command does nothing.");
-        Main.exit(-1);
         break;
 
       default:
