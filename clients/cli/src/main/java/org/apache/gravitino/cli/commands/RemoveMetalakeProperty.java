@@ -62,8 +62,7 @@ public class RemoveMetalakeProperty extends Command {
   }
 
   @Override
-  public Command verify() {
-    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
+  public Command validate() {
     if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
     return this;
   }

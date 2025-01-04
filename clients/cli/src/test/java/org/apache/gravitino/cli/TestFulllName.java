@@ -47,6 +47,7 @@ public class TestFulllName {
 
   @BeforeEach
   public void setUp() {
+    Main.useExit = false;
     options = new GravitinoOptions().options();
     System.setOut(new PrintStream(outContent));
     System.setErr(new PrintStream(errContent));
@@ -82,8 +83,7 @@ public class TestFulllName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
-    String metalakeName = fullName.getMetalakeName();
-    assertNull(metalakeName);
+    assertThrows(RuntimeException.class, fullName::getMetalakeName);
   }
 
   @Test
@@ -223,15 +223,5 @@ public class TestFulllName {
     FullName fullName = new FullName(commandLine);
     String metalakeName = fullName.getMetalakeName();
     assertEquals(metalakeName, "demo_metalake");
-  }
-
-  @Test
-  @SuppressWarnings("DefaultCharset")
-  public void testGetMetalakeWithoutMetalakeOption() throws ParseException {
-    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-    String metalakeName = fullName.getMetalakeName();
-    assertNull(metalakeName);
   }
 }

@@ -69,10 +69,4 @@ public class DeleteMetalake extends Command {
       System.out.println(metalake + " not deleted.");
     }
   }
-
-  @Override
-  public Command verify() {
-    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
-    return super.verify();
-  }
 }

@@ -60,11 +60,4 @@ public class UpdateMetalakeComment extends Command {
 
     System.out.println(metalake + " comment changed.");
   }
-
-  @Override
-  public Command verify() {
-    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
-    if (comment == null) exitWithError(ErrorMessages.MISSING_COMMENT);
-    return super.verify();
-  }
 }

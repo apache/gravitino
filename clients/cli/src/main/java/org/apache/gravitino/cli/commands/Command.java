@@ -106,7 +106,7 @@ public abstract class Command {
    *
    * @return Returns itself via argument validation, otherwise exits.
    */
-  public Command verify() {
+  public Command validate() {
     return this;
   }
 

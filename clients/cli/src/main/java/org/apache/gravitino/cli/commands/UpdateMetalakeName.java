@@ -69,11 +69,4 @@ public class UpdateMetalakeName extends Command {
 
     System.out.println(metalake + " name changed.");
   }
-
-  @Override
-  public Command verify() {
-    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
-    if (name == null) exitWithError(ErrorMessages.MISSING_NAME);
-    return super.verify();
-  }
 }

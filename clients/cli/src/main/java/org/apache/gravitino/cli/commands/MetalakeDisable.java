@@ -53,10 +53,4 @@ public class MetalakeDisable extends Command {
 
     System.out.println(metalake + " has been disabled.");
   }
-
-  @Override
-  public Command verify() {
-    if (metalake == null) exitWithError(ErrorMessages.MISSING_METALAKE);
-    return super.verify();
-  }
 }
