@@ -39,6 +39,10 @@ env_map = {
   "GRAVITINO_OSS_ACCESS_KEY": "oss-access-key-id",
   "GRAVITINO_OSS_SECRET_KEY": "oss-secret-access-key",
   "GRAVITINO_OSS_ENDPOINT": "oss-endpoint",
+  "GRAVITINO_OSS_REGION": "oss-region",
+  "GRAVITINO_OSS_ROLE_ARN": "oss-role-arn",
+  "GRAVITINO_OSS_EXTERNAL_ID": "oss-external-id",
+
 }
 
 init_config = {
