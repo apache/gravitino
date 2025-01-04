@@ -22,6 +22,7 @@ package org.apache.gravitino.cli;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 
 public class ParseType {
 
@@ -36,7 +37,7 @@ public class ParseType {
    * @return a {@link org.apache.gravitino.cli.ParsedType} object representing the parsed type name.
    * @throws IllegalArgumentException if the data type format is unsupported or malformed
    */
-  public static ParsedType parse(String datatype) {
+  public static ParsedType parseBasicType(String datatype) {
     Pattern pattern = Pattern.compile("^(\\w+)\\((\\d+)(?:,(\\d+))?\\)$");
     Matcher matcher = pattern.matcher(datatype);
 
@@ -57,8 +58,8 @@ public class ParseType {
     return null;
   }
 
-  public static Type toType(String datatype) {
-    ParsedType parsed = parse(datatype);
+  private static Type toBasicType(String datatype) {
+    ParsedType parsed = parseBasicType(datatype);
 
     if (parsed != null) {
       if (parsed.getPrecision() != null && parsed.getScale() != null) {
@@ -69,5 +70,37 @@ public class ParseType {
     }
 
     return TypeConverter.convert(datatype);
+  }
+
+  private static Type toListType(String datatype) {
+    Pattern pattern = Pattern.compile("^list<(.+)>$");
+    Matcher matcher = pattern.matcher(datatype);
+    if (matcher.matches()) {
+      Type elementType = toBasicType(matcher.group(1));
+      return Types.ListType.of(elementType, false);
+    }
+    throw new IllegalArgumentException("Malformed list type: " + datatype);
+  }
+
+  private static Type toMapType(String datatype) {
+    Pattern pattern = Pattern.compile("^map<(.+),(.+)>$");
+    Matcher matcher = pattern.matcher(datatype);
+    if (matcher.matches()) {
+      Type keyType = toBasicType(matcher.group(1));
+      Type valueType = toBasicType(matcher.group(2));
+      return Types.MapType.of(keyType, valueType, false);
+    }
+    throw new IllegalArgumentException("Malformed map type: " + datatype);
+  }
+
+  public static Type toType(String datatype) {
+    if (datatype.startsWith("list")) {
+      return toListType(datatype);
+    } else if (datatype.startsWith("map")) {
+      return toMapType(datatype);
+    }
+
+    // fallback: if not complex type, parse as primitive type
+    return toBasicType(datatype);
   }
 }
