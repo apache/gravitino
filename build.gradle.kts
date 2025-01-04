@@ -506,8 +506,8 @@ subprojects {
     val implConfig = configurations.findByName("implementation") ?: return@afterEvaluate
 
     val projectDeps = implConfig.dependencies
-        .filterIsInstance<ProjectDependency>()
-        .filter { it.dependencyProject.plugins.hasPlugin("com.diffplug.spotless") }
+      .filterIsInstance<ProjectDependency>()
+      .filter { it.dependencyProject.plugins.hasPlugin("com.diffplug.spotless") }
 
     tasks.named("spotlessCheck").configure {
       projectDeps.forEach { dep ->
@@ -518,7 +518,6 @@ subprojects {
       }
     }
   }
-
 }
 
 tasks.rat {
