@@ -29,6 +29,7 @@ public class IcebergPropertiesConstants {
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
 
   static final String ICEBERG_CATALOG_TYPE = CatalogUtil.ICEBERG_CATALOG_TYPE;
+  static final String ICEBERG_CATALOG_IMPL = CatalogProperties.CATALOG_IMPL;
 
   public static final String GRAVITINO_ICEBERG_CATALOG_WAREHOUSE = IcebergConstants.WAREHOUSE;
 
@@ -57,6 +58,8 @@ public class IcebergPropertiesConstants {
   public static final String ICEBERG_CATALOG_BACKEND_REST = CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_REST = "rest";
+
+  public static final String ICEBERG_CATALOG_BACKEND_CUSTOM = "custom";
 
   @VisibleForTesting public static final String ICEBERG_LOCATION = IcebergConstants.LOCATION;
 
