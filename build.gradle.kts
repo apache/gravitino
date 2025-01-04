@@ -501,6 +501,24 @@ subprojects {
       exclude("test/**")
     }
   }
+
+  afterEvaluate {
+    val implConfig = configurations.findByName("implementation") ?: return@afterEvaluate
+
+    val projectDeps = implConfig.dependencies
+        .filterIsInstance<ProjectDependency>()
+        .filter { it.dependencyProject.plugins.hasPlugin("com.diffplug.spotless") }
+
+    tasks.named("spotlessCheck").configure {
+      projectDeps.forEach { dep ->
+        val spotlessTask = "${dep.dependencyProject.path}:spotlessCheck"
+        if (tasks.findByPath(spotlessTask) != null) {
+          dependsOn(spotlessTask)
+        }
+      }
+    }
+  }
+
 }
 
 tasks.rat {
