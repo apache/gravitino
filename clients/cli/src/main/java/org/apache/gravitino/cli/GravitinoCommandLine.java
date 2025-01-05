@@ -30,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -167,51 +166,49 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String auth = getAuth();
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     Command.setAuthenticationMode(auth, userName);
 
+    if (CommandActions.LIST.equals(command)) {
+      newListMetalakes(url, ignore, outputFormat).validate().handle();
+      return;
+    }
+
+    String metalake = name.getMetalakeName();
+
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newMetalakeAudit(url, ignore, metalake).handle();
+          newMetalakeAudit(url, ignore, metalake).validate().handle();
         } else {
-          newMetalakeDetails(url, ignore, outputFormat, metalake).handle();
+          newMetalakeDetails(url, ignore, outputFormat, metalake).validate().handle();
         }
-        break;
-
-      case CommandActions.LIST:
-        newListMetalakes(url, ignore, outputFormat).handle();
         break;
 
       case CommandActions.CREATE:
-        if (Objects.isNull(metalake)) {
-          System.err.println(CommandEntities.METALAKE + " is not defined");
-          Main.exit(-1);
-        }
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newCreateMetalake(url, ignore, metalake, comment).handle();
+        newCreateMetalake(url, ignore, metalake, comment).validate().handle();
         break;
 
       case CommandActions.DELETE:
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteMetalake(url, ignore, force, metalake).handle();
+        newDeleteMetalake(url, ignore, force, metalake).validate().handle();
         break;
 
       case CommandActions.SET:
         String property = line.getOptionValue(GravitinoOptions.PROPERTY);
         String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetMetalakeProperty(url, ignore, metalake, property, value).handle();
+        newSetMetalakeProperty(url, ignore, metalake, property, value).validate().handle();
         break;
 
       case CommandActions.REMOVE:
         property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveMetalakeProperty(url, ignore, metalake, property).handle();
+        newRemoveMetalakeProperty(url, ignore, metalake, property).validate().handle();
         break;
 
       case CommandActions.PROPERTIES:
-        newListMetalakeProperties(url, ignore, metalake).handle();
+        newListMetalakeProperties(url, ignore, metalake).validate().handle();
         break;
 
       case CommandActions.UPDATE:
@@ -221,21 +218,22 @@ public class GravitinoCommandLine extends TestableCommandLine {
         }
         if (line.hasOption(GravitinoOptions.ENABLE)) {
           boolean enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
-          newMetalakeEnable(url, ignore, metalake, enableAllCatalogs).handle();
+          newMetalakeEnable(url, ignore, metalake, enableAllCatalogs).validate().handle();
         }
         if (line.hasOption(GravitinoOptions.DISABLE)) {
-          newMetalakeDisable(url, ignore, metalake).handle();
+          newMetalakeDisable(url, ignore, metalake).validate().handle();
         }
 
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newUpdateMetalakeComment(url, ignore, metalake, comment).handle();
+          newUpdateMetalakeComment(url, ignore, metalake, comment).validate().handle();
         }
         if (line.hasOption(GravitinoOptions.RENAME)) {
           String newName = line.getOptionValue(GravitinoOptions.RENAME);
           force = line.hasOption(GravitinoOptions.FORCE);
-          newUpdateMetalakeName(url, ignore, force, metalake, newName).handle();
+          newUpdateMetalakeName(url, ignore, force, metalake, newName).validate().handle();
         }
+
         break;
 
       default:

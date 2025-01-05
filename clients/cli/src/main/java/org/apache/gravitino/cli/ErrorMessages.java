@@ -37,6 +37,8 @@ public class ErrorMessages {
   public static final String MISSING_ROLE = "Missing --role option.";
   public static final String MISSING_TAG = "Missing --tag option.";
   public static final String MISSING_URI = "Missing --uri option.";
+  public static final String MISSING_PROPERTY = "Missing --property option.";
+  public static final String MISSING_VALUE = "Missing --value option.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String SCHEMA_EXISTS = "Schema already exists.";
