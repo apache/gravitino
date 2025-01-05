@@ -219,23 +219,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
         if (line.hasOption(GravitinoOptions.ENABLE)) {
           boolean enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
           newMetalakeEnable(url, ignore, metalake, enableAllCatalogs).validate().handle();
-          break;
         }
         if (line.hasOption(GravitinoOptions.DISABLE)) {
           newMetalakeDisable(url, ignore, metalake).validate().handle();
-          break;
         }
 
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           comment = line.getOptionValue(GravitinoOptions.COMMENT);
           newUpdateMetalakeComment(url, ignore, metalake, comment).validate().handle();
-          break;
         }
         if (line.hasOption(GravitinoOptions.RENAME)) {
           String newName = line.getOptionValue(GravitinoOptions.RENAME);
           force = line.hasOption(GravitinoOptions.FORCE);
           newUpdateMetalakeName(url, ignore, force, metalake, newName).validate().handle();
-          break;
         }
 
         break;
