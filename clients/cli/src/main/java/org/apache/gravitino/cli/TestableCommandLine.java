@@ -45,6 +45,7 @@ import org.apache.gravitino.cli.commands.DeleteColumn;
 import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
+import org.apache.gravitino.cli.commands.DeleteModel;
 import org.apache.gravitino.cli.commands.DeleteRole;
 import org.apache.gravitino.cli.commands.DeleteSchema;
 import org.apache.gravitino.cli.commands.DeleteTable;
@@ -938,6 +939,17 @@ public class TestableCommandLine {
       String comment,
       Map<String, String> properties) {
     return new RegisterModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+  }
+
+  protected DeleteModel newDeleteModel(
+      String url,
+      boolean ignore,
+      boolean force,
+      String metalake,
+      String catalog,
+      String schema,
+      String model) {
+    return new DeleteModel(url, ignore, force, metalake, catalog, schema, model);
   }
 
   protected LinkModel newLinkModel(

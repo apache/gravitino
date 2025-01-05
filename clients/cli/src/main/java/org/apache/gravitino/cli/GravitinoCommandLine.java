@@ -1190,6 +1190,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
         }
         break;
 
+      case CommandActions.DELETE:
+        boolean force = line.hasOption(GravitinoOptions.FORCE);
+        newDeleteModel(url, ignore, force, metalake, catalog, schema, model).handle();
+        break;
+
       case CommandActions.CREATE:
         String createComment = line.getOptionValue(GravitinoOptions.COMMENT);
         String[] createProperties = line.getOptionValues(GravitinoOptions.PROPERTIES);

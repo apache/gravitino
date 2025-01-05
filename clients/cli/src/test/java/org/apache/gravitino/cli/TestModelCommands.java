@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.DeleteModel;
 import org.apache.gravitino.cli.commands.LinkModel;
 import org.apache.gravitino.cli.commands.ListModel;
 import org.apache.gravitino.cli.commands.ModelAudit;
@@ -303,11 +304,11 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(false);
+
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.CREATE));
-
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
@@ -337,7 +338,6 @@ public class TestModelCommands {
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.CREATE));
-
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
@@ -422,6 +422,32 @@ public class TestModelCommands {
                         && argument.get("key1").equals("val1")));
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testDeleteModelCommand() {
+    DeleteModel mockDelete = mock(DeleteModel.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.DELETE));
+    doReturn(mockDelete)
+        .when(commandLine)
+        .newDeleteModel(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "model");
+    commandLine.handleCommandLine();
+    verify(mockDelete).handle();
   }
 
   @Test
