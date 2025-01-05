@@ -47,14 +47,15 @@ public class TestParseType {
   }
 
   @Test
-  public void testParseTypeList() {
-    // valid input
+  public void testParseTypeListValidInput() {
     Type type = ParseType.toType("list(integer)");
     assertThat(type, instanceOf(Types.ListType.class));
     Type elementType = ((Types.ListType) type).elementType();
     assertThat(elementType, instanceOf(Types.IntegerType.class));
+  }
 
-    // invalid inputs
+  @Test
+  public void testParseTypeListMalformedInput() {
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list()"));
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list(10)"));
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list(unknown)"));
@@ -63,17 +64,20 @@ public class TestParseType {
   }
 
   @Test
-  public void testParseTypeMap() {
-    // valid input
+  public void testParseTypeMapValidInput() {
     Type type = ParseType.toType("map(string,integer)");
     assertThat(type, instanceOf(Types.MapType.class));
     Type keyType = ((Types.MapType) type).keyType();
     Type valueType = ((Types.MapType) type).valueType();
     assertThat(keyType, instanceOf(Types.StringType.class));
     assertThat(valueType, instanceOf(Types.IntegerType.class));
+  }
 
-    // invalid inputs
+  @Test
+  public void testParseTypeMapMalformedInput() {
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map()"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(10,10)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(unknown,unknown)"));
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(string)"));
     assertThrows(
         IllegalArgumentException.class, () -> ParseType.toType("map(string,integer,integer)"));
