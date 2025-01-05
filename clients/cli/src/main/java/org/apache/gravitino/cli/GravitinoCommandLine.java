@@ -1192,22 +1192,46 @@ public class GravitinoCommandLine extends TestableCommandLine {
         }
         break;
 
-      case CommandActions.CREATE:
-        {
-          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
-          Map<String, String> propertyMap = new Properties().parse(properties);
-          newCreateModel(url, ignore, metalake, catalog, schema, model, comment, propertyMap)
-              .handle();
-          break;
-        }
-
       case CommandActions.DELETE:
         {
           boolean force = line.hasOption(GravitinoOptions.FORCE);
           newDeleteModel(url, ignore, force, metalake, catalog, schema, model).handle();
           break;
         }
+
+      case CommandActions.CREATE:
+        String createComment = line.getOptionValue(GravitinoOptions.COMMENT);
+        String[] createProperties = line.getOptionValues(GravitinoOptions.PROPERTIES);
+        Map<String, String> createPropertyMap = new Properties().parse(createProperties);
+        newCreateModel(
+                url, ignore, metalake, catalog, schema, model, createComment, createPropertyMap)
+            .handle();
+        break;
+
+      case CommandActions.UPDATE:
+        String[] alias = line.getOptionValues(GravitinoOptions.ALIAS);
+        String uri = line.getOptionValue(GravitinoOptions.URI);
+        if (uri == null) {
+          System.err.println(ErrorMessages.MISSING_URI);
+          Main.exit(-1);
+        }
+
+        String linkComment = line.getOptionValue(GravitinoOptions.COMMENT);
+        String[] linkProperties = line.getOptionValues(CommandActions.PROPERTIES);
+        Map<String, String> linkPropertityMap = new Properties().parse(linkProperties);
+        newLinkModel(
+                url,
+                ignore,
+                metalake,
+                catalog,
+                schema,
+                model,
+                uri,
+                alias,
+                linkComment,
+                linkPropertityMap)
+            .handle();
+        break;
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);

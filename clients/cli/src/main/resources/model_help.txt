@@ -4,8 +4,17 @@ Please set the metalake in the Gravitino configuration file or the environment v
 
 Example commands
 
-Create a model
-gcli model create --name hadoop.schema.model --comment new_comment --properties managed=true,location=file:/tmp/root/schema/example
+Register a model
+gcli model create -m demo_metalake --name Hive_catalog.default.model
+
+Register a model with comment
+gcli model create -m demo_metalake --name Hive_catalog.default.model --comment comment
+
+Register a model with properties
+gcli model create -m demo_metalake --name Hive_catalog.default.model --properties key1=val1 key2=val2
+
+Register a model with properties and comment
+gcli model create -m demo_metalake --name Hive_catalog.default.model --properties key1=val1 klinkey2=val2 --comment comment
 
 List models
 gcli model list --name hadoop.schema
@@ -15,6 +24,18 @@ gcli model details --name hadoop.schema.model
 
 Show model audit information
 gcli model details --name hadoop.schema.model --audit
+
+Link a model
+gcli model update -m demo_metalake --name Hive_catalog.default.model --uri file:///tmp/file
+
+Link a model with alias
+gcli model update -m demo_metalake --name Hive_catalog.default.model --uri file:///tmp/file  --alias aliasA aliasB
+
+Link a model with all component
+gcli model update -m demo_metalake --name Hive_catalog.default.model --uri file:///tmp/file  --alias aliasA aliasB --comment comment --properties key1=val1 key2=val2
+
+Link a model without uri
+gcli model update -m demo_metalake --name Hive_catalog.default.model
 
 Delete a model
 gcli model delete --name hadoop.schema.model

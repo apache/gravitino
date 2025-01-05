@@ -34,7 +34,6 @@ import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateMetalake;
-import org.apache.gravitino.cli.commands.CreateModel;
 import org.apache.gravitino.cli.commands.CreateRole;
 import org.apache.gravitino.cli.commands.CreateSchema;
 import org.apache.gravitino.cli.commands.CreateTable;
@@ -57,6 +56,7 @@ import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
+import org.apache.gravitino.cli.commands.LinkModel;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
@@ -85,6 +85,7 @@ import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
+import org.apache.gravitino.cli.commands.RegisterModel;
 import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
@@ -928,7 +929,7 @@ public class TestableCommandLine {
     return new ModelDetails(url, ignore, metalake, catalog, schema, model);
   }
 
-  protected CreateModel newCreateModel(
+  protected RegisterModel newCreateModel(
       String url,
       boolean ignore,
       String metalake,
@@ -937,7 +938,7 @@ public class TestableCommandLine {
       String model,
       String comment,
       Map<String, String> properties) {
-    return new CreateModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+    return new RegisterModel(url, ignore, metalake, catalog, schema, model, comment, properties);
   }
 
   protected DeleteModel newDeleteModel(
@@ -949,5 +950,20 @@ public class TestableCommandLine {
       String schema,
       String model) {
     return new DeleteModel(url, ignore, force, metalake, catalog, schema, model);
+  }
+
+  protected LinkModel newLinkModel(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      String uri,
+      String[] alias,
+      String comment,
+      Map<String, String> properties) {
+    return new LinkModel(
+        url, ignore, metalake, catalog, schema, model, uri, alias, comment, properties);
   }
 }
