@@ -65,7 +65,6 @@ public class ErrorMessages {
   public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
   public static final String MISSING_PROVIDER = "Missing --provider option.";
 
-
   public static final String REGISTER_FAILED = "Failed to register model: ";
 
   public static final String UNKNOWN_CATALOG = "Unknown catalog name.";
