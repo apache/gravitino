@@ -42,6 +42,7 @@ jobs:
             cherry-pick
           reviewers: |
             jerryshao
+            FANNG1
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
