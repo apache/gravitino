@@ -74,4 +74,10 @@ public class SetCatalogProperty extends Command {
 
     System.out.println(catalog + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    checkProperty(property, value);
+    return this;
+  }
 }

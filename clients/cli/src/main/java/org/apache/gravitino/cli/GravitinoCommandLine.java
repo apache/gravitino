@@ -268,9 +268,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newCatalogAudit(url, ignore, metalake, catalog).handle();
+          newCatalogAudit(url, ignore, metalake, catalog).validate().handle();
         } else {
-          newCatalogDetails(url, ignore, outputFormat, metalake, catalog).handle();
+          newCatalogDetails(url, ignore, outputFormat, metalake, catalog).validate().handle();
         }
         break;
 
@@ -279,27 +279,29 @@ public class GravitinoCommandLine extends TestableCommandLine {
         String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
         String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
         Map<String, String> propertyMap = new Properties().parse(properties);
-        newCreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap).handle();
+        newCreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap)
+            .validate()
+            .handle();
         break;
 
       case CommandActions.DELETE:
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteCatalog(url, ignore, force, metalake, catalog).handle();
+        newDeleteCatalog(url, ignore, force, metalake, catalog).validate().handle();
         break;
 
       case CommandActions.SET:
         String property = line.getOptionValue(GravitinoOptions.PROPERTY);
         String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetCatalogProperty(url, ignore, metalake, catalog, property, value).handle();
+        newSetCatalogProperty(url, ignore, metalake, catalog, property, value).validate().handle();
         break;
 
       case CommandActions.REMOVE:
         property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveCatalogProperty(url, ignore, metalake, catalog, property).handle();
+        newRemoveCatalogProperty(url, ignore, metalake, catalog, property).validate().handle();
         break;
 
       case CommandActions.PROPERTIES:
-        newListCatalogProperties(url, ignore, metalake, catalog).handle();
+        newListCatalogProperties(url, ignore, metalake, catalog).validate().handle();
         break;
 
       case CommandActions.UPDATE:
@@ -309,19 +311,21 @@ public class GravitinoCommandLine extends TestableCommandLine {
         }
         if (line.hasOption(GravitinoOptions.ENABLE)) {
           boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
-          newCatalogEnable(url, ignore, metalake, catalog, enableMetalake).handle();
+          newCatalogEnable(url, ignore, metalake, catalog, enableMetalake).validate().handle();
         }
         if (line.hasOption(GravitinoOptions.DISABLE)) {
-          newCatalogDisable(url, ignore, metalake, catalog).handle();
+          newCatalogDisable(url, ignore, metalake, catalog).validate().handle();
         }
 
         if (line.hasOption(GravitinoOptions.COMMENT)) {
           String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment).handle();
+          newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment)
+              .validate()
+              .handle();
         }
         if (line.hasOption(GravitinoOptions.RENAME)) {
           String newName = line.getOptionValue(GravitinoOptions.RENAME);
-          newUpdateCatalogName(url, ignore, metalake, catalog, newName).handle();
+          newUpdateCatalogName(url, ignore, metalake, catalog, newName).validate().handle();
         }
         break;
 

@@ -81,4 +81,10 @@ public class CreateCatalog extends Command {
 
     System.out.println(catalog + " catalog created");
   }
+
+  @Override
+  public Command validate() {
+    if (provider == null) exitWithError(ErrorMessages.MISSING_PROVIDER);
+    return super.validate();
+  }
 }

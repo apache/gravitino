@@ -66,9 +66,7 @@ public class SetMetalakeProperty extends Command {
 
   @Override
   public Command validate() {
-    if (property == null && value == null) exitWithError("Missing --property and --value options.");
-    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
-    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+    checkProperty(property, value);
     return this;
   }
 }

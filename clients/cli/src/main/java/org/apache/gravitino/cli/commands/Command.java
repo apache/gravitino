@@ -112,6 +112,18 @@ public abstract class Command {
   }
 
   /**
+   * Validates that both property and value parameters are not null.
+   *
+   * @param property The property name to check
+   * @param value The value associated with the property
+   */
+  protected void checkProperty(String property, String value) {
+    if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+  }
+
+  /**
    * Builds a {@link GravitinoClient} instance with the provided server URL and metalake.
    *
    * @param metalake The name of the metalake.
