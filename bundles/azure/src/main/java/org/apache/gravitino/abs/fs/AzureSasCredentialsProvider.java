@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.abs.fs;
 
-import static org.apache.gravitino.credential.ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE;
-
 import java.io.IOException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
@@ -141,16 +139,14 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
   private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
-      if (credential.credentialType().equals(ADLS_TOKEN_CREDENTIAL_TYPE)) {
+      if (credential instanceof ADLSTokenCredential) {
         return credential;
       }
     }
 
     // If dynamic credential not found, use the static one
     for (Credential credential : credentials) {
-      if (credential
-          .credentialType()
-          .equals(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE)) {
+      if (credential instanceof AzureAccountKeyCredential) {
         return credential;
       }
     }

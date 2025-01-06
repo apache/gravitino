@@ -131,16 +131,14 @@ public class OSSCredentialsProvider implements CredentialsProvider {
   private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
-      if (credential.credentialType().equals(OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE)) {
+      if (credential instanceof OSSTokenCredential) {
         return credential;
       }
     }
 
     // If dynamic credential not found, use the static one
     for (Credential credential : credentials) {
-      if (credential
-          .credentialType()
-          .equals(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE)) {
+      if (credential instanceof OSSSecretKeyCredential) {
         return credential;
       }
     }

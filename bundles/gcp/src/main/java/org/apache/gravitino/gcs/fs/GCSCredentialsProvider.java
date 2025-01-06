@@ -21,8 +21,6 @@ package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
@@ -115,16 +113,12 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
    * @return An credential.
    */
   private Credential getCredential(Credential[] credentials) {
-    // Use dynamic credential if found.
-    Optional<Credential> optionalCredential =
-        Arrays.stream(credentials)
-            .filter(
-                credential ->
-                    credential
-                        .credentialType()
-                        .equals(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE))
-            .findFirst();
+    for (Credential credential : credentials) {
+      if (credential instanceof GCSTokenCredential) {
+        return credential;
+      }
+    }
 
-    return optionalCredential.orElse(null);
+    return null;
   }
 }
