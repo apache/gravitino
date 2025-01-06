@@ -250,7 +250,7 @@ class TestSchemaCommands {
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals("Missing --property and --value options.", output);
+    assertEquals(ErrorMessages.MISSING_PROPERTY_AND_VALUE, output);
   }
 
   @Test

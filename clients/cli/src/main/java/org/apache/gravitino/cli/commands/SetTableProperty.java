@@ -90,4 +90,12 @@ public class SetTableProperty extends Command {
 
     System.out.println(table + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+    return super.validate();
+  }
 }

@@ -440,17 +440,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newTableAudit(url, ignore, metalake, catalog, schema, table).handle();
+          newTableAudit(url, ignore, metalake, catalog, schema, table).validate().handle();
         } else if (line.hasOption(GravitinoOptions.INDEX)) {
-          newListIndexes(url, ignore, metalake, catalog, schema, table).handle();
+          newListIndexes(url, ignore, metalake, catalog, schema, table).validate().handle();
         } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
-          newTableDistribution(url, ignore, metalake, catalog, schema, table).handle();
+          newTableDistribution(url, ignore, metalake, catalog, schema, table).validate().handle();
         } else if (line.hasOption(GravitinoOptions.PARTITION)) {
-          newTablePartition(url, ignore, metalake, catalog, schema, table).handle();
+          newTablePartition(url, ignore, metalake, catalog, schema, table).validate().handle();
         } else if (line.hasOption(GravitinoOptions.SORTORDER)) {
-          newTableSortOrder(url, ignore, metalake, catalog, schema, table).handle();
+          newTableSortOrder(url, ignore, metalake, catalog, schema, table).validate().handle();
         } else {
-          newTableDetails(url, ignore, metalake, catalog, schema, table).handle();
+          newTableDetails(url, ignore, metalake, catalog, schema, table).validate().handle();
         }
         break;
 
@@ -459,39 +459,47 @@ public class GravitinoCommandLine extends TestableCommandLine {
           String columnFile = line.getOptionValue(GravitinoOptions.COLUMNFILE);
           String comment = line.getOptionValue(GravitinoOptions.COMMENT);
           newCreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment)
+              .validate()
               .handle();
           break;
         }
       case CommandActions.DELETE:
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteTable(url, ignore, force, metalake, catalog, schema, table).handle();
+        newDeleteTable(url, ignore, force, metalake, catalog, schema, table).validate().handle();
         break;
 
       case CommandActions.SET:
         String property = line.getOptionValue(GravitinoOptions.PROPERTY);
         String value = line.getOptionValue(GravitinoOptions.VALUE);
         newSetTableProperty(url, ignore, metalake, catalog, schema, table, property, value)
+            .validate()
             .handle();
         break;
 
       case CommandActions.REMOVE:
         property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property).handle();
+        newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property)
+            .validate()
+            .handle();
         break;
 
       case CommandActions.PROPERTIES:
-        newListTableProperties(url, ignore, metalake, catalog, schema, table).handle();
+        newListTableProperties(url, ignore, metalake, catalog, schema, table).validate().handle();
         break;
 
       case CommandActions.UPDATE:
         {
           if (line.hasOption(GravitinoOptions.COMMENT)) {
             String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-            newUpdateTableComment(url, ignore, metalake, catalog, schema, table, comment).handle();
+            newUpdateTableComment(url, ignore, metalake, catalog, schema, table, comment)
+                .validate()
+                .handle();
           }
           if (line.hasOption(GravitinoOptions.RENAME)) {
             String newName = line.getOptionValue(GravitinoOptions.RENAME);
-            newUpdateTableName(url, ignore, metalake, catalog, schema, table, newName).handle();
+            newUpdateTableName(url, ignore, metalake, catalog, schema, table, newName)
+                .validate()
+                .handle();
           }
           break;
         }
