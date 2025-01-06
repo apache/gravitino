@@ -37,7 +37,7 @@ For example, relational metadata models for tabular data, like Hive, MySQL, Post
 File metadata model for all the unstructured data, like HDFS, S3, and others.
 
 Besides the unified metadata models, Gravitino also provides a unified metadata governance layer
-(WIP) to manage the metadata in a unified way, including access control, auditing, discovery and
+to manage the metadata in a unified way, including access control, auditing, discovery and
 others.
 
 ### Direct metadata management
@@ -71,8 +71,8 @@ The goal of Gravitino is to unify the data management in both data and AI assets
 
 ### The metadata object of Apache Gravitino
 
-* **Metalake**: The top-level container for metadata. Typically, one group has one metalake
-  to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.
+* **Metalake**: The container/tenant for metadata. Typically, one group has one metalake
+  to manage all the metadata in it. Each metalake exposes a three-level namespace (catalog.schema.
   table) to organize the data.
 * **Catalog**: A catalog is a collection of metadata from a specific metadata source.
   Each catalog has a related connector to connect to the specific metadata source.
