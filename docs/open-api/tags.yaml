@@ -290,7 +290,7 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
-          description: Not Found - The specified metalake or tag does not exist or the specified tag is not associated with the specified metadata object
+          description: Not Found - The specified metalake does not exist or the specified tag is not associated with the specified metadata object
           content:
             application/vnd.gravitino.v1+json:
               schema:
