@@ -23,6 +23,7 @@ import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
 import com.google.common.base.Joiner;
 import java.io.File;
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
 import org.apache.gravitino.cli.Main;
@@ -205,6 +206,6 @@ public abstract class Command {
   }
 
   protected String getMissingEntitiesInfo(String... entities) {
-    return "Missing required argument(s): " + COMMA_JOINER.join(entities);
+    return ErrorMessages.MISSING_ENTITIES + COMMA_JOINER.join(entities);
   }
 }

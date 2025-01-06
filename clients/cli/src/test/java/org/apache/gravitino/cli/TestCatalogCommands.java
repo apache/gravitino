@@ -436,9 +436,9 @@ class TestCatalogCommands {
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
-        "Missing --name option."
+        ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.CATALOG);
   }
 
@@ -530,6 +530,6 @@ class TestCatalogCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
     verify(commandLine, never())
         .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "melake_demo", "catalog");
-    assertTrue(errContent.toString().contains("Unable to enable and disable at the same time"));
+    assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
   }
 }

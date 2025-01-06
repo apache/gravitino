@@ -211,7 +211,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       case CommandActions.UPDATE:
         if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-          System.err.println("Unable to enable and disable at the same time");
+          System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
           Main.exit(-1);
         }
         if (line.hasOption(GravitinoOptions.ENABLE)) {
@@ -306,7 +306,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       case CommandActions.UPDATE:
         if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-          System.err.println("Unable to enable and disable at the same time");
+          System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
           Main.exit(-1);
         }
         if (line.hasOption(GravitinoOptions.ENABLE)) {
@@ -677,7 +677,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
           }
           newTagEntity(url, ignore, metalake, name, tags).handle();
         } else {
-          System.err.println("The set command only supports tag properties or attaching tags.");
+          System.err.println(ErrorMessages.INVALID_SET_COMMAND);
           Main.exit(-1);
         }
         break;
@@ -936,7 +936,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       }
       System.out.print(helpMessage.toString());
     } catch (IOException e) {
-      System.err.println("Failed to load help message: " + e.getMessage());
+      System.err.println(ErrorMessages.HELP_FAILED + e.getMessage());
       Main.exit(-1);
     }
   }
@@ -1313,7 +1313,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   private void checkEntities(List<String> entities) {
     if (!entities.isEmpty()) {
-      System.err.println("Missing required argument(s): " + COMMA_JOINER.join(entities));
+      System.err.println(ErrorMessages.MISSING_ENTITIES + COMMA_JOINER.join(entities));
       Main.exit(-1);
     }
   }
