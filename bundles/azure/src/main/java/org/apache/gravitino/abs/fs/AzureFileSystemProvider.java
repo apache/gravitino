@@ -74,7 +74,7 @@ public class AzureFileSystemProvider implements FileSystemProvider {
 
     hadoopConfMap.forEach(configuration::set);
 
-    // Check whether this is from GVFS client.
+    // This is a workaround to judge whether it's from a Gravitino GVFS client.
     if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       // Test whether SAS works
       try {

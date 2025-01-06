@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.Path;
 public class GCSFileSystemProvider implements FileSystemProvider {
   private static final String GCS_SERVICE_ACCOUNT_JSON_FILE =
       "fs.gs.auth.service.account.json.keyfile";
+  private static final String GCS_TOKEN_PROVIDER_IMPL = "fs.gs.auth.access.token.provider.impl";
 
   @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
@@ -46,14 +47,14 @@ public class GCSFileSystemProvider implements FileSystemProvider {
     FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY)
         .forEach(configuration::set);
 
+    // This is a workaround to judge whether it's from a Gravitino GVFS client.
     if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       AccessTokenProvider accessTokenProvider = new GCSCredentialsProvider();
       accessTokenProvider.setConf(configuration);
-      // Why is this check necessary?, if Gravitino fails to get any credentials, we fall back to
+      // Why is this check necessary?if Gravitino fails to get any credentials, we fall back to
       // the default behavior of the GoogleHadoopFileSystem to use service account credentials.
       if (accessTokenProvider.getAccessToken() != null) {
-        configuration.set(
-            "fs.gs.auth.access.token.provider.impl", GCSCredentialsProvider.class.getName());
+        configuration.set(GCS_TOKEN_PROVIDER_IMPL, GCSCredentialsProvider.class.getName());
       }
     }
 

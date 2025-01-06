@@ -19,16 +19,11 @@
 
 package org.apache.gravitino.s3.fs;
 
-import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_SESSION_ACCESS_KEY_ID;
-import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY;
-import static org.apache.gravitino.credential.S3TokenCredential.GRAVITINO_S3_TOKEN;
-
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
-import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
@@ -62,7 +57,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
 
   @Override
   public AWSCredentials getCredentials() {
-    // Refresh credentials if they are null or about to expire in 5 minutes
+    // Refresh credentials if they are null or about to expire.
     if (basicSessionCredentials == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
         try {
@@ -84,7 +79,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
-    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
+    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
@@ -101,18 +96,18 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
       return;
     }
 
-    Map<String, String> credentialMap = credential.toProperties();
-
-    String accessKeyId = credentialMap.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
-    String secretAccessKey = credentialMap.get(GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY);
-
-    if (S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE.equals(
-        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
-      String sessionToken = credentialMap.get(GRAVITINO_S3_TOKEN);
+    if (credential instanceof S3SecretKeyCredential) {
+      S3SecretKeyCredential s3SecretKeyCredential = (S3SecretKeyCredential) credential;
       basicSessionCredentials =
-          new BasicSessionCredentials(accessKeyId, secretAccessKey, sessionToken);
-    } else {
-      basicSessionCredentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+          new BasicAWSCredentials(
+              s3SecretKeyCredential.accessKeyId(), s3SecretKeyCredential.secretAccessKey());
+    } else if (credential instanceof S3TokenCredential) {
+      S3TokenCredential s3TokenCredential = (S3TokenCredential) credential;
+      basicSessionCredentials =
+          new BasicSessionCredentials(
+              s3TokenCredential.accessKeyId(),
+              s3TokenCredential.secretAccessKey(),
+              s3TokenCredential.sessionToken());
     }
 
     if (credential.expireTimeInMs() > 0) {

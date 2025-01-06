@@ -29,11 +29,12 @@ dependencies {
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(project(":core"))
-  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
+  compileOnly(project(":clients:client-java"))
 
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.gcs)
+  compileOnly(libs.slf4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")

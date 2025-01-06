@@ -28,7 +28,7 @@ dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(project(":core"))
-  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
+  compileOnly(project(":clients:client-java"))
   compileOnly(libs.hadoop3.abs)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)

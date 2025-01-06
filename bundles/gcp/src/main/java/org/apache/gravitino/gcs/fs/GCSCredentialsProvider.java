@@ -22,7 +22,6 @@ package org.apache.gravitino.gcs.fs;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
@@ -64,7 +63,6 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
 
   @Override
   public void refresh() throws IOException {
-    // Refresh credentials if they are null or about to expire in 5 minutes
     // The format of filesetIdentifier is "metalake.catalog.fileset.schema"
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
@@ -83,12 +81,9 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
       return;
     }
 
-    Map<String, String> credentialMap = credential.toProperties();
-
-    if (GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE.equals(
-        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
-      String sessionToken = credentialMap.get(GCSTokenCredential.GCS_TOKEN_NAME);
-      accessToken = new AccessToken(sessionToken, credential.expireTimeInMs());
+    if (credential instanceof GCSTokenCredential) {
+      GCSTokenCredential gcsTokenCredential = (GCSTokenCredential) credential;
+      accessToken = new AccessToken(gcsTokenCredential.token(), credential.expireTimeInMs());
 
       if (credential.expireTimeInMs() > 0) {
         expirationTime =

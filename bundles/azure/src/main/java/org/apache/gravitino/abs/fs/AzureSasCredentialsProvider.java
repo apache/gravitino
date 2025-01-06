@@ -20,14 +20,11 @@
 package org.apache.gravitino.abs.fs;
 
 import static org.apache.gravitino.credential.ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE;
-import static org.apache.gravitino.credential.ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN;
-import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY;
-import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME;
 
 import java.io.IOException;
-import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.file.Fileset;
@@ -85,7 +82,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   @Override
   public String getSASToken(String account, String fileSystem, String path, String operation) {
-    // Refresh credentials if they are null or about to expire in 5 minutes
+    // Refresh credentials if they are null or about to expire.
     if (sasToken == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
         try {
@@ -116,12 +113,13 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
       return;
     }
 
-    Map<String, String> credentialMap = credential.toProperties();
-    if (ADLS_TOKEN_CREDENTIAL_TYPE.equals(credentialMap.get(Credential.CREDENTIAL_TYPE))) {
-      sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
-    } else {
-      azureStorageAccountName = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
-      azureStorageAccountKey = credentialMap.get(GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    if (credential instanceof ADLSTokenCredential) {
+      ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
+      sasToken = adlsTokenCredential.sasToken();
+    } else if (credential instanceof AzureAccountKeyCredential) {
+      AzureAccountKeyCredential azureAccountKeyCredential = (AzureAccountKeyCredential) credential;
+      azureStorageAccountName = azureAccountKeyCredential.accountName();
+      azureStorageAccountKey = azureAccountKeyCredential.accountKey();
     }
 
     if (credential.expireTimeInMs() > 0) {

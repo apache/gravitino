@@ -19,16 +19,11 @@
 
 package org.apache.gravitino.oss.fs;
 
-import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID;
-import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY;
-import static org.apache.gravitino.credential.OSSTokenCredential.GRAVITINO_OSS_TOKEN;
-
 import com.aliyun.oss.common.auth.BasicCredentials;
 import com.aliyun.oss.common.auth.Credentials;
 import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentials;
 import java.net.URI;
-import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
@@ -86,7 +81,7 @@ public class OSSCredentialsProvider implements CredentialsProvider {
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
-    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
+    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
@@ -103,17 +98,18 @@ public class OSSCredentialsProvider implements CredentialsProvider {
       return;
     }
 
-    Map<String, String> credentialMap = credential.toProperties();
-
-    String accessKeyId = credentialMap.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
-    String secretAccessKey = credentialMap.get(GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY);
-
-    if (OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE.equals(
-        credentialMap.get(Credential.CREDENTIAL_TYPE))) {
-      String sessionToken = credentialMap.get(GRAVITINO_OSS_TOKEN);
-      basicCredentials = new BasicCredentials(accessKeyId, secretAccessKey, sessionToken);
-    } else {
-      basicCredentials = new DefaultCredentials(accessKeyId, secretAccessKey);
+    if (credential instanceof OSSSecretKeyCredential) {
+      OSSSecretKeyCredential ossSecretKeyCredential = (OSSSecretKeyCredential) credential;
+      basicCredentials =
+          new DefaultCredentials(
+              ossSecretKeyCredential.accessKeyId(), ossSecretKeyCredential.secretAccessKey());
+    } else if (credential instanceof OSSTokenCredential) {
+      OSSTokenCredential ossTokenCredential = (OSSTokenCredential) credential;
+      basicCredentials =
+          new BasicCredentials(
+              ossTokenCredential.accessKeyId(),
+              ossTokenCredential.secretAccessKey(),
+              ossTokenCredential.securityToken());
     }
 
     if (credential.expireTimeInMs() > 0) {

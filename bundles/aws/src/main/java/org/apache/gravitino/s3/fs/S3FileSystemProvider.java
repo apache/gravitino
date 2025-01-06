@@ -70,7 +70,8 @@ public class S3FileSystemProvider implements FileSystemProvider {
     // Only call from GVFS client will have this key and support GravitinoS3CredentialProvider as
     // the file system provider will be used by GVFS client and Gravitino server, only GVFS client
     // will have this key.
-    if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
+    if (hadoopConfMap.containsKey(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       configuration.set(
           Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
     }
