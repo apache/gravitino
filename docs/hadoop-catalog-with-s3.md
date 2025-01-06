@@ -19,7 +19,7 @@ $ bin/gravitino-server.sh start
 
 ## Create a Hadoop Catalog with S3 in Gravitino
 
-### Catalog a catalog
+### Catalog a Hadoop catalog with S3
 
 Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with S3:
 
@@ -54,7 +54,7 @@ First of all, you need to create a Hadoop catalog with S3. The following example
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "catalog",
+  "name": "test_catalog",
   "type": "FILESET",
   "comment": "comment",
   "provider": "hadoop",
@@ -85,7 +85,7 @@ s3Properties = ImmutableMap.<String, String>builder()
     .put("filesystem-providers", "s3")
     .build();
 
-Catalog s3Catalog = gravitinoClient.createCatalog("catalog",
+Catalog s3Catalog = gravitinoClient.createCatalog("test_catalog",
     Type.FILESET,
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a S3 fileset catalog",
@@ -106,7 +106,7 @@ s3_properties = {
     "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
 }
 
-s3_catalog = gravitino_client.create_catalog(name="catalog",
+s3_catalog = gravitino_client.create_catalog(name="test_catalog",
                                              type=Catalog.Type.FILESET,
                                              provider="hadoop",
                                              comment="This is a S3 fileset catalog",
@@ -121,7 +121,7 @@ s3_catalog = gravitino_client.create_catalog(name="catalog",
 The value of location should always start with `s3a` NOT `s3` for AWS S3, for instance, `s3a://bucket/root`. Value like `s3://bucket/root` is not supported due to the limitation of the hadoop-aws library.
 :::
 
-Then create a schema and fileset in the catalog created above. 
+Then create a schema and a fileset in the catalog created above. 
 
 Using the following code to create a schema and fileset:
 
@@ -131,12 +131,12 @@ Using the following code to create a schema and fileset:
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "schema",
+  "name": "test_schema",
   "comment": "comment",
   "properties": {
     "location": "s3a://bucket/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
 ```
 
 </TabItem>
@@ -151,7 +151,7 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "s3a://bucket/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema("schema",
+Schema schema = supportsSchemas.createSchema("test_schema",
     "This is a schema",
     schemaProperties
 );
@@ -163,8 +163,8 @@ Schema schema = supportsSchemas.createSchema("schema",
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
-catalog.as_schemas().create_schema(name="schema",
+catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
+catalog.as_schemas().create_schema(name="test_schema",
                                    comment="This is a schema",
                                    properties={"location": "s3a://bucket/root/schema"})
 ```
@@ -185,7 +185,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
 ```
 
 </TabItem>
@@ -197,7 +197,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog("catalog");
+Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -205,7 +205,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("schema", "example_fileset"),
+  NameIdentifier.of("test_schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
   "s3a://bucket/root/schema/example_fileset",
@@ -253,7 +253,7 @@ spark = SparkSession.builder
   .appName("s3_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_URL}")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   .config("spark.hadoop.s3-access-key-id", os.environ["S3_ACCESS_KEY_ID"])
   .config("spark.hadoop.s3-secret-access-key", os.environ["S3_SECRET_ACCESS_KEY"])
@@ -281,12 +281,12 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-${gravitino-v
 ```
 
 - [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment and `hadoop-aws` jar.
-- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is the Gravitino AWS jar without Hadoop environment and `hadoop-aws` jar.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed version of the Gravitino AWS bundle jar without Hadoop environment and `hadoop-aws` jar.
 
 Please choose the correct jar according to your environment.
 
 :::note
-In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
+In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
 ### Using Gravitino virtual file system Java client to access the fileset
@@ -310,7 +310,7 @@ fs.mkdirs(filesetPath);
 
 Similar to Spark configurations, you need to add S3 bundle jars to the classpath according to your environment.
 
-### Using fileset with hadoop fs command
+### Accessing a fileset using the Hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
 
@@ -366,7 +366,7 @@ hadoop dfs -ls gvfs://fileset/s3_catalog/schema/example
 hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/schema/example
 ```
 
-### Using Gravitino virtual file system Python client
+### Using the Gravitino virtual file system Python client to access a fileset
 
 ```python
 from gravitino import gvfs

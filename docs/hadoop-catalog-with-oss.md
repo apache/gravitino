@@ -44,7 +44,7 @@ Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#filese
 
 The rest of this document shows how to use the Hadoop catalog with OSS in Gravitino with a full example.
 
-### Create a Hadoop catalog/schema/file set with OSS
+### Create a Hadoop catalog/schema/fileset with OSS
 
 First, you need to create a Hadoop catalog with OSS. The following example shows how to create a Hadoop catalog with OSS:
 
@@ -54,7 +54,7 @@ First, you need to create a Hadoop catalog with OSS. The following example shows
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "catalog",
+  "name": "test_catalog",
   "type": "FILESET",
   "comment": "comment",
   "provider": "hadoop",
@@ -85,7 +85,7 @@ ossProperties = ImmutableMap.<String, String>builder()
     .put("filesystem-providers", "oss")
     .build();
 
-Catalog ossCatalog = gravitinoClient.createCatalog("catalog",
+Catalog ossCatalog = gravitinoClient.createCatalog("test_catalog",
     Type.FILESET,
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a OSS fileset catalog",
@@ -106,7 +106,7 @@ oss_properties = {
     "oss-endpoint": "ossProperties"
 }
 
-oss_catalog = gravitino_client.create_catalog(name="catalog",
+oss_catalog = gravitino_client.create_catalog(name="test_catalog",
                                              type=Catalog.Type.FILESET,
                                              provider="hadoop",
                                              comment="This is a OSS fileset catalog",
@@ -117,7 +117,7 @@ oss_catalog = gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
-Then create a schema and fileset in the catalog created above.
+Then create a schema and a fileset in the catalog created above.
 
 Using the following code to create a schema and fileset:
 
@@ -127,27 +127,26 @@ Using the following code to create a schema and fileset:
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "schema",
+  "name": "test_schema",
   "comment": "comment",
   "properties": {
     "location": "oss://bucket/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
+Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "oss://bucket/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema("schema",
+Schema schema = supportsSchemas.createSchema("test_schema",
     "This is a schema",
     schemaProperties
 );
@@ -159,8 +158,8 @@ Schema schema = supportsSchemas.createSchema("schema",
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
-catalog.as_schemas().create_schema(name="schema",
+catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
+catalog.as_schemas().create_schema(name="test_schema",
                                    comment="This is a schema",
                                    properties={"location": "oss://bucket/root/schema"})
 ```
@@ -181,7 +180,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
 ```
 
 </TabItem>
@@ -193,7 +192,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog("catalog");
+Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -201,7 +200,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("schema", "example_fileset"),
+  NameIdentifier.of("test_schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
   "oss://bucket/root/schema/example_fileset",
@@ -215,8 +214,8 @@ filesetCatalog.createFileset(
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(name="catalog")
-catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "example_fileset"),
+catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
                                             type=Fileset.Type.MANAGED,
                                             comment="This is an example fileset",
                                             storage_location="oss://bucket/root/schema/example_fileset",
@@ -248,7 +247,7 @@ spark = SparkSession.builder
 .appName("oss_fielset_test")
 .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
 .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+.config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_URL}")
 .config("spark.hadoop.fs.gravitino.client.metalake", "test")
 .config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
 .config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
@@ -277,12 +276,12 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-bundle-{gr
 ```
 
 - [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) is the Gravitino Aliyun jar with Hadoop environment and `hadoop-oss` jar.
-- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) is the Gravitino OSS jar without Hadoop environment and `hadoop-oss` jar.
+- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) is a condensed version of the Gravitino Aliyun bundle jar without Hadoop environment and `hadoop-aliyun` jar.
 
 Please choose the correct jar according to your environment.
 
 :::note
-In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
+In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
 ### Using Gravitino virtual file system Java client to access the fileset
@@ -304,7 +303,7 @@ fs.mkdirs(filesetPath);
 
 Similar to Spark configurations, you need to add OSS bundle jars to the classpath according to your environment.
 
-### Using fileset with hadoop fs command
+### Accessing a fileset using the Hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
 
@@ -361,7 +360,7 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/example
 ```
 
 
-### Using Gravitino virtual file system Python client
+### Using Gravitino virtual file system Python client to access a fileset
 
 ```python
 from gravitino import gvfs

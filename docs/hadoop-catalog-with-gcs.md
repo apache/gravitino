@@ -22,13 +22,13 @@ $ bin/gravitino-server.sh start
 The rest of this document shows how to use the Hadoop catalog with GCS in Gravitino with a full example.
 
 
-### Catalog a catalog
+### Catalog a Hadoop catalog with GCS
 
 Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
 
 | Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `gs` if it's a GCS fileset, a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`.                                        | (none)          | Yes                        | 0.7.0-incubating |
+| `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                    | (none)          | Yes                        | 0.7.0-incubating |
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a GCS fileset. | 0.7.0-incubating |
 
@@ -52,7 +52,7 @@ First, you need to create a Hadoop catalog with GCS. The following example shows
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "catalog",
+  "name": "test_catalog",
   "type": "FILESET",
   "comment": "comment",
   "provider": "hadoop",
@@ -79,7 +79,7 @@ gcsProperties = ImmutableMap.<String, String>builder()
     .put("filesystem-providers", "gcs")
     .build();
 
-Catalog gcsCatalog = gravitinoClient.createCatalog("catalog",
+Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
     Type.FILESET,
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a GCS fileset catalog",
@@ -98,7 +98,7 @@ gcs_properties = {
     "gcs-service-account-file": "path_of_gcs_service_account_file"
 }
 
-gcs_properties = gravitino_client.create_catalog(name="catalog",
+gcs_properties = gravitino_client.create_catalog(name="test_catalog",
                                              type=Catalog.Type.FILESET,
                                              provider="hadoop",
                                              comment="This is a GCS fileset catalog",
@@ -109,7 +109,7 @@ gcs_properties = gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
-Then create a schema and fileset in the catalog created above.
+Then create a schema and a fileset in the catalog created above.
 
 Using the following code to create a schema and fileset:
 
@@ -119,27 +119,26 @@ Using the following code to create a schema and fileset:
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "schema",
+  "name": "test_schema",
   "comment": "comment",
   "properties": {
     "location": "gs://bucket/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
+Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "gs://bucket/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema("schema",
+Schema schema = supportsSchemas.createSchema("test_schema",
     "This is a schema",
     schemaProperties
 );
@@ -151,8 +150,8 @@ Schema schema = supportsSchemas.createSchema("schema",
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
-catalog.as_schemas().create_schema(name="schema",
+catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
+catalog.as_schemas().create_schema(name="test_schema",
                                    comment="This is a schema",
                                    properties={"location": "gs://bucket/root/schema"})
 ```
@@ -173,7 +172,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
 ```
 
 </TabItem>
@@ -185,7 +184,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog("catalog");
+Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -193,7 +192,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("schema", "example_fileset"),
+  NameIdentifier.of("test_schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
   "gs://bucket/root/schema/example_fileset",
@@ -207,8 +206,8 @@ filesetCatalog.createFileset(
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(name="catalog")
-catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "example_fileset"),
+catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
                                             type=Fileset.Type.MANAGED,
                                             comment="This is an example fileset",
                                             storage_location="gs://bucket/root/schema/example_fileset",
@@ -240,8 +239,8 @@ spark = SparkSession.builder
 .appName("gcs_fielset_test")
 .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
 .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-.config("spark.hadoop.fs.gravitino.client.metalake", "test")
+.config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_URL}")
+.config("spark.hadoop.fs.gravitino.client.metalake", "test_metalake")
 .config("spark.hadoop.gcs-service-account-file", "/path/to/gcs-service-account-file.json")
 .config("spark.driver.memory", "2g")
 .config("spark.driver.port", "2048")
@@ -266,13 +265,13 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCS jar with Hadoop environment and `gcs-connector` jar.
-- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is the Gravitino GCS jar without Hadoop environment and `gcs-connector` jar.
+- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment and `gcs-connector`.
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and `gcs-connector`.
 
 Please choose the correct jar according to your environment.
 
 :::note
-In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
+In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
 ### Using Gravitino virtual file system Java client to access the fileset
@@ -292,7 +291,7 @@ fs.mkdirs(filesetPath);
 
 Similar to Spark configurations, you need to add GCS bundle jars to the classpath according to your environment.
 
-### Using fileset with hadoop fs command
+### Accessing a fileset using the Hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
 
@@ -339,7 +338,7 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/schema/example
 ```
 
 
-### Using Gravitino virtual file system Python client
+### Using the Gravitino virtual file system Python client to access a fileset
 
 ```python
 from gravitino import gvfs
