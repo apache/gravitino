@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -188,6 +189,33 @@ class TestUserMetaService extends TestJDBCBackend {
         }
       }
     }
+
+    // ISSUE-6061: Test listUsersByNamespace with revoked users
+    Function<UserEntity, UserEntity> revokeUpdater =
+        user -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(user.auditInfo().creator())
+                  .withCreateTime(user.auditInfo().createTime())
+                  .withLastModifier("revokeUser")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          return UserEntity.builder()
+              .withNamespace(user.namespace())
+              .withId(user.id())
+              .withName(user.name())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+
+    Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), revokeUpdater));
+    actualUsers =
+        userMetaService.listUsersByNamespace(
+            AuthorizationUtils.ofUserNamespace(metalakeName), true);
+    Assertions.assertEquals(expectUsers.size(), actualUsers.size());
   }
 
   @Test

@@ -121,6 +121,10 @@ public class AccessControlIT extends BaseIT {
         users.stream().map(User::name).collect(Collectors.toList()));
     Assertions.assertEquals(Lists.newArrayList("role1"), users.get(2).roles());
 
+    // ISSUE-6061: Test listUsers with revoked users
+    metalake.revokeRolesFromUser(Lists.newArrayList("role1"), username);
+    Assertions.assertEquals(3, metalake.listUsers().length);
+
     // Get a not-existed user
     Assertions.assertThrows(NoSuchUserException.class, () -> metalake.getUser("not-existed"));
 
@@ -175,6 +179,10 @@ public class AccessControlIT extends BaseIT {
         Lists.newArrayList(groupName, anotherGroup),
         groups.stream().map(Group::name).collect(Collectors.toList()));
     Assertions.assertEquals(Lists.newArrayList("role2"), groups.get(0).roles());
+
+    // ISSUE-6061: Test listGroups with revoked groups
+    metalake.revokeRolesFromGroup(Lists.newArrayList("role2"), groupName);
+    Assertions.assertEquals(2, metalake.listGroups().length);
 
     Assertions.assertTrue(metalake.removeGroup(groupName));
     Assertions.assertFalse(metalake.removeGroup(groupName));

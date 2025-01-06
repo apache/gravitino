@@ -148,7 +148,7 @@ paths:
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "#/components/parameters/metadataObjectTypeOfRole"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
 
     get:
@@ -387,3 +387,18 @@ components:
         "code": 0,
         "names": [ "user1", "user2" ]
       }
+  parameters:
+    metadataObjectTypeOfRole:
+      name: metadataObjectType
+      in: path
+      description: The type of the metadata object
+      required: true
+      schema:
+        type: string
+        enum:
+          - "METALAKE"
+          - "CATALOG"
+          - "SCHEMA"
+          - "TABLE"
+          - "FILESET"
+          - "TOPIC"
