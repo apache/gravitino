@@ -18,7 +18,7 @@ Gravitino credential vending is used to generate temporary or static credentials
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- No support to Spark/Trino/Flink connector yet.
+- No support for Spark/Trino/Flink connector yet.
 
 ## General configurations
 
@@ -130,7 +130,7 @@ Gravitino supports custom credentials, you can implement the `org.apache.graviti
 
 ## Deployment
 
-Besides setting credentials related configuration, please download Gravitino cloud bundle jar and place it in the classpath of Iceberg catalog server or Hadoop catalog.
+Besides setting credentials related configuration, please download Gravitino cloud bundle jar and place it in the classpath of Iceberg REST server or Hadoop catalog.
 
 Gravitino cloud bundle jar:
 
@@ -141,10 +141,10 @@ Gravitino cloud bundle jar:
 
 The classpath of the server:
 
-- Iceberg REST server: the classpath differs in different deploy mode, please refer to [Server manage](../iceberg-rest-service.md#server-management) part.
+- Iceberg REST server: the classpath differs in different deploy mode, please refer to [Server management](../iceberg-rest-service.md#server-management) part.
 - Hadoop catalog: `catalogs/hadoop/libs/`
 
-## Scenarios
+## Usage example
 
 ### Credential vending for Iceberg REST server
 
