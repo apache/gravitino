@@ -59,6 +59,8 @@ public class ErrorMessages {
   public static final String MISSING_URI = "Missing --uri option.";
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_VALUE = "Missing --value option.";
+  public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
+  public static final String MISSING_COLUMN_FILE = "Missing --columnfile option.";
 
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
       "This command only supports one --tag option.";
