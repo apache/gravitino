@@ -95,6 +95,7 @@ class TestTableCommands {
         .when(commandLine)
         .newListTables(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }

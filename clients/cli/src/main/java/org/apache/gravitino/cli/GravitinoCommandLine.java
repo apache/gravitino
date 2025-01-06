@@ -257,7 +257,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     // Handle the CommandActions.LIST action separately as it doesn't use `catalog`
     if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, outputFormat, metalake).handle();
+      newListCatalogs(url, ignore, outputFormat, metalake).validate().handle();
       return;
     }
 
@@ -356,7 +356,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     // Handle the CommandActions.LIST action separately as it doesn't use `schema`
     if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListSchema(url, ignore, metalake, catalog).handle();
+      newListSchema(url, ignore, metalake, catalog).validate().handle();
       return;
     }
 
@@ -429,7 +429,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     // Handle CommandActions.LIST action separately as it doesn't require the `table`
     if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListTables(url, ignore, metalake, catalog, schema).handle();
+      newListTables(url, ignore, metalake, catalog, schema).validate().handle();
       return;
     }
 
@@ -833,7 +833,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListColumns(url, ignore, metalake, catalog, schema, table).handle();
+      newListColumns(url, ignore, metalake, catalog, schema, table).validate().handle();
       return;
     }
 
@@ -844,7 +844,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newColumnAudit(url, ignore, metalake, catalog, schema, table, column).handle();
+          newColumnAudit(url, ignore, metalake, catalog, schema, table, column).validate().handle();
         } else {
           System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
           Main.exit(-1);
@@ -878,12 +878,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
                   nullable,
                   autoIncrement,
                   defaultValue)
+              .validate()
               .handle();
           break;
         }
 
       case CommandActions.DELETE:
-        newDeleteColumn(url, ignore, metalake, catalog, schema, table, column).handle();
+        newDeleteColumn(url, ignore, metalake, catalog, schema, table, column).validate().handle();
         break;
 
       case CommandActions.UPDATE:
@@ -891,34 +892,40 @@ public class GravitinoCommandLine extends TestableCommandLine {
           if (line.hasOption(GravitinoOptions.COMMENT)) {
             String comment = line.getOptionValue(GravitinoOptions.COMMENT);
             newUpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.RENAME)) {
             String newName = line.getOptionValue(GravitinoOptions.RENAME);
             newUpdateColumnName(url, ignore, metalake, catalog, schema, table, column, newName)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.DATATYPE)
               && !line.hasOption(GravitinoOptions.DEFAULT)) {
             String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
             newUpdateColumnDatatype(url, ignore, metalake, catalog, schema, table, column, datatype)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.POSITION)) {
             String position = line.getOptionValue(GravitinoOptions.POSITION);
             newUpdateColumnPosition(url, ignore, metalake, catalog, schema, table, column, position)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.NULL)) {
             boolean nullable = line.getOptionValue(GravitinoOptions.NULL).equals("true");
             newUpdateColumnNullability(
                     url, ignore, metalake, catalog, schema, table, column, nullable)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.AUTO)) {
             boolean autoIncrement = line.getOptionValue(GravitinoOptions.AUTO).equals("true");
             newUpdateColumnAutoIncrement(
                     url, ignore, metalake, catalog, schema, table, column, autoIncrement)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.DEFAULT)) {
@@ -926,6 +933,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
             String dataType = line.getOptionValue(GravitinoOptions.DATATYPE);
             newUpdateColumnDefault(
                     url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType)
+                .validate()
                 .handle();
           }
           break;
@@ -1190,7 +1198,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     // Handle CommandActions.LIST action separately as it doesn't require the `model`
     if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListModel(url, ignore, metalake, catalog, schema).handle();
+      newListModel(url, ignore, metalake, catalog, schema).validate().handle();
       return;
     }
 

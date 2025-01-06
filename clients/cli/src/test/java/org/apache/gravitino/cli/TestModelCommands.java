@@ -94,6 +94,7 @@ public class TestModelCommands {
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"));
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }

@@ -88,6 +88,7 @@ class TestSchemaCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListSchema(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
