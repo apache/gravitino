@@ -17,9 +17,9 @@ at `${HADOOP_HOME}/share/hadoop/common/lib/`. After that, start Gravitino server
 $ bin/gravitino-server.sh start
 ```
 
-## Create a Hadoop Catalog with OSS in Gravitino
+## Create a Hadoop Catalog with OSS
 
-### Catalog a catalog
+### Catalog an OSS Hadoop catalog
 
 Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
 
@@ -348,8 +348,8 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
-Copy the corresponding jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory. For OSS, you need to copy `gravitino-aliyun-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-then copy hadoop-aliyun-{version}.jar and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, for simple you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+For OSS, you need to copy `gravitino-aliyun-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory,
+then copy hadoop-aliyun-{version}.jar and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
 
 3. Run the following command to access the fileset:

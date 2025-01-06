@@ -17,11 +17,11 @@ at `${HADOOP_HOME}/share/hadoop/common/lib/`. After that, start Gravitino server
 $ bin/gravitino-server.sh start
 ```
 
-## Create a Hadoop Catalog with ADLS in Gravitino
+## Create a Hadoop Catalog with ADLS
 
 The rest of this document shows how to use the Hadoop catalog with ADLS in Gravitino with a full example.
 
-### Catalog a Hadoop catalog with ADLS 
+### Catalog a ADLS Hadoop catalog
 
 Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with ADLS:
 
@@ -337,8 +337,8 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
-Copy the corresponding jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory. For ADLS, you need to copy `gravitino-azure-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-then copy `hadoop-azure-${version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, for simple you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+For ADLS, you need to copy `gravitino-azure-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory,
+then copy `hadoop-azure-${version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
 
 3. Run the following command to access the fileset:
