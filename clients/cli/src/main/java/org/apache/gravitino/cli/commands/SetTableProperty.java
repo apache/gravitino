@@ -93,7 +93,7 @@ public class SetTableProperty extends Command {
 
   @Override
   public Command validate() {
-    validateProperty(property, value);
+    validatePropertyAndValue(property, value);
     return super.validate();
   }
 }

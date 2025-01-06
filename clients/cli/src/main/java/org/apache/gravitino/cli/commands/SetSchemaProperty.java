@@ -84,7 +84,7 @@ public class SetSchemaProperty extends Command {
 
   @Override
   public Command validate() {
-    validateProperty(property, value);
+    validatePropertyAndValue(property, value);
     return this;
   }
 }

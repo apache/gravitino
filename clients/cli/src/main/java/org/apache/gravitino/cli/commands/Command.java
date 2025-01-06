@@ -112,15 +112,28 @@ public abstract class Command {
   }
 
   /**
-   * Validates that both property and value parameters are not null.
+   * Validates that both property and value arguments are not null.
    *
    * @param property The property name to check
    * @param value The value associated with the property
    */
-  protected void validateProperty(String property, String value) {
+  protected void validatePropertyAndValue(String property, String value) {
     if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
-    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
-    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+    validateString(property, ErrorMessages.MISSING_PROPERTY);
+    validateString(value, ErrorMessages.MISSING_VALUE);
+  }
+
+  /**
+   * Validates that the property argument is not null.
+   *
+   * @param property The property name to validate
+   */
+  protected void validateProperty(String property) {
+    validateString(property, ErrorMessages.MISSING_PROPERTY);
+  }
+
+  private void validateString(String s, String message) {
+    if (s == null) exitWithError(message);
   }
 
   /**
@@ -215,9 +228,5 @@ public abstract class Command {
     } else {
       throw new IllegalArgumentException("Unsupported output format");
     }
-  }
-
-  protected String getMissingEntitiesInfo(String... entities) {
-    return ErrorMessages.MISSING_ENTITIES + COMMA_JOINER.join(entities);
   }
 }

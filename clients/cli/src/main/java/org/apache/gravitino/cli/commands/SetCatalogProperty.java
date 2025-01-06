@@ -77,7 +77,7 @@ public class SetCatalogProperty extends Command {
 
   @Override
   public Command validate() {
-    validateProperty(property, value);
+    validatePropertyAndValue(property, value);
     return this;
   }
 }

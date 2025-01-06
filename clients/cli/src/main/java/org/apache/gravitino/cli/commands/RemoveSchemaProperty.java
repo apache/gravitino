@@ -80,7 +80,7 @@ public class RemoveSchemaProperty extends Command {
 
   @Override
   public Command validate() {
-    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    validateProperty(property);
     return super.validate();
   }
 }
