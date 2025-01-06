@@ -66,7 +66,7 @@ public class SetMetalakeProperty extends Command {
 
   @Override
   public Command validate() {
-    checkProperty(property, value);
+    validatePropertyAndValue(property, value);
     return this;
   }
 }
