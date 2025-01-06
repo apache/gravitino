@@ -74,7 +74,7 @@ Catalog catalog = gravitinoClient.createCatalog(
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-catalog = gravitino_client.create_catalog(name="catalog",
+catalog = gravitino_client.create_catalog(name="model_catalog",
                                           type=Catalog.Type.MODEL,
                                           provider=None,
                                           comment="This is a model catalog",
@@ -243,7 +243,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .put("k1", "v1")
         .build();
 
-Model = catalog.asModelCatalog().registerModel(
+Model model = catalog.asModelCatalog().registerModel(
     NameIdentifier.of("model_schema", "example_model"),
     "This is an example model",
     propertiesMap);
@@ -256,9 +256,9 @@ Model = catalog.asModelCatalog().registerModel(
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
 
 catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model = catalog.as_model_catalog().register_model(ident=NameIdentifier.of("model_schema", "example_model"),
-                                                  comment="This is an example model",
-                                                  properties={"k1": "v1"})
+model: Model = catalog.as_model_catalog().register_model(ident=NameIdentifier.of("model_schema", "example_model"),
+                                                         comment="This is an example model",
+                                                         properties={"k1": "v1"})
 ```
 
 </TabItem>
