@@ -57,4 +57,28 @@ public class CommonMetaService {
         "Parent entity id should not be null and should be greater than 0.");
     return parentEntityId;
   }
+
+  public Long[] getParentEntityIdsByNamespace(Namespace namespace) {
+    Preconditions.checkArgument(
+        !namespace.isEmpty() && namespace.levels().length <= 3,
+        "Namespace should not be empty and length should be less than or equal to 3.");
+    Long[] parentEntityIds = new Long[3];
+    if (namespace.levels().length >= 1) {
+      parentEntityIds[0] = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+    }
+
+    if (namespace.levels().length >= 2) {
+      parentEntityIds[1] =
+          CatalogMetaService.getInstance()
+              .getCatalogIdByMetalakeIdAndName(parentEntityIds[0], namespace.level(1));
+    }
+
+    if (namespace.levels().length >= 3) {
+      parentEntityIds[2] =
+          SchemaMetaService.getInstance()
+              .getSchemaIdByCatalogIdAndName(parentEntityIds[1], namespace.level(2));
+    }
+
+    return parentEntityIds;
+  }
 }

@@ -316,14 +316,8 @@ public class SchemaMetaService {
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    String metalake = namespace.level(0);
-    String catalog = namespace.level(1);
-
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    builder.withMetalakeId(metalakeId);
-
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalog);
-    builder.withCatalogId(catalogId);
+    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    builder.withMetalakeId(parentEntityIds[0]);
+    builder.withCatalogId(parentEntityIds[1]);
   }
 }

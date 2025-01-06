@@ -154,20 +154,10 @@ public class TopicMetaService {
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
-    String metalake = namespace.level(0);
-    String catalog = namespace.level(1);
-    String schema = namespace.level(2);
-
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    builder.withMetalakeId(metalakeId);
-
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalog);
-    builder.withCatalogId(catalogId);
-
-    Long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schema);
-    builder.withSchemaId(schemaId);
+    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    builder.withMetalakeId(parentEntityIds[0]);
+    builder.withCatalogId(parentEntityIds[1]);
+    builder.withSchemaId(parentEntityIds[2]);
   }
 
   public TopicEntity getTopicByIdentifier(NameIdentifier identifier) {
