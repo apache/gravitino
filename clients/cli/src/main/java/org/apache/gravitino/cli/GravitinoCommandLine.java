@@ -1201,15 +1201,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newModelAudit(url, ignore, metalake, catalog, schema, model).handle();
+          newModelAudit(url, ignore, metalake, catalog, schema, model).validate().handle();
         } else {
-          newModelDetails(url, ignore, metalake, catalog, schema, model).handle();
+          newModelDetails(url, ignore, metalake, catalog, schema, model).validate().handle();
         }
         break;
 
       case CommandActions.DELETE:
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteModel(url, ignore, force, metalake, catalog, schema, model).handle();
+        newDeleteModel(url, ignore, force, metalake, catalog, schema, model).validate().handle();
         break;
 
       case CommandActions.CREATE:
@@ -1218,17 +1218,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
         Map<String, String> createPropertyMap = new Properties().parse(createProperties);
         newCreateModel(
                 url, ignore, metalake, catalog, schema, model, createComment, createPropertyMap)
+            .validate()
             .handle();
         break;
 
       case CommandActions.UPDATE:
         String[] alias = line.getOptionValues(GravitinoOptions.ALIAS);
         String uri = line.getOptionValue(GravitinoOptions.URI);
-        if (uri == null) {
-          System.err.println(ErrorMessages.MISSING_URI);
-          Main.exit(-1);
-        }
-
         String linkComment = line.getOptionValue(GravitinoOptions.COMMENT);
         String[] linkProperties = line.getOptionValues(CommandActions.PROPERTIES);
         Map<String, String> linkPropertityMap = new Properties().parse(linkProperties);
@@ -1243,6 +1239,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
                 alias,
                 linkComment,
                 linkPropertityMap)
+            .validate()
             .handle();
         break;
 
