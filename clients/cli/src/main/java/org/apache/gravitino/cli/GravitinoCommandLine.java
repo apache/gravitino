@@ -1015,7 +1015,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListTopics(url, ignore, metalake, catalog, schema).handle();
+      newListTopics(url, ignore, metalake, catalog, schema).validate().handle();
       return;
     }
 
@@ -1025,20 +1025,22 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newTopicDetails(url, ignore, metalake, catalog, schema, topic).handle();
+        newTopicDetails(url, ignore, metalake, catalog, schema, topic).validate().handle();
         break;
 
       case CommandActions.CREATE:
         {
           String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment).handle();
+          newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment)
+              .validate()
+              .handle();
           break;
         }
 
       case CommandActions.DELETE:
         {
           boolean force = line.hasOption(GravitinoOptions.FORCE);
-          newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic).handle();
+          newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic).validate().handle();
           break;
         }
 
@@ -1046,7 +1048,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
         {
           if (line.hasOption(GravitinoOptions.COMMENT)) {
             String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-            newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
+            newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment)
+                .validate()
+                .handle();
           }
           break;
         }
@@ -1056,6 +1060,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
           String property = line.getOptionValue(GravitinoOptions.PROPERTY);
           String value = line.getOptionValue(GravitinoOptions.VALUE);
           newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value)
+              .validate()
               .handle();
           break;
         }
@@ -1063,12 +1068,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
       case CommandActions.REMOVE:
         {
           String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-          newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property).handle();
+          newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property)
+              .validate()
+              .handle();
           break;
         }
 
       case CommandActions.PROPERTIES:
-        newListTopicProperties(url, ignore, metalake, catalog, schema, topic).handle();
+        newListTopicProperties(url, ignore, metalake, catalog, schema, topic).validate().handle();
         break;
 
       default:
