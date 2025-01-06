@@ -19,15 +19,15 @@
 
  set -euo pipefail
 
-s3-access_key_id=${s3-access_key_id:-}
-s3-secret_access=${s3-secret_access:-}
-s3-region=${s3-region:-}
-s3-bucket=${s3-bucket:-}
+S3-ACCESS_KEY_ID=${S3-ACCESS_KEY_ID:-}
+S3-SECRET_ACCESS=${S3-SECRET_ACCESS:-}
+S3-REGION=${S3-REGION:-}
+S3-BUCKET=${S3-BUCKET:-}
 
 # Check required environment variables
-if [[ -z "$s3-access_key_id" || -z "$s3-secret_access" || -z "$s3-region" || -z "$s3-bucket" ]]; then
+if [[ -z "$S3-ACCESS_KEY_ID" || -z "$S3-SECRET_ACCESS" || -z "$S3-REGION" || -z "$S3-BUCKET" ]]; then
   echo "Error: One or more required S3 environment variables are not set."
-  echo "Please set: s3-access_key_id, s3-secret_access, s3-region, s3-bucket."
+  echo "Please set: S3-ACCESS_KEY_ID, S3-SECRET_ACCESS, S3-REGION, S3-BUCKET."
   exit 1
 fi
 
@@ -40,7 +40,7 @@ $GRAVITINO_SERVER_DIR/bin/start_gravitino_server.sh
 
 GRAVITINO_SERVER_URL=http://localhost:8090
 
-curl $GRAVITINO_SERVER_URL/api/metalakes
+check_server_ready "$GRAVITINO_SERVER_URL/api/metalakes"
 
 # create metalake
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -56,10 +56,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "s3a://'"$s3-bucket"'",
-    "s3-access-key-id": "'"$s3-access_key_id"'",
-    "s3-secret-access-key": "'"$s3-secret_access"'",
-    "s3-endpoint": "http://s3.'"$s3-region"'.amazonaws.com",
+    "location": "s3a://'"$S3-BUCKET"'",
+    "s3-access-key-id": "'"$S3-ACCESS_KEY_ID"'",
+    "s3-secret-access-key": "'"$S3-SECRET_ACCESS"'",
+    "s3-endpoint": "http://s3.'"$S3-REGION"'.amazonaws.com",
     "filesystem-providers": "s3"
   }
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs
@@ -70,7 +70,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name":"s1","comment":"comment","properties":{}
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs/catalog/schemas
 
-# create fileset
+# create FILESET
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name":"fileset1","comment":"comment","properties":{}
@@ -79,26 +79,44 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 echo "Start the Gvfs fuse client"
 
-mount_dir=$CLIENT_FUSE_DIR/target/gvfs
-if [ -d "$mount_dir" ]; then
+MOUNT_DIR=$CLIENT_FUSE_DIR/target/gvfs
+if [ -d "$MOUNT_DIR" ]; then
   echo "Unmount the existing mount point"
-  fusermount -u $mount_dir
+  fusermount -u $MOUNT_DIR
 else
   echo "Create the mount point"
-  mkdir -p $mount_dir
+  mkdir -p $MOUNT_DIR
 fi
 
-fileset=gvfs://fileset/test/c1/s1/fileset1
+FILESET=gvfs://fileset/test/c1/s1/fileset1
 
-config_file=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
-cp $CLIENT_FUSE_DIR/test/conf/gvfs_fuse-s3.toml $config_file
+CONF_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
+cp $CLIENT_FUSE_DIR/test/conf/gvfs_fuse-s3.toml $CONF_FILE
 
 
-sed -i 's|s3-access_key_id = ".*"|s3-access_key_id = "$s3-access_key_id"|' "$config_file"
-sed -i 's|s3-secret_access_key = ".*"|s3-secret_access_key = "$s3-secret_access"|' "$config_file"
-sed -i 's|s3-region = ".*"|s3-region = "$s3-region"|' "$config_file"
-sed -i 's|s3-bucket = ".*"|s3-bucket = "$s3-bucket"|' "$config_file"
+sed -i 's|S3-ACCESS_KEY_ID = ".*"|S3-ACCESS_KEY_ID = "$S3-ACCESS_KEY_ID"|' "$CONF_FILE"
+sed -i 's|S3-SECRET_ACCESS_key = ".*"|S3-SECRET_ACCESS_key = "$S3-SECRET_ACCESS"|' "$CONF_FILE"
+sed -i 's|S3-REGION = ".*"|S3-REGION = "$S3-REGION"|' "$CONF_FILE"
+sed -i 's|S3-BUCKET = ".*"|S3-BUCKET = "$S3-BUCKET"|' "$CONF_FILE"
 
-$CLIENT_FUSE_DIR/target/debug/gvfs-fuse $mount_dir $fileset $config_file
+$CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $FILESET $CONF_FILE
 
+check_server_ready() {
+  local url=$1
+  local retries=10  # Number of retries
+  local wait_time=3 # Wait time between retries (seconds)
+
+  for ((i=1; i<=retries; i++)); do
+    if curl --silent --head --fail "$url" >/dev/null; then
+      echo "Gravitino server is ready."
+      return 0
+    else
+      echo "Attempt $i/$retries: Server not ready. Retrying in $wait_time seconds..."
+      sleep "$wait_time"
+    fi
+  done
+
+  echo "Error: Gravitino server did not become ready after $((retries * wait_time)) seconds."
+  exit 1
+}
 
