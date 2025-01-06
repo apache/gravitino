@@ -314,7 +314,8 @@ public class FilesetMetaService {
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
     builder.withMetalakeId(parentEntityIds[0]);
     builder.withCatalogId(parentEntityIds[1]);
     builder.withSchemaId(parentEntityIds[2]);

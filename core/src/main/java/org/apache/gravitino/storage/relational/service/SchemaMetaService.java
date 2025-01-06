@@ -316,7 +316,8 @@ public class SchemaMetaService {
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
     builder.withMetalakeId(parentEntityIds[0]);
     builder.withCatalogId(parentEntityIds[1]);
   }

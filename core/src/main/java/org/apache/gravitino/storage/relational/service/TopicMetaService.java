@@ -154,7 +154,8 @@ public class TopicMetaService {
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
-    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
     builder.withMetalakeId(parentEntityIds[0]);
     builder.withCatalogId(parentEntityIds[1]);
     builder.withSchemaId(parentEntityIds[2]);

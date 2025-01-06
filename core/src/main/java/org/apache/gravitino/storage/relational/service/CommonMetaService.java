@@ -64,7 +64,8 @@ public class CommonMetaService {
         "Namespace should not be empty and length should be less than or equal to 3.");
     Long[] parentEntityIds = new Long[3];
     if (namespace.levels().length >= 1) {
-      parentEntityIds[0] = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+      parentEntityIds[0] =
+          MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
     }
 
     if (namespace.levels().length >= 2) {

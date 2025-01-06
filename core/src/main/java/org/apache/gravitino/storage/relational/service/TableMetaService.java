@@ -253,7 +253,8 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
     builder.withMetalakeId(parentEntityIds[0]);
     builder.withCatalogId(parentEntityIds[1]);
     builder.withSchemaId(parentEntityIds[2]);
