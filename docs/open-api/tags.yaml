@@ -243,7 +243,7 @@ paths:
                 NameListResponse:
                   $ref: "#/components/examples/NameListResponse"
         "404":
-          description: Not Found - The specified metalake or metadata object or tag does not exist
+          description: Not Found - The specified metalake does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -251,10 +251,6 @@ paths:
               examples:
                 NoSuchMetalakeException:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchTagException:
-                  $ref: "#/components/examples/NoSuchTagException"
-                NoSuchMetadataObjectException:
-                  $ref: "#/components/examples/NoSuchMetadataObjectException"
         "409":
           description: Conflict - The target tag already associated with the specified metadata object
           content:
@@ -294,7 +290,7 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
-          description: Not Found - The specified metalake or metadata object or tag does not exist or the specified tag is not associated with the specified metadata object
+          description: Not Found - The specified metalake or tag does not exist or the specified tag is not associated with the specified metadata object
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -304,8 +300,6 @@ paths:
                   $ref: "#/components/examples/NoSuchTagException"
                 NoSuchMetalakeException:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchMetadataObjectException:
-                  $ref: "#/components/examples/NoSuchMetadataObjectException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
