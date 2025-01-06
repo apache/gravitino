@@ -578,29 +578,29 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newGroupAudit(url, ignore, metalake, group).handle();
+          newGroupAudit(url, ignore, metalake, group).validate().handle();
         } else {
-          newGroupDetails(url, ignore, metalake, group).handle();
+          newGroupDetails(url, ignore, metalake, group).validate().handle();
         }
         break;
 
       case CommandActions.LIST:
-        newListGroups(url, ignore, metalake).handle();
+        newListGroups(url, ignore, metalake).validate().handle();
         break;
 
       case CommandActions.CREATE:
-        newCreateGroup(url, ignore, metalake, group).handle();
+        newCreateGroup(url, ignore, metalake, group).validate().handle();
         break;
 
       case CommandActions.DELETE:
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteGroup(url, ignore, force, metalake, group).handle();
+        newDeleteGroup(url, ignore, force, metalake, group).validate().handle();
         break;
 
       case CommandActions.REVOKE:
         String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
         for (String role : revokeRoles) {
-          newRemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
+          newRemoveRoleFromGroup(url, ignore, metalake, group, role).validate().handle();
         }
         System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
         break;
@@ -608,7 +608,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
       case CommandActions.GRANT:
         String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
         for (String role : grantRoles) {
-          newAddRoleToGroup(url, ignore, metalake, group, role).handle();
+          newAddRoleToGroup(url, ignore, metalake, group, role).validate().handle();
         }
         System.out.printf("Grant roles %s to group %s%n", COMMA_JOINER.join(grantRoles), group);
         break;
