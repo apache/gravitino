@@ -78,9 +78,9 @@ public class AzureFileSystemProvider implements FileSystemProvider {
     if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       // Test whether SAS works
       try {
-        AzureSasCredentialProvider azureSasCredentialProvider = new AzureSasCredentialProvider();
-        azureSasCredentialProvider.initialize(configuration, null);
-        String sas = azureSasCredentialProvider.getSASToken(null, null, null, null);
+        AzureSasCredentialsProvider azureSasCredentialsProvider = new AzureSasCredentialsProvider();
+        azureSasCredentialsProvider.initialize(configuration, null);
+        String sas = azureSasCredentialsProvider.getSASToken(null, null, null, null);
         if (sas != null) {
           String accountName =
               String.format(
@@ -91,15 +91,15 @@ public class AzureFileSystemProvider implements FileSystemProvider {
               FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
           configuration.set(
               FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
-              AzureSasCredentialProvider.class.getName());
+              AzureSasCredentialsProvider.class.getName());
           configuration.set(FS_AZURE_ACCOUNT_IS_HNS_ENABLED, "true");
-        } else if (azureSasCredentialProvider.getAzureStorageAccountKey() != null
-            && azureSasCredentialProvider.getAzureStorageAccountName() != null) {
+        } else if (azureSasCredentialsProvider.getAzureStorageAccountKey() != null
+            && azureSasCredentialsProvider.getAzureStorageAccountName() != null) {
           configuration.set(
               String.format(
                   "fs.azure.account.key.%s.dfs.core.windows.net",
-                  azureSasCredentialProvider.getAzureStorageAccountName()),
-              azureSasCredentialProvider.getAzureStorageAccountKey());
+                  azureSasCredentialsProvider.getAzureStorageAccountName()),
+              azureSasCredentialsProvider.getAzureStorageAccountKey());
         }
       } catch (Exception e) {
         // Can't use SAS, use account key and account key instead

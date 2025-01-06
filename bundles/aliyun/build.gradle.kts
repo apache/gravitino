@@ -29,6 +29,7 @@ dependencies {
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(project(":core"))
+  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.oss)
@@ -39,7 +40,6 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":clients:filesystem-hadoop3-common")) {
     exclude("*")
   }

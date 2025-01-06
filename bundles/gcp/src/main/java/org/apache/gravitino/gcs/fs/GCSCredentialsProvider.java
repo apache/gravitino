@@ -36,8 +36,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GCSCredentialProvider implements AccessTokenProvider {
-  private static final Logger LOG = LoggerFactory.getLogger(GCSCredentialProvider.class);
+public class GCSCredentialsProvider implements AccessTokenProvider {
+  private static final Logger LOG = LoggerFactory.getLogger(GCSCredentialsProvider.class);
   private Configuration configuration;
   private GravitinoClient client;
   private String filesetIdentifier;
@@ -53,6 +53,10 @@ public class GCSCredentialProvider implements AccessTokenProvider {
         refresh();
       } catch (IOException e) {
         LOG.error("Failed to refresh the access token", e);
+      } finally {
+        if (null != this.client) {
+          this.client.close();
+        }
       }
     }
     return accessToken;
@@ -65,20 +69,20 @@ public class GCSCredentialProvider implements AccessTokenProvider {
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
+    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
 
-    Optional<Credential> optionalCredential = getCredential(credentials);
+    Credential credential = getCredential(credentials);
     // Can't find any credential, use the default one.
-    if (!optionalCredential.isPresent()) {
+    if (null == credential) {
       LOG.warn(
           "No credential found for fileset: {}, try to use static JSON file", filesetIdentifier);
       return;
     }
 
-    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
 
     if (GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE.equals(
@@ -101,7 +105,6 @@ public class GCSCredentialProvider implements AccessTokenProvider {
     this.configuration = configuration;
     this.filesetIdentifier =
         configuration.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
   }
 
   @Override
@@ -114,14 +117,19 @@ public class GCSCredentialProvider implements AccessTokenProvider {
    * uses static credential.
    *
    * @param credentials The credential array.
-   * @return An optional credential.
+   * @return An credential.
    */
-  private Optional<Credential> getCredential(Credential[] credentials) {
+  private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
-    return Arrays.stream(credentials)
-        .filter(
-            credential ->
-                credential.credentialType().equals(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE))
-        .findFirst();
+    Optional<Credential> optionalCredential =
+        Arrays.stream(credentials)
+            .filter(
+                credential ->
+                    credential
+                        .credentialType()
+                        .equals(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE))
+            .findFirst();
+
+    return optionalCredential.orElse(null);
   }
 }

@@ -28,9 +28,7 @@ import com.aliyun.oss.common.auth.Credentials;
 import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentials;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
@@ -45,18 +43,18 @@ import org.apache.hadoop.fs.aliyun.oss.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OSSCredentialProvider implements CredentialsProvider {
+public class OSSCredentialsProvider implements CredentialsProvider {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OSSCredentialProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OSSCredentialsProvider.class);
   private Credentials basicCredentials;
   private final String filesetIdentifier;
-  private final GravitinoClient client;
+  private GravitinoClient client;
   private final Configuration configuration;
 
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
-  public OSSCredentialProvider(URI uri, Configuration conf) {
+  public OSSCredentialsProvider(URI uri, Configuration conf) {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
     this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
@@ -71,7 +69,13 @@ public class OSSCredentialProvider implements CredentialsProvider {
     // If the credentials are null or about to expire, refresh the credentials.
     if (basicCredentials == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
-        refresh();
+        try {
+          refresh();
+        } finally {
+          if (null != this.client) {
+            this.client.close();
+          }
+        }
       }
     }
 
@@ -82,13 +86,14 @@ public class OSSCredentialProvider implements CredentialsProvider {
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
+    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    Optional<Credential> optionalCredential = getCredential(credentials);
+    Credential credential = getCredential(credentials);
 
-    if (!optionalCredential.isPresent()) {
+    if (credential == null) {
       LOG.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
       expirationTime = Long.MAX_VALUE;
       this.basicCredentials =
@@ -98,7 +103,6 @@ public class OSSCredentialProvider implements CredentialsProvider {
       return;
     }
 
-    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
 
     String accessKeyId = credentialMap.get(GRAVITINO_OSS_SESSION_ACCESS_KEY_ID);
@@ -126,29 +130,25 @@ public class OSSCredentialProvider implements CredentialsProvider {
    * uses static credential.
    *
    * @param credentials The credential array.
-   * @return An optional credential.
+   * @return A credential. Null if not found.
    */
-  private Optional<Credential> getCredential(Credential[] credentials) {
+  private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
-    Optional<Credential> dynamicCredential =
-        Arrays.stream(credentials)
-            .filter(
-                credential ->
-                    credential
-                        .credentialType()
-                        .equals(OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE))
-            .findFirst();
-    if (dynamicCredential.isPresent()) {
-      return dynamicCredential;
+    for (Credential credential : credentials) {
+      if (credential.credentialType().equals(OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE)) {
+        return credential;
+      }
     }
 
-    // If dynamic credential not found, use the static one if possible
-    return Arrays.stream(credentials)
-        .filter(
-            credential ->
-                credential
-                    .credentialType()
-                    .equals(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE))
-        .findFirst();
+    // If dynamic credential not found, use the static one
+    for (Credential credential : credentials) {
+      if (credential
+          .credentialType()
+          .equals(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE)) {
+        return credential;
+      }
+    }
+
+    return null;
   }
 }
