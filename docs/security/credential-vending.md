@@ -45,7 +45,7 @@ A credential with static S3 access key id and secret access key.
 
 #### S3 token credential
 
-An S3 token is a token credential with scoped privileges. To use an S3 token credential, you should create a role and grant it proper privileges.
+An S3 token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html). To use an S3 token credential, you should create a role and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                                                                                 | Default value | Required | Since Version    |
 |-------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -71,7 +71,7 @@ A credential with static OSS access key id and secret access key.
 
 #### OSS token credential
 
-An OSS token is a token credential with scoped privileges. To use an OSS token credential, you should create a role and grant it proper privileges.
+An OSS token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://www.alibabacloud.com/help/en/oss/developer-reference/use-temporary-access-credentials-provided-by-sts-to-access-oss). To use an OSS token credential, you should create a role and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                   | Default value | Required | Since Version    |
 |-------------------------------------|---------------------------------------------------|-------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -96,7 +96,7 @@ A credential with static Azure storage account name and key.
 
 #### ADLS token credential
 
-An ADLS token is a token credential with scoped privileges. To use an ADLS token credential, you should create a Microsoft Entra ID service principal and grant it proper privileges.
+An ADLS token is a token credential with scoped privileges, by leveraging Azure [User Delegation Sas](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas). To use an ADLS token credential, you should create a Microsoft Entra ID service principal and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                                         | Default value | Required | Since Version    |
 |-------------------------------------|-----------------------------------------------------|---------------------------------------------------------------------|---------------|----------|------------------|
@@ -112,7 +112,7 @@ An ADLS token is a token credential with scoped privileges. To use an ADLS token
 
 #### GCS token credential
 
-An GCS token is a token credential with scoped privileges. To use an GCS token credential, you should create an GCS service account and grant it proper privileges.
+An GCS token is a token credential with scoped privileges, by leveraging GCS [Credential Access Boundaries](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials). To use an GCS token credential, you should create an GCS service account and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                | Default value                       | Required | Since Version    |
 |-------------------------------------|---------------------------------------------------|------------------------------------------------------------|-------------------------------------|----------|------------------|
@@ -164,7 +164,7 @@ gravitino.iceberg-rest.s3-region = {region_name}
 gravitino.iceberg-rest.s3-role-arn = {role_arn}
 ```
 
-3. Exploring the Iceberg table with Spark client.
+3. Exploring the Iceberg table with Spark client with credential vending enabled.
 
 ```shell
 ./bin/spark-sql -v \
