@@ -151,7 +151,7 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Please refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 :::note
-For Gravitino Iceberg REST server, please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even `gcs-service-account-file` is setting.
+Please ensure that the credential file can be accessed by the Gravitino server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
 :::
 
 :::info

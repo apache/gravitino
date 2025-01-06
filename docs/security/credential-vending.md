@@ -18,7 +18,7 @@ Gravitino credential vending is used to generate temporary or static credentials
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- Doesn't support Spark/Trino/Flink connector.
+- No support to Spark/Trino/Flink connector yet.
 
 ## General configurations
 
@@ -45,7 +45,7 @@ A credential with static S3 access key id and secret access key.
 
 #### S3 token credential
 
-A credential with a subscope privileged token, to use S3 token credential, you should create a role and grant proper privilege to the role to access the S3 data.
+An S3 token is a token credential with scoped privileges. To use an S3 token credential, you should create a role and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                                                                                 | Default value | Required | Since Version    |
 |-------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -71,7 +71,7 @@ A credential with static OSS access key id and secret access key.
 
 #### OSS token credential
 
-A credential with a subscope privileged token, to use OSS token credential, you should create an role and grant proper privilege to the role to access the OSS data.
+An OSS token is a token credential with scoped privileges. To use an OSS token credential, you should create a role and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                   | Default value | Required | Since Version    |
 |-------------------------------------|---------------------------------------------------|-------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -96,7 +96,7 @@ A credential with static Azure storage account name and key.
 
 #### ADLS token credential
 
-A credential with a subscope privileged token, to use ADLS token credential, you should create an Microsoft Entra ID service principal and grant proper privilege to it to access the Azure data.
+An ADLS token is a token credential with scoped privileges. To use an ADLS token credential, you should create a Microsoft Entra ID service principal and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                                         | Default value | Required | Since Version    |
 |-------------------------------------|-----------------------------------------------------|---------------------------------------------------------------------|---------------|----------|------------------|
@@ -112,7 +112,7 @@ A credential with a subscope privileged token, to use ADLS token credential, you
 
 #### GCS token credential
 
-A credential with a subscope privileged token, to use GCS token credential, you should create an GCS service account and grant proper privilege to it to access the OSS data.
+An GCS token is a token credential with scoped privileges. To use an GCS token credential, you should create an GCS service account and grant it proper privileges.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                | Default value                       | Required | Since Version    |
 |-------------------------------------|---------------------------------------------------|------------------------------------------------------------|-------------------------------------|----------|------------------|
@@ -121,7 +121,7 @@ A credential with a subscope privileged token, to use GCS token credential, you 
 | `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                       | GCS Application default credential. | No       | 0.8.0-incubating |
 
 :::note
-For Gravitino Iceberg REST server, please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even `gcs-service-account-file` is setting.
+For Gravitino Iceberg REST server, please ensure that the credential file can be accessed by the server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
 :::
 
 ## Custom credentials
