@@ -724,7 +724,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   private String getOneTag(String[] tags) {
-    Preconditions.checkArgument(tags.length <= 1, ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
+    if (tags.length > 1) {
+      System.err.println(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
+      Main.exit(-1);
+    }
     return tags[0];
   }
 
