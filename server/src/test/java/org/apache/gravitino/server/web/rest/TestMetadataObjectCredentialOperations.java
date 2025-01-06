@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,10 +34,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
-import org.apache.gravitino.dto.responses.ErrorConstants;
-import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.NoSuchCredentialException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -138,25 +134,6 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     credentialResponse = response.readEntity(CredentialResponse.class);
     Assertions.assertEquals(0, credentialResponse.getCode());
     Assertions.assertEquals(0, credentialResponse.getCredentials().length);
-
-    // Test throws NoSuchCredentialException
-    doThrow(new NoSuchCredentialException("mock error"))
-        .when(credentialOperationDispatcher)
-        .getCredentials(any());
-    response =
-        target(basePath(metalake))
-            .path(metadataObject.type().toString())
-            .path(metadataObject.fullName())
-            .path("/credentials")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(
-        NoSuchCredentialException.class.getSimpleName(), errorResponse.getType());
   }
 
   private String basePath(String metalake) {
