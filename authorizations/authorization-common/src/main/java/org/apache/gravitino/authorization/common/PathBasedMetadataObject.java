@@ -96,4 +96,37 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
           name != null, "Cannot create a path based metadata object with null name");
     }
   }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof PathBasedMetadataObject)) {
+      return false;
+    }
+
+    PathBasedMetadataObject that = (PathBasedMetadataObject) o;
+    return java.util.Objects.equals(name, that.name)
+        && java.util.Objects.equals(parent, that.parent)
+        && java.util.Objects.equals(path, that.path)
+        && type == that.type;
+  }
+
+  @Override
+  public int hashCode() {
+    return java.util.Objects.hash(name, parent, path, type);
+  }
+
+  @Override
+  public String toString() {
+    return "MetadataObject: [fullName="
+        + fullName()
+        + "],  [path="
+        + path
+        + "], [type="
+        + type
+        + "]";
+  }
 }
