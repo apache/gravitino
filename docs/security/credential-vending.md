@@ -134,14 +134,14 @@ Besides setting credentials related configuration, please download Gravitino clo
 
 Gravitino cloud bundle jar:
 
-- [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/aws-bundle)
-- [Gravitino Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/aliyun-bundle)
-- [Gravitino GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gcp-bundle)
-- [Gravitino Azure bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/azure-bundle)
+- [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)
+- [Gravitino Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle)
+- [Gravitino GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
+- [Gravitino Azure bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
 
 The classpath of the server:
 
-- Iceberg REST server: the classpath diffs in different deploy mode, please refer to [Server manage](../iceberg-rest-service.md#server-management) part.
+- Iceberg REST server: the classpath differs in different deploy mode, please refer to [Server manage](../iceberg-rest-service.md#server-management) part.
 - Hadoop catalog: `catalogs/hadoop/libs/`
 
 ## Scenarios
@@ -150,7 +150,7 @@ The classpath of the server:
 
 Suppose the Iceberg table data is stored in S3, follow the steps below:
 
-1. Download the Gravitino AWS bundle jar, and place it to the classpath of Iceberg REST server.
+1. Download the [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), and place it to the classpath of Iceberg REST server.
 
 2. Add s3 token credential configurations.
 
