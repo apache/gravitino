@@ -211,7 +211,7 @@ same.
 
 ### Register a model
 
-You can create a model by sending a `POST` request to the `/api/metalakes/{metalake_name}
+You can register a model by sending a `POST` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or just use the Gravitino
 Java/Python client. The following is an example of creating a model:
 
@@ -345,7 +345,7 @@ Note that the delete operation will delete all the model versions under this mod
 ### List models
 
 You can list all the models in a schema by sending a `GET` request to the `/api/metalakes/
-{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/moldes` endpoint or by using the
+{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or by using the
 Gravitino Java/Python client. The following is an example of listing all the models in a schema:
 
 <Tabs groupId="language" queryString>
@@ -390,7 +390,7 @@ model_list = catalog.as_model_catalog().list_models(namespace=Namespace.of("mode
 ### Link a ModelVersion
 
 You can link a ModelVersion by sending a `POST` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or by using
+/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions` endpoint or by using
 the Gravitino Java/Python client. The following is an example of linking a ModelVersion:
 
 <Tabs groupId="language" queryString>
@@ -405,7 +405,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model
+}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions
 ```
 
 </TabItem>

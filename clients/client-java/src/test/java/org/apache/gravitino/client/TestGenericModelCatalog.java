@@ -380,7 +380,8 @@ public class TestGenericModelCatalog extends TestBase {
     String modelVersionPath =
         withSlash(
             GenericModelCatalog.formatModelVersionRequestPath(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "schema1", "model1")));
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "schema1", "model1"))
+                + "/versions");
 
     ModelVersionLinkRequest request =
         new ModelVersionLinkRequest(
