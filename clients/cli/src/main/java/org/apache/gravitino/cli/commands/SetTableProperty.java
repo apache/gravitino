@@ -93,9 +93,7 @@ public class SetTableProperty extends Command {
 
   @Override
   public Command validate() {
-    if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
-    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
-    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+    validateProperty(property, value);
     return super.validate();
   }
 }

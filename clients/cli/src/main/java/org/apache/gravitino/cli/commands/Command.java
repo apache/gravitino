@@ -117,7 +117,7 @@ public abstract class Command {
    * @param property The property name to check
    * @param value The value associated with the property
    */
-  protected void checkProperty(String property, String value) {
+  protected void validateProperty(String property, String value) {
     if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
     if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
     if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);

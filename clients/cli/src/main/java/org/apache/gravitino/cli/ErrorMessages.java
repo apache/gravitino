@@ -64,7 +64,6 @@ public class ErrorMessages {
 
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
       "This command only supports one --tag option.";
-  public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
   public static final String MISSING_PROVIDER = "Missing --provider option.";
 
   public static final String REGISTER_FAILED = "Failed to register model: ";
