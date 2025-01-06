@@ -108,10 +108,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 echo "Start the Gvfs fuse client"
 
 MOUNT_DIR=$CLIENT_FUSE_DIR/target/gvfs
-if [ -d "$MOUNT_DIR" ]; then
-  echo "Unmount the existing mount point"
-  umount -l $MOUNT_DIR > /dev/null 2>&1 || true
-else
+
+umount $MOUNT_DIR > /dev/null 2>&1 || true
+if [ ! -d "$MOUNT_DIR" ]; then
   echo "Create the mount point"
   mkdir -p $MOUNT_DIR
 fi
