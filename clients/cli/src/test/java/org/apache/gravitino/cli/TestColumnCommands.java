@@ -464,7 +464,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -496,7 +496,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -531,7 +531,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.TABLE, CommandEntities.COLUMN)));
   }
 
@@ -563,7 +563,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.COLUMN)));
   }
 
@@ -588,7 +588,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -617,7 +617,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.TABLE)));
   }
 
@@ -643,7 +643,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.TABLE);
   }
 }

@@ -121,7 +121,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Arrays.asList(CommandEntities.CATALOG, CommandEntities.SCHEMA)),
         output);
   }
@@ -150,7 +150,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Collections.singletonList(CommandEntities.SCHEMA)),
         output);
   }
@@ -205,7 +205,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(
                 Arrays.asList(
                     CommandEntities.CATALOG, CommandEntities.SCHEMA, CommandEntities.MODEL)),
@@ -238,7 +238,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.MODEL)),
         output);
   }
@@ -269,7 +269,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Collections.singletonList(CommandEntities.MODEL)),
         output);
   }

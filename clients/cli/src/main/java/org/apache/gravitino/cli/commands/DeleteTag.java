@@ -59,7 +59,7 @@ public class DeleteTag extends Command {
     }
 
     if (tags == null || tags.length == 0) {
-      System.err.println(ErrorMessages.TAG_EMPTY);
+      System.err.println(ErrorMessages.MISSING_TAG);
     } else {
       boolean hasOnlyOneTag = tags.length == 1;
       if (hasOnlyOneTag) {

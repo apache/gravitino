@@ -322,7 +322,7 @@ class TestTagCommands {
             isNull(),
             eq("value"));
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals(output, "The set command only supports tag properties or attaching tags.");
+    assertEquals(output, ErrorMessages.INVALID_SET_COMMAND);
   }
 
   @Test
@@ -350,7 +350,7 @@ class TestTagCommands {
             eq("property"),
             isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals(output, "The set command only supports tag properties or attaching tags.");
+    assertEquals(output, ErrorMessages.INVALID_SET_COMMAND);
   }
 
   @Test
@@ -371,7 +371,7 @@ class TestTagCommands {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> commandLine.handleCommandLine(),
-        "Error: The current command only supports one --tag option.");
+        ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
   }
 
   @Test

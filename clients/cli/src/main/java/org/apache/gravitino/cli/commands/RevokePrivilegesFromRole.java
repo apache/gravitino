@@ -73,7 +73,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
 
       for (String privilege : privileges) {
         if (!Privileges.isValid(privilege)) {
-          System.err.println("Unknown privilege " + privilege);
+          System.err.println(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
           return;
         }
         PrivilegeDTO privilegeDTO =
