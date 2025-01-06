@@ -77,4 +77,10 @@ public class RemoveSchemaProperty extends Command {
 
     System.out.println(property + " property removed.");
   }
+
+  @Override
+  public Command validate() {
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    return super.validate();
+  }
 }

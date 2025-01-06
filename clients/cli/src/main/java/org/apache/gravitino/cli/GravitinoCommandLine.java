@@ -367,35 +367,39 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newSchemaAudit(url, ignore, metalake, catalog, schema).handle();
+          newSchemaAudit(url, ignore, metalake, catalog, schema).validate().handle();
         } else {
-          newSchemaDetails(url, ignore, metalake, catalog, schema).handle();
+          newSchemaDetails(url, ignore, metalake, catalog, schema).validate().handle();
         }
         break;
 
       case CommandActions.CREATE:
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newCreateSchema(url, ignore, metalake, catalog, schema, comment).handle();
+        newCreateSchema(url, ignore, metalake, catalog, schema, comment).validate().handle();
         break;
 
       case CommandActions.DELETE:
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteSchema(url, ignore, force, metalake, catalog, schema).handle();
+        newDeleteSchema(url, ignore, force, metalake, catalog, schema).validate().handle();
         break;
 
       case CommandActions.SET:
         String property = line.getOptionValue(GravitinoOptions.PROPERTY);
         String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetSchemaProperty(url, ignore, metalake, catalog, schema, property, value).handle();
+        newSetSchemaProperty(url, ignore, metalake, catalog, schema, property, value)
+            .validate()
+            .handle();
         break;
 
       case CommandActions.REMOVE:
         property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveSchemaProperty(url, ignore, metalake, catalog, schema, property).handle();
+        newRemoveSchemaProperty(url, ignore, metalake, catalog, schema, property)
+            .validate()
+            .handle();
         break;
 
       case CommandActions.PROPERTIES:
-        newListSchemaProperties(url, ignore, metalake, catalog, schema).handle();
+        newListSchemaProperties(url, ignore, metalake, catalog, schema).validate().handle();
         break;
 
       default:

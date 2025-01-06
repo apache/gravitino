@@ -81,4 +81,12 @@ public class SetSchemaProperty extends Command {
 
     System.out.println(schema + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    if (property == null && value == null) exitWithError("Missing --property and --value options.");
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+    return this;
+  }
 }
