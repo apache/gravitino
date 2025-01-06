@@ -56,7 +56,7 @@ public class Main {
         commandLine.handleSimpleLine();
       }
     } catch (ParseException exp) {
-      System.err.println("Error parsing command line: " + exp.getMessage());
+      System.err.println(ErrorMessages.PARSE_ERROR + exp.getMessage());
       GravitinoCommandLine.displayHelp(options);
       exit(-1);
     }

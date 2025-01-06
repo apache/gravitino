@@ -62,6 +62,8 @@ public class GravitinoOptions {
   public static final String ALL = "all";
   public static final String ENABLE = "enable";
   public static final String DISABLE = "disable";
+  public static final String ALIAS = "alias";
+  public static final String URI = "uri";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -108,6 +110,10 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
     options.addOption(createSimpleOption(null, ALL, "all operation for --enable"));
+
+    // model options
+    options.addOption(createArgOption(null, URI, "model version artifact"));
+    options.addOption(createArgsOption(null, ALIAS, "model aliases"));
 
     // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));

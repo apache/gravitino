@@ -22,6 +22,7 @@ package org.apache.gravitino.cli;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
@@ -139,6 +140,30 @@ class TestTagCommands {
             "comment");
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateCommandWithoutTagOption() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(false);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.CREATE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newCreateTags(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            isNull(),
+            isNull());
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MISSING_TAG);
   }
 
   @Test
@@ -273,6 +298,62 @@ class TestTagCommands {
   }
 
   @Test
+  void testSetTagPropertyCommandWithoutPropertyOption() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.SET));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newSetTagProperty(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            eq("tagA"),
+            isNull(),
+            eq("value"));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.INVALID_SET_COMMAND);
+  }
+
+  @Test
+  void testSetTagPropertyCommandWithoutValueOption() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.SET));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newSetTagProperty(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            eq("tagA"),
+            eq("property"),
+            isNull());
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.INVALID_SET_COMMAND);
+  }
+
+  @Test
   void testSetMultipleTagPropertyCommandError() {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -290,7 +371,7 @@ class TestTagCommands {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> commandLine.handleCommandLine(),
-        "Error: The current command only supports one --tag option.");
+        ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
   }
 
   @Test
@@ -339,6 +420,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(false);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.table");
     GravitinoCommandLine commandLine =
         spy(
@@ -448,6 +530,32 @@ class TestTagCommands {
   }
 
   @Test
+  void testTagEntityCommandWithoutName() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.SET));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newTagEntity(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            isNull(),
+            argThat(
+                argument -> argument != null && argument.length > 0 && "tagA".equals(argument[0])));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MISSING_NAME);
+  }
+
+  @Test
   void testTagsEntityCommand() {
     TagEntity mockTagEntity = mock(TagEntity.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
@@ -514,6 +622,37 @@ class TestTagCommands {
                 }));
     commandLine.handleCommandLine();
     verify(mockUntagEntity).handle();
+  }
+
+  @Test
+  void testUntagEntityCommandWithoutName() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
+        .thenReturn(new String[] {"tagA", "tagB"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.REMOVE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newUntagEntity(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            isNull(),
+            argThat(
+                argument ->
+                    argument != null
+                        && argument.length > 0
+                        && "tagA".equals(argument[0])
+                        && "tagB".equals(argument[1])));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MISSING_NAME);
   }
 
   @Test

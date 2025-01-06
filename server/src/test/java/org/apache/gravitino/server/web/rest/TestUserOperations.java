@@ -115,6 +115,15 @@ public class TestUserOperations extends JerseyTest {
 
     when(manager.addUser(any(), any())).thenReturn(user);
 
+    // test with IllegalRequest
+    UserAddRequest illegalReq = new UserAddRequest("");
+    Response illegalResp =
+        target("/metalakes/metalake1/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
     Response resp =
         target("/metalakes/metalake1/users")
             .request(MediaType.APPLICATION_JSON_TYPE)

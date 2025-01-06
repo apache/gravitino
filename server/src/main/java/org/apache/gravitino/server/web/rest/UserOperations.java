@@ -129,11 +129,13 @@ public class UserOperations {
               TreeLockUtils.doWithTreeLock(
                   NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
                   LockType.WRITE,
-                  () ->
-                      Utils.ok(
-                          new UserResponse(
-                              DTOConverters.toDTO(
-                                  accessControlManager.addUser(metalake, request.getName()))))));
+                  () -> {
+                    request.validate();
+                    return Utils.ok(
+                        new UserResponse(
+                            DTOConverters.toDTO(
+                                accessControlManager.addUser(metalake, request.getName()))));
+                  }));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.ADD, request.getName(), metalake, e);

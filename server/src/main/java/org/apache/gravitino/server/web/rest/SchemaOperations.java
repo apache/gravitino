@@ -210,11 +210,7 @@ public class SchemaOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
-            boolean dropped =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofCatalog(metalake, catalog),
-                    LockType.WRITE,
-                    () -> dispatcher.dropSchema(ident, cascade));
+            boolean dropped = dispatcher.dropSchema(ident, cascade);
             if (!dropped) {
               LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
             }

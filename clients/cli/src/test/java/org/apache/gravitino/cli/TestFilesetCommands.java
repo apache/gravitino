@@ -369,7 +369,7 @@ class TestFilesetCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.CATALOG, CommandEntities.SCHEMA)));
   }
 
@@ -394,7 +394,7 @@ class TestFilesetCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA)));
   }
 
@@ -419,7 +419,7 @@ class TestFilesetCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -448,7 +448,7 @@ class TestFilesetCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.FILESET)));
   }
 
@@ -474,7 +474,7 @@ class TestFilesetCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.FILESET)));
   }
 }

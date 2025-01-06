@@ -287,7 +287,7 @@ class TestSchemaCommands {
     verify(commandLine, never())
         .newListSchema(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null);
     assertTrue(
-        errContent.toString().contains("Missing required argument(s): " + CommandEntities.CATALOG));
+        errContent.toString().contains(ErrorMessages.MISSING_ENTITIES + CommandEntities.CATALOG));
   }
 
   @Test
@@ -308,7 +308,7 @@ class TestSchemaCommands {
         errContent
             .toString()
             .contains(
-                "Missing required argument(s): "
+                ErrorMessages.MISSING_ENTITIES
                     + CommandEntities.CATALOG
                     + ", "
                     + CommandEntities.SCHEMA));
@@ -330,6 +330,6 @@ class TestSchemaCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     assertTrue(
-        errContent.toString().contains("Missing required argument(s): " + CommandEntities.SCHEMA));
+        errContent.toString().contains(ErrorMessages.MISSING_ENTITIES + CommandEntities.SCHEMA));
   }
 }
