@@ -93,11 +93,13 @@ FILESET=gvfs://fileset/test/c1/s1/fileset1
 CONF_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
 cp $CLIENT_FUSE_DIR/test/conf/gvfs_fuse-s3.toml $CONF_FILE
 
-
-sed -i 's|S3-ACCESS_KEY_ID = ".*"|S3-ACCESS_KEY_ID = "$S3-ACCESS_KEY_ID"|' "$CONF_FILE"
-sed -i 's|S3-SECRET_ACCESS_key = ".*"|S3-SECRET_ACCESS_key = "$S3-SECRET_ACCESS"|' "$CONF_FILE"
-sed -i 's|S3-REGION = ".*"|S3-REGION = "$S3-REGION"|' "$CONF_FILE"
-sed -i 's|S3-BUCKET = ".*"|S3-BUCKET = "$S3-BUCKET"|' "$CONF_FILE"
+awk '{
+    if ($0 ~ /S3-ACCESS_KEY_ID/) $0 = "S3-ACCESS_KEY_ID = \"" ENVIRON["S3_ACCESS_KEY_ID"] "\"";
+    if ($0 ~ /S3-SECRET_ACCESS_KEY/) $0 = "S3-SECRET_ACCESS_KEY = \"" ENVIRON["S3_SECRET_ACCESS"] "\"";
+    if ($0 ~ /S3-REGION/) $0 = "S3-REGION = \"" ENVIRON["S3_REGION"] "\"";
+    if ($0 ~ /S3-BUCKET/) $0 = "S3-BUCKET = \"" ENVIRON["S3_BUCKET"] "\"";
+    print
+}' $CLIENT_FUSE_DIR/test/conf/gvfs_fuse-s3.toml > "$CONF_FILE"
 
 $CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $FILESET $CONF_FILE
 
