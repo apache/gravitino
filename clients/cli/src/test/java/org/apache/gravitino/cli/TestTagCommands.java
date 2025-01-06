@@ -118,6 +118,25 @@ class TestTagCommands {
   }
 
   @Test
+  void testTagDetailsCommandWithMultipleTag() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
+        .thenReturn(new String[] {"tagA", "tagB"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newTagDetails(eq(GravitinoCommandLine.DEFAULT_URL), eq(false), eq("metalake_demo"), any());
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR, output);
+  }
+
+  @Test
   void testCreateTagCommand() {
     CreateTag mockCreate = mock(CreateTag.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
@@ -355,6 +374,7 @@ class TestTagCommands {
 
   @Test
   void testSetMultipleTagPropertyCommandError() {
+    Main.useExit = false;
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
@@ -368,10 +388,17 @@ class TestTagCommands {
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.SET));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> commandLine.handleCommandLine(),
-        ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
+    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newSetTagProperty(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            any(),
+            eq("property"),
+            eq("value"));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR, output);
   }
 
   @Test
@@ -393,6 +420,33 @@ class TestTagCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", "property");
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
+  }
+
+  @Test
+  void testRemoveTagPropertyCommandWithMultipleTags() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
+        .thenReturn(new String[] {"tagA", "tagB"});
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.REMOVE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newRemoveTagProperty(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            any(),
+            eq("property"));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR, output);
   }
 
   @Test
@@ -460,6 +514,33 @@ class TestTagCommands {
   }
 
   @Test
+  void testUpdateTagCommentCommandWithMultipleTags() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
+        .thenReturn(new String[] {"tagA", "tagB"});
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("new comment");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.UPDATE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newUpdateTagComment(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            any(),
+            eq("new comment"));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR, output);
+  }
+
+  @Test
   void testUpdateTagNameCommand() {
     UpdateTagName mockUpdateName = mock(UpdateTagName.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
@@ -477,6 +558,33 @@ class TestTagCommands {
         .newUpdateTagName(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", "tagB");
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
+  }
+
+  @Test
+  void testUpdateTagNameCommandWithMultipleTags() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
+        .thenReturn(new String[] {"tagA", "tagB"});
+    when(mockCommandLine.hasOption(GravitinoOptions.RENAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.RENAME)).thenReturn("tagC");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.UPDATE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newUpdateTagName(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq("metalake_demo"),
+            any(),
+            eq("tagC"));
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR, output);
   }
 
   @Test
