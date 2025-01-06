@@ -119,8 +119,8 @@ public abstract class Command {
    */
   protected void validatePropertyAndValue(String property, String value) {
     if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
-    validateString(property, ErrorMessages.MISSING_PROPERTY);
-    validateString(value, ErrorMessages.MISSING_VALUE);
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
   }
 
   /**
@@ -129,11 +129,7 @@ public abstract class Command {
    * @param property The property name to validate
    */
   protected void validateProperty(String property) {
-    validateString(property, ErrorMessages.MISSING_PROPERTY);
-  }
-
-  private void validateString(String s, String message) {
-    if (s == null) exitWithError(message);
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
   }
 
   /**
