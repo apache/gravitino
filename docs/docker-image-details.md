@@ -59,11 +59,12 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
-
 - apache/gravitino-iceberg-rest:0.8.0-incubating
+  - Supports OSS and ADLS storage.
+
+- apache/gravitino-iceberg-rest:0.7.0-incubating
   - Using JDBC catalog backend.
   - Supports S3 and GCS storage.
-  - Supports OSS and ADLS storage.
   - Supports credential vending.
   - Supports changing configuration by environment variables.
 
