@@ -406,7 +406,7 @@ class PermissionManager {
   }
 
   Role grantPrivilegesToRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges) {
     try {
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper =
           new AuthorizationPluginCallbackWrapper();
@@ -476,7 +476,7 @@ class PermissionManager {
       String metalake,
       String role,
       MetadataObject object,
-      List<Privilege> privileges,
+      Set<Privilege> privileges,
       RoleEntity roleEntity,
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
@@ -513,7 +513,7 @@ class PermissionManager {
   }
 
   Role revokePrivilegesFromRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges) {
     try {
       AuthorizationPluginCallbackWrapper authorizationCallbackWrapper =
           new AuthorizationPluginCallbackWrapper();
@@ -587,7 +587,7 @@ class PermissionManager {
       String metalake,
       String role,
       MetadataObject object,
-      List<Privilege> privileges,
+      Set<Privilege> privileges,
       RoleEntity roleEntity,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
     AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
@@ -615,7 +615,7 @@ class PermissionManager {
       String metalake,
       String role,
       MetadataObject object,
-      List<Privilege> privileges,
+      Set<Privilege> privileges,
       RoleEntity roleEntity,
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationCallbackWrapper) {

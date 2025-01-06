@@ -232,7 +232,7 @@ public class PermissionOperations {
                                     object,
                                     privilegeGrantRequest.getPrivileges().stream()
                                         .map(DTOConverters::fromPrivilegeDTO)
-                                        .collect(Collectors.toList()))))));
+                                        .collect(Collectors.toSet()))))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
@@ -277,7 +277,7 @@ public class PermissionOperations {
                                     object,
                                     privilegeRevokeRequest.getPrivileges().stream()
                                         .map(DTOConverters::fromPrivilegeDTO)
-                                        .collect(Collectors.toList()))))));
+                                        .collect(Collectors.toSet()))))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
