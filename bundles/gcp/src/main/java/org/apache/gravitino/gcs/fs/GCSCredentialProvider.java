@@ -106,7 +106,7 @@ public class GCSCredentialProvider implements AccessTokenProvider {
 
   @Override
   public Configuration getConf() {
-    return this.configuration;
+    return configuration;
   }
 
   /**

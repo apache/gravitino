@@ -61,9 +61,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
-    if (!hadoopConfMap.containsKey(Constants.CREDENTIALS_PROVIDER_KEY)
-        && config.containsKey(
-            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
+    if (shouldSetCredentialsProviderExplicitly(config)) {
       hadoopConfMap.put(
           Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialProvider.class.getCanonicalName());
     }
@@ -71,6 +69,20 @@ public class OSSFileSystemProvider implements FileSystemProvider {
     hadoopConfMap.forEach(configuration::set);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  /**
+   * Check if the credential provider should be set explicitly.
+   *
+   * <p>When the credential provider is not set and the server URI is set (this means the call is
+   * from GVFS client), we need to manually set the credential provider
+   *
+   * @param config the configuration map
+   * @return true if the credential provider should be set explicitly
+   */
+  private boolean shouldSetCredentialsProviderExplicitly(Map<String, String> config) {
+    return !config.containsKey(Constants.CREDENTIALS_PROVIDER_KEY)
+        && config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
   }
 
   @Override
