@@ -1105,7 +1105,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     // Handle CommandActions.LIST action separately as it doesn't require the `fileset`
     if (CommandActions.LIST.equals(command)) {
       checkEntities(missingEntities);
-      newListFilesets(url, ignore, metalake, catalog, schema).handle();
+      newListFilesets(url, ignore, metalake, catalog, schema).validate().handle();
       return;
     }
 
@@ -1115,7 +1115,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     switch (command) {
       case CommandActions.DETAILS:
-        newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();
+        newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).validate().handle();
         break;
 
       case CommandActions.CREATE:
@@ -1124,6 +1124,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
           String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
           Map<String, String> propertyMap = new Properties().parse(properties);
           newCreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap)
+              .validate()
               .handle();
           break;
         }
@@ -1131,7 +1132,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
       case CommandActions.DELETE:
         {
           boolean force = line.hasOption(GravitinoOptions.FORCE);
-          newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
+          newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset)
+              .validate()
+              .handle();
           break;
         }
 
@@ -1140,6 +1143,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
           String property = line.getOptionValue(GravitinoOptions.PROPERTY);
           String value = line.getOptionValue(GravitinoOptions.VALUE);
           newSetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value)
+              .validate()
               .handle();
           break;
         }
@@ -1148,12 +1152,15 @@ public class GravitinoCommandLine extends TestableCommandLine {
         {
           String property = line.getOptionValue(GravitinoOptions.PROPERTY);
           newRemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property)
+              .validate()
               .handle();
           break;
         }
 
       case CommandActions.PROPERTIES:
-        newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset).handle();
+        newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset)
+            .validate()
+            .handle();
         break;
 
       case CommandActions.UPDATE:
@@ -1161,11 +1168,14 @@ public class GravitinoCommandLine extends TestableCommandLine {
           if (line.hasOption(GravitinoOptions.COMMENT)) {
             String comment = line.getOptionValue(GravitinoOptions.COMMENT);
             newUpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment)
+                .validate()
                 .handle();
           }
           if (line.hasOption(GravitinoOptions.RENAME)) {
             String newName = line.getOptionValue(GravitinoOptions.RENAME);
-            newUpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, newName).handle();
+            newUpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, newName)
+                .validate()
+                .handle();
           }
           break;
         }
