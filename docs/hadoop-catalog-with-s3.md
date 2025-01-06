@@ -295,10 +295,10 @@ In some Spark versions, a Hadoop environment is needed by the driver, adding the
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 
-conf.set("s3-endpoint", "http://localhost:9000");
+conf.set("s3-endpoint", "${GRAVITINO_SERVER_IP:PORT}");
 conf.set("s3-access-key-id", "minio");
 conf.set("s3-secret-access-key", "minio123");
 
@@ -329,7 +329,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>http://192.168.50.188:8090</value>
+    <value>${GRAVITINO_SERVER_IP:PORT}</value>
   </property>
 
   <property>
@@ -374,7 +374,7 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "s3_endpoint": "http://localhost:9000",
+    "s3_endpoint": "${GRAVITINO_SERVER_IP:PORT}",
     "s3_access_key_id": "minio",
     "s3_secret_access_key": "minio123"
 }

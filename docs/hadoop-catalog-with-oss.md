@@ -292,7 +292,7 @@ conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hado
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
-conf.set("oss-endpoint", "http://localhost:9000");
+conf.set("oss-endpoint", "${GRAVITINO_SERVER_IP:PORT}");
 conf.set("oss-access-key-id", "minio");
 conf.set("oss-secret-access-key", "minio123"); 
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
@@ -322,7 +322,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>http://192.168.50.188:8090</value>
+    <value>${GRAVITINO_SERVER_IP:PORT}</value>
   </property>
 
   <property>
@@ -368,11 +368,11 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "oss_endpoint": "http://localhost:9000",
+    "oss_endpoint": "${GRAVITINO_SERVER_IP:PORT}",
     "oss_access_key_id": "minio",
     "oss_secret_access_key": "minio123"
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="test_metalake", options=options)
 
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
@@ -386,7 +386,7 @@ The following are examples of how to use the pandas library to access the OSS fi
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
+    "server_uri": "${GRAVITINO_SERVER_IP:PORT}", 
     "metalake_name": "test",
     "options": {
         "oss_access_key_id": "access_key",
@@ -418,7 +418,7 @@ GVFS Java client:
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // No need to set oss-access-key-id and oss-secret-access-key
 Path filesetPath = new Path("gvfs://fileset/oss_test_catalog/test_schema/test_fileset/new_dir");
@@ -434,7 +434,7 @@ spark = SparkSession.builder
   .appName("oss_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_IP:PORT}")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   # No need to set oss-access-key-id and oss-secret-access-key
   .config("spark.driver.memory", "2g")

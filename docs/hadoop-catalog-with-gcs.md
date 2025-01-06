@@ -42,7 +42,7 @@ Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#filese
 
 ## Using Hadoop catalog with GCS
 
-### Create a Hadoop catalog/schema/file set with GCS
+### Create a Hadoop catalog/schema/fileset with GCS
 
 First, you need to create a Hadoop catalog with GCS. The following example shows how to create a Hadoop catalog with GCS:
 
@@ -61,7 +61,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "gcs-service-account-file": "path_of_gcs_service_account_file",
     "filesystem-providers": "gcs"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs
+}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs
 ```
 
 </TabItem>
@@ -69,7 +69,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
+    .builder("${GRAVITINO_SERVER_IP:PORT}")
     .withMetalake("metalake")
     .build();
 
@@ -92,7 +92,7 @@ Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
 gcs_properties = {
     "location": "gs://bucket/root",
     "gcs-service-account-file": "path_of_gcs_service_account_file"
@@ -124,7 +124,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "gs://bucket/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs/test_catalog/schemas
 ```
 
 </TabItem>
@@ -172,7 +172,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
 ```
 
 </TabItem>
@@ -180,7 +180,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
+    .builder("${GRAVITINO_SERVER_IP:PORT}")
     .withMetalake("metalake")
     .build();
 
@@ -204,7 +204,7 @@ filesetCatalog.createFileset(
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
 
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
@@ -227,7 +227,7 @@ from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, Graviti
 from pyspark.sql import SparkSession
 import os
 
-gravitino_url = "http://localhost:8090"
+gravitino_url = "${GRAVITINO_SERVER_IP:PORT}"
 metalake_name = "test"
 
 catalog_name = "your_gcs_catalog"
@@ -280,7 +280,7 @@ In some Spark versions, a Hadoop environment is needed by the driver, adding the
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 conf.set("gcs-service-account-file", "/path/your-service-account-file.json");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
@@ -310,7 +310,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>http://192.168.50.188:8090</value>
+    <value>${GRAVITINO_SERVER_IP:PORT}</value>
   </property>
 
   <property>
@@ -348,7 +348,7 @@ options = {
     "auth_type": "simple",
     "gcs_service_account_file": "path_of_gcs_service_account_file.json",
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="test_metalake", options=options)
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
@@ -360,7 +360,7 @@ The following are examples of how to use the pandas library to access the GCS fi
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
+    "server_uri": "${GRAVITINO_SERVER_IP:PORT}", 
     "metalake_name": "test",
     "options": {
         "gcs_service_account_file": "path_of_gcs_service_account_file.json",
@@ -391,7 +391,7 @@ GVFS Java client:
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // No need to set gcs-service-account-file
 Path filesetPath = new Path("gvfs://fileset/gcs_test_catalog/test_schema/test_fileset/new_dir");
@@ -407,7 +407,7 @@ spark = SparkSession.builder
   .appName("gcs_fileset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_IP:PORT}")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   # No need to set gcs-service-account-file
   .config("spark.driver.memory", "2g")

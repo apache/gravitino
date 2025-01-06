@@ -63,7 +63,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "azure-storage-account-key": "The account key of the Azure Blob Storage",
     "filesystem-providers": "abs"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs
+}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs
 ```
 
 </TabItem>
@@ -71,7 +71,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
+    .builder("${GRAVITINO_SERVER_IP:PORT}")
     .withMetalake("metalake")
     .build();
 
@@ -95,7 +95,7 @@ Catalog adlsCatalog = gravitinoClient.createCatalog("example_catalog",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
 adls_properties = {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure_storage_account_name": "azure storage account name",
@@ -128,7 +128,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs/test_catalog/schemas
 ```
 
 </TabItem>
@@ -176,7 +176,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
 ```
 
 </TabItem>
@@ -184,7 +184,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
+    .builder("${GRAVITINO_SERVER_IP:PORT}")
     .withMetalake("metalake")
     .build();
 
@@ -208,7 +208,7 @@ filesetCatalog.createFileset(
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
 
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
@@ -231,7 +231,7 @@ from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, Graviti
 from pyspark.sql import SparkSession
 import os
 
-gravitino_url = "http://localhost:8090"
+gravitino_url = "${GRAVITINO_SERVER_IP:PORT}"
 metalake_name = "test"
 
 catalog_name = "your_adls_catalog"
@@ -286,7 +286,7 @@ In some Spark versions, a Hadoop environment is needed by the driver, adding the
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_URL}");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 conf.set("azure-storage-account-name", "account_name_of_adls");
 conf.set("azure-storage-account-key", "account_key_of_adls");
@@ -317,7 +317,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>http://192.168.50.188:8090</value>
+    <value>${GRAVITINO_SERVER_IP:PORT}</value>
   </property>
 
   <property>
@@ -359,7 +359,7 @@ options = {
     "azure_storage_account_name": "azure_account_name",
     "azure_storage_account_key": "azure_account_key"
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="test_metalake", options=options)
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
@@ -372,7 +372,7 @@ The following are examples of how to use the pandas library to access the ADLS f
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
+    "server_uri": "${GRAVITINO_SERVER_IP:PORT}", 
     "metalake_name": "test",
     "options": {
         "azure_storage_account_name": "azure_account_name",
@@ -404,7 +404,7 @@ GVFS Java client:
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // No need to set azure-storage-account-name and azure-storage-account-name
 Path filesetPath = new Path("gvfs://fileset/adls_test_catalog/test_schema/test_fileset/new_dir");
@@ -420,7 +420,7 @@ spark = SparkSession.builder
   .appName("adls_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_IP:PORT}")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   # No need to set azure-storage-account-name and azure-storage-account-name
   .config("spark.driver.memory", "2g")
