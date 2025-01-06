@@ -19,10 +19,9 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.google.common.collect.Sets;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.cli.ErrorMessages;

@@ -22,10 +22,9 @@ import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.time.Instant;
 import java.util.List;
-
-import com.google.common.collect.Sets;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Group;

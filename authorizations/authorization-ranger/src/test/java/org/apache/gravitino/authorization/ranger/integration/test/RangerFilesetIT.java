@@ -28,14 +28,13 @@ import static org.apache.gravitino.integration.test.container.RangerContainer.RA
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.collect.Sets;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
@@ -322,7 +321,7 @@ public class RangerFilesetIT extends BaseIT {
             String.format("%s.%s", catalogName, schemaName),
             fileset.name(),
             MetadataObject.Type.FILESET),
-            Sets.newHashSet(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
+        Sets.newHashSet(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
     Assertions.assertEquals(1, policies.size());
     Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());

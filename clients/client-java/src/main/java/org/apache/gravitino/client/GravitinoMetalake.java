@@ -20,12 +20,17 @@ package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
 import com.google.common.collect.Sets;
-import com.google.errorprone.annotations.InlineMe;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -1035,7 +1040,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws RuntimeException If granting privileges to a role encounters storage issues.
    */
   public Role grantPrivilegesToRole(String role, MetadataObject object, Set<Privilege> privileges)
-          throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
           IllegalPrivilegeException {
     PrivilegeGrantRequest request =
         new PrivilegeGrantRequest(DTOConverters.toPrivileges(privileges));
@@ -1099,27 +1104,27 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   public Role revokePrivilegesFromRole(
-          String role, MetadataObject object, Set<Privilege> privileges)
-          throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+      String role, MetadataObject object, Set<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
           IllegalPrivilegeException {
     PrivilegeRevokeRequest request =
-            new PrivilegeRevokeRequest(DTOConverters.toPrivileges(privileges));
+        new PrivilegeRevokeRequest(DTOConverters.toPrivileges(privileges));
     request.validate();
 
     RoleResponse resp =
-            restClient.put(
-                    String.format(
-                            API_PERMISSION_PATH,
-                            RESTUtils.encodeString(this.name()),
-                            String.format(
-                                    "roles/%s/%s/%s/revoke",
-                                    RESTUtils.encodeString(role),
-                                    object.type().name().toLowerCase(Locale.ROOT),
-                                    RESTUtils.encodeString(object.fullName()))),
-                    request,
-                    RoleResponse.class,
-                    Collections.emptyMap(),
-                    ErrorHandlers.permissionOperationErrorHandler());
+        restClient.put(
+            String.format(
+                API_PERMISSION_PATH,
+                RESTUtils.encodeString(this.name()),
+                String.format(
+                    "roles/%s/%s/%s/revoke",
+                    RESTUtils.encodeString(role),
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    RESTUtils.encodeString(object.fullName()))),
+            request,
+            RoleResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
 
     resp.validate();
 

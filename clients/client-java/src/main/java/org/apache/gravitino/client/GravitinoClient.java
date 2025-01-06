@@ -20,12 +20,11 @@
 package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import com.google.common.collect.Sets;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
@@ -445,7 +444,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
   public Role grantPrivilegesToRole(String role, MetadataObject object, Set<Privilege> privileges)
-          throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
           IllegalPrivilegeException {
     return getMetalake().grantPrivilegesToRole(role, object, privileges);
   }
@@ -487,8 +486,8 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   public Role revokePrivilegesFromRole(
-          String role, MetadataObject object, Set<Privilege> privileges)
-          throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+      String role, MetadataObject object, Set<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
           IllegalPrivilegeException {
     return getMetalake().revokePrivilegesFromRole(role, object, privileges);
   }
