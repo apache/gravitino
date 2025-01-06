@@ -19,6 +19,9 @@ $ bin/gravitino-server.sh start
 
 ## Create a Hadoop Catalog with GCS in Gravitino
 
+The rest of this document shows how to use the Hadoop catalog with GCS in Gravitino with a full example.
+
+
 ### Catalog a catalog
 
 Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
@@ -36,7 +39,6 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 ### Create a fileset
 
 Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
-
 
 ## Using Hadoop catalog with GCS
 
@@ -216,7 +218,7 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 </TabItem>
 </Tabs>
 
-## Using Spark to access the fileset
+### Using Spark to access the fileset
 
 The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
 
@@ -273,7 +275,7 @@ Please choose the correct jar according to your environment.
 In some Spark version, Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work, in this case, you should add the jars to the spark classpath directly.
 :::
 
-## Using Gravitino virual file system Java client to access the fileset
+### Using Gravitino virtual file system Java client to access the fileset
 
 ```java
 Configuration conf = new Configuration();
@@ -288,7 +290,7 @@ fs.mkdirs(filesetPath);
 ...
 ```
 
-## Using fileset with hadoop fs command
+### Using fileset with hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
 
@@ -335,7 +337,7 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/schema/example
 ```
 
 
-## Using Gravitino virtual file system Python client
+### Using Gravitino virtual file system Python client
 
 ```python
 from gravitino import gvfs
@@ -349,7 +351,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
-## Using fileset with pandas
+### Using fileset with pandas
 
 The following are examples of how to use the pandas library to access the GCS fileset
 
@@ -367,6 +369,8 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
                  storage_options=storage_options)
 ds.head()
 ```
+
+For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
 ## Fileset with credential
 
