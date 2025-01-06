@@ -290,6 +290,8 @@ fs.mkdirs(filesetPath);
 ...
 ```
 
+Similar to Spark configurations, you need to add GCS bundle jars to the classpath according to your environment.
+
 ### Using fileset with hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
@@ -403,7 +405,7 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-  .appName("gcs_fielset_test")
+  .appName("gcs_fileset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
   .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")

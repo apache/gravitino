@@ -308,6 +308,8 @@ fs.mkdirs(filesetPath);
 ...
 ```
 
+Similar to Spark configurations, you need to add S3 bundle jars to the classpath according to your environment.
+
 ### Using fileset with hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
