@@ -317,7 +317,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.CATALOG, CommandEntities.SCHEMA)));
   }
 
@@ -342,7 +342,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA)));
   }
 
@@ -367,7 +367,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -396,7 +396,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.TOPIC)));
   }
 
@@ -422,7 +422,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.TOPIC)));
   }
 }

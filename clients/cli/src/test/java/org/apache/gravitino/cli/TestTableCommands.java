@@ -457,7 +457,7 @@ class TestTableCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.CATALOG
             + ", "
             + CommandEntities.SCHEMA);
@@ -485,7 +485,7 @@ class TestTableCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.SCHEMA);
   }
 
@@ -510,7 +510,7 @@ class TestTableCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.CATALOG
             + ", "
             + CommandEntities.SCHEMA
@@ -539,7 +539,7 @@ class TestTableCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.SCHEMA
             + ", "
             + CommandEntities.TABLE);
@@ -568,7 +568,7 @@ class TestTableCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.TABLE);
   }
 }

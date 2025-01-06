@@ -96,7 +96,7 @@ public class RegisterModel extends Command {
     if (registeredModel != null) {
       System.out.println("Successful register " + registeredModel.name() + ".");
     } else {
-      System.err.println("Failed to register model: " + model + ".");
+      System.err.println(ErrorMessages.REGISTER_FAILED + model + ".");
       Main.exit(-1);
     }
   }

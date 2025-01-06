@@ -112,7 +112,7 @@ public class Privileges {
       case MANAGE_GRANTS:
         return Privilege.Name.MANAGE_GRANTS;
       default:
-        System.err.println("Unknown privilege");
+        System.err.println(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
         return null;
     }
   }
