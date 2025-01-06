@@ -18,6 +18,7 @@
  */
 use crate::error::ErrorCode::InvalidConfig;
 use crate::error::GvfsError;
+use opendal::Operator;
 use reqwest::Url;
 use std::path::PathBuf;
 
@@ -34,6 +35,19 @@ pub(crate) fn parse_location(location: &str) -> GvfsResult<Url> {
 pub(crate) fn extract_root_path(location: &str) -> GvfsResult<PathBuf> {
     let url = parse_location(location)?;
     Ok(PathBuf::from(url.path()))
+}
+
+pub(crate) async fn delete_dir(op: &Operator, dir_name: &str) {
+    let childs = op.list(dir_name).await.expect("list dir failed");
+    for child in childs {
+        let child_name = dir_name.to_string() + child.name();
+        if child.metadata().is_dir() {
+            Box::pin(delete_dir(op, &child_name)).await;
+        } else {
+            op.delete(&child_name).await.expect("delete file failed");
+        }
+    }
+    op.delete(dir_name).await.expect("delete dir failed");
 }
 
 #[cfg(test)]

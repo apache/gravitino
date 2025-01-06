@@ -95,7 +95,7 @@ pub async fn create_gvfs_filesystem(
     Ok(CreateFileSystemResult::Gvfs(fs))
 }
 
-fn create_fs_with_fileset(
+pub(crate) fn create_fs_with_fileset(
     catalog: &Catalog,
     fileset: &Fileset,
     config: &AppConfig,

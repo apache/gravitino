@@ -181,11 +181,12 @@ pub fn extract_s3_config(config: &AppConfig) -> HashMap<String, String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::default_raw_filesystem::DefaultRawFileSystem;
     use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
     use crate::filesystem::RawFileSystem;
+    use crate::utils::delete_dir;
     use opendal::layers::TimeoutLayer;
     use std::time::Duration;
 
@@ -205,24 +206,9 @@ mod tests {
         assert_eq!(result.unwrap(), "ap-southeast-2");
     }
 
-    async fn delete_dir(op: &Operator, dir_name: &str) {
-        let childs = op.list(dir_name).await.expect("list dir failed");
-        for child in childs {
-            let child_name = dir_name.to_string() + child.name();
-            if child.metadata().is_dir() {
-                Box::pin(delete_dir(op, &child_name)).await;
-            } else {
-                op.delete(&child_name).await.expect("delete file failed");
-            }
-        }
-        op.delete(dir_name).await.expect("delete dir failed");
-    }
-
-    async fn create_s3_fs(cwd: &Path) -> S3FileSystem {
+    pub(crate) async fn cleanup_s3_fs(cwd: &Path) -> Operator {
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
         let opendal_config = extract_s3_config(&config);
-
-        let fs_context = FileSystemContext::default();
 
         let builder = S3::from_map(opendal_config);
         let op = Operator::new(builder)
@@ -241,8 +227,16 @@ mod tests {
         op.create_dir(&file_name)
             .await
             .expect("create test dir failed");
+        op
+    }
 
+    async fn create_s3_fs(cwd: &Path) -> S3FileSystem {
+        let op = cleanup_s3_fs(cwd).await;
+
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
+        let fs_context = FileSystemContext::default();
         let open_dal_fs = OpenDalFileSystem::new(op, &config, &fs_context);
+
         S3FileSystem { open_dal_fs }
     }
 

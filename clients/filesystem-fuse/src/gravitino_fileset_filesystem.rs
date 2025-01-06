@@ -140,16 +140,23 @@ impl PathFileSystem for GravitinoFilesetFileSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::GravitinoConfig;
+    use crate::config::{AppConfig, GravitinoConfig};
+    use crate::default_raw_filesystem::DefaultRawFileSystem;
+    use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
+    use crate::filesystem::{FileSystemContext, PathFileSystem, RawFileSystem};
+    use crate::gravitino_client::{Catalog, Fileset, GravitinoClient};
     use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
+    use crate::gvfs_creator::create_fs_with_fileset;
     use crate::memory_filesystem::MemoryFileSystem;
+    use crate::s3_filesystem::tests::cleanup_s3_fs;
+    use std::collections::HashMap;
     use std::path::Path;
 
     #[tokio::test]
     async fn test_map_fileset_path_to_raw_path() {
         let fs = GravitinoFilesetFileSystem {
             physical_fs: Box::new(MemoryFileSystem::new().await),
-            client: super::GravitinoClient::new(&GravitinoConfig::default()),
+            client: GravitinoClient::new(&GravitinoConfig::default()),
             location: "/c1/fileset1".into(),
         };
         let path = fs.gvfs_path_to_raw_path(Path::new("/a"));
@@ -162,7 +169,7 @@ mod tests {
     async fn test_map_raw_path_to_fileset_path() {
         let fs = GravitinoFilesetFileSystem {
             physical_fs: Box::new(MemoryFileSystem::new().await),
-            client: super::GravitinoClient::new(&GravitinoConfig::default()),
+            client: GravitinoClient::new(&GravitinoConfig::default()),
             location: "/c1/fileset1".into(),
         };
         let path = fs
@@ -171,5 +178,65 @@ mod tests {
         assert_eq!(path, Path::new("/a"));
         let path = fs.raw_path_to_gvfs_path(Path::new("/c1/fileset1")).unwrap();
         assert_eq!(path, Path::new("/"));
+    }
+
+    async fn create_fileset_fs(path: &Path) -> GravitinoFilesetFileSystem {
+        cleanup_s3_fs(path).await;
+
+        let catalog = Catalog::new(
+            "c1",
+            vec![
+                ("location".to_string(), "s3a://trino-test-ice".to_string()),
+                (
+                    "s3-endpoint".to_string(),
+                    "http://s3.ap-southeast-2.amazonaws.com".to_string(),
+                ),
+            ]
+            .into_iter()
+            .collect::<HashMap<String, String>>(),
+        );
+        let file_set_location = format!("s3a://trino-test-ice{}", path.to_string_lossy());
+        let file_set = Fileset::new("fileset1", &file_set_location);
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
+        let fs_context = FileSystemContext::default();
+        let inner_fs = create_fs_with_fileset(&catalog, &file_set, &config, &fs_context).unwrap();
+        GravitinoFilesetFileSystem::new(
+            inner_fs,
+            path,
+            GravitinoClient::new(&config.gravitino),
+            &config,
+            &fs_context,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn test_fileset_file_system() {
+        if std::env::var("RUN_S3_TESTS").is_err() {
+            return;
+        }
+        let cwd = Path::new("/gvfs_test3");
+        let fs = create_fileset_fs(cwd).await;
+        let _ = fs.init().await;
+        let mut tester = TestPathFileSystem::new(Path::new("/"), fs);
+        tester.test_path_file_system().await;
+    }
+
+    #[tokio::test]
+    async fn test_fileset_with_raw_file_system() {
+        if std::env::var("RUN_S3_TESTS").is_err() {
+            return;
+        }
+
+        let cwd = Path::new("/gvfs_test4");
+        let fileset_fs = create_fileset_fs(cwd).await;
+        let raw_fs = DefaultRawFileSystem::new(
+            fileset_fs,
+            &AppConfig::default(),
+            &FileSystemContext::default(),
+        );
+        let _ = raw_fs.init().await;
+        let mut tester = TestRawFileSystem::new(Path::new("/"), raw_fs);
+        tester.test_raw_file_system().await;
     }
 }
