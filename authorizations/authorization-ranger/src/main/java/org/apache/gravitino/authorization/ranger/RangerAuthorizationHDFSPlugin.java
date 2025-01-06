@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -138,56 +137,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    * @param authzMetadataObject The ranger securable object to find the managed policy.
    * @return The managed policy for the metadata object.
    */
+  @Override
   public RangerPolicy findManagedPolicy(AuthorizationMetadataObject authzMetadataObject)
       throws AuthorizationPluginException {
-    List<RangerPolicy> policies = wildcardSearchPolies(authzMetadataObject);
-    if (!policies.isEmpty()) {
-      /**
-       * Because Ranger doesn't support the precise search, Ranger will return the policy meets the
-       * wildcard(*,?) conditions, If you use `/a/b` condition to search policy, the Ranger will
-       * match `/a/b1`, `/a/b2`, `/a/b*`, So we need to manually precisely filter this research
-       * results.
-       */
-      List<String> nsMetadataObj = authzMetadataObject.names();
-      PathBasedMetadataObject pathAuthzMetadataObject =
-          (PathBasedMetadataObject) authzMetadataObject;
-      Map<String, String> preciseFilters = new HashMap<>();
-      for (int i = 0; i < nsMetadataObj.size() && i < policyResourceDefinesRule().size(); i++) {
-        preciseFilters.put(
-            policyResourceDefinesRule().get(i), getAuthorizationPath(pathAuthzMetadataObject));
-      }
-      policies =
-          policies.stream()
-              .filter(
-                  policy ->
-                      policy.getResources().entrySet().stream()
-                          .allMatch(
-                              entry ->
-                                  preciseFilters.containsKey(entry.getKey())
-                                      && entry.getValue().getValues().size() == 1
-                                      && entry
-                                          .getValue()
-                                          .getValues()
-                                          .contains(preciseFilters.get(entry.getKey()))))
-              .collect(Collectors.toList());
+    List<String> nsMetadataObj = authzMetadataObject.names();
+    PathBasedMetadataObject pathAuthzMetadataObject = (PathBasedMetadataObject) authzMetadataObject;
+    Map<String, String> preciseFilters = new HashMap<>();
+    for (int i = 0; i < nsMetadataObj.size() && i < policyResourceDefinesRule().size(); i++) {
+      preciseFilters.put(
+          policyResourceDefinesRule().get(i), getAuthorizationPath(pathAuthzMetadataObject));
     }
-    // Only return the policies that are managed by Gravitino.
-    if (policies.size() > 1) {
-      throw new AuthorizationPluginException("Each metadata object can have at most one policy.");
-    }
-
-    if (policies.isEmpty()) {
-      return null;
-    }
-
-    RangerPolicy policy = policies.get(0);
-    // Delegating Gravitino management policies cannot contain duplicate privilege
-    policy.getPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-    policy.getDenyPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-    policy.getRowFilterPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-    policy.getDataMaskPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-
-    return policy;
+    return preciseFindPolicy(authzMetadataObject, preciseFilters);
   }
 
   @Override
@@ -214,9 +174,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   /**
-   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * If rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` <br>
-   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * If rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
    */
   @Override
@@ -238,18 +198,18 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   protected void updatePolicyByMetadataObject(
       MetadataObject.Type operationType,
-      AuthorizationMetadataObject oldAuthzMetaobject,
-      AuthorizationMetadataObject newAuthzMetaobject) {
+      AuthorizationMetadataObject oldAuthzMetaObject,
+      AuthorizationMetadataObject newAuthzMetaObject) {
     PathBasedMetadataObject newPathBasedMetadataObject =
-        (PathBasedMetadataObject) newAuthzMetaobject;
-    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaobject);
-    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaobject);
+        (PathBasedMetadataObject) newAuthzMetaObject;
+    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
+    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
     if (oldPolicies.isEmpty()) {
-      LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaobject);
+      LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaObject);
       return;
     }
     if (!existNewPolicies.isEmpty()) {
-      LOG.warn("The Ranger policy for the metadata object({}) already exists!", newAuthzMetaobject);
+      LOG.warn("The Ranger policy for the metadata object({}) already exists!", newAuthzMetaObject);
     }
     oldPolicies.stream()
         .forEach(
@@ -274,7 +234,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 if (alreadyExist) {
                   LOG.warn(
                       "The Ranger policy for the metadata object({}) already exists!",
-                      newAuthzMetaobject);
+                      newAuthzMetaObject);
                   return;
                 }
 
@@ -288,11 +248,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   /**
-   * IF remove the SCHEMA, need to remove these the relevant policies, `{schema}`, `{schema}.*`,
+   * If remove the SCHEMA, need to remove these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` <br>
-   * IF remove the TABLE, need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * If remove the TABLE, need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
-   * IF remove the COLUMN, Only need to remove `{schema}.*.*` <br>
+   * If remove the COLUMN, Only need to remove `{schema}.*.*` <br>
    */
   @Override
   protected void doRemoveMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
@@ -320,7 +280,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         authzMetadataObject.type() == SCHEMA, "The metadata object type must be SCHEMA");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1, "The metadata object names must be 1");
+        authzMetadataObject.names().size() == 1,
+        "The size of the metadata object's name must be 1.");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Remove all schema in this catalog
       String catalogName = authzMetadataObject.names().get(0);

@@ -144,6 +144,51 @@ public abstract class RangerAuthorizationPlugin
       AuthorizationMetadataObject oldAuthzMetaobject,
       AuthorizationMetadataObject newAuthzMetaobject);
 
+  /**
+   * Because Ranger doesn't support the precise search, Ranger will return the policy meets the
+   * wildcard(*,?) conditions, If you use `db.table` condition to search policy, the Ranger will
+   * match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually precisely filter this
+   * research results.
+   */
+  protected RangerPolicy preciseFindPolicy(
+      AuthorizationMetadataObject authzMetadataObject, Map<String, String> preciseFilters)
+      throws AuthorizationPluginException {
+    List<RangerPolicy> policies = wildcardSearchPolies(authzMetadataObject);
+    if (!policies.isEmpty()) {
+      policies =
+          policies.stream()
+              .filter(
+                  policy ->
+                      policy.getResources().entrySet().stream()
+                          .allMatch(
+                              entry ->
+                                  preciseFilters.containsKey(entry.getKey())
+                                      && entry.getValue().getValues().size() == 1
+                                      && entry
+                                          .getValue()
+                                          .getValues()
+                                          .contains(preciseFilters.get(entry.getKey()))))
+              .collect(Collectors.toList());
+    }
+    // Only return the policies that are managed by Gravitino.
+    if (policies.size() > 1) {
+      throw new AuthorizationPluginException("Each metadata object can have at most one policy.");
+    }
+
+    if (policies.isEmpty()) {
+      return null;
+    }
+
+    RangerPolicy policy = policies.get(0);
+    // Delegating Gravitino management policies cannot contain duplicate privilege
+    policy.getPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
+    policy.getDenyPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
+    policy.getRowFilterPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
+    policy.getDataMaskPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
+
+    return policy;
+  }
+
   protected RangerPolicy addOwnerToNewPolicy(
       AuthorizationMetadataObject metadataObject, Owner newOwner) {
     RangerPolicy policy = createPolicyAddResources(metadataObject);

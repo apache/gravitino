@@ -91,53 +91,15 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
    * @param authzMetadataObject The ranger securable object to find the managed policy.
    * @return The managed policy for the metadata object.
    */
+  @Override
   public RangerPolicy findManagedPolicy(AuthorizationMetadataObject authzMetadataObject)
       throws AuthorizationPluginException {
-    List<RangerPolicy> policies = wildcardSearchPolies(authzMetadataObject);
-    if (!policies.isEmpty()) {
-      /**
-       * Because Ranger doesn't support the precise search, Ranger will return the policy meets the
-       * wildcard(*,?) conditions, If you use `db.table` condition to search policy, the Ranger will
-       * match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually precisely filter
-       * this research results.
-       */
-      List<String> nsMetadataObj = authzMetadataObject.names();
-      Map<String, String> preciseFilters = new HashMap<>();
-      for (int i = 0; i < nsMetadataObj.size() && i < policyResourceDefinesRule().size(); i++) {
-        preciseFilters.put(policyResourceDefinesRule().get(i), nsMetadataObj.get(i));
-      }
-      policies =
-          policies.stream()
-              .filter(
-                  policy ->
-                      policy.getResources().entrySet().stream()
-                          .allMatch(
-                              entry ->
-                                  preciseFilters.containsKey(entry.getKey())
-                                      && entry.getValue().getValues().size() == 1
-                                      && entry
-                                          .getValue()
-                                          .getValues()
-                                          .contains(preciseFilters.get(entry.getKey()))))
-              .collect(Collectors.toList());
+    List<String> nsMetadataObj = authzMetadataObject.names();
+    Map<String, String> preciseFilters = new HashMap<>();
+    for (int i = 0; i < nsMetadataObj.size() && i < policyResourceDefinesRule().size(); i++) {
+      preciseFilters.put(policyResourceDefinesRule().get(i), nsMetadataObj.get(i));
     }
-    // Only return the policies that are managed by Gravitino.
-    if (policies.size() > 1) {
-      throw new AuthorizationPluginException("Each metadata object can have at most one policy.");
-    }
-
-    if (policies.isEmpty()) {
-      return null;
-    }
-
-    RangerPolicy policy = policies.get(0);
-    // Delegating Gravitino management policies cannot contain duplicate privilege
-    policy.getPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-    policy.getDenyPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-    policy.getRowFilterPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-    policy.getDataMaskPolicyItems().forEach(RangerHelper::checkPolicyItemAccess);
-
-    return policy;
+    return preciseFindPolicy(authzMetadataObject, preciseFilters);
   }
 
   /** Wildcard search the Ranger policies in the different Ranger service. */
@@ -161,11 +123,11 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   }
 
   /**
-   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * If rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` <br>
-   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * If rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
-   * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
+   * If rename the COLUMN, Only need to rename `{schema}.*.*` <br>
    */
   @Override
   protected void doRenameMetadataObject(
@@ -239,16 +201,16 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   @Override
   protected void updatePolicyByMetadataObject(
       MetadataObject.Type operationType,
-      AuthorizationMetadataObject oldAuthzMetaobject,
-      AuthorizationMetadataObject newAuthzMetaobject) {
-    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaobject);
-    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaobject);
+      AuthorizationMetadataObject oldAuthzMetaObject,
+      AuthorizationMetadataObject newAuthzMetaObject) {
+    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
+    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
     if (oldPolicies.isEmpty()) {
-      LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaobject);
+      LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaObject);
       return;
     }
     if (!existNewPolicies.isEmpty()) {
-      LOG.warn("The Ranger policy for the metadata object({}) already exists!", newAuthzMetaobject);
+      LOG.warn("The Ranger policy for the metadata object({}) already exists!", newAuthzMetaObject);
     }
     Map<MetadataObject.Type, Integer> operationTypeIndex =
         ImmutableMap.of(
@@ -266,18 +228,18 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                 if (policy
                     .getName()
                     .equals(
-                        AuthorizationSecurableObject.DOT_JOINER.join(oldAuthzMetaobject.names()))) {
+                        AuthorizationSecurableObject.DOT_JOINER.join(oldAuthzMetaObject.names()))) {
                   List<String> policyNames =
                       Lists.newArrayList(
                           AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
                   Preconditions.checkArgument(
-                      policyNames.size() >= oldAuthzMetaobject.names().size(),
+                      policyNames.size() >= oldAuthzMetaObject.names().size(),
                       String.format("The policy name(%s) is invalid!", policyName));
                   if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
                     // Doesn't need to rename the policy `*`
                     return;
                   }
-                  policyNames.set(index, newAuthzMetaobject.names().get(index));
+                  policyNames.set(index, newAuthzMetaObject.names().get(index));
                   policy.setName(AuthorizationSecurableObject.DOT_JOINER.join(policyNames));
                 }
                 // Update the policy resource name to new name
@@ -286,7 +248,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     .put(
                         policyResourceDefinesRule().get(index),
                         new RangerPolicy.RangerPolicyResource(
-                            newAuthzMetaobject.names().get(index)));
+                            newAuthzMetaObject.names().get(index)));
 
                 boolean alreadyExist =
                     existNewPolicies.stream()
@@ -297,7 +259,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                 if (alreadyExist) {
                   LOG.warn(
                       "The Ranger policy for the metadata object({}) already exists!",
-                      newAuthzMetaobject);
+                      newAuthzMetaObject);
                   return;
                 }
 
@@ -311,11 +273,11 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   }
 
   /**
-   * IF remove the SCHEMA, need to remove these the relevant policies, `{schema}`, `{schema}.*`,
+   * If remove the SCHEMA, need to remove these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` <br>
-   * IF remove the TABLE, need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * If remove the TABLE, need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
-   * IF remove the COLUMN, Only need to remove `{schema}.*.*` <br>
+   * If remove the COLUMN, Only need to remove `{schema}.*.*` <br>
    */
   @Override
   protected void doRemoveMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
