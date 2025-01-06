@@ -316,21 +316,14 @@ public class SchemaMetaService {
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    Long parentEntityId = null;
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
-      switch (level) {
-        case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
-        case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
-          break;
-      }
-    }
+    String metalake = namespace.level(0);
+    String catalog = namespace.level(1);
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    builder.withMetalakeId(metalakeId);
+
+    Long catalogId =
+        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalog);
+    builder.withCatalogId(catalogId);
   }
 }

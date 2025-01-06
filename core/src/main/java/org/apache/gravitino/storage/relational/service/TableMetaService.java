@@ -253,27 +253,20 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    Long parentEntityId = null;
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
-      switch (level) {
-        case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
-        case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
-          continue;
-        case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          builder.withSchemaId(parentEntityId);
-          break;
-      }
-    }
+    String metalake = namespace.level(0);
+    String catalog = namespace.level(1);
+    String schema = namespace.level(2);
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    builder.withMetalakeId(metalakeId);
+
+    Long catalogId =
+        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalog);
+    builder.withCatalogId(catalogId);
+
+    Long schemaId =
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schema);
+    builder.withSchemaId(schemaId);
   }
 
   private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
