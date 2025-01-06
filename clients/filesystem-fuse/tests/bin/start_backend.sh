@@ -17,28 +17,56 @@
 # specific language governing permissions and limitations
 # under the License.
 
- set -euo pipefail
+set -euo pipefail
 
-S3-ACCESS_KEY_ID=${S3-ACCESS_KEY_ID:-}
-S3-SECRET_ACCESS=${S3-SECRET_ACCESS:-}
-S3-REGION=${S3-REGION:-}
-S3-BUCKET=${S3-BUCKET:-}
+S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+S3_SECRET_ACCESS=${S3_SECRET_ACCESS:-}
+S3_REGION=${S3_REGION:-}
+S3_BUCKET=${S3_BUCKET:-}
 
 # Check required environment variables
-if [[ -z "$S3-ACCESS_KEY_ID" || -z "$S3-SECRET_ACCESS" || -z "$S3-REGION" || -z "$S3-BUCKET" ]]; then
+if [[ -z "$S3_ACCESS_KEY_ID" || -z "$S3_SECRET_ACCESS" || -z "$S3_REGION" || -z "$S3_BUCKET" ]]; then
   echo "Error: One or more required S3 environment variables are not set."
-  echo "Please set: S3-ACCESS_KEY_ID, S3-SECRET_ACCESS, S3-REGION, S3-BUCKET."
+  echo "Please set: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS, S3_REGION, S3_BUCKET."
   exit 1
 fi
 
-GRAVITINO_SERVER_HOME=../../..
-GRAVITINO_SERVER_DIR=$GRAVITINO_SERVER_HOME/distribution/package
-CLIENT_FUSE_DIR=$GRAVITINO_SERVER_HOME/clients/filesystem-fuse
+GRAVITINO_HOME=../../../..
+GRAVITINO_SERVER_DIR=$GRAVITINO_HOME/distribution/package
+CLIENT_FUSE_DIR=$GRAVITINO_HOME/clients/filesystem-fuse
+GRAVITINO_SERVER_URL=http://localhost:8090
+
+# copy the aws-bundle to the server
+if ls $GRAVITINO_SERVER_DIR/catalogs/hadoop/libs/gravitino-aws-bundle-*-incubating-SNAPSHOT.jar 1>/dev/null 2>&1; then
+  echo "File exists, skipping copy."
+else
+  cp $GRAVITINO_HOME/bundles/aws-bundle/build/libs/gravitino-aws-bundle-*-incubating-SNAPSHOT.jar \
+    $GRAVITINO_SERVER_DIR/catalogs/hadoop/libs
+fi
+
 
 echo "Start the Gravitino server"
-$GRAVITINO_SERVER_DIR/bin/start_gravitino_server.sh
+rm -rf $GRAVITINO_SERVER_DIR/data
+$GRAVITINO_SERVER_DIR/bin/gravitino.sh restart
 
-GRAVITINO_SERVER_URL=http://localhost:8090
+check_server_ready() {
+  local url=$1
+  local retries=10  # Number of retries
+  local wait_time=1 # Wait time between retries (seconds)
+
+  for ((i=1; i<=retries; i++)); do
+    if curl --silent --head --fail "$url" >/dev/null; then
+      echo "Gravitino server is ready."
+      return 0
+    else
+      echo "Attempt $i/$retries: Server not ready. Retrying in $wait_time seconds..."
+      sleep "$wait_time"
+    fi
+  done
+
+  echo "Error: Gravitino server did not become ready after $((retries * wait_time)) seconds."
+  exit 1
+}
 
 check_server_ready "$GRAVITINO_SERVER_URL/api/metalakes"
 
@@ -56,10 +84,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "s3a://'"$S3-BUCKET"'",
-    "s3-access-key-id": "'"$S3-ACCESS_KEY_ID"'",
-    "s3-secret-access-key": "'"$S3-SECRET_ACCESS"'",
-    "s3-endpoint": "http://s3.'"$S3-REGION"'.amazonaws.com",
+    "location": "s3a://'"$S3_BUCKET"'",
+    "s3-access-key-id": "'"$S3_ACCESS_KEY_ID"'",
+    "s3-secret-access-key": "'"$S3_SECRET_ACCESS"'",
+    "s3-endpoint": "http://s3.'"$S3_REGION"'.amazonaws.com",
     "filesystem-providers": "s3"
   }
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs
@@ -68,7 +96,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name":"s1","comment":"comment","properties":{}
-}' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs/catalog/schemas
+}' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs/c1/schemas
 
 # create FILESET
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -82,7 +110,7 @@ echo "Start the Gvfs fuse client"
 MOUNT_DIR=$CLIENT_FUSE_DIR/target/gvfs
 if [ -d "$MOUNT_DIR" ]; then
   echo "Unmount the existing mount point"
-  fusermount -u $MOUNT_DIR
+  umount -l $MOUNT_DIR > /dev/null 2>&1 || true
 else
   echo "Create the mount point"
   mkdir -p $MOUNT_DIR
@@ -91,34 +119,19 @@ fi
 FILESET=gvfs://fileset/test/c1/s1/fileset1
 
 CONF_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
-cp $CLIENT_FUSE_DIR/test/conf/gvfs_fuse-s3.toml $CONF_FILE
 
-awk '{
-    if ($0 ~ /S3-ACCESS_KEY_ID/) $0 = "S3-ACCESS_KEY_ID = \"" ENVIRON["S3_ACCESS_KEY_ID"] "\"";
-    if ($0 ~ /S3-SECRET_ACCESS_KEY/) $0 = "S3-SECRET_ACCESS_KEY = \"" ENVIRON["S3_SECRET_ACCESS"] "\"";
-    if ($0 ~ /S3-REGION/) $0 = "S3-REGION = \"" ENVIRON["S3_REGION"] "\"";
-    if ($0 ~ /S3-BUCKET/) $0 = "S3-BUCKET = \"" ENVIRON["S3_BUCKET"] "\"";
-    print
-}' $CLIENT_FUSE_DIR/test/conf/gvfs_fuse-s3.toml > "$CONF_FILE"
+awk -v access_key="$S3_ACCESS_KEY_ID" \
+    -v secret_key="$S3_SECRET_ACCESS" \
+    -v region="$S3_REGION" \
+    -v bucket="$S3_BUCKET" \
+    'BEGIN { in_extend_config = 0 }
+    /^\[extend_config\]/ { in_extend_config = 1 }
+    in_extend_config && /s3-access_key_id/ { $0 = "s3-access_key_id = \"" access_key "\"" }
+    in_extend_config && /s3-secret_access_key/ { $0 = "s3-secret_access_key = \"" secret_key "\"" }
+    in_extend_config && /s3-region/ { $0 = "s3-region = \"" region "\"" }
+    in_extend_config && /s3-bucket/ { $0 = "s3-bucket = \"" bucket "\"" }
+    { print }' $CLIENT_FUSE_DIR/tests/conf/gvfs_fuse_s3.toml > "$CONF_FILE"
 
 $CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $FILESET $CONF_FILE
 
-check_server_ready() {
-  local url=$1
-  local retries=10  # Number of retries
-  local wait_time=3 # Wait time between retries (seconds)
-
-  for ((i=1; i<=retries; i++)); do
-    if curl --silent --head --fail "$url" >/dev/null; then
-      echo "Gravitino server is ready."
-      return 0
-    else
-      echo "Attempt $i/$retries: Server not ready. Retrying in $wait_time seconds..."
-      sleep "$wait_time"
-    fi
-  done
-
-  echo "Error: Gravitino server did not become ready after $((retries * wait_time)) seconds."
-  exit 1
-}
 
