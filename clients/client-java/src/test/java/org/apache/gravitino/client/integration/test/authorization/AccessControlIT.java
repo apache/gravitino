@@ -489,7 +489,18 @@ public class AccessControlIT extends BaseIT {
             metalake.grantPrivilegesToRole(
                 roleName,
                 duplicatedCatalog,
-                Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.SelectTable.deny())));
+                Lists.newArrayList(Privileges.ReadFileset.allow(), Privileges.ReadFileset.deny())));
+
+    // repeat to grant a privilege
+    metalake.grantPrivilegesToRole(
+        roleName, duplicatedCatalog, Lists.newArrayList(Privileges.ReadFileset.allow()));
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                roleName, duplicatedCatalog, Lists.newArrayList(Privileges.ReadFileset.deny())));
+    metalake.revokePrivilegesFromRole(
+        roleName, duplicatedCatalog, Lists.newArrayList(Privileges.ReadFileset.allow()));
 
     // repeat to grant a privilege
     role =

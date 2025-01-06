@@ -489,7 +489,7 @@ class PermissionManager {
       return targetObject;
     } else {
       updatePrivileges.addAll(privileges);
-      AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
+      AuthorizationUtils.checkDuplicatedNamePrivilege(updatePrivileges);
 
       SecurableObject newSecurableObject =
           SecurableObjects.parse(
@@ -590,6 +590,8 @@ class PermissionManager {
       List<Privilege> privileges,
       RoleEntity roleEntity,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
+    AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
+
     // Add a new securable object if there doesn't exist the object in the role
     SecurableObject securableObject =
         SecurableObjects.parse(object.fullName(), object.type(), Lists.newArrayList(privileges));
