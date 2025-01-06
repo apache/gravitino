@@ -28,9 +28,7 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
@@ -45,10 +43,10 @@ import org.apache.hadoop.fs.s3a.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class S3CredentialProvider implements AWSCredentialsProvider {
+public class S3CredentialsProvider implements AWSCredentialsProvider {
 
-  private static final Logger LOG = LoggerFactory.getLogger(S3CredentialProvider.class);
-  private final GravitinoClient client;
+  private static final Logger LOG = LoggerFactory.getLogger(S3CredentialsProvider.class);
+  private GravitinoClient client;
   private final String filesetIdentifier;
   private final Configuration configuration;
 
@@ -56,11 +54,10 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
-  public S3CredentialProvider(final URI uri, final Configuration conf) {
+  public S3CredentialsProvider(final URI uri, final Configuration conf) {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
     this.configuration = conf;
-    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
   }
 
   @Override
@@ -68,7 +65,13 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
     // Refresh credentials if they are null or about to expire in 5 minutes
     if (basicSessionCredentials == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
-        refresh();
+        try {
+          refresh();
+        } finally {
+          if (null != this.client) {
+            this.client.close();
+          }
+        }
       }
     }
 
@@ -81,14 +84,15 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
+    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    Optional<Credential> optionalCredential = getCredential(credentials);
+    Credential credential = getCredential(credentials);
 
     // Can't find any credential, use the default AKSK if possible.
-    if (!optionalCredential.isPresent()) {
+    if (credential == null) {
       LOG.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
       expirationTime = Long.MAX_VALUE;
       this.basicSessionCredentials =
@@ -97,7 +101,6 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
       return;
     }
 
-    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
 
     String accessKeyId = credentialMap.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
@@ -126,27 +129,22 @@ public class S3CredentialProvider implements AWSCredentialsProvider {
    * uses static credential.
    *
    * @param credentials The credential array.
-   * @return An optional credential.
+   * @return A credential. Null if not found.
    */
-  private Optional<Credential> getCredential(Credential[] credentials) {
+  private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
-    Optional<Credential> dynamicCredential =
-        Arrays.stream(credentials)
-            .filter(
-                credential ->
-                    credential.credentialType().equals(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE))
-            .findFirst();
-    if (dynamicCredential.isPresent()) {
-      return dynamicCredential;
+    for (Credential credential : credentials) {
+      if (credential.credentialType().equals(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)) {
+        return credential;
+      }
     }
 
     // If dynamic credential not found, use the static one
-    return Arrays.stream(credentials)
-        .filter(
-            credential ->
-                credential
-                    .credentialType()
-                    .equals(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE))
-        .findFirst();
+    for (Credential credential : credentials) {
+      if (credential.credentialType().equals(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE)) {
+        return credential;
+      }
+    }
+    return null;
   }
 }

@@ -25,9 +25,7 @@ import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITIN
 import static org.apache.gravitino.credential.AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
@@ -42,9 +40,9 @@ import org.apache.hadoop.fs.azurebfs.extensions.SASTokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AzureSasCredentialProvider implements SASTokenProvider, Configurable {
+public class AzureSasCredentialsProvider implements SASTokenProvider, Configurable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AzureSasCredentialProvider.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AzureSasCredentialsProvider.class);
 
   private Configuration configuration;
 
@@ -82,7 +80,7 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
   public void initialize(Configuration conf, String accountName) throws IOException {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
+    this.configuration = conf;
   }
 
   @Override
@@ -90,7 +88,13 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
     // Refresh credentials if they are null or about to expire in 5 minutes
     if (sasToken == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
-        refresh();
+        try {
+          refresh();
+        } finally {
+          if (null != this.client) {
+            this.client.close();
+          }
+        }
       }
     }
     return sasToken;
@@ -100,20 +104,19 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
+    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
 
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    Optional<Credential> optionalCredential = getCredential(credentials);
+    Credential credential = getCredential(credentials);
 
-    if (!optionalCredential.isPresent()) {
+    if (credential == null) {
       LOGGER.warn("No credentials found for fileset {}", filesetIdentifier);
       return;
     }
 
-    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
-
     if (ADLS_TOKEN_CREDENTIAL_TYPE.equals(credentialMap.get(Credential.CREDENTIAL_TYPE))) {
       sasToken = credentialMap.get(GRAVITINO_ADLS_SAS_TOKEN);
     } else {
@@ -135,25 +138,25 @@ public class AzureSasCredentialProvider implements SASTokenProvider, Configurabl
    * uses static credential.
    *
    * @param credentials The credential array.
-   * @return An optional credential.
+   * @return A credential. Null if not found.
    */
-  private Optional<Credential> getCredential(Credential[] credentials) {
+  private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
-    Optional<Credential> dynamicCredential =
-        Arrays.stream(credentials)
-            .filter(credential -> credential.credentialType().equals(ADLS_TOKEN_CREDENTIAL_TYPE))
-            .findFirst();
-    if (dynamicCredential.isPresent()) {
-      return dynamicCredential;
+    for (Credential credential : credentials) {
+      if (credential.credentialType().equals(ADLS_TOKEN_CREDENTIAL_TYPE)) {
+        return credential;
+      }
     }
 
     // If dynamic credential not found, use the static one
-    return Arrays.stream(credentials)
-        .filter(
-            credential ->
-                credential
-                    .credentialType()
-                    .equals(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE))
-        .findFirst();
+    for (Credential credential : credentials) {
+      if (credential
+          .credentialType()
+          .equals(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE)) {
+        return credential;
+      }
+    }
+
+    return null;
   }
 }

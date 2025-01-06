@@ -63,7 +63,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
 
     if (shouldSetCredentialsProviderExplicitly(config)) {
       hadoopConfMap.put(
-          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialProvider.class.getCanonicalName());
+          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialsProvider.class.getCanonicalName());
     }
 
     hadoopConfMap.forEach(configuration::set);
