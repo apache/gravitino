@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
@@ -108,25 +109,21 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     }
 
     PathBasedMetadataObject that = (PathBasedMetadataObject) o;
-    return java.util.Objects.equals(name, that.name)
-        && java.util.Objects.equals(parent, that.parent)
-        && java.util.Objects.equals(path, that.path)
+    return Objects.equals(name, that.name)
+        && Objects.equals(parent, that.parent)
+        && Objects.equals(path, that.path)
         && type == that.type;
   }
 
   @Override
   public int hashCode() {
-    return java.util.Objects.hash(name, parent, path, type);
+    return Objects.hash(name, parent, path, type);
   }
 
   @Override
   public String toString() {
-    return "MetadataObject: [fullName="
-        + fullName()
-        + "],  [path="
-        + path
-        + "], [type="
-        + type
-        + "]";
+    return "MetadataObject: [fullName=" + fullName() + "],  [path=" + path == null
+        ? "null"
+        : path + "], [type=" + type + "]";
   }
 }

@@ -323,21 +323,30 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         authzMetadataObject.names().size() == 1, "The metadata object names must be 1");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Remove all schema in this catalog
-      NameIdentifier[] catalogs =
-          GravitinoEnv.getInstance().catalogDispatcher().listCatalogs(Namespace.of(metalake));
-      Arrays.asList(catalogs).stream()
+      String catalogName = authzMetadataObject.names().get(0);
+      NameIdentifier[] schemas =
+          GravitinoEnv.getInstance()
+              .schemaDispatcher()
+              .listSchemas(Namespace.of(metalake, catalogName));
+      Arrays.asList(schemas).stream()
           .forEach(
-              catalog -> {
-                List<String> catalogLocations =
+              schema -> {
+                List<String> schemaLocations =
                     AuthorizationUtils.getMetadataObjectLocation(
-                        NameIdentifier.of(catalog.name()), Entity.EntityType.CATALOG);
-                catalogLocations.stream()
+                        NameIdentifier.of(metalake, catalogName, schema.name()),
+                        Entity.EntityType.SCHEMA);
+                schemaLocations.stream()
                     .forEach(
                         locationPath -> {
-                          AuthorizationMetadataObject catalogMetadataObject =
+                          List<String> names =
+                              ImmutableList.of(metalake, catalogName, schema.name());
+                          AuthorizationMetadataObject schemaMetadataObject =
                               new PathBasedMetadataObject(
-                                  metalake, catalog.name(), locationPath, PATH);
-                          doRemoveSchemaMetadataObject(catalogMetadataObject);
+                                  AuthorizationMetadataObject.getParentFullName(names),
+                                  AuthorizationMetadataObject.getLastName(names),
+                                  locationPath,
+                                  PATH);
+                          doRemoveSchemaMetadataObject(schemaMetadataObject);
                         });
               });
     } else {
