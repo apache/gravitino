@@ -27,6 +27,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -905,7 +907,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     MetadataObject catalogObject =
         MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
     metalake.revokePrivilegesFromRole(
-        roleName, catalogObject, Lists.newArrayList(Privileges.CreateSchema.allow()));
+        roleName, catalogObject, Sets.newHashSet(Privileges.CreateSchema.allow()));
     waitForUpdatingPolicies();
 
     // Use Spark to show this databases(schema)
@@ -920,7 +922,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     MetadataObject schemaObject =
         MetadataObjects.of(catalogName, schemaName, MetadataObject.Type.SCHEMA);
     metalake.grantPrivilegesToRole(
-        roleName, schemaObject, Lists.newArrayList(Privileges.UseSchema.allow()));
+        roleName, schemaObject, Sets.newHashSet(Privileges.UseSchema.allow()));
     waitForUpdatingPolicies();
 
     // Use Spark to show this databases(schema) again
@@ -1020,7 +1022,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.grantPrivilegesToRole(
         roleName,
         MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE),
-        Lists.newArrayList(Privileges.CreateSchema.allow()));
+        Sets.newHashSet(Privileges.CreateSchema.allow()));
 
     // Fail to create a schema
     Assertions.assertThrows(

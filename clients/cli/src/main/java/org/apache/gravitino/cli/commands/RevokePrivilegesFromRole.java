@@ -21,6 +21,8 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import com.google.common.collect.Sets;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -85,7 +87,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
       }
 
       MetadataObject metadataObject = constructMetadataObject(entity, client);
-      client.revokePrivilegesFromRole(role, metadataObject, privilegesList);
+      client.revokePrivilegesFromRole(role, metadataObject, Sets.newHashSet(privilegesList));
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;

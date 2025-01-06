@@ -34,6 +34,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import com.google.common.collect.Sets;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
@@ -262,7 +264,7 @@ public class RangerFilesetIT extends BaseIT {
             String.format("%s.%s", catalogName, schemaName),
             fileset.name(),
             MetadataObject.Type.FILESET),
-        Lists.newArrayList(Privileges.WriteFileset.allow()));
+        Sets.newHashSet(Privileges.WriteFileset.allow()));
 
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
     Assertions.assertEquals(1, policies.size());
@@ -320,7 +322,7 @@ public class RangerFilesetIT extends BaseIT {
             String.format("%s.%s", catalogName, schemaName),
             fileset.name(),
             MetadataObject.Type.FILESET),
-        Lists.newArrayList(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
+            Sets.newHashSet(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
     Assertions.assertEquals(1, policies.size());
     Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
@@ -460,7 +462,7 @@ public class RangerFilesetIT extends BaseIT {
             fileset.name(),
             MetadataObject.Type.FILESET);
     metalake.grantPrivilegesToRole(
-        filesetRole, filesetObject, Lists.newArrayList(Privileges.WriteFileset.allow()));
+        filesetRole, filesetObject, Sets.newHashSet(Privileges.WriteFileset.allow()));
     RangerBaseE2EIT.waitForUpdatingPolicies();
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
         .doAs(
@@ -488,7 +490,7 @@ public class RangerFilesetIT extends BaseIT {
     metalake.revokePrivilegesFromRole(
         filesetRole,
         filesetObject,
-        Lists.newArrayList(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
+        Sets.newHashSet(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
     RangerBaseE2EIT.waitForUpdatingPolicies();
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
         .doAs(
