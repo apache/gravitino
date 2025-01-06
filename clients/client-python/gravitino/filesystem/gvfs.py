@@ -894,6 +894,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         finally:
             write_lock.release()
 
+    def _file_system_is_not_expired(self, expire_time: int):
+        return expire_time > time.time() * 1000
+
     # Disable Too many branches (13/12) (too-many-branches)
     # pylint: disable=R0912
     def _get_filesystem(
@@ -910,8 +913,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 name_identifier
             )
             if cache_value is not None:
-                # if the cache value is not expired, return the cache value
-                if cache_value[0] > time.time() * 1000:
+                if self._file_system_is_not_expired(cache_value[0]):
                     return cache_value[1]
         finally:
             read_lock.release()
@@ -924,8 +926,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
 
             if cache_value is not None:
-                # if the cache value is not expired, return the cache value
-                if cache_value[0] > time.time() * 1000:
+                if self._file_system_is_not_expired(cache_value[0]):
                     return cache_value[1]
 
             new_cache_value: Tuple[int, AbstractFileSystem]
