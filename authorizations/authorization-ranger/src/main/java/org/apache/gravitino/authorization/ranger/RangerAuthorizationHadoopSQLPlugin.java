@@ -324,7 +324,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
       doRemoveSchemaMetadataObject(authzMetadataObject);
     } else if (type.equals(TABLE)) {
       doRemoveTableMetadataObject(authzMetadataObject);
-    } else if (type.equals(COLUMN) || type.equals(PATH)) {
+    } else if (type.equals(COLUMN)) {
       removePolicyByMetadataObject(authzMetadataObject);
     } else {
       throw new IllegalArgumentException(

@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -74,7 +73,6 @@ public class AuthorizationUtils {
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
-  private static final Pattern HDFS_PATTERN = Pattern.compile("^hdfs://[^/]*");
 
   private AuthorizationUtils() {}
 
@@ -398,7 +396,6 @@ public class AuthorizationUtils {
           {
             NameIdentifier[] identifiers =
                 GravitinoEnv.getInstance().catalogDispatcher().listCatalogs(Namespace.of(metalake));
-            List<String> finalLocationPath = locations;
             Arrays.stream(identifiers)
                 .collect(Collectors.toList())
                 .forEach(
@@ -420,9 +417,7 @@ public class AuthorizationUtils {
                           Preconditions.checkArgument(
                               defaultSchemaLocation != null,
                               String.format("Catalog %s location is not found", ident));
-                          String location =
-                              HDFS_PATTERN.matcher(defaultSchemaLocation).replaceAll("");
-                          finalLocationPath.add(location);
+                          locations.add(defaultSchemaLocation);
                         }
                       }
                     });
@@ -443,8 +438,7 @@ public class AuthorizationUtils {
                 Preconditions.checkArgument(
                     defaultSchemaLocation != null,
                     String.format("Catalog %s location is not found", ident));
-                String location = HDFS_PATTERN.matcher(defaultSchemaLocation).replaceAll("");
-                locations.add(location);
+                locations.add(defaultSchemaLocation);
               }
             }
           }
@@ -456,8 +450,7 @@ public class AuthorizationUtils {
               String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
               Preconditions.checkArgument(
                   schemaLocation != null, String.format("Schema %s location is not found", ident));
-              String location = HDFS_PATTERN.matcher(schemaLocation).replaceAll("");
-              locations.add(location);
+              locations.add(schemaLocation);
             }
           }
           break;
@@ -468,8 +461,7 @@ public class AuthorizationUtils {
               String schemaLocation = table.properties().get(HiveConstants.LOCATION);
               Preconditions.checkArgument(
                   schemaLocation != null, String.format("Table %s location is not found", ident));
-              String location = HDFS_PATTERN.matcher(schemaLocation).replaceAll("");
-              locations.add(location);
+              locations.add(schemaLocation);
             }
           }
           break;
@@ -483,7 +475,7 @@ public class AuthorizationUtils {
           Preconditions.checkArgument(
               filesetLocation != null,
               String.format("Fileset %s location is not found", identifier));
-          locations.add(HDFS_PATTERN.matcher(filesetLocation).replaceAll(""));
+          locations.add(filesetLocation);
           break;
         case TOPIC:
           break;

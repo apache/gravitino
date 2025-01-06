@@ -231,11 +231,7 @@ public class CatalogHiveIT extends BaseIT {
       Arrays.stream(metalake.listCatalogs())
           .forEach(
               catalogName -> {
-                try {
-                  metalake.dropCatalog(catalogName, true);
-                } catch (Exception e) {
-                  // Ignore exception
-                }
+                metalake.dropCatalog(catalogName, true);
               });
       client.dropMetalake(metalakeName, true);
     }

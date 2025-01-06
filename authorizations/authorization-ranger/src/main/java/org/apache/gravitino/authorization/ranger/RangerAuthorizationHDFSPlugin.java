@@ -27,7 +27,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -36,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -64,6 +64,7 @@ import org.slf4j.LoggerFactory;
 
 public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHDFSPlugin.class);
+  private static final Pattern HDFS_PATTERN = Pattern.compile("^hdfs://[^/]*");
 
   public RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
@@ -127,6 +128,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     return ImmutableList.of(RangerDefines.PolicyResource.PATH.getName());
   }
 
+  String getAuthorizationPath(PathBasedMetadataObject pathBasedMetadataObject) {
+    return HDFS_PATTERN.matcher(pathBasedMetadataObject.path()).replaceAll("");
+  }
+
   /**
    * Find the managed policy for the ranger securable object.
    *
@@ -148,7 +153,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           (PathBasedMetadataObject) authzMetadataObject;
       Map<String, String> preciseFilters = new HashMap<>();
       for (int i = 0; i < nsMetadataObj.size() && i < policyResourceDefinesRule().size(); i++) {
-        preciseFilters.put(policyResourceDefinesRule().get(i), pathAuthzMetadataObject.path());
+        preciseFilters.put(
+            policyResourceDefinesRule().get(i), getAuthorizationPath(pathAuthzMetadataObject));
       }
       policies =
           policies.stream()
@@ -197,7 +203,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         .forEach(
             resourceDefine -> {
               searchFilters.put(
-                  SearchFilter.RESOURCE_PREFIX + resourceDefine, pathBasedMetadataObject.path());
+                  SearchFilter.RESOURCE_PREFIX + resourceDefine,
+                  getAuthorizationPath(pathBasedMetadataObject));
             });
     try {
       return rangerClient.findPolicies(searchFilters);
@@ -216,68 +223,16 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   protected void doRenameMetadataObject(
       AuthorizationMetadataObject authzMetadataObject,
       AuthorizationMetadataObject newAuthzMetadataObject) {
-    List<Map<String, String>> mappingOldAndNewMetadata;
-    if (newAuthzMetadataObject.type().equals(SCHEMA)) {
-      mappingOldAndNewMetadata =
-          ImmutableList.of(
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
-              ImmutableMap.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
-              ImmutableMap.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL));
-    } else if (newAuthzMetadataObject.type().equals(TABLE)) {
-      mappingOldAndNewMetadata =
-          ImmutableList.of(
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(1), newAuthzMetadataObject.names().get(1)),
-              ImmutableMap.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL));
-    } else if (newAuthzMetadataObject.type().equals(COLUMN)) {
-      mappingOldAndNewMetadata =
-          ImmutableList.of(
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(1), newAuthzMetadataObject.names().get(1)),
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(2), newAuthzMetadataObject.names().get(2)));
-    } else if (newAuthzMetadataObject.type().equals(PATH)) {
-      // do nothing when fileset is renamed
-      return;
-    } else {
-      throw new IllegalArgumentException(
-          "Unsupported metadata object type: " + authzMetadataObject.type());
-    }
-
-    List<String> oldMetadataNames = new ArrayList<>();
-    List<String> newMetadataNames = new ArrayList<>();
-    for (int index = 0; index < mappingOldAndNewMetadata.size(); index++) {
-      oldMetadataNames.add(mappingOldAndNewMetadata.get(index).keySet().stream().findFirst().get());
-      newMetadataNames.add(mappingOldAndNewMetadata.get(index).values().stream().findFirst().get());
-
-      AuthorizationMetadataObject.Type type;
-      if (index == 0) {
-        type = RangerHadoopSQLMetadataObject.Type.SCHEMA;
-      } else if (index == 1) {
-        type = RangerHadoopSQLMetadataObject.Type.TABLE;
-      } else {
-        type = RangerHadoopSQLMetadataObject.Type.COLUMN;
-      }
-      AuthorizationMetadataObject oldHadoopSQLMetadataObject =
-          new RangerHadoopSQLMetadataObject(
-              AuthorizationMetadataObject.getParentFullName(oldMetadataNames),
-              AuthorizationMetadataObject.getLastName(oldMetadataNames),
-              type);
-      AuthorizationMetadataObject newHadoopSQLMetadataObject =
-          new RangerHadoopSQLMetadataObject(
-              AuthorizationMetadataObject.getParentFullName(newMetadataNames),
-              AuthorizationMetadataObject.getLastName(newMetadataNames),
-              type);
-      updatePolicyByMetadataObject(
-          newAuthzMetadataObject.type().metadataObjectType(),
-          oldHadoopSQLMetadataObject,
-          newHadoopSQLMetadataObject);
-    }
+    Preconditions.checkArgument(
+        authzMetadataObject instanceof PathBasedMetadataObject,
+        "The metadata object must be a PathBasedMetadataObject");
+    Preconditions.checkArgument(
+        newAuthzMetadataObject instanceof PathBasedMetadataObject,
+        "The metadata object must be a PathBasedMetadataObject");
+    updatePolicyByMetadataObject(
+        newAuthzMetadataObject.type().metadataObjectType(),
+        authzMetadataObject,
+        newAuthzMetadataObject);
   }
 
   @Override
@@ -285,6 +240,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       MetadataObject.Type operationType,
       AuthorizationMetadataObject oldAuthzMetaobject,
       AuthorizationMetadataObject newAuthzMetaobject) {
+    PathBasedMetadataObject newPathBasedMetadataObject =
+        (PathBasedMetadataObject) newAuthzMetaobject;
     List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaobject);
     List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaobject);
     if (oldPolicies.isEmpty()) {
@@ -294,43 +251,19 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     if (!existNewPolicies.isEmpty()) {
       LOG.warn("The Ranger policy for the metadata object({}) already exists!", newAuthzMetaobject);
     }
-    Map<MetadataObject.Type, Integer> operationTypeIndex =
-        ImmutableMap.of(
-            MetadataObject.Type.SCHEMA, 0,
-            MetadataObject.Type.TABLE, 1,
-            MetadataObject.Type.COLUMN, 2);
     oldPolicies.stream()
         .forEach(
             policy -> {
               try {
-                String policyName = policy.getName();
-                int index = operationTypeIndex.get(operationType);
-
                 // Update the policy name is following Gravitino's spec
-                if (policy
-                    .getName()
-                    .equals(
-                        AuthorizationSecurableObject.DOT_JOINER.join(oldAuthzMetaobject.names()))) {
-                  List<String> policyNames =
-                      Lists.newArrayList(
-                          AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
-                  Preconditions.checkArgument(
-                      policyNames.size() >= oldAuthzMetaobject.names().size(),
-                      String.format("The policy name(%s) is invalid!", policyName));
-                  if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
-                    // Doesn't need to rename the policy `*`
-                    return;
-                  }
-                  policyNames.set(index, newAuthzMetaobject.names().get(index));
-                  policy.setName(AuthorizationSecurableObject.DOT_JOINER.join(policyNames));
-                }
+                policy.setName(getAuthorizationPath(newPathBasedMetadataObject));
                 // Update the policy resource name to new name
                 policy
                     .getResources()
                     .put(
-                        rangerHelper.policyResourceDefines.get(index),
+                        rangerHelper.policyResourceDefines.get(0),
                         new RangerPolicy.RangerPolicyResource(
-                            newAuthzMetaobject.names().get(index)));
+                            getAuthorizationPath(newPathBasedMetadataObject)));
 
                 boolean alreadyExist =
                     existNewPolicies.stream()
@@ -367,7 +300,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       doRemoveSchemaMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.type().equals(TABLE)) {
       doRemoveTableMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(PATH)) {
+    } else if (authzMetadataObject.type().equals(COLUMN)
+        || authzMetadataObject.type().equals(PATH)) {
       removePolicyByMetadataObject(authzMetadataObject);
     } else {
       throw new IllegalArgumentException(
@@ -471,9 +405,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     PathBasedMetadataObject pathBasedMetadataObject = (PathBasedMetadataObject) metadataObject;
     RangerPolicy policy = new RangerPolicy();
     policy.setService(rangerServiceName);
-    policy.setName(pathBasedMetadataObject.path());
+    policy.setName(getAuthorizationPath(pathBasedMetadataObject));
     RangerPolicy.RangerPolicyResource policyResource =
-        new RangerPolicy.RangerPolicyResource(pathBasedMetadataObject.path(), false, true);
+        new RangerPolicy.RangerPolicyResource(
+            getAuthorizationPath(pathBasedMetadataObject), false, true);
     policy.getResources().put(RangerDefines.PolicyResource.PATH.getName(), policyResource);
     return policy;
   }
@@ -569,7 +504,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               });
                       break;
                     default:
-                      checkOmissionTranslate(
+                      checkUnprocessedTranslate(
                           Privileges.UseSchema.allow(),
                           securableObject.type(),
                           gravitinoPrivilege.name());
@@ -600,7 +535,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               });
                       break;
                     default:
-                      checkOmissionTranslate(
+                      checkUnprocessedTranslate(
                           Privileges.CreateSchema.allow(),
                           securableObject.type(),
                           gravitinoPrivilege.name());
@@ -633,7 +568,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                 rangerSecurableObjects.add(
                                     generateAuthorizationSecurableObject(
                                         pathBasedMetadataObject.names(),
-                                        pathBasedMetadataObject.path(),
+                                        getAuthorizationPath(pathBasedMetadataObject),
                                         PathBasedMetadataObject.Type.PATH,
                                         rangerPrivileges));
                               });
@@ -654,7 +589,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     return rangerSecurableObjects;
   }
 
-  private void checkOmissionTranslate(
+  private void checkUnprocessedTranslate(
       Privileges.GenericPrivilege<?> privilege,
       MetadataObject.Type gravitinoType,
       Privilege.Name gravitinoPrivilege) {
@@ -685,7 +620,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   rangerSecurableObjects.add(
                       generateAuthorizationSecurableObject(
                           pathBasedMetadataObject.names(),
-                          pathBasedMetadataObject.path(),
+                          getAuthorizationPath(pathBasedMetadataObject),
                           PathBasedMetadataObject.Type.PATH,
                           ownerMappingRule()));
                 });
