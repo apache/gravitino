@@ -139,8 +139,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
-    } else if (entity.equals(CommandEntities.MODEL)) {
-      handleModelCommand();
     } else if (entity.equals(CommandEntities.TOPIC)) {
       handleTopicCommand();
     } else if (entity.equals(CommandEntities.FILESET)) {
