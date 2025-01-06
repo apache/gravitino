@@ -48,7 +48,8 @@ include(
   "clients:filesystem-hadoop3",
   "clients:filesystem-hadoop3-runtime",
   "clients:client-python",
-  "clients:cli"
+  "clients:cli",
+  "clients:filesystem-hadoop3-common"
 )
 if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
   include("clients:filesystem-fuse")

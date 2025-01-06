@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.filesystem.hadoop;
+package org.apache.gravitino.filesystem.common;
 
 /** Configuration class for Gravitino Virtual File System. */
 public class GravitinoVirtualFileSystemConfiguration {

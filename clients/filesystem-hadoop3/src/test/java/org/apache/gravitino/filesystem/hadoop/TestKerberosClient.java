@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.server.authentication.KerberosAuthenticator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;

@@ -28,43 +28,45 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoS3CredentialProvider implements AWSCredentialsProvider {
+public class S3CredentialProvider implements AWSCredentialsProvider {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GravitinoS3CredentialProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(S3CredentialProvider.class);
   private final GravitinoClient client;
   private final String filesetIdentifier;
   private final Configuration configuration;
 
   private AWSCredentials basicSessionCredentials;
-  private long expirationTime;
+  private long expirationTime = Long.MAX_VALUE;
+  private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
-  public GravitinoS3CredentialProvider(final URI uri, final Configuration conf) {
+  public S3CredentialProvider(final URI uri, final Configuration conf) {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
     this.configuration = conf;
-    GravitinoVirtualFileSystem gravitinoVirtualFileSystem = new GravitinoVirtualFileSystem();
-    this.client = gravitinoVirtualFileSystem.initializeClient(conf);
+    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
   }
 
   @Override
   public AWSCredentials getCredentials() {
     // Refresh credentials if they are null or about to expire in 5 minutes
-    if (basicSessionCredentials == null
-        || System.currentTimeMillis() > expirationTime - 5 * 60 * 1000) {
+    if (basicSessionCredentials == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
         refresh();
       }
@@ -83,10 +85,11 @@ public class GravitinoS3CredentialProvider implements AWSCredentialsProvider {
 
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
+    Optional<Credential> optionalCredential = getCredential(credentials);
 
     // Can't find any credential, use the default AKSK if possible.
-    if (credentials.length == 0) {
-      LOGGER.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
+    if (!optionalCredential.isPresent()) {
+      LOG.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
       expirationTime = Long.MAX_VALUE;
       this.basicSessionCredentials =
           new BasicAWSCredentials(
@@ -94,7 +97,7 @@ public class GravitinoS3CredentialProvider implements AWSCredentialsProvider {
       return;
     }
 
-    Credential credential = getCredential(credentials);
+    Credential credential = optionalCredential.get();
     Map<String, String> credentialMap = credential.toProperties();
 
     String accessKeyId = credentialMap.get(GRAVITINO_S3_SESSION_ACCESS_KEY_ID);
@@ -103,15 +106,18 @@ public class GravitinoS3CredentialProvider implements AWSCredentialsProvider {
     if (S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE.equals(
         credentialMap.get(Credential.CREDENTIAL_TYPE))) {
       String sessionToken = credentialMap.get(GRAVITINO_S3_TOKEN);
-      this.basicSessionCredentials =
+      basicSessionCredentials =
           new BasicSessionCredentials(accessKeyId, secretAccessKey, sessionToken);
     } else {
-      this.basicSessionCredentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+      basicSessionCredentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
     }
 
-    this.expirationTime = credential.expireTimeInMs();
-    if (expirationTime <= 0) {
-      expirationTime = Long.MAX_VALUE;
+    if (credential.expireTimeInMs() > 0) {
+      expirationTime =
+          System.currentTimeMillis()
+              + (long)
+                  ((credential.expireTimeInMs() - System.currentTimeMillis())
+                      * EXPIRATION_TIME_FACTOR);
     }
   }
 
@@ -120,16 +126,27 @@ public class GravitinoS3CredentialProvider implements AWSCredentialsProvider {
    * uses static credential.
    *
    * @param credentials The credential array.
-   * @return The credential.
+   * @return An optional credential.
    */
-  private Credential getCredential(Credential[] credentials) {
-    for (Credential credential : credentials) {
-      if (S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE.equals(credential.credentialType())) {
-        return credential;
-      }
+  private Optional<Credential> getCredential(Credential[] credentials) {
+    // Use dynamic credential if found.
+    Optional<Credential> dynamicCredential =
+        Arrays.stream(credentials)
+            .filter(
+                credential ->
+                    credential.credentialType().equals(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE))
+            .findFirst();
+    if (dynamicCredential.isPresent()) {
+      return dynamicCredential;
     }
 
-    // Not found, use the first one.
-    return credentials[0];
+    // If dynamic credential not found, use the static one
+    return Arrays.stream(credentials)
+        .filter(
+            credential ->
+                credential
+                    .credentialType()
+                    .equals(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE))
+        .findFirst();
   }
 }

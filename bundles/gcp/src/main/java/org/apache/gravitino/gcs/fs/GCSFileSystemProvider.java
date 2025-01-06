@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -47,14 +47,13 @@ public class GCSFileSystemProvider implements FileSystemProvider {
         .forEach(configuration::set);
 
     if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
-      AccessTokenProvider accessTokenProvider = new GravitinoGCSCredentialProvider();
+      AccessTokenProvider accessTokenProvider = new GCSCredentialProvider();
       accessTokenProvider.setConf(configuration);
       // Why is this check necessary?, if Gravitino fails to get any credentials, we fall back to
       // the default behavior of the GoogleHadoopFileSystem to use service account credentials.
       if (accessTokenProvider.getAccessToken() != null) {
         configuration.set(
-            "fs.gs.auth.access.token.provider.impl",
-            GravitinoGCSCredentialProvider.class.getName());
+            "fs.gs.auth.access.token.provider.impl", GCSCredentialProvider.class.getName());
       }
     }
 

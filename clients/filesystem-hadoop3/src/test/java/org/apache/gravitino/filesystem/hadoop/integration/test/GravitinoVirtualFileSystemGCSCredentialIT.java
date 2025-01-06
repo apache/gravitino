@@ -75,7 +75,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put(FILESYSTEM_PROVIDERS, "gcs");
-    properties.put(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
     properties.put("gcs-credential-file-path", SERVICE_ACCOUNT_FILE);
     properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, "gcs-token");
 
@@ -94,7 +94,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    conf.set(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
   }
 
   @AfterAll

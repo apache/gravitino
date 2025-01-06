@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -65,8 +65,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
         && config.containsKey(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       hadoopConfMap.put(
-          Constants.CREDENTIALS_PROVIDER_KEY,
-          GravitinoOSSCredentialProvider.class.getCanonicalName());
+          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialProvider.class.getCanonicalName());
     }
 
     hadoopConfMap.forEach(configuration::set);

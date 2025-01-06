@@ -30,7 +30,7 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -78,10 +78,9 @@ public class AzureFileSystemProvider implements FileSystemProvider {
     if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
       // Test whether SAS works
       try {
-        GravitinoAzureSasCredentialProvider gravitinoAzureSasCredentialProvider =
-            new GravitinoAzureSasCredentialProvider();
-        gravitinoAzureSasCredentialProvider.initialize(configuration, null);
-        String sas = gravitinoAzureSasCredentialProvider.getSASToken(null, null, null, null);
+        AzureSasCredentialProvider azureSasCredentialProvider = new AzureSasCredentialProvider();
+        azureSasCredentialProvider.initialize(configuration, null);
+        String sas = azureSasCredentialProvider.getSASToken(null, null, null, null);
         if (sas != null) {
           String accountName =
               String.format(
@@ -92,15 +91,15 @@ public class AzureFileSystemProvider implements FileSystemProvider {
               FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
           configuration.set(
               FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
-              GravitinoAzureSasCredentialProvider.class.getName());
+              AzureSasCredentialProvider.class.getName());
           configuration.set(FS_AZURE_ACCOUNT_IS_HNS_ENABLED, "true");
-        } else if (gravitinoAzureSasCredentialProvider.getAzureStorageAccountKey() != null
-            && gravitinoAzureSasCredentialProvider.getAzureStorageAccountName() != null) {
+        } else if (azureSasCredentialProvider.getAzureStorageAccountKey() != null
+            && azureSasCredentialProvider.getAzureStorageAccountName() != null) {
           configuration.set(
               String.format(
                   "fs.azure.account.key.%s.dfs.core.windows.net",
-                  gravitinoAzureSasCredentialProvider.getAzureStorageAccountName()),
-              gravitinoAzureSasCredentialProvider.getAzureStorageAccountKey());
+                  azureSasCredentialProvider.getAzureStorageAccountName()),
+              azureSasCredentialProvider.getAzureStorageAccountKey());
         }
       } catch (Exception e) {
         // Can't use SAS, use account key and account key instead
