@@ -129,14 +129,14 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
   private Credential getCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
-      if (credential.credentialType().equals(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)) {
+      if (credential instanceof S3TokenCredential) {
         return credential;
       }
     }
 
     // If dynamic credential not found, use the static one
     for (Credential credential : credentials) {
-      if (credential.credentialType().equals(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE)) {
+      if (credential instanceof S3SecretKeyCredential) {
         return credential;
       }
     }
