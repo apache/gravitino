@@ -87,4 +87,10 @@ public class RemoveTopicProperty extends Command {
 
     System.out.println(property + " property removed.");
   }
+
+  @Override
+  public Command validate() {
+    validateProperty(property);
+    return super.validate();
+  }
 }

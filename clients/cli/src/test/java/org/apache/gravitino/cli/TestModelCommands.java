@@ -94,6 +94,7 @@ public class TestModelCommands {
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"));
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -121,7 +122,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Arrays.asList(CommandEntities.CATALOG, CommandEntities.SCHEMA)),
         output);
   }
@@ -150,7 +151,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Collections.singletonList(CommandEntities.SCHEMA)),
         output);
   }
@@ -176,6 +177,7 @@ public class TestModelCommands {
             eq("catalog"),
             eq("schema"),
             eq("model"));
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -205,7 +207,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(
                 Arrays.asList(
                     CommandEntities.CATALOG, CommandEntities.SCHEMA, CommandEntities.MODEL)),
@@ -238,7 +240,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.MODEL)),
         output);
   }
@@ -269,7 +271,7 @@ public class TestModelCommands {
     assertEquals(
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Collections.singletonList(CommandEntities.MODEL)),
         output);
   }
@@ -291,6 +293,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newModelAudit(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "model");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -320,6 +323,7 @@ public class TestModelCommands {
             eq("model"),
             isNull(),
             argThat(Map::isEmpty));
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -349,6 +353,7 @@ public class TestModelCommands {
             eq("model"),
             eq("comment"),
             argThat(Map::isEmpty));
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -384,6 +389,7 @@ public class TestModelCommands {
                     argument.size() == 2
                         && argument.containsKey("key1")
                         && argument.get("key1").equals("val1")));
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -420,6 +426,7 @@ public class TestModelCommands {
                     argument.size() == 2
                         && argument.containsKey("key1")
                         && argument.get("key1").equals("val1")));
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -446,6 +453,7 @@ public class TestModelCommands {
             "catalog",
             "schema",
             "model");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -478,6 +486,7 @@ public class TestModelCommands {
             isNull(),
             isNull(),
             argThat(Map::isEmpty));
+    doReturn(linkModelMock).when(linkModelMock).validate();
     commandLine.handleCommandLine();
     verify(linkModelMock).handle();
   }
@@ -516,6 +525,7 @@ public class TestModelCommands {
                         && "aliasB".equals(argument[1])),
             isNull(),
             argThat(Map::isEmpty));
+    doReturn(linkModelMock).when(linkModelMock).validate();
     commandLine.handleCommandLine();
     verify(linkModelMock).handle();
   }
@@ -523,30 +533,23 @@ public class TestModelCommands {
   @Test
   void testLinkModelCommandWithoutURI() {
     Main.useExit = false;
-    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
-    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
-    when(mockCommandLine.hasOption(GravitinoOptions.URI)).thenReturn(false);
-    when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(false);
-    GravitinoCommandLine commandLine =
-        spy(
-            new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
 
-    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
-    verify(commandLine, never())
-        .newLinkModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("model"),
-            isNull(),
-            isNull(),
-            isNull(),
-            argThat(Map::isEmpty));
+    LinkModel spyLinkModel =
+        spy(
+            new LinkModel(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "model",
+                null,
+                new String[] {"aliasA", "aliasB"},
+                "comment",
+                Collections.EMPTY_MAP));
+
+    assertThrows(RuntimeException.class, spyLinkModel::validate);
+    verify(spyLinkModel, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(ErrorMessages.MISSING_URI, output);
   }
@@ -596,6 +599,7 @@ public class TestModelCommands {
                         && argument.containsKey("key2")
                         && "val1".equals(argument.get("key1"))
                         && "val2".equals(argument.get("key2"))));
+    doReturn(linkModelMock).when(linkModelMock).validate();
     commandLine.handleCommandLine();
     verify(linkModelMock).handle();
   }

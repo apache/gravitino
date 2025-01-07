@@ -204,7 +204,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
     BaseResponse resp =
         restClient.post(
-            formatModelVersionRequestPath(modelFullIdent),
+            formatModelVersionRequestPath(modelFullIdent) + "/versions",
             req,
             BaseResponse.class,
             Collections.emptyMap(),

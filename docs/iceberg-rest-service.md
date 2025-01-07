@@ -441,7 +441,7 @@ SELECT * FROM dml.test;
 You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
-docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
+docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.8.0-incubating
 ```
 
 Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
@@ -464,6 +464,12 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_AZURE_TENANT_ID`            | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
 | `GRAVITINO_AZURE_CLIENT_ID`            | `gravitino.iceberg-rest.azure-client-id`            | 0.8.0-incubating |
 | `GRAVITINO_AZURE_CLIENT_SECRET`        | `gravitino.iceberg-rest.azure-client-secret`        | 0.8.0-incubating |
+| `GRAVITINO_OSS_ACCESS_KEY`             | `gravitino.iceberg-rest.oss-access-key-id`          | 0.8.0-incubating |
+| `GRAVITINO_OSS_SECRET_KEY`             | `gravitino.iceberg-rest.oss-secret-access-key`      | 0.8.0-incubating |
+| `GRAVITINO_OSS_ENDPOINT`               | `gravitino.iceberg-rest.oss-endpoint`               | 0.8.0-incubating |
+| `GRAVITINO_OSS_REGION`                 | `gravitino.iceberg-rest.oss-region`                 | 0.8.0-incubating |
+| `GRAVITINO_OSS_ROLE_ARN`               | `gravitino.iceberg-rest.oss-role-arn`               | 0.8.0-incubating |
+| `GRAVITINO_OSS_EXTERNAL_ID`            | `gravitino.iceberg-rest.oss-external-id`            | 0.8.0-incubating |
 
 The below environment is deprecated, please use the corresponding configuration items instead.
 

@@ -63,7 +63,7 @@ public class RemoveMetalakeProperty extends Command {
 
   @Override
   public Command validate() {
-    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
-    return this;
+    validateProperty(property);
+    return super.validate();
   }
 }

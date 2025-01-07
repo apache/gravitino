@@ -90,4 +90,10 @@ public class SetTableProperty extends Command {
 
     System.out.println(table + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return super.validate();
+  }
 }

@@ -449,6 +449,6 @@ class TestMetalakeCommands {
         .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", false);
     verify(commandLine, never())
         .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", false);
-    assertTrue(errContent.toString().contains("Unable to enable and disable at the same time"));
+    assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
   }
 }
