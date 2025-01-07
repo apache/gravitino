@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import static org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject.Type.SCHEMA;
-import static org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject.Type.TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -315,7 +312,7 @@ public abstract class RangerAuthorizationPlugin
         authzSecurableObjects.stream()
             .forEach(
                 authzSecurableObject -> {
-                  if (!doRemoveSecurableObject(role.name(), authzSecurableObject)) {
+                  if (!removeSecurableObject(role.name(), authzSecurableObject)) {
                     throw new AuthorizationPluginException(
                         "Failed to add the securable object to the Ranger policy!");
                   }
@@ -343,7 +340,7 @@ public abstract class RangerAuthorizationPlugin
         rangerOldSecurableObjects.stream()
             .forEach(
                 AuthorizationSecurableObject -> {
-                  doRemoveSecurableObject(role.name(), AuthorizationSecurableObject);
+                  removeSecurableObject(role.name(), AuthorizationSecurableObject);
                 });
         rangerNewSecurableObjects.stream()
             .forEach(
@@ -397,14 +394,14 @@ public abstract class RangerAuthorizationPlugin
                 newAuthzMetadataObject.fullName());
             continue;
           }
-          doRenameMetadataObject(oldAuthMetadataObject, newAuthzMetadataObject);
+          renameMetadataObject(oldAuthMetadataObject, newAuthzMetadataObject);
         }
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
         List<AuthorizationMetadataObject> authzMetadataObjects =
             translateMetadataObject(metadataObject);
-        authzMetadataObjects.stream().forEach(this::doRemoveMetadataObject);
+        authzMetadataObjects.stream().forEach(this::removeMetadataObject);
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
@@ -829,7 +826,7 @@ public abstract class RangerAuthorizationPlugin
    * <br>
    * 3. If policy does not contain any policy item, then delete this policy. <br>
    */
-  private boolean doRemoveSecurableObject(
+  private boolean removeSecurableObject(
       String roleName, AuthorizationSecurableObject authzSecurableObject) {
     RangerPolicy policy = findManagedPolicy(authzSecurableObject);
     if (policy == null) {
@@ -920,11 +917,11 @@ public abstract class RangerAuthorizationPlugin
    * <br>
    * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
    */
-  protected abstract void doRenameMetadataObject(
+  protected abstract void renameMetadataObject(
       AuthorizationMetadataObject authzMetadataObject,
       AuthorizationMetadataObject newAuthzMetadataObject);
 
-  protected abstract void doRemoveMetadataObject(AuthorizationMetadataObject authzMetadataObject);
+  protected abstract void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject);
 
   /**
    * Remove the policy by the metadata object names. <br>

@@ -48,7 +48,6 @@ import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
@@ -180,7 +179,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    * <br>
    */
   @Override
-  protected void doRenameMetadataObject(
+  protected void renameMetadataObject(
       AuthorizationMetadataObject authzMetadataObject,
       AuthorizationMetadataObject newAuthzMetadataObject) {
     Preconditions.checkArgument(
@@ -256,7 +255,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    * If remove the PATH, Only need to remove `{path}` <br>
    */
   @Override
-  protected void doRemoveMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+  protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     if (authzMetadataObject.type().equals(SCHEMA)) {
       doRemoveSchemaMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.type().equals(TABLE)) {
@@ -475,10 +474,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               });
                       break;
                     default:
-                      checkUnprocessedTranslate(
-                          Privileges.UseSchema.allow(),
-                          securableObject.type(),
-                          gravitinoPrivilege.name());
+                      throw new AuthorizationPluginException(
+                          "The privilege %s is not supported for the securable object: %s",
+                          gravitinoPrivilege.name(), securableObject.type());
                   }
                   break;
                 case CREATE_SCHEMA:
@@ -506,10 +504,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               });
                       break;
                     default:
-                      checkUnprocessedTranslate(
-                          Privileges.CreateSchema.allow(),
-                          securableObject.type(),
-                          gravitinoPrivilege.name());
+                      throw new AuthorizationPluginException(
+                          "The privilege %s is not supported for the securable object: %s",
+                          gravitinoPrivilege.name(), securableObject.type());
                   }
                   break;
                 case SELECT_TABLE:
@@ -558,17 +555,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             });
 
     return rangerSecurableObjects;
-  }
-
-  private void checkUnprocessedTranslate(
-      Privileges.GenericPrivilege<?> privilege,
-      MetadataObject.Type gravitinoType,
-      Privilege.Name gravitinoPrivilege) {
-    Preconditions.checkArgument(
-        privilege.canBindTo(gravitinoType),
-        "The translate %s privilege for %s is omitted!",
-        gravitinoType,
-        gravitinoPrivilege);
   }
 
   @Override
@@ -666,7 +652,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 newAuthzMetadataObject.fullName());
             continue;
           }
-          doRenameMetadataObject(oldAuthMetadataObject, newAuthzMetadataObject);
+          renameMetadataObject(oldAuthMetadataObject, newAuthzMetadataObject);
         }
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObjectChange.RemoveMetadataObject changeMetadataObject =
@@ -684,7 +670,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   pathBaseMetadataObject.validateAuthorizationMetadataObject();
                   authzMetadataObjects.add(pathBaseMetadataObject);
                 });
-        authzMetadataObjects.forEach(this::doRemoveMetadataObject);
+        authzMetadataObjects.forEach(this::removeMetadataObject);
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "

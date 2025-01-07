@@ -377,6 +377,23 @@ public class AuthorizationUtils {
     }
   }
 
+  // The Hive default schema location is Hive warehouse directory
+  private static String getHiveDefaultLocation(String metalakeName, String catalogName) {
+    NameIdentifier defaultSchemaIdent =
+        NameIdentifier.of(metalakeName, catalogName, "default" /*Hive default schema*/);
+    Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(defaultSchemaIdent);
+    if (schema.properties().containsKey(HiveConstants.LOCATION)) {
+      String defaultSchemaLocation = schema.properties().get(HiveConstants.LOCATION);
+      if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
+        return defaultSchemaLocation;
+      } else {
+        LOG.warn("Schema %s location is not found", defaultSchemaIdent);
+      }
+    }
+
+    return null;
+  }
+
   public static List<String> getMetadataObjectLocation(
       NameIdentifier ident, Entity.EntityType type) {
     List<String> locations = new ArrayList<>();
@@ -403,22 +420,11 @@ public class AuthorizationUtils {
                       Catalog catalogObj =
                           GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(identifier);
                       if (catalogObj.provider().equals("hive")) {
-                        Schema schema =
-                            GravitinoEnv.getInstance()
-                                .schemaDispatcher()
-                                .loadSchema(
-                                    NameIdentifier.of(
-                                        metalake,
-                                        catalogObj.name(),
-                                        "default" /*Hive default schema*/));
-                        if (schema.properties().containsKey(HiveConstants.LOCATION)) {
-                          String defaultSchemaLocation =
-                              schema.properties().get(HiveConstants.LOCATION);
-                          if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
-                            locations.add(defaultSchemaLocation);
-                          } else {
-                            LOG.warn("Catalog %s location is not found", ident);
-                          }
+                        // The Hive default schema location is Hive warehouse directory
+                        String defaultSchemaLocation =
+                            getHiveDefaultLocation(metalake, catalogObj.name());
+                        if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
+                          locations.add(defaultSchemaLocation);
                         }
                       }
                     });
@@ -428,45 +434,49 @@ public class AuthorizationUtils {
           {
             Catalog catalogObj = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(ident);
             if (catalogObj.provider().equals("hive")) {
-              Schema schema =
-                  GravitinoEnv.getInstance()
-                      .schemaDispatcher()
-                      .loadSchema(
-                          NameIdentifier.of(
-                              metalake, catalogObj.name(), "default" /*Hive default schema*/));
-              if (schema.properties().containsKey(HiveConstants.LOCATION)) {
-                String defaultSchemaLocation = schema.properties().get(HiveConstants.LOCATION);
-                if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
-                  locations.add(defaultSchemaLocation);
-                } else {
-                  LOG.warn("Catalog %s location is not found", ident);
-                }
+              // The Hive default schema location is Hive warehouse directory
+              String defaultSchemaLocation = getHiveDefaultLocation(metalake, catalogObj.name());
+              if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
+                locations.add(defaultSchemaLocation);
               }
             }
           }
           break;
         case SCHEMA:
           {
-            Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
-            if (schema.properties().containsKey(HiveConstants.LOCATION)) {
-              String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
-              if (schemaLocation != null && schemaLocation.isEmpty()) {
-                locations.add(schemaLocation);
-              } else {
-                LOG.warn("Schema %s location is not found", ident);
+            Catalog catalogObj =
+                GravitinoEnv.getInstance()
+                    .catalogDispatcher()
+                    .loadCatalog(NameIdentifier.of(metalake, ident.namespace().level(0)));
+            if (catalogObj.provider().equals("hive")) {
+              Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
+              if (schema.properties().containsKey(HiveConstants.LOCATION)) {
+                String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
+                if (schemaLocation != null && schemaLocation.isEmpty()) {
+                  locations.add(schemaLocation);
+                } else {
+                  LOG.warn("Schema %s location is not found", ident);
+                }
               }
             }
+            // TODO: [#6133] Supports get Fileset schema location in the AuthorizationUtils
           }
           break;
         case TABLE:
           {
-            Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
-            if (table.properties().containsKey(HiveConstants.LOCATION)) {
-              String tableLocation = table.properties().get(HiveConstants.LOCATION);
-              if (tableLocation != null && tableLocation.isEmpty()) {
-                locations.add(tableLocation);
-              } else {
-                LOG.warn("Table %s location is not found", ident);
+            Catalog catalogObj =
+                GravitinoEnv.getInstance()
+                    .catalogDispatcher()
+                    .loadCatalog(NameIdentifier.of(metalake, ident.namespace().level(0)));
+            if (catalogObj.provider().equals("hive")) {
+              Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
+              if (table.properties().containsKey(HiveConstants.LOCATION)) {
+                String tableLocation = table.properties().get(HiveConstants.LOCATION);
+                if (tableLocation != null && tableLocation.isEmpty()) {
+                  locations.add(tableLocation);
+                } else {
+                  LOG.warn("Table %s location is not found", ident);
+                }
               }
             }
           }

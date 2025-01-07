@@ -130,7 +130,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
    * If rename the COLUMN, Only need to rename `{schema}.*.*` <br>
    */
   @Override
-  protected void doRenameMetadataObject(
+  protected void renameMetadataObject(
       AuthorizationMetadataObject authzMetadataObject,
       AuthorizationMetadataObject newAuthzMetadataObject) {
     List<Pair<String, String>> mappingOldAndNewMetadata;
@@ -272,7 +272,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
    * If remove the COLUMN, Only need to remove `{schema}.*.*` <br>
    */
   @Override
-  protected void doRemoveMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+  protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     AuthorizationMetadataObject.Type type = authzMetadataObject.type();
     if (type.equals(SCHEMA)) {
       doRemoveSchemaMetadataObject(authzMetadataObject);
@@ -784,14 +784,14 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                 newAuthzMetadataObject.fullName());
             continue;
           }
-          doRenameMetadataObject(oldAuthMetadataObject, newAuthzMetadataObject);
+          renameMetadataObject(oldAuthMetadataObject, newAuthzMetadataObject);
         }
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
             ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
         List<AuthorizationMetadataObject> authzMetadataObjects =
             translateMetadataObject(metadataObject);
-        authzMetadataObjects.stream().forEach(this::doRemoveMetadataObject);
+        authzMetadataObjects.stream().forEach(this::removeMetadataObject);
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
