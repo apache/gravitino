@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.Type.PATH;
 import static org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject.Type.COLUMN;
 import static org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject.Type.SCHEMA;
 import static org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject.Type.TABLE;
@@ -37,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
@@ -133,37 +133,29 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   protected void doRenameMetadataObject(
       AuthorizationMetadataObject authzMetadataObject,
       AuthorizationMetadataObject newAuthzMetadataObject) {
-    List<Map<String, String>> mappingOldAndNewMetadata = new ArrayList<>();
+    List<Pair<String, String>> mappingOldAndNewMetadata;
     if (newAuthzMetadataObject.type().equals(SCHEMA)) {
       // Rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
       // * `{schema}.*.*`
       mappingOldAndNewMetadata =
           ImmutableList.of(
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
-              ImmutableMap.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
-              ImmutableMap.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL));
+              Pair.of(authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
+              Pair.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
+              Pair.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL));
     } else if (newAuthzMetadataObject.type().equals(TABLE)) {
       // Rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
       mappingOldAndNewMetadata =
           ImmutableList.of(
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(1), newAuthzMetadataObject.names().get(1)),
-              ImmutableMap.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL));
+              Pair.of(authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
+              Pair.of(authzMetadataObject.names().get(1), newAuthzMetadataObject.names().get(1)),
+              Pair.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL));
     } else if (newAuthzMetadataObject.type().equals(COLUMN)) {
       // Rename the COLUMN, Only need to rename `{schema}.*.*`
       mappingOldAndNewMetadata =
           ImmutableList.of(
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(1), newAuthzMetadataObject.names().get(1)),
-              ImmutableMap.of(
-                  authzMetadataObject.names().get(2), newAuthzMetadataObject.names().get(2)));
-    } else if (newAuthzMetadataObject.type().equals(PATH)) {
-      // do nothing when fileset is renamed
+              Pair.of(authzMetadataObject.names().get(0), newAuthzMetadataObject.names().get(0)),
+              Pair.of(authzMetadataObject.names().get(1), newAuthzMetadataObject.names().get(1)),
+              Pair.of(authzMetadataObject.names().get(2), newAuthzMetadataObject.names().get(2)));
     } else {
       throw new IllegalArgumentException(
           "Unsupported metadata object type: " + authzMetadataObject.type());
@@ -172,8 +164,8 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     List<String> oldMetadataNames = new ArrayList<>();
     List<String> newMetadataNames = new ArrayList<>();
     for (int index = 0; index < mappingOldAndNewMetadata.size(); index++) {
-      oldMetadataNames.add(mappingOldAndNewMetadata.get(index).keySet().stream().findFirst().get());
-      newMetadataNames.add(mappingOldAndNewMetadata.get(index).values().stream().findFirst().get());
+      oldMetadataNames.add(mappingOldAndNewMetadata.get(index).getKey());
+      newMetadataNames.add(mappingOldAndNewMetadata.get(index).getValue());
 
       AuthorizationMetadataObject.Type type;
       if (index == 0) {
@@ -298,12 +290,12 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
    * Remove the SCHEMA, Need to remove these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` permissions.
    */
-  private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authMetadataObject) {
+  private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(
-        authMetadataObject.type() == SCHEMA, "The metadata object type must be SCHEMA");
+        authzMetadataObject.type() == SCHEMA, "The metadata object type must be SCHEMA");
     Preconditions.checkArgument(
-        authMetadataObject.names().size() == 1, "The metadata object names must be 1");
-    if (RangerHelper.RESOURCE_ALL.equals(authMetadataObject.name())) {
+        authzMetadataObject.names().size() == 1, "The metadata object names must be 1");
+    if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Delete metalake or catalog policies in this Ranger service
       try {
         List<RangerPolicy> policies = rangerClient.getPoliciesInService(rangerServiceName);
@@ -314,31 +306,31 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         throw new RuntimeException(e);
       }
     } else {
-      List<List<String>> loop =
+      List<Pair<AuthorizationMetadataObject.Type, List<String>>> loop =
           ImmutableList.of(
-              ImmutableList.of(authMetadataObject.name())
+              Pair.of(
+                  RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                  ImmutableList.of(authzMetadataObject.name())),
               /** SCHEMA permission */
-              ,
-              ImmutableList.of(authMetadataObject.name(), RangerHelper.RESOURCE_ALL)
+              Pair.of(
+                  RangerHadoopSQLMetadataObject.Type.TABLE,
+                  ImmutableList.of(authzMetadataObject.name(), RangerHelper.RESOURCE_ALL)),
               /** TABLE permission */
-              ,
-              ImmutableList.of(
-                  authMetadataObject.name(), RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL)
+              Pair.of(
+                  RangerHadoopSQLMetadataObject.Type.COLUMN,
+                  ImmutableList.of(
+                      authzMetadataObject.name(),
+                      RangerHelper.RESOURCE_ALL,
+                      RangerHelper.RESOURCE_ALL))
               /** COLUMN permission */
               );
 
       for (int index = 0; index < loop.size(); index++) {
-        AuthorizationMetadataObject.Type type =
-            (index == 0
-                ? RangerHadoopSQLMetadataObject.Type.SCHEMA
-                : (index == 1
-                    ? RangerHadoopSQLMetadataObject.Type.TABLE
-                    : RangerHadoopSQLMetadataObject.Type.COLUMN));
         AuthorizationMetadataObject authzMetadataObject1 =
             new RangerHadoopSQLMetadataObject(
-                AuthorizationMetadataObject.getParentFullName(loop.get(index)),
-                AuthorizationMetadataObject.getLastName(loop.get(index)),
-                type);
+                AuthorizationMetadataObject.getParentFullName(loop.get(index).getValue()),
+                AuthorizationMetadataObject.getLastName(loop.get(index).getValue()),
+                loop.get(index).getKey());
         removePolicyByMetadataObject(authzMetadataObject1);
       }
     }
@@ -349,29 +341,24 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
    * permissions.
    */
   private void doRemoveTableMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    List<List<String>> loop =
+    List<Pair<AuthorizationMetadataObject.Type, List<String>>> loop =
         ImmutableList.of(
-            authzMetadataObject.names()
+            Pair.of(RangerHadoopSQLMetadataObject.Type.TABLE, authzMetadataObject.names()),
             /** TABLE permission */
-            ,
-            Stream.concat(
-                    authzMetadataObject.names().stream(), Stream.of(RangerHelper.RESOURCE_ALL))
-                .collect(Collectors.toList())
+            Pair.of(
+                RangerHadoopSQLMetadataObject.Type.COLUMN,
+                Stream.concat(
+                        authzMetadataObject.names().stream(), Stream.of(RangerHelper.RESOURCE_ALL))
+                    .collect(Collectors.toList()))
             /** COLUMN permission */
             );
 
     for (int index = 0; index < loop.size(); index++) {
-      AuthorizationMetadataObject.Type type =
-          (index == 0
-              ? RangerHadoopSQLMetadataObject.Type.SCHEMA
-              : (index == 1
-                  ? RangerHadoopSQLMetadataObject.Type.TABLE
-                  : RangerHadoopSQLMetadataObject.Type.COLUMN));
       AuthorizationMetadataObject authzMetadataObject1 =
           new RangerHadoopSQLMetadataObject(
-              AuthorizationMetadataObject.getParentFullName(loop.get(index)),
-              AuthorizationMetadataObject.getLastName(loop.get(index)),
-              type);
+              AuthorizationMetadataObject.getParentFullName(loop.get(index).getValue()),
+              AuthorizationMetadataObject.getLastName(loop.get(index).getValue()),
+              loop.get(index).getKey());
       removePolicyByMetadataObject(authzMetadataObject1);
     }
   }
