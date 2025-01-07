@@ -428,7 +428,7 @@ public class AuthorizationUtils {
             if (catalogObj.provider().equals("hive")) {
               // The Hive default schema location is Hive warehouse directory
               String defaultSchemaLocation =
-                  getHiveDefaultLocation(ident.namespace().level(0), ident.namespace().level(1));
+                  getHiveDefaultLocation(ident.namespace().level(0), ident.name());
               if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
                 locations.add(defaultSchemaLocation);
               }
