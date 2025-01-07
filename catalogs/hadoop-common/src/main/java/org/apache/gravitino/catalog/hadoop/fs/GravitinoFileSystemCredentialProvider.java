@@ -22,9 +22,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 import org.apache.gravitino.credential.Credential;
 import org.apache.hadoop.conf.Configurable;
 
-/**
- * Interface for providing credentials for Gravitino Virtual File System.
- */
+/** Interface for providing credentials for Gravitino Virtual File System. */
 public interface GravitinoFileSystemCredentialProvider extends Configurable {
 
   String GVFS_CREDENTIAL_PROVIDER = "fs.gvfs.credential.provider";
@@ -33,6 +31,7 @@ public interface GravitinoFileSystemCredentialProvider extends Configurable {
 
   /**
    * Get credentials for Gravitino Virtual File System.
+   *
    * @return credentials for Gravitino Virtual File System
    */
   Credential[] getCredentials();
