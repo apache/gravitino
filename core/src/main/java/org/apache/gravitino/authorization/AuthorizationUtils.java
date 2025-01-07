@@ -397,22 +397,14 @@ public class AuthorizationUtils {
   public static List<String> getMetadataObjectLocation(
       NameIdentifier ident, Entity.EntityType type) {
     List<String> locations = new ArrayList<>();
-    MetadataObject metadataObject;
     try {
-      metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
-    } catch (IllegalArgumentException e) {
-      LOG.warn("Illegal argument exception for metadata object %s type %s", ident, type, e);
-      return locations;
-    }
-
-    String metalake =
-        (type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0));
-    try {
-      switch (metadataObject.type()) {
+      switch (type) {
         case METALAKE:
           {
             NameIdentifier[] identifiers =
-                GravitinoEnv.getInstance().catalogDispatcher().listCatalogs(Namespace.of(metalake));
+                GravitinoEnv.getInstance()
+                    .catalogDispatcher()
+                    .listCatalogs(Namespace.of(ident.name()));
             Arrays.stream(identifiers)
                 .collect(Collectors.toList())
                 .forEach(
@@ -422,7 +414,7 @@ public class AuthorizationUtils {
                       if (catalogObj.provider().equals("hive")) {
                         // The Hive default schema location is Hive warehouse directory
                         String defaultSchemaLocation =
-                            getHiveDefaultLocation(metalake, catalogObj.name());
+                            getHiveDefaultLocation(ident.name(), catalogObj.name());
                         if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
                           locations.add(defaultSchemaLocation);
                         }
@@ -435,7 +427,8 @@ public class AuthorizationUtils {
             Catalog catalogObj = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(ident);
             if (catalogObj.provider().equals("hive")) {
               // The Hive default schema location is Hive warehouse directory
-              String defaultSchemaLocation = getHiveDefaultLocation(metalake, catalogObj.name());
+              String defaultSchemaLocation =
+                  getHiveDefaultLocation(ident.namespace().level(0), ident.namespace().level(1));
               if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
                 locations.add(defaultSchemaLocation);
               }
@@ -447,7 +440,9 @@ public class AuthorizationUtils {
             Catalog catalogObj =
                 GravitinoEnv.getInstance()
                     .catalogDispatcher()
-                    .loadCatalog(NameIdentifier.of(metalake, ident.namespace().level(0)));
+                    .loadCatalog(
+                        NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
+            LOG.info("Catalog provider is %s", catalogObj.provider());
             if (catalogObj.provider().equals("hive")) {
               Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
               if (schema.properties().containsKey(HiveConstants.LOCATION)) {
@@ -467,7 +462,8 @@ public class AuthorizationUtils {
             Catalog catalogObj =
                 GravitinoEnv.getInstance()
                     .catalogDispatcher()
-                    .loadCatalog(NameIdentifier.of(metalake, ident.namespace().level(0)));
+                    .loadCatalog(
+                        NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
             if (catalogObj.provider().equals("hive")) {
               Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
               if (table.properties().containsKey(HiveConstants.LOCATION)) {
@@ -483,20 +479,17 @@ public class AuthorizationUtils {
           break;
         case FILESET:
           FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
-          NameIdentifier identifier = getObjectNameIdentifier(metalake, metadataObject);
-          Fileset fileset = filesetDispatcher.loadFileset(identifier);
+          Fileset fileset = filesetDispatcher.loadFileset(ident);
           Preconditions.checkArgument(
-              fileset != null, String.format("Fileset %s is not found", identifier));
+              fileset != null, String.format("Fileset %s is not found", ident));
           String filesetLocation = fileset.storageLocation();
           Preconditions.checkArgument(
-              filesetLocation != null,
-              String.format("Fileset %s location is not found", identifier));
+              filesetLocation != null, String.format("Fileset %s location is not found", ident));
           locations.add(filesetLocation);
           break;
         default:
           throw new AuthorizationPluginException(
-              "The metadata object type %s is not supported get location paths.",
-              metadataObject.type());
+              "Failed to get location paths for metadata object %s type %s", ident, type);
       }
     } catch (Exception e) {
       LOG.warn("Failed to get location paths for metadata object %s type %s", ident, type, e);

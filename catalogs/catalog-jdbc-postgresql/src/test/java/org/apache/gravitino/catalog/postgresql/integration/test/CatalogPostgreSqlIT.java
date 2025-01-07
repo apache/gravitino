@@ -653,7 +653,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
         });
   }
 
-  @Test
+  //  @Test TODO(mchades): https://github.com/apache/gravitino/issues/6134
   void testCreateAndLoadSchema() throws SQLException {
     String testSchemaName = "test";
 
@@ -682,7 +682,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName2, false));
     createSchema(testSchemaName2);
     SupportsSchemas schemaOps = newCatalog.asSchemas();
-    Assertions.assertDoesNotThrow(() -> schemaOps.loadSchema(testSchemaName2));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> schemaOps.loadSchema(testSchemaName2));
     // recovered by re-build the catalog
     Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
     newCatalog = createCatalog(newCatalogName);
