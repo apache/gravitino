@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import static org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER;
-
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -52,13 +50,13 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCredentialException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -270,7 +268,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         catalogCache.get(
             catalogIdent, ident -> client.loadCatalog(catalogIdent.name()).asFilesetCatalog());
     Catalog catalog = (Catalog) filesetCatalog;
-
     Preconditions.checkArgument(
         filesetCatalog != null, String.format("Loaded fileset catalog: %s is null.", catalogIdent));
 
@@ -317,26 +314,18 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
                 Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
-
                 totalProperty.putAll(getConfigMap(getConf()));
-                // If enable the cloud store credential, we should pass the configuration here.
-                totalProperty.put(GVFS_FILESET_IDENTIFIER, identifier.toString());
 
-                Fileset fileset =
-                    catalog
-                        .asFilesetCatalog()
-                        .loadFileset(
-                            NameIdentifier.of(identifier.namespace().level(2), identifier.name()));
-
-                try {
-                  fileset.supportsCredentials().getCredentials();
-                  // it has enabled the credential provider
+                boolean enableCredentialProvider =
+                    enableGravitinoCredentialProvider(catalog, identifier);
+                if (enableCredentialProvider) {
+                  // It has enabled the credential provider
                   totalProperty.put(
-                      "fs.gvfs.credential.provider",
+                      GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER,
                       DefaultGravitinoFileSystemCredentialProvider.class.getCanonicalName());
-                  totalProperty.put("fs.gvfs.virtual.path", virtualPathString);
-                } catch (NoSuchCredentialException e) {
-                  // No credential found, do nothing.
+                  totalProperty.put(
+                      GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER_PATH,
+                      virtualPathString);
                 }
 
                 return provider.getFileSystem(filePath, totalProperty);
@@ -348,6 +337,23 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             });
 
     return new FilesetContextPair(new Path(actualFileLocation), fs);
+  }
+
+  private boolean enableGravitinoCredentialProvider(
+      Catalog catalog, NameIdentifier filesetIdentifier) {
+    Fileset fileset =
+        catalog
+            .asFilesetCatalog()
+            .loadFileset(
+                NameIdentifier.of(
+                    filesetIdentifier.namespace().level(2), filesetIdentifier.name()));
+    try {
+      Credential[] credentials = fileset.supportsCredentials().getCredentials();
+      return credentials.length > 0;
+    } catch (NoSuchCredentialException e) {
+      // No credential found, do nothing.
+      return false;
+    }
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {

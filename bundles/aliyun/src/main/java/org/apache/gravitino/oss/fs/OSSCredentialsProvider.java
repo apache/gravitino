@@ -24,35 +24,35 @@ import com.aliyun.oss.common.auth.Credentials;
 import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentials;
 import java.net.URI;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.aliyun.oss.Constants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class OSSCredentialsProvider implements CredentialsProvider {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OSSCredentialsProvider.class);
+  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
   private Credentials basicCredentials;
-  private final String filesetIdentifier;
-  private GravitinoClient client;
-  private final Configuration configuration;
-
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public OSSCredentialsProvider(URI uri, Configuration conf) {
-    this.filesetIdentifier =
-        conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    this.configuration = conf;
+    initGvfsCredentialProvider(conf);
+  }
+
+  private void initGvfsCredentialProvider(Configuration conf) {
+    try {
+      gravitinoFileSystemCredentialProvider =
+          (GravitinoFileSystemCredentialProvider)
+              Class.forName(
+                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      gravitinoFileSystemCredentialProvider.setConf(conf);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
+    }
   }
 
   @Override
@@ -60,16 +60,9 @@ public class OSSCredentialsProvider implements CredentialsProvider {
 
   @Override
   public Credentials getCredentials() {
-    // If the credentials are null or about to expire, refresh the credentials.
     if (basicCredentials == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
-        try {
-          refresh();
-        } finally {
-          if (null != this.client) {
-            this.client.close();
-          }
-        }
+        refresh();
       }
     }
 
@@ -77,24 +70,10 @@ public class OSSCredentialsProvider implements CredentialsProvider {
   }
 
   private void refresh() {
-    String[] idents = filesetIdentifier.split("\\.");
-    String catalog = idents[1];
-
-    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
-
-    Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    Credential credential = getCredential(credentials);
-
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential credential = getCredential(gravitinoCredentials);
     if (credential == null) {
-      LOG.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
-      expirationTime = Long.MAX_VALUE;
-      this.basicCredentials =
-          new DefaultCredentials(
-              configuration.get(Constants.ACCESS_KEY_ID),
-              configuration.get(Constants.ACCESS_KEY_SECRET));
-      return;
+      throw new RuntimeException("No suitable credential for OSS found...");
     }
 
     if (credential instanceof OSSSecretKeyCredential) {

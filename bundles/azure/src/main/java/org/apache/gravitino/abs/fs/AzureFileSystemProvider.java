@@ -30,18 +30,14 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.azurebfs.services.AuthType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AzureFileSystemProvider implements FileSystemProvider {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(AzureFileSystemProvider.class);
 
   @VisibleForTesting public static final String ABS_PROVIDER_SCHEME = "abfss";
 
@@ -68,15 +64,13 @@ public class AzureFileSystemProvider implements FileSystemProvider {
           config.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
     }
 
-    if (!config.containsKey(ABFS_IMPL_KEY)) {
+    if (!hadoopConfMap.containsKey(ABFS_IMPL_KEY)) {
       configuration.set(ABFS_IMPL_KEY, ABFS_IMPL);
     }
 
     hadoopConfMap.forEach(configuration::set);
 
-    // This is a workaround to judge whether it's from a Gravitino GVFS client.
-    if (config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
-      // Test whether SAS works
+    if (enableCredentialProvidedByGravitino(hadoopConfMap)) {
       try {
         AzureSasCredentialsProvider azureSasCredentialsProvider = new AzureSasCredentialsProvider();
         azureSasCredentialsProvider.initialize(configuration, null);
@@ -102,14 +96,15 @@ public class AzureFileSystemProvider implements FileSystemProvider {
               azureSasCredentialsProvider.getAzureStorageAccountKey());
         }
       } catch (Exception e) {
-        // Can't use SAS, use account key and account key instead
-        LOGGER.warn(
-            "Failed to use SAS token and user account from credential provider, use default conf. ",
-            e);
+        throw new IOException("Failed to get SAS token from AzureSasCredentialsProvider", e);
       }
     }
 
     return FileSystem.get(path.toUri(), configuration);
+  }
+
+  private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
+    return null != config.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 
   @Override

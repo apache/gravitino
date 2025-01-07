@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -61,15 +61,9 @@ public class OSSFileSystemProvider implements FileSystemProvider {
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
-    //    if (shouldSetCredentialsProviderExplicitly(config)) {
-    //      hadoopConfMap.put(
-    //          Constants.CREDENTIALS_PROVIDER_KEY,
-    // OSSCredentialsProvider.class.getCanonicalName());
-    //    }
-
     if (enableCredentialProvidedByGravitino(config)) {
       hadoopConfMap.put(
-          Constants.CREDENTIALS_PROVIDER_KEY, TestOSSCredentialProvider.class.getCanonicalName());
+          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialsProvider.class.getCanonicalName());
     }
 
     hadoopConfMap.forEach(configuration::set);
@@ -78,21 +72,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
   }
 
   private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
-    return null != config.get("fs.gvfs.provider.impl");
-  }
-
-  /**
-   * Check if the credential provider should be set explicitly.
-   *
-   * <p>When the credential provider is not set and the server URI is set (this means the call is
-   * from GVFS client), we need to manually set the credential provider
-   *
-   * @param config the configuration map
-   * @return true if the credential provider should be set explicitly
-   */
-  private boolean shouldSetCredentialsProviderExplicitly(Map<String, String> config) {
-    return !config.containsKey(Constants.CREDENTIALS_PROVIDER_KEY)
-        && config.containsKey(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+    return null != config.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 
   @Override

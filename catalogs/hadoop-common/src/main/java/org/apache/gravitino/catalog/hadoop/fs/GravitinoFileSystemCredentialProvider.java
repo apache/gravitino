@@ -24,5 +24,9 @@ import org.apache.hadoop.conf.Configurable;
 
 public interface GravitinoFileSystemCredentialProvider extends Configurable {
 
+  String GVFS_CREDENTIAL_PROVIDER = "fs.gvfs.credential.provider";
+
+  String GVFS_CREDENTIAL_PROVIDER_PATH = "fs.gvfs.virtual.path";
+
   Credential[] getCredentials();
 }

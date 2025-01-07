@@ -28,10 +28,6 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
 
-  implementation(project(":clients:filesystem-hadoop3-common")) {
-    exclude(group = "*")
-  }
-
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }

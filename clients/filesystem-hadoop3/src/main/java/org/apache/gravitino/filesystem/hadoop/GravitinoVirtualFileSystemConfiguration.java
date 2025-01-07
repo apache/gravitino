@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.filesystem.common;
+package org.apache.gravitino.filesystem.hadoop;
 
 /** Configuration class for Gravitino Virtual File System. */
 public class GravitinoVirtualFileSystemConfiguration {
@@ -97,9 +97,6 @@ public class GravitinoVirtualFileSystemConfiguration {
    */
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
-
-  /** The configuration key for the fileset identifier. */
-  public static final String GVFS_FILESET_IDENTIFIER = "fs.gvfs.fileset.identifier";
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }

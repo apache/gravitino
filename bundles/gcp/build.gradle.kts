@@ -34,12 +34,8 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.gcs)
-  compileOnly(libs.slf4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":clients:filesystem-hadoop3-common")) {
     exclude("*")
   }
   implementation(project(":catalogs:hadoop-common")) {

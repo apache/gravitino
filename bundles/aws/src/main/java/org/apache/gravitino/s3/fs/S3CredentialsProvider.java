@@ -24,35 +24,35 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.s3a.Constants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class S3CredentialsProvider implements AWSCredentialsProvider {
-
-  private static final Logger LOG = LoggerFactory.getLogger(S3CredentialsProvider.class);
-  private GravitinoClient client;
-  private final String filesetIdentifier;
-  private final Configuration configuration;
+  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
 
   private AWSCredentials basicSessionCredentials;
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public S3CredentialsProvider(final URI uri, final Configuration conf) {
-    this.filesetIdentifier =
-        conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    this.configuration = conf;
+    initGvfsCredentialProvider(conf);
+  }
+
+  private void initGvfsCredentialProvider(Configuration conf) {
+    try {
+      gravitinoFileSystemCredentialProvider =
+          (GravitinoFileSystemCredentialProvider)
+              Class.forName(
+                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      gravitinoFileSystemCredentialProvider.setConf(conf);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
+    }
   }
 
   @Override
@@ -60,13 +60,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
     // Refresh credentials if they are null or about to expire.
     if (basicSessionCredentials == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
-        try {
-          refresh();
-        } finally {
-          if (null != this.client) {
-            this.client.close();
-          }
-        }
+        refresh();
       }
     }
 
@@ -75,25 +69,11 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
 
   @Override
   public void refresh() {
-    // The format of filesetIdentifier is "metalake.catalog.fileset.schema"
-    String[] idents = filesetIdentifier.split("\\.");
-    String catalog = idents[1];
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential credential = getSuitableCredential(gravitinoCredentials);
 
-    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
-
-    Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    Credential credential = getCredential(credentials);
-
-    // Can't find any credential, use the default AKSK if possible.
     if (credential == null) {
-      LOG.warn("No credential found for fileset: {}, try to use static AKSK", filesetIdentifier);
-      expirationTime = Long.MAX_VALUE;
-      this.basicSessionCredentials =
-          new BasicAWSCredentials(
-              configuration.get(Constants.ACCESS_KEY), configuration.get(Constants.SECRET_KEY));
-      return;
+      throw new RuntimeException("No suitable credential for S3 found...");
     }
 
     if (credential instanceof S3SecretKeyCredential) {
@@ -126,7 +106,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  private Credential getCredential(Credential[] credentials) {
+  private Credential getSuitableCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof S3TokenCredential) {

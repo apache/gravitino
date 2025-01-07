@@ -47,12 +47,13 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
   private static final Logger LOG =
       LoggerFactory.getLogger(GravitinoVirtualFileSystemABSCredentialIT.class);
 
-  public static final String ABS_ACCOUNT_NAME = System.getenv("ABS_STS_ACCOUNT_NAME");
-  public static final String ABS_ACCOUNT_KEY = System.getenv("ABS_STS_ACCOUNT_KEY");
-  public static final String ABS_CONTAINER_NAME = System.getenv("ABS_STS_CONTAINER_NAME");
-  public static final String ABS_TENANT_ID = System.getenv("ABS_STS_TENANT_ID");
-  public static final String ABS_CLIENT_ID = System.getenv("ABS_STS_CLIENT_ID");
-  public static final String ABS_CLIENT_SECRET = System.getenv("ABS_STS_CLIENT_SECRET");
+  public static final String ABS_ACCOUNT_NAME = System.getenv("ABS_ACCOUNT_NAME_FOR_CREDENTIAL");
+  public static final String ABS_ACCOUNT_KEY = System.getenv("ABS_ACCOUNT_KEY_FOR_CREDENTIAL");
+  public static final String ABS_CONTAINER_NAME =
+      System.getenv("ABS_CONTAINER_NAME_FOR_CREDENTIAL");
+  public static final String ABS_TENANT_ID = System.getenv("ABS_TENANT_ID_FOR_CREDENTIAL");
+  public static final String ABS_CLIENT_ID = System.getenv("ABS_CLIENT_ID_FOR_CREDENTIAL");
+  public static final String ABS_CLIENT_SECRET = System.getenv("ABS_CLIENT_SECRET_FOR_CREDENTIAL");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -169,11 +170,11 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
   public void testAppend() throws IOException {}
 
   private static boolean absIsConfigured() {
-    return StringUtils.isNotBlank(System.getenv("ABS_STS_ACCOUNT_NAME"))
-        && StringUtils.isNotBlank(System.getenv("ABS_STS_ACCOUNT_KEY"))
-        && StringUtils.isNotBlank(System.getenv("ABS_STS_CONTAINER_NAME"))
-        && StringUtils.isNotBlank(System.getenv("ABS_STS_TENANT_ID"))
-        && StringUtils.isNotBlank(System.getenv("ABS_STS_CLIENT_ID"))
-        && StringUtils.isNotBlank(System.getenv("ABS_STS_CLIENT_SECRET"));
+    return StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_NAME_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_KEY_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("ABS_CONTAINER_NAME_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("ABS_TENANT_ID_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("ABS_CLIENT_ID_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("ABS_CLIENT_SECRET_FOR_CREDENTIAL"));
   }
 }

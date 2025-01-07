@@ -41,7 +41,6 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;

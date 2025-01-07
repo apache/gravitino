@@ -20,36 +20,22 @@
 package org.apache.gravitino.abs.fs;
 
 import java.io.IOException;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azurebfs.extensions.SASTokenProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AzureSasCredentialsProvider implements SASTokenProvider, Configurable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AzureSasCredentialsProvider.class);
-
   private Configuration configuration;
-
-  private String filesetIdentifier;
-
-  private GravitinoClient client;
-
   private String sasToken;
-
   private String azureStorageAccountName;
   private String azureStorageAccountKey;
 
+  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
@@ -73,8 +59,6 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   @Override
   public void initialize(Configuration conf, String accountName) throws IOException {
-    this.filesetIdentifier =
-        conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
     this.configuration = conf;
   }
 
@@ -83,32 +67,17 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
     // Refresh credentials if they are null or about to expire.
     if (sasToken == null || System.currentTimeMillis() >= expirationTime) {
       synchronized (this) {
-        try {
-          refresh();
-        } finally {
-          if (null != this.client) {
-            this.client.close();
-          }
-        }
+        refresh();
       }
     }
     return sasToken;
   }
 
   private void refresh() {
-    String[] idents = filesetIdentifier.split("\\.");
-    String catalog = idents[1];
-
-    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
-    Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-
-    Credential[] credentials = fileset.supportsCredentials().getCredentials();
-    Credential credential = getCredential(credentials);
-
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential credential = getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
-      LOGGER.warn("No credentials found for fileset {}", filesetIdentifier);
-      return;
+      throw new RuntimeException("No suitable credential for OSS found...");
     }
 
     if (credential instanceof ADLSTokenCredential) {
@@ -136,7 +105,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  private Credential getCredential(Credential[] credentials) {
+  private Credential getSuitableCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof ADLSTokenCredential) {

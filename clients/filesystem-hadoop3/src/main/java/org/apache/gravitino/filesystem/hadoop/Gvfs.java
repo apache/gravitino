@@ -21,7 +21,6 @@ package org.apache.gravitino.filesystem.hadoop;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DelegateToFileSystem;
 

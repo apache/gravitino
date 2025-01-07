@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.filesystem.common;
+package org.apache.gravitino.filesystem.hadoop;
 
 import com.google.common.base.Preconditions;
 import java.io.File;

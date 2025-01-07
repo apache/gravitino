@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -67,11 +67,7 @@ public class S3FileSystemProvider implements FileSystemProvider {
       configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
 
-    // Only call from GVFS client will have this key and support GravitinoS3CredentialProvider as
-    // the file system provider will be used by GVFS client and Gravitino server, only GVFS client
-    // will have this key.
-    if (hadoopConfMap.containsKey(
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)) {
+    if (enableCredentialProvidedByGravitino(config)) {
       configuration.set(
           Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
     }
@@ -80,6 +76,10 @@ public class S3FileSystemProvider implements FileSystemProvider {
     checkAndSetCredentialProvider(configuration);
 
     return S3AFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
+    return null != config.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 
   private void checkAndSetCredentialProvider(Configuration configuration) {

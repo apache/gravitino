@@ -46,9 +46,9 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
   private static final Logger LOG =
       LoggerFactory.getLogger(GravitinoVirtualFileSystemGCSCredentialIT.class);
 
-  public static final String BUCKET_NAME = System.getenv("GCS_STS_BUCKET_NAME");
+  public static final String BUCKET_NAME = System.getenv("GCS_BUCKET_NAME_FOR_CREDENTIAL");
   public static final String SERVICE_ACCOUNT_FILE =
-      System.getenv("GCS_STS_SERVICE_ACCOUNT_JSON_PATH");
+      System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH_FOR_CREDENTIAL");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -145,7 +145,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
   public void testAppend() throws IOException {}
 
   private static boolean isGCPConfigured() {
-    return StringUtils.isNotBlank(System.getenv("GCS_STS_SERVICE_ACCOUNT_JSON_PATH"))
-        && StringUtils.isNotBlank(System.getenv("GCS_STS_BUCKET_NAME"));
+    return StringUtils.isNotBlank(System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("GCS_BUCKET_NAME_FOR_CREDENTIAL"));
   }
 }

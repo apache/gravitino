@@ -21,23 +21,14 @@ package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.GCSTokenCredential;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class GCSCredentialsProvider implements AccessTokenProvider {
-  private static final Logger LOG = LoggerFactory.getLogger(GCSCredentialsProvider.class);
   private Configuration configuration;
-  private GravitinoClient client;
-  private String filesetIdentifier;
+  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
 
   private AccessToken accessToken;
   private long expirationTime = Long.MAX_VALUE;
@@ -49,11 +40,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
       try {
         refresh();
       } catch (IOException e) {
-        LOG.error("Failed to refresh the access token", e);
-      } finally {
-        if (null != this.client) {
-          this.client.close();
-        }
+        throw new RuntimeException("Failed to refresh access token", e);
       }
     }
     return accessToken;
@@ -61,22 +48,11 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
 
   @Override
   public void refresh() throws IOException {
-    // The format of filesetIdentifier is "metalake.catalog.fileset.schema"
-    String[] idents = filesetIdentifier.split("\\.");
-    String catalog = idents[1];
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
 
-    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
-
-    Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
-    Credential[] credentials = fileset.supportsCredentials().getCredentials();
-
-    Credential credential = getCredential(credentials);
-    // Can't find any credential, use the default one.
-    if (null == credential) {
-      LOG.warn(
-          "No credential found for fileset: {}, try to use static JSON file", filesetIdentifier);
-      return;
+    Credential credential = getSuitableCredential(gravitinoCredentials);
+    if (credential == null) {
+      throw new RuntimeException("No suitable credential for OSS found...");
     }
 
     if (credential instanceof GCSTokenCredential) {
@@ -96,8 +72,21 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
   @Override
   public void setConf(Configuration configuration) {
     this.configuration = configuration;
-    this.filesetIdentifier =
-        configuration.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
+    initGvfsCredentialProvider(configuration);
+  }
+
+  private void initGvfsCredentialProvider(Configuration conf) {
+    try {
+      gravitinoFileSystemCredentialProvider =
+          (GravitinoFileSystemCredentialProvider)
+              Class.forName(
+                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      gravitinoFileSystemCredentialProvider.setConf(conf);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
+    }
   }
 
   @Override
@@ -112,7 +101,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
    * @param credentials The credential array.
    * @return An credential.
    */
-  private Credential getCredential(Credential[] credentials) {
+  private Credential getSuitableCredential(Credential[] credentials) {
     for (Credential credential : credentials) {
       if (credential instanceof GCSTokenCredential) {
         return credential;

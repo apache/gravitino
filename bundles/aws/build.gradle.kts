@@ -37,9 +37,6 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  implementation(project(":clients:filesystem-hadoop3-common")) {
-    exclude("*")
-  }
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }

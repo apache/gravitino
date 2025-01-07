@@ -31,7 +31,6 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
-import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
