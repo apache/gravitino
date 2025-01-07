@@ -414,10 +414,11 @@ public class AuthorizationUtils {
                         if (schema.properties().containsKey(HiveConstants.LOCATION)) {
                           String defaultSchemaLocation =
                               schema.properties().get(HiveConstants.LOCATION);
-                          Preconditions.checkArgument(
-                              defaultSchemaLocation != null,
-                              String.format("Catalog %s location is not found", ident));
-                          locations.add(defaultSchemaLocation);
+                          if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
+                            locations.add(defaultSchemaLocation);
+                          } else {
+                            LOG.warn("Catalog %s location is not found", ident);
+                          }
                         }
                       }
                     });
@@ -435,10 +436,11 @@ public class AuthorizationUtils {
                               metalake, catalogObj.name(), "default" /*Hive default schema*/));
               if (schema.properties().containsKey(HiveConstants.LOCATION)) {
                 String defaultSchemaLocation = schema.properties().get(HiveConstants.LOCATION);
-                Preconditions.checkArgument(
-                    defaultSchemaLocation != null,
-                    String.format("Catalog %s location is not found", ident));
-                locations.add(defaultSchemaLocation);
+                if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
+                  locations.add(defaultSchemaLocation);
+                } else {
+                  LOG.warn("Catalog %s location is not found", ident);
+                }
               }
             }
           }
@@ -448,9 +450,11 @@ public class AuthorizationUtils {
             Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
             if (schema.properties().containsKey(HiveConstants.LOCATION)) {
               String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
-              Preconditions.checkArgument(
-                  schemaLocation != null, String.format("Schema %s location is not found", ident));
-              locations.add(schemaLocation);
+              if (schemaLocation != null && schemaLocation.isEmpty()) {
+                locations.add(schemaLocation);
+              } else {
+                LOG.warn("Schema %s location is not found", ident);
+              }
             }
           }
           break;
@@ -458,10 +462,12 @@ public class AuthorizationUtils {
           {
             Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
             if (table.properties().containsKey(HiveConstants.LOCATION)) {
-              String schemaLocation = table.properties().get(HiveConstants.LOCATION);
-              Preconditions.checkArgument(
-                  schemaLocation != null, String.format("Table %s location is not found", ident));
-              locations.add(schemaLocation);
+              String tableLocation = table.properties().get(HiveConstants.LOCATION);
+              if (tableLocation != null && tableLocation.isEmpty()) {
+                locations.add(tableLocation);
+              } else {
+                LOG.warn("Table %s location is not found", ident);
+              }
             }
           }
           break;
@@ -476,8 +482,6 @@ public class AuthorizationUtils {
               filesetLocation != null,
               String.format("Fileset %s location is not found", identifier));
           locations.add(filesetLocation);
-          break;
-        case TOPIC:
           break;
         default:
           throw new AuthorizationPluginException(

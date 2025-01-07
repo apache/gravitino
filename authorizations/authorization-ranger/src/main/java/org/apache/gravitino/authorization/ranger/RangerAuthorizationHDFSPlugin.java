@@ -253,6 +253,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    * If remove the TABLE, need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
    * If remove the COLUMN, Only need to remove `{schema}.*.*` <br>
+   * If remove the PATH, Only need to remove `{path}` <br>
    */
   @Override
   protected void doRemoveMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
