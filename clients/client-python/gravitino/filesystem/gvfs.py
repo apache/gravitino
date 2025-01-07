@@ -71,6 +71,7 @@ PROTOCOL_NAME = "gvfs"
 
 TIME_WITHOUT_EXPIRATION = sys.maxsize
 
+
 class StorageType(Enum):
     HDFS = "hdfs"
     LOCAL = "file"
