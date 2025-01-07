@@ -101,7 +101,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
     String[] idents = filesetIdentifier.split("\\.");
     String catalog = idents[1];
 
-    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
+    client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     FilesetCatalog filesetCatalog = client.loadCatalog(catalog).asFilesetCatalog();
     Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of(idents[2], idents[3]));
 

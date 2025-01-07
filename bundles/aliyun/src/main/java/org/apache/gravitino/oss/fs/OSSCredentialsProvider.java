@@ -52,7 +52,6 @@ public class OSSCredentialsProvider implements CredentialsProvider {
   public OSSCredentialsProvider(URI uri, Configuration conf) {
     this.filesetIdentifier =
         conf.get(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_IDENTIFIER);
-    this.client = GravitinoVirtualFileSystemUtils.createClient(conf);
     this.configuration = conf;
   }
 
