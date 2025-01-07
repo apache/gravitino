@@ -933,11 +933,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             if storage_type == StorageType.HDFS:
                 fs_class = importlib.import_module("pyarrow.fs").HadoopFileSystem
                 new_cache_value = (
-                    0,
+                    sys.maxsize,
                     ArrowFSWrapper(fs_class.from_uri(actual_file_location)),
                 )
             elif storage_type == StorageType.LOCAL:
-                new_cache_value = (0, LocalFileSystem())
+                new_cache_value = (sys.maxsize, LocalFileSystem())
             elif storage_type == StorageType.GCS:
                 new_cache_value = self._get_gcs_filesystem(
                     fileset_catalog, name_identifier
@@ -1070,7 +1070,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
         credential = self._get_most_suitable_oss_credential(credentials)
         if credential is not None:
-            oss_endpoint = fileset_catalog.properties()["oss-endpoint"]
+            oss_endpoint = fileset_catalog.properties().get("oss-endpoint", None)
             expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
             if isinstance(credential, OSSTokenCredential):
                 fs = importlib.import_module("ossfs").OSSFileSystem(
@@ -1183,7 +1183,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def _get_most_suitable_s3_credential(self, credentials: List[Credential]):
         for credential in credentials:
-            # Prefer to use the token credential, if
+            # Prefer to use the token credential, if it does not exist, use the
+            # secret key credential.
             if isinstance(credential, S3TokenCredential):
                 return credential
 
@@ -1194,7 +1195,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def _get_most_suitable_oss_credential(self, credentials: List[Credential]):
         for credential in credentials:
-            # Prefer to use the token credential, if
+            # Prefer to use the token credential, if it does not exist, use the
+            # secret key credential.
             if isinstance(credential, OSSTokenCredential):
                 return credential
 
@@ -1205,14 +1207,15 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def _get_most_suitable_gcs_credential(self, credentials: List[Credential]):
         for credential in credentials:
-            # Prefer to use the token credential, if
+            # Prefer to use the token credential, if it does not exist, return None.
             if isinstance(credential, GCSTokenCredential):
                 return credential
         return None
 
     def _get_most_suitable_abs_credential(self, credentials: List[Credential]):
         for credential in credentials:
-            # Prefer to use the token credential, if
+            # Prefer to use the token credential, if it does not exist, use the
+            # account key credential
             if isinstance(credential, ADLSTokenCredential):
                 return credential
 
