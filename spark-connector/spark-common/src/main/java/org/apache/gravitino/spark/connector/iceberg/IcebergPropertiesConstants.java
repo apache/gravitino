@@ -59,8 +59,6 @@ public class IcebergPropertiesConstants {
 
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_REST = "rest";
 
-  public static final String ICEBERG_CATALOG_BACKEND_CUSTOM = "custom";
-
   @VisibleForTesting public static final String ICEBERG_LOCATION = IcebergConstants.LOCATION;
 
   @VisibleForTesting

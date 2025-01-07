@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -49,8 +50,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogBackend),
         String.format("%s should not be empty", IcebergConstants.CATALOG_BACKEND));
-    if (catalogBackend.equalsIgnoreCase(
-        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_CUSTOM)) {
+    if (catalogBackend.equalsIgnoreCase(IcebergCatalogBackend.CUSTOM.name())) {
       String catalogBackendImpl = all.remove(IcebergConstants.CATALOG_BACKEND_IMPL);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(catalogBackendImpl),
@@ -58,7 +58,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
               "%s should not be empty when %s is %s",
               IcebergConstants.CATALOG_BACKEND_IMPL,
               IcebergConstants.CATALOG_BACKEND,
-              IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_CUSTOM));
+              IcebergCatalogBackend.CUSTOM.name()));
       all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL, catalogBackendImpl);
     } else {
       all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);

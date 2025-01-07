@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -121,7 +122,7 @@ public class TestIcebergPropertiesConverter {
         icebergPropertiesConverter.toSparkCatalogProperties(
             ImmutableMap.of(
                 IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-                IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_CUSTOM,
+                IcebergCatalogBackend.CUSTOM.name(),
                 IcebergConstants.CATALOG_BACKEND_IMPL,
                 "CustomCatalog",
                 IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
