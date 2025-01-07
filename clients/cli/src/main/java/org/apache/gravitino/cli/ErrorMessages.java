@@ -48,20 +48,27 @@ public class ErrorMessages {
   public static final String HELP_FAILED = "Failed to load help message: ";
 
   public static final String MALFORMED_NAME = "Malformed entity name.";
+  public static final String MISSING_COLUMN_FILE = "Missing --columnfile option.";
+  public static final String MISSING_DATATYPE = "Missing --datatype option.";
   public static final String MISSING_ENTITIES = "Missing required entity names: ";
 
   public static final String MISSING_GROUP = "Missing --group option.";
   public static final String MISSING_METALAKE = "Missing --metalake option.";
   public static final String MISSING_NAME = "Missing --name option.";
+  public static final String MISSING_PRIVILEGES = "Missing --privilege option.";
   public static final String MISSING_PROPERTY = "Missing --property option.";
+  public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
   public static final String MISSING_ROLE = "Missing --role option.";
   public static final String MISSING_TAG = "Missing --tag option.";
   public static final String MISSING_URI = "Missing --uri option.";
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_VALUE = "Missing --value option.";
 
+  public static final String MULTIPLE_ROLE_COMMAND_ERROR =
+      "This command only supports one --role option.";
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
       "This command only supports one --tag option.";
+  public static final String MISSING_PROVIDER = "Missing --provider option.";
 
   public static final String REGISTER_FAILED = "Failed to register model: ";
 

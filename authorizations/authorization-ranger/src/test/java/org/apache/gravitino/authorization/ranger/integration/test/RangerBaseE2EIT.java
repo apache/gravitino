@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -905,7 +906,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     MetadataObject catalogObject =
         MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
     metalake.revokePrivilegesFromRole(
-        roleName, catalogObject, Lists.newArrayList(Privileges.CreateSchema.allow()));
+        roleName, catalogObject, Sets.newHashSet(Privileges.CreateSchema.allow()));
     waitForUpdatingPolicies();
 
     // Use Spark to show this databases(schema)
@@ -920,7 +921,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     MetadataObject schemaObject =
         MetadataObjects.of(catalogName, schemaName, MetadataObject.Type.SCHEMA);
     metalake.grantPrivilegesToRole(
-        roleName, schemaObject, Lists.newArrayList(Privileges.UseSchema.allow()));
+        roleName, schemaObject, Sets.newHashSet(Privileges.UseSchema.allow()));
     waitForUpdatingPolicies();
 
     // Use Spark to show this databases(schema) again
@@ -1020,7 +1021,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.grantPrivilegesToRole(
         roleName,
         MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE),
-        Lists.newArrayList(Privileges.CreateSchema.allow()));
+        Sets.newHashSet(Privileges.CreateSchema.allow()));
 
     // Fail to create a schema
     Assertions.assertThrows(

@@ -303,7 +303,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         request.validate()
 
         resp = self.rest_client.post(
-            f"{self._format_model_version_request_path(model_full_ident)}",
+            f"{self._format_model_version_request_path(model_full_ident)}/versions",
             request,
             error_handler=MODEL_ERROR_HANDLER,
         )
