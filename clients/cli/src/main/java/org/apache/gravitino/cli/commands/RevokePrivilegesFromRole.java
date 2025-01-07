@@ -103,4 +103,10 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
     String all = String.join(",", privileges);
     System.out.println(role + " revoked " + all + " on " + entity.getName());
   }
+
+  @Override
+  public Command validate() {
+    if (privileges == null) exitWithError(ErrorMessages.MISSING_PRIVILEGES);
+    return super.validate();
+  }
 }

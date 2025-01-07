@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -767,34 +766,34 @@ public class GravitinoCommandLine extends TestableCommandLine {
     switch (command) {
       case CommandActions.DETAILS:
         if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newRoleAudit(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
+          newRoleAudit(url, ignore, metalake, getOneRole(roles)).validate().handle();
         } else {
-          newRoleDetails(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
+          newRoleDetails(url, ignore, metalake, getOneRole(roles)).validate().handle();
         }
         break;
 
       case CommandActions.LIST:
-        newListRoles(url, ignore, metalake).handle();
+        newListRoles(url, ignore, metalake).validate().handle();
         break;
 
       case CommandActions.CREATE:
-        newCreateRole(url, ignore, metalake, roles).handle();
+        newCreateRole(url, ignore, metalake, roles).validate().handle();
         break;
 
       case CommandActions.DELETE:
         boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteRole(url, ignore, forceDelete, metalake, roles).handle();
+        newDeleteRole(url, ignore, forceDelete, metalake, roles).validate().handle();
         break;
 
       case CommandActions.GRANT:
-        newGrantPrivilegesToRole(
-                url, ignore, metalake, getOneRole(roles, CommandActions.GRANT), name, privileges)
+        newGrantPrivilegesToRole(url, ignore, metalake, getOneRole(roles), name, privileges)
+            .validate()
             .handle();
         break;
 
       case CommandActions.REVOKE:
-        newRevokePrivilegesFromRole(
-                url, ignore, metalake, getOneRole(roles, CommandActions.REMOVE), name, privileges)
+        newRevokePrivilegesFromRole(url, ignore, metalake, getOneRole(roles), name, privileges)
+            .validate()
             .handle();
         break;
 
@@ -805,9 +804,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
     }
   }
 
-  private String getOneRole(String[] roles, String command) {
-    Preconditions.checkArgument(
-        roles.length == 1, command + " requires only one role, but multiple are currently passed.");
+  private String getOneRole(String[] roles) {
+    if (roles == null || roles.length != 1) {
+      System.err.println(ErrorMessages.MULTIPLE_ROLE_COMMAND_ERROR);
+      Main.exit(-1);
+    }
+
     return roles[0];
   }
 

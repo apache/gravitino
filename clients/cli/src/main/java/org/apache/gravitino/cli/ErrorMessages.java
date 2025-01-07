@@ -55,6 +55,7 @@ public class ErrorMessages {
   public static final String MISSING_GROUP = "Missing --group option.";
   public static final String MISSING_METALAKE = "Missing --metalake option.";
   public static final String MISSING_NAME = "Missing --name option.";
+  public static final String MISSING_PRIVILEGES = "Missing --privilege option.";
   public static final String MISSING_PROPERTY = "Missing --property option.";
   public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
   public static final String MISSING_ROLE = "Missing --role option.";
@@ -63,6 +64,8 @@ public class ErrorMessages {
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_VALUE = "Missing --value option.";
 
+  public static final String MULTIPLE_ROLE_COMMAND_ERROR =
+      "This command only supports one --role option.";
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
       "This command only supports one --tag option.";
   public static final String MISSING_PROVIDER = "Missing --provider option.";
