@@ -103,4 +103,10 @@ public class CreateTag extends Command {
       System.out.println("Tags " + String.join(",", remaining) + " not created");
     }
   }
+
+  @Override
+  public Command validate() {
+    if (tags == null) exitWithError(ErrorMessages.MISSING_TAG);
+    return super.validate();
+  }
 }

@@ -116,4 +116,10 @@ public class DeleteTag extends Command {
       System.out.println("Tag " + tags[0] + " not deleted.");
     }
   }
+
+  @Override
+  public Command validate() {
+    if (tags == null) exitWithError(ErrorMessages.MISSING_TAG);
+    return super.validate();
+  }
 }

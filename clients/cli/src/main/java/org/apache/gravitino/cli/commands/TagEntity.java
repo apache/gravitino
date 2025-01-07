@@ -105,4 +105,10 @@ public class TagEntity extends Command {
 
     System.out.println(entity + " now tagged with " + all);
   }
+
+  @Override
+  public Command validate() {
+    if (name == null || !name.hasName()) exitWithError(ErrorMessages.MISSING_NAME);
+    return super.validate();
+  }
 }
