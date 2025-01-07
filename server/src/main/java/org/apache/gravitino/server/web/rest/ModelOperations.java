@@ -286,7 +286,7 @@ public class ModelOperations {
   }
 
   @POST
-  @Path("{model}")
+  @Path("{model}/versions")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "link-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "link-model-version", absolute = true)

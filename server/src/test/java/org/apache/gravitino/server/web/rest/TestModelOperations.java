@@ -601,6 +601,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp =
         target(modelPath())
             .path("model1")
+            .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -619,6 +620,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp1 =
         target(modelPath())
             .path("model1")
+            .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -637,6 +639,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp2 =
         target(modelPath())
             .path("model1")
+            .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -656,6 +659,7 @@ public class TestModelOperations extends JerseyTest {
     Response resp3 =
         target(modelPath())
             .path("model1")
+            .path("versions")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));

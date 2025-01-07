@@ -42,6 +42,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
   relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
+  mergeServiceFiles()
 }
 
 tasks.jar {

@@ -113,4 +113,10 @@ public class UntagEntity extends Command {
       System.out.println(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
     }
   }
+
+  @Override
+  public Command validate() {
+    if (name == null || !name.hasName()) exitWithError(ErrorMessages.MISSING_NAME);
+    return super.validate();
+  }
 }

@@ -514,7 +514,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 
 :::note
 
-Gravitino python client does not support customized filesets defined by users due to the limit of `fsspec` library. 
+Gravitino python client does not support [customized file systems](hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library. 
 :::
 
 
