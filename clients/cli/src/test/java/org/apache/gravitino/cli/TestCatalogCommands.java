@@ -92,6 +92,7 @@ class TestCatalogCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }

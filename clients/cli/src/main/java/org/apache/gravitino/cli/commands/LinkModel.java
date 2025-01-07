@@ -103,4 +103,10 @@ public class LinkModel extends Command {
     System.out.println(
         "Linked model " + model + " to " + uri + " with aliases " + Arrays.toString(alias));
   }
+
+  @Override
+  public Command validate() {
+    if (uri == null) exitWithError(ErrorMessages.MISSING_URI);
+    return super.validate();
+  }
 }
