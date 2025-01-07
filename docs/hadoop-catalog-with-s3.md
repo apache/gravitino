@@ -6,22 +6,28 @@ keyword: Hadoop catalog S3
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document describes how to configure a Hadoop catalog with S3. 
+This document explains how to configure a Hadoop catalog with S3 in Gravitino.
 
 ## Prerequisites
 
-In order to create a Hadoop catalog with S3, you need to place [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) in Gravitino Hadoop catalog classpath located 
-at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`. After that, start Gravitino server with the following command:
+To create a Hadoop catalog with S3, follow these steps:
+
+1. Download the [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) file.
+2. Place this file in the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+3. Start the Gravitino server using the following command:
 
 ```bash
 $ bin/gravitino-server.sh start
 ```
 
+Once the server is running, you can proceed to create the Hadoop catalog with S3.
+
+
 ## Create a Hadoop Catalog with S3
 
-### Create a S3 Hadoop catalog
+### Configuration for S3 Hadoop Catalog
 
-Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with S3:
+In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are necessary to configure a Hadoop catalog with S3:
 
 | Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                  | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|------------------|
@@ -31,20 +37,20 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 | `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
 | `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
-### Create a schema
+### Configuration for a schema
 
-Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+To learn how to create a schema, refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations).
 
-### Create a fileset
+### Configuration for a fileset
 
-Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
+For more details on creating a fileset, Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations).
 
 
-## Using Hadoop catalog with S3
+## Using the Hadoop catalog with S3
 
-The rest of this document shows how to use the Hadoop catalog with S3 in Gravitino with a full example.
+This section demonstrates how to use the Hadoop catalog with S3 in Gravitino, with a complete example.
 
-### Create a Hadoop catalog/schema/fileset with S3
+### Step1: Create a Hadoop Catalog with S3
 
 First of all, you need to create a Hadoop catalog with S3. The following example shows how to create a Hadoop catalog with S3:
 
@@ -118,12 +124,12 @@ s3_catalog = gravitino_client.create_catalog(name="test_catalog",
 </Tabs>
 
 :::note
-The value of location should always start with `s3a` NOT `s3` for AWS S3, for instance, `s3a://bucket/root`. Value like `s3://bucket/root` is not supported due to the limitation of the hadoop-aws library.
+When using S3 with Hadoop, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
 :::
 
-Then create a schema and a fileset in the catalog created above. 
+### Step2: Create a schema
 
-Using the following code to create a schema and a fileset:
+Once your Hadoop catalog with S3 is created, you can create a schema under the catalog. Here are examples of how to do that:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -171,6 +177,10 @@ catalog.as_schemas().create_schema(name="test_schema",
 
 </TabItem>
 </Tabs>
+
+### Step3: Create a fileset
+
+After creating the schema, you can create a fileset. Here are examples for creating a fileset:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -230,10 +240,11 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 </TabItem>
 </Tabs>
 
+## Accessing a fileset with S3
 
 ### Using Spark to access the fileset
 
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+The following Python code demonstrates how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
 
 ```python
 import logging

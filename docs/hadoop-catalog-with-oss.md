@@ -6,22 +6,26 @@ keyword: Hadoop catalog OSS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document describes how to configure a Hadoop catalog with Aliyun OSS.
+This document explains how to configure a Hadoop catalog with Aliyun OSS (Object Storage Service) in Gravitino.
 
 ## Prerequisites
 
-In order to create a Hadoop catalog with OSS, you need to place [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) in Gravitino Hadoop catalog classpath located
-at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`. After that, start Gravitino server with the following command:
+To set up a Hadoop catalog with OSS, follow these steps:
+
+1. Download the [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) file.
+2. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+3. Start the Gravitino server by running the following command:
 
 ```bash
 $ bin/gravitino-server.sh start
 ```
+Once the server is up and running, you can proceed to configure the Hadoop catalog with OSS.
 
 ## Create a Hadoop Catalog with OSS
 
-### Create an OSS Hadoop catalog
+### Configuration for an OSS Hadoop catalog
 
-Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
+In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
 
 | Configuration item            | Description                                                                                                                                                                                                                   | Default value   | Required                   | Since version    |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
@@ -31,22 +35,21 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 | `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
 | `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
 
-### Create a schema
+### Configuration for a schema
 
-Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+To create a schema, refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations).
 
-### Create a fileset
+### Configuration for a fileset
 
-Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
-
+For instructions on how to create a fileset, refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
 
 ## Using Hadoop catalog with OSS
 
-The rest of this document shows how to use the Hadoop catalog with OSS in Gravitino with a full example.
+This section will show you how to use the Hadoop catalog with OSS in Gravitino, including detailed examples.
 
-### Create a Hadoop catalog/schema/fileset with OSS
+### Create a Hadoop catalog with OSS
 
-First, you need to create a Hadoop catalog with OSS. The following example shows how to create a Hadoop catalog with OSS:
+First, you need to create a Hadoop catalog for OSS. The following examples demonstrate how to create a Hadoop catalog with OSS:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -117,9 +120,9 @@ oss_catalog = gravitino_client.create_catalog(name="test_catalog",
 </TabItem>
 </Tabs>
 
-Then create a schema and a fileset in the catalog created above.
+Step 2: Create a Schema
 
-Using the following code to create a schema and a fileset:
+Once the Hadoop catalog with OSS is created, you can create a schema inside that catalog. Below are examples of how to do this:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -166,6 +169,12 @@ catalog.as_schemas().create_schema(name="test_schema",
 
 </TabItem>
 </Tabs>
+
+
+### Create a fileset
+
+Now that the schema is created, you can create a fileset inside it. Here’s how:
+
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -224,6 +233,8 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 </TabItem>
 </Tabs>
+
+## Accessing a fileset with OSS
 
 ### Using Spark to access the fileset
 
@@ -432,7 +443,7 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-  .appName("oss_fielset_test")
+  .appName("oss_fileset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
   .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_IP:PORT}")

@@ -21,8 +21,7 @@ $ bin/gravitino-server.sh start
 
 The rest of this document shows how to use the Hadoop catalog with GCS in Gravitino with a full example.
 
-
-### Create a GCS Hadoop catalog
+### Configuration for a GCS Hadoop catalog
 
 Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
 
@@ -32,17 +31,19 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a GCS fileset. | 0.7.0-incubating |
 
-### Create a schema
+### Configuration for a schema
 
 Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
 
-### Create a fileset
+### Configuration for a fileset
 
 Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
 
 ## Using Hadoop catalog with GCS
 
-### Create a Hadoop catalog/schema/fileset with GCS
+This section will show you how to use the Hadoop catalog with GCS in Gravitino, including detailed examples.
+
+### Create a Hadoop catalog with GCS
 
 First, you need to create a Hadoop catalog with GCS. The following example shows how to create a Hadoop catalog with GCS:
 
@@ -109,9 +110,9 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 </TabItem>
 </Tabs>
 
-Then create a schema and a fileset in the catalog created above.
+### Step2: Create a schema
 
-Using the following code to create a schema and a fileset:
+Once you have created a Hadoop catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -158,6 +159,11 @@ catalog.as_schemas().create_schema(name="test_schema",
 
 </TabItem>
 </Tabs>
+
+
+### Step3: Create a fileset
+
+After creating a schema, you can create a fileset. The following example shows how to create a fileset:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -216,6 +222,8 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 </TabItem>
 </Tabs>
+
+## Accessing a fileset with GCS
 
 ### Using Spark to access the fileset
 
