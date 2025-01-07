@@ -50,7 +50,6 @@ from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
     NoSuchCredentialException,
-    CatalogNotInUseException,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
@@ -896,8 +895,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         finally:
             write_lock.release()
 
-    def _file_system_is_not_expired(self, expire_time: int):
-        return expire_time > time.time() * 1000
+    def _file_system_expired(self, expire_time: int):
+        return expire_time <= time.time() * 1000
 
     # Disable Too many branches (13/12) (too-many-branches)
     # pylint: disable=R0912
@@ -915,7 +914,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 name_identifier
             )
             if cache_value is not None:
-                if self._file_system_is_not_expired(cache_value[0]):
+                if not self._file_system_expired(cache_value[0]):
                     return cache_value[1]
         finally:
             read_lock.release()
@@ -928,7 +927,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
 
             if cache_value is not None:
-                if self._file_system_is_not_expired(cache_value[0]):
+                if not self._file_system_expired(cache_value[0]):
                     return cache_value[1]
 
             new_cache_value: Tuple[int, AbstractFileSystem]
@@ -971,7 +970,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 NameIdentifier.of(identifier.namespace().level(2), identifier.name())
             )
             credentials = fileset.support_credentials().get_credentials()
-        except (NoSuchCredentialException, CatalogNotInUseException) as e:
+        except NoSuchCredentialException as e:
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
@@ -1005,7 +1004,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 NameIdentifier.of(identifier.namespace().level(2), identifier.name())
             )
             credentials = fileset.support_credentials().get_credentials()
-        except (NoSuchCredentialException, CatalogNotInUseException) as e:
+        except NoSuchCredentialException as e:
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
@@ -1066,7 +1065,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 NameIdentifier.of(identifier.namespace().level(2), identifier.name())
             )
             credentials = fileset.support_credentials().get_credentials()
-        except (NoSuchCredentialException, CatalogNotInUseException) as e:
+        except NoSuchCredentialException as e:
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 
@@ -1129,7 +1128,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 NameIdentifier.of(identifier.namespace().level(2), identifier.name())
             )
             credentials = fileset.support_credentials().get_credentials()
-        except (NoSuchCredentialException, CatalogNotInUseException) as e:
+        except NoSuchCredentialException as e:
             logger.warning("Failed to get credentials from fileset: %s", e)
             credentials = []
 

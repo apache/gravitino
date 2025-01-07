@@ -38,12 +38,12 @@ logger = logging.getLogger(__name__)
 
 def azure_abs_with_credential_is_prepared():
     return (
-        os.environ.get("ABS_STS_ACCOUNT_NAME")
-        and os.environ.get("ABS_STS_ACCOUNT_KEY")
-        and os.environ.get("ABS_STS_CONTAINER_NAME")
-        and os.environ.get("ABS_STS_TENANT_ID")
-        and os.environ.get("ABS_STS_CLIENT_ID")
-        and os.environ.get("ABS_STS_CLIENT_SECRET")
+        os.environ.get("ABS_ACCOUNT_NAME_FOR_CREDENTIAL")
+        and os.environ.get("ABS_ACCOUNT_KEY_FOR_CREDENTIAL")
+        and os.environ.get("ABS_CONTAINER_NAME_FOR_CREDENTIAL")
+        and os.environ.get("ABS_TENANT_ID_FOR_CREDENTIAL")
+        and os.environ.get("ABS_CLIENT_ID_FOR_CREDENTIAL")
+        and os.environ.get("ABS_CLIENT_SECRET_FOR_CREDENTIAL")
     )
 
 
@@ -54,12 +54,12 @@ def azure_abs_with_credential_is_prepared():
 class TestGvfsWithCredentialABS(TestGvfsWithABS):
     # Before running this test, please set the make sure azure-bundle-xxx.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
-    azure_abs_account_key = os.environ.get("ABS_STS_ACCOUNT_KEY")
-    azure_abs_account_name = os.environ.get("ABS_STS_ACCOUNT_NAME")
-    azure_abs_container_name = os.environ.get("ABS_STS_CONTAINER_NAME")
-    azure_abs_tenant_id = os.environ.get("ABS_STS_TENANT_ID")
-    azure_abs_client_id = os.environ.get("ABS_STS_CLIENT_ID")
-    azure_abs_client_secret = os.environ.get("ABS_STS_CLIENT_SECRET")
+    azure_abs_account_key = os.environ.get("ABS_ACCOUNT_NAME_FOR_CREDENTIAL")
+    azure_abs_account_name = os.environ.get("ABS_ACCOUNT_KEY_FOR_CREDENTIAL")
+    azure_abs_container_name = os.environ.get("ABS_CONTAINER_NAME_FOR_CREDENTIAL")
+    azure_abs_tenant_id = os.environ.get("ABS_TENANT_ID_FOR_CREDENTIAL")
+    azure_abs_client_id = os.environ.get("ABS_CLIENT_ID_FOR_CREDENTIAL")
+    azure_abs_client_secret = os.environ.get("ABS_CLIENT_SECRET_FOR_CREDENTIAL")
 
     metalake_name: str = "TestGvfsWithCredentialABS_metalake" + str(randint(1, 10000))
 
