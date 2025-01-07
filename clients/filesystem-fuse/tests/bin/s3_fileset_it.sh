@@ -19,6 +19,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
 S3_SECRET_ACCESS=${S3_SECRET_ACCESS:-}
 S3_REGION=${S3_REGION:-}
@@ -147,7 +150,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+cd $CLIENT_FUSE_DIR
+
 # Start the gvfs-fuse process in the background
+echo "Starting gvfs-fuse"
+# Build the gvfs-fuse
+make build
+
 $CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $MOUNT_FROM_LOCATION $CONF_FILE > $CLIENT_FUSE_DIR/target/debug/fuse.log 2>&1 &
 FUSE_PID=$!
 echo "Gvfs fuse started with PID: $FUSE_PID"
@@ -175,8 +184,6 @@ check_gvfs_fuse_ready() {
 check_gvfs_fuse_ready
 
 # run the integration test
-cd $CLIENT_FUSE_DIR
+
 export RUN_TEST_WITH_BACKGROUND=1
 cargo test --test fuse_test test_fuse_system_with_manual -- --exact
-
-sleep 3

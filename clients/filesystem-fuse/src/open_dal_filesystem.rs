@@ -265,23 +265,26 @@ mod test {
     use opendal::layers::LoggingLayer;
     use opendal::{services, Builder, Operator};
 
-    #[tokio::test]
-    async fn test_s3_stat() {
-        if std::env::var(TEST_ENV_WITH_S3).is_err() {
-            return;
-        }
-
+    fn create_opendal() -> Operator {
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
         let opendal_config = extract_s3_config(&config);
 
         let builder = services::S3::from_map(opendal_config);
 
         // Init an operator
-        let op = Operator::new(builder)
+        Operator::new(builder)
             .expect("opendal create failed")
             .layer(LoggingLayer::default())
-            .finish();
+            .finish()
+    }
 
+    #[tokio::test]
+    async fn test_s3_stat() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
+            return;
+        }
+
+        let op = create_opendal();
         let path = "/";
         let list = op.list(path).await;
         if let Ok(l) = list {
@@ -297,6 +300,33 @@ mod test {
             println!("stat result: {:?}", m);
         } else {
             println!("stat error: {:?}", meta.err());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_s3_delete() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
+            return;
+        }
+
+        let op = create_opendal();
+        let path = "/s1/fileset1/gvfs_test/test_dir/test_file";
+
+        let meta = op.stat(path).await;
+        if let Ok(m) = meta {
+            println!("stat result: {:?}", m);
+        } else {
+            println!("stat error: {:?}", meta.err());
+        }
+
+        let result = op.remove(vec![path.to_string()]).await;
+        match result {
+            Ok(_) => {
+                println!("Delete successful (or no-op).");
+            }
+            Err(e) => {
+                println!("Delete failed: {:?}", e);
+            }
         }
     }
 }
