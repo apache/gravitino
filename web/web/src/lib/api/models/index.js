@@ -45,7 +45,7 @@ const Apis = {
   LINK_VERSION: ({ metalake, catalog, schema, model }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
-    )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}`,
+    )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions`,
   DELETE_VERSION: ({ metalake, catalog, schema, model, version }) => {
     return `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
