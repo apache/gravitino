@@ -23,6 +23,7 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
+  implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(libs.commons.lang3)
   implementation(libs.hadoop3.client.api)

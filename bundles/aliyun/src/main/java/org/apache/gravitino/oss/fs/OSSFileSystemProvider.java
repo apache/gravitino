@@ -61,14 +61,24 @@ public class OSSFileSystemProvider implements FileSystemProvider {
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
-    if (shouldSetCredentialsProviderExplicitly(config)) {
+    //    if (shouldSetCredentialsProviderExplicitly(config)) {
+    //      hadoopConfMap.put(
+    //          Constants.CREDENTIALS_PROVIDER_KEY,
+    // OSSCredentialsProvider.class.getCanonicalName());
+    //    }
+
+    if (enableCredentialProvidedByGravitino(config)) {
       hadoopConfMap.put(
-          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialsProvider.class.getCanonicalName());
+          Constants.CREDENTIALS_PROVIDER_KEY, TestOSSCredentialProvider.class.getCanonicalName());
     }
 
     hadoopConfMap.forEach(configuration::set);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
+    return null != config.get("fs.gvfs.provider.impl");
   }
 
   /**

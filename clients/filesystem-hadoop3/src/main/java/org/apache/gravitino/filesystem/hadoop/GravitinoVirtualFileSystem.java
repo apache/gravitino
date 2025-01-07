@@ -54,6 +54,8 @@ import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchCredentialException;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.filesystem.common.GravitinoVirtualFileSystemUtils;
@@ -319,6 +321,23 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 totalProperty.putAll(getConfigMap(getConf()));
                 // If enable the cloud store credential, we should pass the configuration here.
                 totalProperty.put(GVFS_FILESET_IDENTIFIER, identifier.toString());
+
+                Fileset fileset =
+                    catalog
+                        .asFilesetCatalog()
+                        .loadFileset(
+                            NameIdentifier.of(identifier.namespace().level(2), identifier.name()));
+
+                try {
+                  fileset.supportsCredentials().getCredentials();
+                  // it has enabled the credential provider
+                  totalProperty.put(
+                      "fs.gvfs.credential.provider",
+                      DefaultGravitinoFileSystemCredentialProvider.class.getCanonicalName());
+                  totalProperty.put("fs.gvfs.virtual.path", virtualPathString);
+                } catch (NoSuchCredentialException e) {
+                  // No credential found, do nothing.
+                }
 
                 return provider.getFileSystem(filePath, totalProperty);
               } catch (IOException ioe) {
