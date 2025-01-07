@@ -140,7 +140,6 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
     catalogProps.put("location", ossLocation);
     catalogProps.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     catalogProps.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
-
     catalogProps.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog localCatalog =

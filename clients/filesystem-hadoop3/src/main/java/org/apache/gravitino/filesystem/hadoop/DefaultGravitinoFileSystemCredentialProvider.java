@@ -31,6 +31,10 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.hadoop.conf.Configuration;
 
+/**
+ * Default implementation of {@link GravitinoFileSystemCredentialProvider} which provides credentials
+ * for Gravitino Virtual File System.
+ */
 public class DefaultGravitinoFileSystemCredentialProvider
     implements GravitinoFileSystemCredentialProvider {
 
