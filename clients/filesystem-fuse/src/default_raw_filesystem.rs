@@ -342,7 +342,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             .remove(fh)
             .ok_or(Errno::from(libc::EBADF))?;
 
-        // todo: handle race condition
+        // todo: need to handle racing condition
         if file_entry.is_ok() {
             let mut file = opened_file.lock().await;
             file.close().await
