@@ -22,19 +22,12 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 
-/**
- * Represents an event that is triggered upon the successful list of models within a namespace.
- *
- * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
- * number of tables directly within the ListTableEvent, the actual tables listed are not maintained
- * in this event. This design decision helps in managing resource efficiency, especially in
- * environments with extensive table listings.
- */
+/** Represents an event that is triggered upon the successful list of models within a namespace. */
 public class ListModelEvent extends ModelEvent {
   private final Namespace namespace;
 
   /**
-   * Constructs an instance of {@code ListTableEvent}.
+   * Constructs an instance of {@code ListModelEvent}.
    *
    * @param user The username of the individual who initiated the model listing.
    * @param namespace The namespace from which models were listed.

@@ -59,8 +59,8 @@ public class DropModelVersionEvent extends ModelEvent {
   /**
    * Retrieves the existence status of the model version at the time of the drop operation.
    *
-   * @return A boolean value indicating whether the model version existed. {@code true} if the table
-   *     existed, otherwise {@code false}.
+   * @return A boolean value indicating whether the model version existed. {@code true} if the model
+   *     version existed, otherwise {@code false}.
    */
   public boolean isExists() {
     return isExists;
