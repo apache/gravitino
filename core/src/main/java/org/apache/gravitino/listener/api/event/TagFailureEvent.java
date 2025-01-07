@@ -27,7 +27,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * exception.
  */
 @DeveloperApi
-public class TagFailureEvent extends FailureEvent {
+public abstract class TagFailureEvent extends FailureEvent {
 
   /**
    * Constructs a new {@code TagFailureEvent} instance.
@@ -37,7 +37,7 @@ public class TagFailureEvent extends FailureEvent {
    * @param exception The exception encountered during the tag operation, providing insights into
    *     the reasons behind the failure.
    */
-  public TagFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+  protected TagFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
 }

@@ -28,7 +28,7 @@ import org.apache.gravitino.listener.api.event.DeleteTagFailureEvent;
 import org.apache.gravitino.listener.api.event.GetTagFailureEvent;
 import org.apache.gravitino.listener.api.event.GetTagForMetadataObjectFailureEvent;
 import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagFailureEvent;
-import org.apache.gravitino.listener.api.event.ListTagFailureEvent;
+import org.apache.gravitino.listener.api.event.ListTagsFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFailureEvent;
@@ -61,7 +61,7 @@ public class TagEventDispatcher implements TagDispatcher {
       return dispatcher.listTags(metalake);
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new ListTagFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, e));
+          new ListTagsFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, e));
       throw e;
     }
   }

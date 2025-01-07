@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Represents an event triggered when an attempt to list metadata objects for a tag fails due to an
@@ -38,7 +38,7 @@ public class ListMetadataObjectsForTagFailureEvent extends TagFailureEvent {
    */
   public ListMetadataObjectsForTagFailureEvent(
       String user, String metalake, String name, Exception exception) {
-    super(user, NameIdentifier.of(metalake), exception);
+    super(user, NameIdentifierUtil.ofTag(metalake, name), exception);
   }
 
   /**

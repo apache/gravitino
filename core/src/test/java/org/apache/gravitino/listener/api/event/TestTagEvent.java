@@ -139,9 +139,9 @@ public class TestTagEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listTags("metalake"));
     Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(ListTagFailureEvent.class, event.getClass());
+    Assertions.assertEquals(ListTagsFailureEvent.class, event.getClass());
     Assertions.assertEquals(
-        GravitinoRuntimeException.class, ((ListTagFailureEvent) event).exception().getClass());
+        GravitinoRuntimeException.class, ((ListTagsFailureEvent) event).exception().getClass());
     Assertions.assertEquals(OperationType.LIST_TAG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }

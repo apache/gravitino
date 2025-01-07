@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered when an attempt to list tags fails due to an exception. */
 @DeveloperApi
-public class ListTagFailureEvent extends TagFailureEvent {
+public class ListTagsFailureEvent extends TagFailureEvent {
 
   /**
    * Constructs a new {@code ListTagFailureEvent} instance.
@@ -34,7 +34,7 @@ public class ListTagFailureEvent extends TagFailureEvent {
    * @param exception The exception encountered during the tag listing operation, providing insights
    *     into the reasons behind the failure.
    */
-  public ListTagFailureEvent(String user, String metalake, Exception exception) {
+  public ListTagsFailureEvent(String user, String metalake, Exception exception) {
     super(user, NameIdentifier.of(metalake), exception);
   }
 
