@@ -62,7 +62,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
   protected String schemaName = GravitinoITUtils.genRandomName("schema");
   protected GravitinoMetalake metalake;
   protected Configuration conf = new Configuration();
-  protected int defaultBockSize = 128 * 1024 * 1024;
+  protected int defaultBlockSize = 128 * 1024 * 1024;
   protected int defaultReplication = 3;
 
   @BeforeAll
@@ -483,7 +483,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
     Path gvfsPath = genGvfsPath(filesetName);
     try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-      assertEquals(defaultBockSize, gvfs.getDefaultBlockSize(gvfsPath));
+      assertEquals(defaultBlockSize, gvfs.getDefaultBlockSize(gvfsPath));
     }
 
     catalog.asFilesetCatalog().dropFileset(filesetIdent);
