@@ -123,7 +123,7 @@ The value of location should always start with `s3a` NOT `s3` for AWS S3, for in
 
 Then create a schema and a fileset in the catalog created above. 
 
-Using the following code to create a schema and fileset:
+Using the following code to create a schema and a fileset:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -303,13 +303,13 @@ conf.set("s3-endpoint", "${GRAVITINO_SERVER_IP:PORT}");
 conf.set("s3-access-key-id", "minio");
 conf.set("s3-secret-access-key", "minio123");
 
-Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/adls_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ...
 ```
 
-Similar to Spark configurations, you need to add S3 bundle jars to the classpath according to your environment.
+Similar to Spark configurations, you need to add S3 (bundle) jars to the classpath according to your environment.
 
 ### Accessing a fileset using the Hadoop fs command
 
@@ -363,8 +363,8 @@ then copy hadoop-aws-{version}.jar and related dependencies to the `${HADOOP_HOM
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/s3_catalog/schema/example
-hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/schema/example
+hadoop dfs -ls gvfs://fileset/s3_catalog/s3_schema/s3_fileset
+hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
 ```
 
 ### Using the Gravitino virtual file system Python client to access a fileset

@@ -115,7 +115,7 @@ adls_properties = gravitino_client.create_catalog(name="example_catalog",
 
 Then create a schema and fileset in the catalog created above.
 
-Using the following code to create a schema and fileset:
+Using the following code to create a schema and a fileset:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -346,8 +346,8 @@ then copy `hadoop-azure-${version}.jar` and related dependencies to the `${HADOO
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/adls_catalog/schema/example
-hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/schema/example
+hadoop dfs -ls gvfs://fileset/adls_catalog/adls_schema/adls_fileset
+hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/adls_fileset
 ```
 
 ### Using the Gravitino virtual file system Python client to access a fileset
@@ -362,7 +362,7 @@ options = {
     "azure_storage_account_key": "azure_account_key"
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="test_metalake", options=options)
-fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
+fs.ls("gvfs://fileset/{adls_catalog}/{adls_schema}/{adls_fileset}/")
 ```
 
 

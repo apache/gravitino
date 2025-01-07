@@ -111,7 +111,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 
 Then create a schema and a fileset in the catalog created above.
 
-Using the following code to create a schema and fileset:
+Using the following code to create a schema and a fileset:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -334,8 +334,8 @@ Then copy `hadoop-gcp-${version}.jar` and other possible dependencies to the `${
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/gcs_catalog/schema/example
-hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/schema/example
+hadoop dfs -ls gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
+hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 ```
 
 
