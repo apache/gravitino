@@ -117,6 +117,9 @@ class TestGvfsWithS3Credential(TestGvfsWithS3):
             endpoint_url=cls.s3_endpoint,
         )
 
+    # The following tests are copied from tests/integration/test_gvfs_with_s3.py, with some modifications as
+    # `mkdir` and `makedirs` have different behavior in the S3, other cloud storage like GCS, ABS, and OSS.
+    # are similar.
     def test_mkdir(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
         mkdir_actual_dir = self.fileset_storage_location + "/test_mkdir"

@@ -69,6 +69,7 @@ logger = logging.getLogger(__name__)
 
 PROTOCOL_NAME = "gvfs"
 
+TIME_WITHOUT_EXPIRATION = sys.maxsize
 
 class StorageType(Enum):
     HDFS = "hdfs"
@@ -933,11 +934,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             if storage_type == StorageType.HDFS:
                 fs_class = importlib.import_module("pyarrow.fs").HadoopFileSystem
                 new_cache_value = (
-                    sys.maxsize,
+                    TIME_WITHOUT_EXPIRATION,
                     ArrowFSWrapper(fs_class.from_uri(actual_file_location)),
                 )
             elif storage_type == StorageType.LOCAL:
-                new_cache_value = (sys.maxsize, LocalFileSystem())
+                new_cache_value = (TIME_WITHOUT_EXPIRATION, LocalFileSystem())
             elif storage_type == StorageType.GCS:
                 new_cache_value = self._get_gcs_filesystem(
                     fileset_catalog, name_identifier
@@ -991,7 +992,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "Service account key is not found in the options."
             )
         return (
-            sys.maxsize,
+            TIME_WITHOUT_EXPIRATION,
             importlib.import_module("gcsfs").GCSFileSystem(
                 token=service_account_key_path
             ),
@@ -1049,7 +1050,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
 
         return (
-            sys.maxsize,
+            TIME_WITHOUT_EXPIRATION,
             importlib.import_module("s3fs").S3FileSystem(
                 key=aws_access_key_id,
                 secret=aws_secret_access_key,
@@ -1112,15 +1113,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "OSS secret access key is not found in the options."
             )
 
-        # get 'oss_endpoint_url' from oss options, if the key is not found, throw an exception
-        oss_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
-        if oss_endpoint_url is None:
-            raise GravitinoRuntimeException(
-                "OSS endpoint url is not found in the options."
-            )
-
         return (
-            sys.maxsize,
+            TIME_WITHOUT_EXPIRATION,
             importlib.import_module("ossfs").OSSFileSystem(
                 key=oss_access_key_id,
                 secret=oss_secret_access_key,
@@ -1174,7 +1168,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
 
         return (
-            sys.maxsize,
+            TIME_WITHOUT_EXPIRATION,
             importlib.import_module("adlfs").AzureBlobFileSystem(
                 account_name=abs_account_name,
                 account_key=abs_account_key,
@@ -1226,7 +1220,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def _get_expire_time_by_ratio(self, expire_time: int):
         if expire_time <= 0:
-            return sys.maxsize
+            return TIME_WITHOUT_EXPIRATION
         return time.time() * 1000 + (expire_time - time.time() * 1000) * 0.9
 
 
