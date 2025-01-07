@@ -99,5 +99,17 @@ public enum OperationType {
   RENAME_VIEW,
   LIST_VIEW,
 
+  // Model event
+  REGISTER_MODEL,
+  DROP_MODEL,
+  GET_MODEL,
+  LIST_MODEL,
+
+  // Model Version
+  LINK_MODEL_VERSION,
+  DROP_MODEL_VERSION,
+  GET_MODEL_VERSION,
+  LIST_MODEL_VERSIONS,
+
   UNKNOWN,
 }
