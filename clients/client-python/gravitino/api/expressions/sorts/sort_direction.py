@@ -29,9 +29,6 @@ class SortDirection(Enum):
     DESCENDING = ("desc", NullOrdering.NULLS_LAST)
     """Descending sort direction. Nulls appear last. For ascending order, this means nulls appear at the end."""
 
-    _direction: str
-    _default_null_ordering: NullOrdering
-
     def __init__(self, direction: str, default_null_ordering: NullOrdering):
         self._direction = direction
         self._default_null_ordering = default_null_ordering

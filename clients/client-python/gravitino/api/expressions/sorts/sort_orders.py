@@ -23,9 +23,6 @@ from gravitino.api.expressions.sorts.sort_order import SortOrder
 
 
 class SortImpl(SortOrder):
-    _expression: Expression
-    _direction: SortDirection
-    _null_ordering: NullOrdering
 
     def __init__(
         self,
