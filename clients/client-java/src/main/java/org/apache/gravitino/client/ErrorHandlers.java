@@ -44,7 +44,6 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchCredentialException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -898,10 +897,6 @@ public class ErrorHandlers {
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
             throw new NoSuchMetalakeException(errorMessage);
-          } else if (errorResponse
-              .getType()
-              .equals(NoSuchCredentialException.class.getSimpleName())) {
-            throw new NoSuchCredentialException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }

@@ -291,6 +291,7 @@ components:
             - hive
             - lakehouse-iceberg
             - lakehouse-paimon
+            - lakehouse-hudi
             - jdbc-mysql
             - jdbc-postgresql
             - jdbc-doris
