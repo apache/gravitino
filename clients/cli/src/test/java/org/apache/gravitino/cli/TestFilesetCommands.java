@@ -92,6 +92,7 @@ class TestFilesetCommands {
         .when(commandLine)
         .newListFilesets(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -117,6 +118,7 @@ class TestFilesetCommands {
             "catalog",
             "schema",
             "fileset");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -147,6 +149,7 @@ class TestFilesetCommands {
             eq("fileset"),
             eq("comment"),
             any());
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -173,6 +176,7 @@ class TestFilesetCommands {
             "catalog",
             "schema",
             "fileset");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -200,6 +204,7 @@ class TestFilesetCommands {
             "catalog",
             "schema",
             "fileset");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -229,6 +234,7 @@ class TestFilesetCommands {
             "schema",
             "fileset",
             "new_comment");
+    doReturn(mockUpdateComment).when(mockUpdateComment).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
   }
@@ -258,6 +264,7 @@ class TestFilesetCommands {
             "schema",
             "fileset",
             "new_name");
+    doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
   }
@@ -284,6 +291,7 @@ class TestFilesetCommands {
             "catalog",
             "schema",
             "fileset");
+    doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
@@ -316,8 +324,72 @@ class TestFilesetCommands {
             "fileset",
             "property",
             "value");
+    doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testSetFilesetPropertyCommandWithoutPropertyAndValue() {
+    Main.useExit = false;
+    SetFilesetProperty spySetProperty =
+        spy(
+            new SetFilesetProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                null,
+                null));
+
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY_AND_VALUE, errOutput);
+  }
+
+  @Test
+  void testSetFilesetPropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    SetFilesetProperty spySetProperty =
+        spy(
+            new SetFilesetProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                null,
+                "value"));
+
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, errOutput);
+  }
+
+  @Test
+  void testSetFilesetPropertyCommandWithoutValue() {
+    Main.useExit = false;
+    SetFilesetProperty spySetProperty =
+        spy(
+            new SetFilesetProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                "property",
+                null));
+
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_VALUE, errOutput);
   }
 
   @Test
@@ -345,8 +417,29 @@ class TestFilesetCommands {
             "schema",
             "fileset",
             "property");
+    doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testRemoveFilesetPropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    RemoveFilesetProperty spyRemoveProperty =
+        spy(
+            new RemoveFilesetProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                null));
+
+    assertThrows(RuntimeException.class, spyRemoveProperty::validate);
+    verify(spyRemoveProperty, never()).handle();
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, errOutput);
   }
 
   @Test

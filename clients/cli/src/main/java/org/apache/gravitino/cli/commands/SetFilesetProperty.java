@@ -90,4 +90,10 @@ public class SetFilesetProperty extends Command {
 
     System.out.println(schema + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return super.validate();
+  }
 }
