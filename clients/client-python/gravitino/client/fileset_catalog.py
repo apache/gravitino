@@ -24,7 +24,7 @@ from gravitino.api.credential.credential import Credential
 from gravitino.api.fileset import Fileset
 from gravitino.api.fileset_change import FilesetChange
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
-from gravitino.catalog.base_schema_catalog import BaseSchemaCatalog
+from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_fileset import GenericFileset
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
@@ -205,7 +205,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         req.validate()
 
         resp = self.rest_client.put(
-            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}",
             req,
             error_handler=FILESET_ERROR_HANDLER,
         )
@@ -231,7 +231,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         resp = self.rest_client.delete(
-            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}",
             error_handler=FILESET_ERROR_HANDLER,
         )
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
@@ -289,9 +289,9 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         )
         FilesetCatalog.check_fileset_namespace(ident.namespace())
 
-    def _get_fileset_full_namespace(self, table_namespace: Namespace) -> Namespace:
+    def _get_fileset_full_namespace(self, fileset_namespace: Namespace) -> Namespace:
         return Namespace.of(
-            self._catalog_namespace.level(0), self.name(), table_namespace.level(0)
+            self._catalog_namespace.level(0), self.name(), fileset_namespace.level(0)
         )
 
     @staticmethod

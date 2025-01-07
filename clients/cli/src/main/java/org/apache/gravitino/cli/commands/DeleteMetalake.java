@@ -58,7 +58,7 @@ public class DeleteMetalake extends Command {
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (MetalakeInUseException inUseException) {
-      System.err.println(metalake + " in use, please disable it first.");
+      System.err.println(metalake + ErrorMessages.ENTITY_IN_USE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

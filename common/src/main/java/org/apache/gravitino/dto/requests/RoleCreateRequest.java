@@ -79,5 +79,14 @@ public class RoleCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(securableObjects != null, "\"securableObjects\" can't null ");
+    for (SecurableObjectDTO objectDTO : securableObjects) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(objectDTO.name()), "\" securable object name\" can't be blank");
+      Preconditions.checkArgument(
+          objectDTO.type() != null, "\" securable object type\" can't be null");
+      Preconditions.checkArgument(
+          objectDTO.privileges() != null && !objectDTO.privileges().isEmpty(),
+          "\"securable object privileges\" can't be null or empty");
+    }
   }
 }

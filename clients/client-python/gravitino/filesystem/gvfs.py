@@ -35,7 +35,7 @@ from gravitino.audit.internal_client_type import InternalClientType
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
-from gravitino.catalog.fileset_catalog import FilesetCatalog
+from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig

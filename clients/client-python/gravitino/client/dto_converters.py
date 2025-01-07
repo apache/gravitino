@@ -17,7 +17,8 @@
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
-from gravitino.catalog.fileset_catalog import FilesetCatalog
+from gravitino.client.fileset_catalog import FilesetCatalog
+from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.requests.catalog_update_request import CatalogUpdateRequest
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
@@ -54,6 +55,18 @@ class DTOConverters:
         namespace = Namespace.of(metalake)
         if catalog.type() == Catalog.Type.FILESET:
             return FilesetCatalog(
+                namespace=namespace,
+                name=catalog.name(),
+                catalog_type=catalog.type(),
+                provider=catalog.provider(),
+                comment=catalog.comment(),
+                properties=catalog.properties(),
+                audit=catalog.audit_info(),
+                rest_client=client,
+            )
+
+        if catalog.type() == Catalog.Type.MODEL:
+            return GenericModelCatalog(
                 namespace=namespace,
                 name=catalog.name(),
                 catalog_type=catalog.type(),

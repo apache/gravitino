@@ -93,6 +93,7 @@ class TestColumnCommands {
         .when(commandLine)
         .newListColumns(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -120,6 +121,7 @@ class TestColumnCommands {
             "schema",
             "users",
             "name");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -187,6 +189,7 @@ class TestColumnCommands {
             true,
             false,
             null);
+    doReturn(mockAddColumn).when(mockAddColumn).validate();
     commandLine.handleCommandLine();
     verify(mockAddColumn).handle();
   }
@@ -214,6 +217,7 @@ class TestColumnCommands {
             "schema",
             "users",
             "name");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -246,6 +250,7 @@ class TestColumnCommands {
             "users",
             "name",
             "new comment");
+    doReturn(mockUpdateColumn).when(mockUpdateColumn).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateColumn).handle();
   }
@@ -278,6 +283,7 @@ class TestColumnCommands {
             "users",
             "name",
             "renamed");
+    doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
   }
@@ -310,6 +316,7 @@ class TestColumnCommands {
             "users",
             "name",
             "varchar(250)");
+    doReturn(mockUpdateDatatype).when(mockUpdateDatatype).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateDatatype).handle();
   }
@@ -342,6 +349,7 @@ class TestColumnCommands {
             "users",
             "name",
             "first");
+    doReturn(mockUpdatePosition).when(mockUpdatePosition).validate();
     commandLine.handleCommandLine();
     verify(mockUpdatePosition).handle();
   }
@@ -373,6 +381,7 @@ class TestColumnCommands {
             "users",
             "name",
             true);
+    doReturn(mockUpdateNull).when(mockUpdateNull).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateNull).handle();
   }
@@ -404,6 +413,7 @@ class TestColumnCommands {
             "users",
             "name",
             true);
+    doReturn(mockUpdateAuto).when(mockUpdateAuto).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateAuto).handle();
   }
@@ -439,8 +449,31 @@ class TestColumnCommands {
             "name",
             "Fred Smith",
             "varchar(100)");
+    doReturn(mockUpdateDefault).when(mockUpdateDefault).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateDefault).handle();
+  }
+
+  @Test
+  void testUpdateColumnDefaultWithoutDataType() {
+    Main.useExit = false;
+    UpdateColumnDefault spyUpdate =
+        spy(
+            new UpdateColumnDefault(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "user",
+                "name",
+                "",
+                null));
+
+    assertThrows(RuntimeException.class, spyUpdate::validate);
+    verify(spyUpdate, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_DATATYPE, output);
   }
 
   @Test
@@ -464,7 +497,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -496,7 +529,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -531,7 +564,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.TABLE, CommandEntities.COLUMN)));
   }
 
@@ -563,7 +596,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.COLUMN)));
   }
 
@@ -588,7 +621,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -617,7 +650,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.TABLE)));
   }
 
@@ -643,7 +676,7 @@ class TestColumnCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.TABLE);
   }
 }

@@ -118,4 +118,10 @@ public class RemoveAllTags extends Command {
       System.out.println(entity + " has no tags");
     }
   }
+
+  @Override
+  public Command validate() {
+    if (name == null || !name.hasName()) exitWithError(ErrorMessages.MISSING_NAME);
+    return super.validate();
+  }
 }

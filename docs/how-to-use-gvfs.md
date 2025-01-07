@@ -42,10 +42,7 @@ the path mapping and convert automatically.
 
 ### Prerequisites
 
-+ A Hadoop environment with HDFS running. GVFS has been tested against
-  Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
-  x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
-  compatibility issues.
++ A Hadoop environment with HDFS or other Hadoop Compatible File System (HCFS) implementations like S3, GCS, etc. GVFS has been tested against Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any compatibility issues.
 
 ### Configuration
 
@@ -71,11 +68,11 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 
 #### S3 fileset
 
-| Configuration item             | Description                                                                                                                                                                            | Default value | Required                 | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------|------------------|
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                            | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| Configuration item     | Description                   | Default value | Required                  | Since version    |
+|------------------------|-------------------------------|---------------|---------------------------|------------------|
+| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
 At the same time, you need to add the corresponding bundle jar
 1. [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if no hadoop environment is available, or
@@ -84,9 +81,9 @@ At the same time, you need to add the corresponding bundle jar
 
 #### GCS fileset
 
-| Configuration item             | Description                                                                                                                                                                              | Default value | Required                  | Since version    |
-|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
+| Configuration item         | Description                                | Default value | Required                   | Since version    |
+|----------------------------|--------------------------------------------|---------------|----------------------------|------------------|
+| `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes if it's a GCS fileset. | 0.7.0-incubating |
 
 In the meantime, you need to add the corresponding bundle jar
 1. [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if no hadoop environment is available, or
@@ -447,9 +444,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 ### Prerequisites
 
-+ A Hadoop environment with HDFS running. Now we only supports Fileset on HDFS.
-  GVFS in Python has been tested against Hadoop 2.7.3. It is recommended to use Hadoop 2.7.3 or later,
-  it should work with Hadoop 3.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
++ A Hadoop environment with HDFS or other Hadoop Compatible File System (HCFS) implementations like S3, GCS, etc. GVFS has been tested against Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
   if you find any compatibility issues.
 + Python version >= 3.8. It has been tested GVFS works well with Python 3.8 and Python 3.9.
   Your Python version should be at least higher than Python 3.8.
@@ -523,7 +518,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 
 :::note
 
-Gravitino python client does not support customized filesets defined by users due to the limit of `fsspec` library. 
+Gravitino python client does not support [customized file systems](hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library. 
 :::
 
 

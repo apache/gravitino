@@ -19,7 +19,7 @@ import logging
 from typing import Dict, List
 
 from gravitino import GravitinoAdminClient, GravitinoMetalake, MetalakeChange
-from gravitino.dto.dto_converters import DTOConverters
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
