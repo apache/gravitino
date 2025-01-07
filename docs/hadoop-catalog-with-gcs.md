@@ -22,9 +22,9 @@ $ bin/gravitino-server.sh start
 The rest of this document shows how to use the Hadoop catalog with GCS in Gravitino with a full example.
 
 
-### Catalog a GCS Hadoop catalog
+### Create a GCS Hadoop catalog
 
-Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
+Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
 
 | Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|

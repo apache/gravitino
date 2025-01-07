@@ -19,9 +19,9 @@ $ bin/gravitino-server.sh start
 
 ## Create a Hadoop Catalog with OSS
 
-### Catalog an OSS Hadoop catalog
+### Create an OSS Hadoop catalog
 
-Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
+Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
 
 | Configuration item            | Description                                                                                                                                                                                                                   | Default value   | Required                   | Since version    |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|

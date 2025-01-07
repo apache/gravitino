@@ -19,9 +19,9 @@ $ bin/gravitino-server.sh start
 
 ## Create a Hadoop Catalog with S3
 
-### Catalog a S3 Hadoop catalog
+### Create a S3 Hadoop catalog
 
-Apart from configuration method in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with S3:
+Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with S3:
 
 | Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                  | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|------------------|
