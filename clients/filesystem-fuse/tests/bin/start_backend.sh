@@ -71,14 +71,15 @@ check_gravitino_server_ready() {
 
 check_gravitino_server_ready "$GRAVITINO_SERVER_URL/api/metalakes"
 
+echo "Create the metalake, catalog, schema, and fileset"
 # create metalake
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+curl -s -o /dev/null -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name":"test","comment":"comment","properties":{}
 }' $GRAVITINO_SERVER_URL/api/metalakes
 
 # create catalog
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+curl -s -o /dev/null -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "c1",
   "type": "FILESET",
@@ -94,17 +95,16 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs
 
 # create schema
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+curl -s -o /dev/null -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name":"s1","comment":"comment","properties":{}
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs/c1/schemas
 
 # create FILESET
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+curl -s -o /dev/null -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name":"fileset1","comment":"comment","properties":{}
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs/c1/schemas/s1/filesets
-
 
 echo "Start the Gvfs fuse client"
 
@@ -152,7 +152,31 @@ $CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $MOUNT_FROM_LOCATION $CONF_FI
 FUSE_PID=$!
 echo "Gvfs fuse started with PID: $FUSE_PID"
 
+#check the gvfs-fuse is ready
+check_gvfs_fuse_ready() {
+  local retries=10
+  local wait_time=1
+
+  for ((i=1; i<=retries; i++)); do
+    # check the $MOUNT_DIR/.gvfs_meta is exist
+    if [ -f "$MOUNT_DIR/.gvfs_meta" ]; then
+      echo "Gvfs fuse is ready."
+      return 0
+    else
+      echo "Attempt $i/$retries: Gvfs fuse not ready. Retrying in $wait_time seconds..."
+      sleep "$wait_time"
+    fi
+  done
+
+  echo "Error: Gvfs fuse did not become ready after $((retries * wait_time)) seconds."
+  exit 1
+}
+
+check_gvfs_fuse_ready
+
 # run the integration test
 cd $CLIENT_FUSE_DIR
 export RUN_TEST_WITH_BACKGROUND=1
 cargo test --test fuse_test test_fuse_system_with_manual -- --exact
+
+sleep 3
