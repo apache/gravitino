@@ -186,7 +186,6 @@ pub(crate) mod tests {
     use crate::default_raw_filesystem::DefaultRawFileSystem;
     use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
     use crate::filesystem::RawFileSystem;
-    use crate::utils::delete_dir;
     use crate::TEST_ENV_WITH_S3;
     use opendal::layers::TimeoutLayer;
     use std::time::Duration;
@@ -205,6 +204,19 @@ pub(crate) mod tests {
         let result = extract_region(location);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "ap-southeast-2");
+    }
+
+    pub(crate) async fn delete_dir(op: &Operator, dir_name: &str) {
+        let childs = op.list(dir_name).await.expect("list dir failed");
+        for child in childs {
+            let child_name = dir_name.to_string() + child.name();
+            if child.metadata().is_dir() {
+                Box::pin(delete_dir(op, &child_name)).await;
+            } else {
+                op.delete(&child_name).await.expect("delete file failed");
+            }
+        }
+        op.delete(dir_name).await.expect("delete dir failed");
     }
 
     pub(crate) async fn cleanup_s3_fs(cwd: &Path) -> Operator {
