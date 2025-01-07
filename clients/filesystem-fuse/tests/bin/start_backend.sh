@@ -131,6 +131,18 @@ awk -v access_key="$S3_ACCESS_KEY_ID" \
     in_extend_config && /s3-bucket/ { $0 = "s3-bucket = \"" bucket "\"" }
     { print }' $CLIENT_FUSE_DIR/tests/conf/gvfs_fuse_s3.toml > "$CONF_FILE"
 
-$CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $FILESET $CONF_FILE
+# Start the gvfs-fuse process in the background
+$CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $FILESET $CONF_FILE &
+FUSE_PID=$!
 
+# run the integration test
+cd $CLIENT_FUSE_DIR
+make integration_test
+cd -
 
+# Stop the gvfs-fuse process after the test completes
+echo "Stopping the Gvfs fuse client..."
+kill -INT $FUSE_PID
+
+# Stop the Gravitino server
+$GRAVITINO_SERVER_DIR/bin/gravitino.sh stop
