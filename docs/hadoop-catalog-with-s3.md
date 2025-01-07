@@ -10,8 +10,8 @@ This document describes how to configure a Hadoop catalog with S3.
 
 ## Prerequisites
 
-In order to create a Hadoop catalog with S3, you need to place [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) in Gravitino Hadoop classpath located 
-at `${HADOOP_HOME}/share/hadoop/common/lib/`. After that, start Gravitino server with the following command:
+In order to create a Hadoop catalog with S3, you need to place [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) in Gravitino Hadoop catalog classpath located 
+at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`. After that, start Gravitino server with the following command:
 
 ```bash
 $ bin/gravitino-server.sh start
@@ -44,7 +44,7 @@ Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#filese
 
 The rest of this document shows how to use the Hadoop catalog with S3 in Gravitino with a full example.
 
-### Create a Hadoop catalog/schema/file set with S3
+### Create a Hadoop catalog/schema/fileset with S3
 
 First of all, you need to create a Hadoop catalog with S3. The following example shows how to create a Hadoop catalog with S3:
 
@@ -277,11 +277,12 @@ If your Spark **without Hadoop environment**, you can use the following code sni
     
 ```python
 ## Replace the following code snippet with the above code snippet with the same environment variables
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.2.0.jar,/path/to/aws-java-sdk-bundle-1.11.375.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar --master local[1] pyspark-shell"
 ```
 
 - [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment and `hadoop-aws` jar.
 - [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed version of the Gravitino AWS bundle jar without Hadoop environment and `hadoop-aws` jar.
+- `hadoop-aws-3.2.0.jar` and `aws-java-sdk-bundle-1.11.375.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory. 
 
 Please choose the correct jar according to your environment.
 
@@ -355,7 +356,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
-For S3, you need to copy `gravitino-aws-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directoryl,
+For S3, you need to copy `gravitino-aws-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory,
 then copy hadoop-aws-{version}.jar and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
 
 

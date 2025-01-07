@@ -10,8 +10,8 @@ This document describes how to configure a Hadoop catalog with ADLS (Azure Blob 
 
 ## Prerequisites
 
-In order to create a Hadoop catalog with ADLS, you need to place [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) in Gravitino Hadoop classpath located
-at `${HADOOP_HOME}/share/hadoop/common/lib/`. After that, start Gravitino server with the following command:
+In order to create a Hadoop catalog with ADLS, you need to place [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) in Gravitino Hadoop catalog classpath located
+at `${GRAVITINO_HOME}/catalogs/hadoop/libs//`. After that, start Gravitino server with the following command:
 
 ```bash
 $ bin/gravitino-server.sh start
@@ -273,6 +273,8 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gra
 
 - [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment and `hadoop-azure` jar.
 - [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure` jar.
+- `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+
 
 Please choose the correct jar according to your environment.
 

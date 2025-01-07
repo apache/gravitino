@@ -10,8 +10,8 @@ This document describes how to configure a Hadoop catalog with GCS.
 
 ## Prerequisites
 
-In order to create a Hadoop catalog with GCS, you need to place [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) in Gravitino Hadoop classpath located
-at `${HADOOP_HOME}/share/hadoop/common/lib/`. After that, start Gravitino server with the following command:
+In order to create a Hadoop catalog with GCS, you need to place [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) in Gravitino Hadoop catalog classpath located
+at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`. After that, start Gravitino server with the following command:
 
 ```bash
 $ bin/gravitino-server.sh start
@@ -267,6 +267,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravi
 
 - [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment and `gcs-connector`.
 - [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and `gcs-connector`.
+- `gcs-connector-hadoop3-2.2.22-shaded.jar` can be found [here](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
 
 Please choose the correct jar according to your environment.
 
