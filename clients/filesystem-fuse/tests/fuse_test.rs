@@ -19,7 +19,7 @@
 
 use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
-use gvfs_fuse::{gvfs_mount, gvfs_unmount};
+use gvfs_fuse::{gvfs_mount, gvfs_unmount, TEST_ENV_WITH_BACKGROUND};
 use log::{error, info};
 use std::fs::File;
 use std::path::Path;
@@ -106,13 +106,21 @@ fn test_fuse_system_with_auto() {
     test_fuse_filesystem(mount_point);
 }
 
+#[test]
 fn test_fuse_system_with_manual() {
-    test_fuse_filesystem("build/gvfs");
+    if std::env::var(TEST_ENV_WITH_BACKGROUND).is_err() {
+        return;
+    }
+    test_fuse_filesystem("target/gvfs/gvfs_test");
 }
 
 fn test_fuse_filesystem(mount_point: &str) {
     info!("Test startup");
     let base_path = Path::new(mount_point);
+
+    if !file_exists(base_path) {
+        fs::create_dir_all(base_path).expect("Failed to create test dir");
+    }
 
     //test create file
     let test_file = base_path.join("test_create");

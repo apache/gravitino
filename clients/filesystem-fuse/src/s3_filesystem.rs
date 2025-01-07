@@ -187,6 +187,7 @@ pub(crate) mod tests {
     use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
     use crate::filesystem::RawFileSystem;
     use crate::utils::delete_dir;
+    use crate::TEST_ENV_WITH_S3;
     use opendal::layers::TimeoutLayer;
     use std::time::Duration;
 
@@ -242,9 +243,10 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn test_s3_file_system() {
-        if std::env::var("RUN_S3_TESTS").is_err() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
             return;
         }
+
         let cwd = Path::new("/gvfs_test1");
         let fs = create_s3_fs(cwd).await;
 
@@ -255,7 +257,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn test_s3_file_system_with_raw_file_system() {
-        if std::env::var("RUN_S3_TESTS").is_err() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
             return;
         }
 

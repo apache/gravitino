@@ -149,6 +149,7 @@ mod tests {
     use crate::gvfs_creator::create_fs_with_fileset;
     use crate::memory_filesystem::MemoryFileSystem;
     use crate::s3_filesystem::tests::cleanup_s3_fs;
+    use crate::TEST_ENV_WITH_S3;
     use std::collections::HashMap;
     use std::path::Path;
 
@@ -212,7 +213,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fileset_file_system() {
-        if std::env::var("RUN_S3_TESTS").is_err() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
             return;
         }
         let cwd = Path::new("/gvfs_test3");
@@ -224,7 +225,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fileset_with_raw_file_system() {
-        if std::env::var("RUN_S3_TESTS").is_err() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
             return;
         }
 

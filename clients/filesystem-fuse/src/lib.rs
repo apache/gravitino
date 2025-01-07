@@ -36,6 +36,9 @@ mod opened_file_manager;
 mod s3_filesystem;
 mod utils;
 
+pub const TEST_ENV_WITH_S3: &str = "RUN_TEST_WITH_S3";
+pub const TEST_ENV_WITH_BACKGROUND: &str = "RUN_TEST_WITH_BACKGROUND";
+
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {
     gvfs_fuse::mount(mount_to, mount_from, config).await
 }

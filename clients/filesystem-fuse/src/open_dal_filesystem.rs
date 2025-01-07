@@ -261,11 +261,16 @@ fn opendal_filemode_to_filetype(mode: EntryMode) -> FileType {
 mod test {
     use crate::config::AppConfig;
     use crate::s3_filesystem::extract_s3_config;
+    use crate::TEST_ENV_WITH_S3;
     use opendal::layers::LoggingLayer;
     use opendal::{services, Builder, Operator};
 
     #[tokio::test]
     async fn test_s3_stat() {
+        if std::env::var(TEST_ENV_WITH_S3).is_err() {
+            return;
+        }
+
         let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
         let opendal_config = extract_s3_config(&config);
 
