@@ -132,12 +132,12 @@ fn test_fuse_filesystem(mount_point: &str) {
     fs::write(&test_file, "read test").expect("Failed to write file");
 
     //test read file
-    let content = fs::read_to_string(test_file.clone()).expect("Failed to read file");
+    let content = fs::read_to_string(&test_file).expect("Failed to read file");
     assert_eq!(content, "read test", "File content mismatch");
 
     //test delete file
-    fs::remove_file(test_file.clone()).expect("Failed to delete file");
-    assert!(!file_exists(test_file));
+    fs::remove_file(&test_file).expect("Failed to delete file");
+    assert!(!file_exists(&test_file));
 
     //test create directory
     let test_dir = base_path.join("test_dir");
