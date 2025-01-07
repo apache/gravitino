@@ -21,16 +21,13 @@ $ bin/gravitino-server.sh start
 ```
 Once the server is up and running, you can proceed to configure the Hadoop catalog with ADLS.
 
-
 ```bash
 $ bin/gravitino-server.sh start
 ```
 
-## Create a Hadoop Catalog with ADLS
+## Configurations for creating a Hadoop catalog with ADLS
 
-The rest of this document shows how to use the Hadoop catalog with ADLS in Gravitino with a full example.
-
-###  Configuration for a ADLS Hadoop catalog
+### Configuration for a ADLS Hadoop catalog
 
 Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with ADLS:
 
@@ -41,18 +38,17 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 | `azure-storage-account-name `     | The account name of Azure Blob Storage.                                                                                                                                                                                                        | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
 | `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                                                         | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
 
-### Configuration for a schema
+### Configurations for a schema
 
-Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Schema configurations](./hadoop-catalog.md#schema-properties) for more details.
 
-### Configuration for a fileset
+### Configurations for a fileset
 
-Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
+Refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for more details.
 
+## Example of creating Hadoop catalog with ADLS
 
-## Using Hadoop catalog with ADLS
-
-This section demonstrates how to use the Hadoop catalog with ADLS in Gravitino, with a complete example.
+This section demonstrates how to create the Hadoop catalog with ADLS in Gravitino, with a complete example.
 
 ### Step1: Create a Hadoop catalog with ADLS
 

@@ -9,19 +9,20 @@ license: "This software is licensed under the Apache License version 2."
 This document describes how to configure a Hadoop catalog with GCS.
 
 ## Prerequisites
+To set up a Hadoop catalog with OSS, follow these steps:
 
-In order to create a Hadoop catalog with GCS, you need to place [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) in Gravitino Hadoop catalog classpath located
-at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`. After that, start Gravitino server with the following command:
+1. Download the [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) file.
+2. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+3. Start the Gravitino server by running the following command:
 
 ```bash
 $ bin/gravitino-server.sh start
 ```
+Once the server is up and running, you can proceed to configure the Hadoop catalog with GCS.
 
-## Create a Hadoop Catalog with GCS
+## Configurations for creating a Hadoop catalog with GCS
 
-The rest of this document shows how to use the Hadoop catalog with GCS in Gravitino with a full example.
-
-### Configuration for a GCS Hadoop catalog
+### Configurations for a GCS Hadoop catalog
 
 Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
 
@@ -31,15 +32,15 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a GCS fileset. | 0.7.0-incubating |
 
-### Configuration for a schema
+### Configurations for a schema
 
-Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Schema configurations](./hadoop-catalog.md#schema-properties) for more details.
 
-### Configuration for a fileset
+### Configurations for a fileset
 
-Refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
+Refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for more details.
 
-## Using Hadoop catalog with GCS
+## Example of creating Hadoop catalog with GCS
 
 This section will show you how to use the Hadoop catalog with GCS in Gravitino, including detailed examples.
 

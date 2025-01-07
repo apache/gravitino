@@ -21,7 +21,7 @@ $ bin/gravitino-server.sh start
 ```
 Once the server is up and running, you can proceed to configure the Hadoop catalog with OSS.
 
-## Create a Hadoop Catalog with OSS
+## Configurations for creating a Hadoop catalog with OSS
 
 ### Configuration for an OSS Hadoop catalog
 
@@ -35,19 +35,19 @@ In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-con
 | `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
 | `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
 
-### Configuration for a schema
+### Configurations for a schema
 
-To create a schema, refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations).
+To create a schema, refer to [Schema configurations](./hadoop-catalog.md#schema-properties).
 
-### Configuration for a fileset
+### Configurations for a fileset
 
-For instructions on how to create a fileset, refer to [Fileset operation](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
+For instructions on how to create a fileset, refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for more details.
 
-## Using Hadoop catalog with OSS
+## Example of creating Hadoop catalog/schema/fileset with OSS
 
 This section will show you how to use the Hadoop catalog with OSS in Gravitino, including detailed examples.
 
-### Create a Hadoop catalog with OSS
+### Step1: Create a Hadoop catalog with OSS
 
 First, you need to create a Hadoop catalog for OSS. The following examples demonstrate how to create a Hadoop catalog with OSS:
 
