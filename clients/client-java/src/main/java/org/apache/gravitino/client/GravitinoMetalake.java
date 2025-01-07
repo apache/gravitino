@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -1018,6 +1020,27 @@ public class GravitinoMetalake extends MetalakeDTO
   public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
           IllegalPrivilegeException {
+    Set<Privilege> privilegeSet = Sets.newHashSet(privileges);
+    return grantPrivilegesToRole(role, object, privilegeSet);
+  }
+
+  /**
+   * Grant privileges to a role.
+   *
+   * @param role The name of the role.
+   * @param privileges The privileges to grant.
+   * @param object The object is associated with privileges to grant.
+   * @return The role after granted.
+   * @throws NoSuchRoleException If the role with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
+   *     exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
+   * @throws RuntimeException If granting privileges to a role encounters storage issues.
+   */
+  public Role grantPrivilegesToRole(String role, MetadataObject object, Set<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
     PrivilegeGrantRequest request =
         new PrivilegeGrantRequest(DTOConverters.toPrivileges(privileges));
     request.validate();
@@ -1056,8 +1079,31 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
+  @Deprecated
   public Role revokePrivilegesFromRole(
       String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
+    Set<Privilege> privilegeSet = Sets.newHashSet(privileges);
+    return revokePrivilegesFromRole(role, object, privilegeSet);
+  }
+
+  /**
+   * Revoke privileges from a role.
+   *
+   * @param role The name of the role.
+   * @param privileges The privileges to revoke.
+   * @param object The object is associated with privileges to revoke.
+   * @return The role after revoked.
+   * @throws NoSuchRoleException If the role with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
+   *     exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
+   * @throws RuntimeException If revoking privileges from a role encounters storage issues.
+   */
+  public Role revokePrivilegesFromRole(
+      String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
           IllegalPrivilegeException {
     PrivilegeRevokeRequest request =
