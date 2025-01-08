@@ -92,7 +92,7 @@ curl -s -o /dev/null -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "s3a://'"$S3_BUCKET"'",
     "s3-access-key-id": "'"$S3_ACCESS_KEY_ID"'",
     "s3-secret-access-key": "'"$S3_SECRET_ACCESS"'",
-    "s3-endpoint": "http://s3.'"$S3_REGION"'.amazonaws.com",
+    "s3-endpoint": "https://s3.amazonaws.com",
     "filesystem-providers": "s3"
   }
 }' $GRAVITINO_SERVER_URL/api/metalakes/test/catalogs
@@ -185,5 +185,5 @@ check_gvfs_fuse_ready
 
 # run the integration test
 
-export RUN_TEST_WITH_BACKGROUND=1
+export RUN_TEST_WITH_BACKEND=1
 cargo test --test fuse_test test_fuse_system_with_manual -- --exact
