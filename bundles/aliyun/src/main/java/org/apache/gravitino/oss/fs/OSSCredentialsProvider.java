@@ -24,6 +24,7 @@ import com.aliyun.oss.common.auth.Credentials;
 import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentials;
 import java.net.URI;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
@@ -38,21 +39,7 @@ public class OSSCredentialsProvider implements CredentialsProvider {
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public OSSCredentialsProvider(URI uri, Configuration conf) {
-    initGvfsCredentialProvider(conf);
-  }
-
-  private void initGvfsCredentialProvider(Configuration conf) {
-    try {
-      gravitinoFileSystemCredentialProvider =
-          (GravitinoFileSystemCredentialProvider)
-              Class.forName(
-                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
-                  .getDeclaredConstructor()
-                  .newInstance();
-      gravitinoFileSystemCredentialProvider.setConf(conf);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
-    }
+    this.gravitinoFileSystemCredentialProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
   }
 
   @Override

@@ -20,6 +20,7 @@
 package org.apache.gravitino.abs.fs;
 
 import java.io.IOException;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
@@ -60,6 +61,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
   @Override
   public void initialize(Configuration conf, String accountName) throws IOException {
     this.configuration = conf;
+    this.gravitinoFileSystemCredentialProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
   }
 
   @Override

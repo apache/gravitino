@@ -351,6 +351,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       return credentials.length > 0;
     } catch (Exception e) {
       // No credential found, do nothing.
+      Logger.warn("Failed to fetch credentials from fileset: {}", filesetIdentifier, e);
       return false;
     }
   }

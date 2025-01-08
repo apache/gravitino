@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.conf.Configuration;
 
 public class FileSystemUtils {
 
@@ -159,5 +160,27 @@ public class FileSystemUtils {
         });
 
     return result;
+  }
+
+  /**
+   * Get the GravitinoFileSystemCredentialProvider from the configuration.
+   *
+   * @param conf Configuration
+   * @return GravitinoFileSystemCredentialProvider
+   */
+  public static GravitinoFileSystemCredentialProvider getGvfsCredentialProvider(
+      Configuration conf) {
+    try {
+      GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider =
+          (GravitinoFileSystemCredentialProvider)
+              Class.forName(
+                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      gravitinoFileSystemCredentialProvider.setConf(conf);
+      return gravitinoFileSystemCredentialProvider;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
+    }
   }
 }

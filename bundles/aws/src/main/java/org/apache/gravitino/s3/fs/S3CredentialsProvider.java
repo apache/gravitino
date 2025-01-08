@@ -24,6 +24,7 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -38,21 +39,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public S3CredentialsProvider(final URI uri, final Configuration conf) {
-    initGvfsCredentialProvider(conf);
-  }
-
-  private void initGvfsCredentialProvider(Configuration conf) {
-    try {
-      gravitinoFileSystemCredentialProvider =
-          (GravitinoFileSystemCredentialProvider)
-              Class.forName(
-                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
-                  .getDeclaredConstructor()
-                  .newInstance();
-      gravitinoFileSystemCredentialProvider.setConf(conf);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
-    }
+    this.gravitinoFileSystemCredentialProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
   }
 
   @Override

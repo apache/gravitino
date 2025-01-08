@@ -21,6 +21,7 @@ package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.GCSTokenCredential;
@@ -72,21 +73,8 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
   @Override
   public void setConf(Configuration configuration) {
     this.configuration = configuration;
-    initGvfsCredentialProvider(configuration);
-  }
-
-  private void initGvfsCredentialProvider(Configuration conf) {
-    try {
-      gravitinoFileSystemCredentialProvider =
-          (GravitinoFileSystemCredentialProvider)
-              Class.forName(
-                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
-                  .getDeclaredConstructor()
-                  .newInstance();
-      gravitinoFileSystemCredentialProvider.setConf(conf);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
-    }
+    this.gravitinoFileSystemCredentialProvider =
+        FileSystemUtils.getGvfsCredentialProvider(configuration);
   }
 
   @Override
