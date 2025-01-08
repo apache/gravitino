@@ -1208,7 +1208,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
         ratio = float(
             self._options.get(
-                GVFSConfig.GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO, 0.9
+                GVFSConfig.GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO,
+                GVFSConfig.DEFAULT_CREDENTIAL_EXPIRED_TIME_RATIO,
             )
         )
         return time.time() * 1000 + (expire_time - time.time() * 1000) * ratio
