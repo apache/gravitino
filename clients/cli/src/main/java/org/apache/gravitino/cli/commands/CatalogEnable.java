@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 public class CatalogEnable extends Command {
   private final String metalake;
   private final String catalog;
+  private final boolean disable;
   private final boolean enableMetalake;
 
   /**
@@ -38,13 +39,15 @@ public class CatalogEnable extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param disable Whether the disable flag is also turned on
    * @param enableMetalake Whether to enable it's metalake
    */
   public CatalogEnable(
-      String url, boolean ignoreVersions, String metalake, String catalog, boolean enableMetalake) {
+      String url, boolean ignoreVersions, String metalake, String catalog, boolean disable, boolean enableMetalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.disable = disable;
     this.enableMetalake = enableMetalake;
   }
 
@@ -70,5 +73,13 @@ public class CatalogEnable extends Command {
     }
 
     System.out.println(metalake + "." + catalog + " has been enabled.");
+  }
+
+  @Override
+  public Command validate() {
+    if (disable) {
+      exitWithError(ErrorMessages.INVALID_ENABLE_DISABLE);
+    }
+    return super.validate();
   }
 }

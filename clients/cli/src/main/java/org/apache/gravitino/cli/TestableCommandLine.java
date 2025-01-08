@@ -896,8 +896,8 @@ public class TestableCommandLine {
   }
 
   protected MetalakeEnable newMetalakeEnable(
-      String url, boolean ignore, String metalake, boolean enableAllCatalogs) {
-    return new MetalakeEnable(url, ignore, metalake, enableAllCatalogs);
+      String url, boolean ignore, String metalake, boolean disable, boolean enableAllCatalogs) {
+    return new MetalakeEnable(url, ignore, metalake, disable, enableAllCatalogs);
   }
 
   protected MetalakeDisable newMetalakeDisable(String url, boolean ignore, String metalake) {
@@ -905,8 +905,8 @@ public class TestableCommandLine {
   }
 
   protected CatalogEnable newCatalogEnable(
-      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
-    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
+      String url, boolean ignore, String metalake, String catalog, boolean disable, boolean enableMetalake) {
+    return new CatalogEnable(url, ignore, metalake, catalog, disable, enableMetalake);
   }
 
   protected CatalogDisable newCatalogDisable(
