@@ -36,13 +36,13 @@ public class TestGCSTokenProvider {
             "a/b/", Arrays.asList("a", "a/", "a/b"),
             "a", Arrays.asList("a"),
             "a/", Arrays.asList("a"),
-            "", Arrays.asList(),
-            "/", Arrays.asList());
+            "", Arrays.asList(""),
+            "/", Arrays.asList(""));
 
     checkResults.forEach(
         (key, value) -> {
           List<String> parentResources = GCSTokenProvider.getAllResources(key);
-          Assertions.assertEquals(value, parentResources);
+          Assertions.assertArrayEquals(value.toArray(), parentResources.toArray());
         });
   }
 

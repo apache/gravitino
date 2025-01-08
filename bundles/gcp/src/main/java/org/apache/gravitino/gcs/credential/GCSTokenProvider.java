@@ -25,6 +25,7 @@ import com.google.auth.oauth2.CredentialAccessBoundary.AccessBoundaryRule;
 import com.google.auth.oauth2.DownscopedCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -100,8 +101,7 @@ public class GCSTokenProvider implements CredentialProvider {
     return downscopedCredentials.refreshAccessToken();
   }
 
-  @VisibleForTesting
-  List<String> getReadExpressions(String bucketName, String resourcePath) {
+  private List<String> getReadExpressions(String bucketName, String resourcePath) {
     List<String> readExpressions = new ArrayList<>();
     readExpressions.add(
         String.format(
@@ -117,11 +117,17 @@ public class GCSTokenProvider implements CredentialProvider {
     return readExpressions;
   }
 
+  @VisibleForTesting
   // "a/b/c" will get ["a", "a/", "a/b", "a/b/", "a/b/c"]
   static List<String> getAllResources(String resourcePath) {
     if (resourcePath.endsWith("/")) {
       resourcePath = resourcePath.substring(0, resourcePath.length() - 1);
     }
+    if (resourcePath.isEmpty()) {
+      return Arrays.asList("");
+    }
+    Preconditions.checkArgument(
+        !resourcePath.startsWith("/"), resourcePath + " should not start with /");
     List<String> parts = Arrays.asList(resourcePath.split("/"));
     List<String> results = new ArrayList<>();
     String parent = "";
@@ -134,7 +140,8 @@ public class GCSTokenProvider implements CredentialProvider {
     return results;
   }
 
-  // remove the first '/', and append `/` if the path does not end with '/'.
+  @VisibleForTesting
+  // Remove the first '/', and append `/` if the path does not end with '/'.
   static String normalizeUriPath(String resourcePath) {
     if (resourcePath.startsWith("/")) {
       resourcePath = resourcePath.substring(1);
