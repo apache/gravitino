@@ -160,11 +160,12 @@ Click on the `CREATE CATALOG` button displays the dialog to create a catalog.
 Creating a catalog requires these fields:
 
 1. **Catalog name**(**_required_**): the name of the catalog
-2. **Type**(**_required_**): `relational`/`fileset`/`messaging`, the default value is `relational`
+2. **Type**(**_required_**): `relational`/`fileset`/`messaging`/`model`, the default value is `relational`
 3. **Provider**(**_required_**):
     1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`
     2. Type `fileset` - `hadoop`
     3. Type `messaging` - `kafka`
+    4. Type `model` has no provider
 4. **Comment**(_optional_): the comment of this catalog
 5. **Properties**(**each `provider` must fill in the required property fields specifically**)
 
@@ -425,6 +426,7 @@ Displays a confirmation dialog, clicking on the SUBMIT button deletes this catal
 ![delete-catalog](./assets/webui/delete-catalog.png)
 
 ### Schema
+
 Click the catalog tree node on the left sidebar or the catalog name link in the table cell.
 
 Displays the list schemas of the catalog.
@@ -469,14 +471,63 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this schema.
 
 ### Table
 
-![list-tables](./assets/webui/list-tables.png)
+Click the hive schema tree node on the left sidebar or the schema name link in the table cell.
+
+Displays the list tables of the schema.
+
+![list-tables](./assets/webui/list-tabels.png)
+
+#### Create table
+
+Click on the `CREATE TABLE` button displays the dialog to create a table.
+
+![create-table](./assets/webui/create-table.png)
+
+Creating a table needs these fields:
+
+1. **Name**(**_required_**): the name of the table.
+2. **columns**(**_required_**): 
+    1. The name and type of each column are required.
+    2. Only suppport simple types, cannot support complex types by ui, you can create complex types by api.
+3. **Comment**(_optional_): the comment of the table.
+4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
+
+#### Show table details
+
+Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
+
+You can see the detailed information of this table in the drawer component on the right.
+
+![table-details](./assets/webui/table-details.png)
+
+Click the table tree node on the left sidebar or the table name link in the table cell.
+
+You can see the columns and detailed information on the right page.
 
 ![list-columns](./assets/webui/list-columns.png)
+![table-selected-details](./assets/webui/table-selected-details.png)
+
+#### Edit table
+
+Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
+
+Displays the dialog for modifying fields of the selected table.
+
+![update-table-dialog](./assets/webui/update-table-dialog.png)
+
+#### Drop table
+
+Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
+
+Displays a confirmation dialog, clicking on the `DROP` button drops this table.
+
+![delete-table](./assets/webui/delete-table.png)
 
 ### Fileset
+
 Click the fileset schema tree node on the left sidebar or the schema name link in the table cell.
 
-Displays the list fileset of the schema.
+Displays the list filesets of the schema.
 
 ![list-filesets](./assets/webui/list-filesets.png)
 
@@ -528,7 +579,126 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this fileset
 
 ### Topic
 
+Click the kafka schema tree node on the left sidebar or the schema name link in the table cell.
+
+Displays the list topics of the schema.
+
+![list-topics](./assets/webui/list-topics.png)
+
+#### Create topic
+
+Click on the `CREATE TOPIC` button displays the dialog to create a topic.
+
+![create-topic](./assets/webui/create-topic.png)
+
+Creating a topic needs these fields:
+
+1. **Name**(**_required_**): the name of the topic.
+2. **Comment**(_optional_): the comment of the topic.
+3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
+
+#### Show topic details
+
+Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
+
+You can see the detailed information of this topic in the drawer component on the right.
+
+![topic-details](./assets/webui/topic-drawer-details.png)
+
+Click the topic tree node on the left sidebar or the topic name link in the table cell.
+
+You can see the detailed information on the right page.
+
 ![topic-details](./assets/webui/topic-details.png)
+
+#### Edit topic
+
+Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
+
+Displays the dialog for modifying fields of the selected topic.
+
+![update-topic-dialog](./assets/webui/update-topic-dialog.png)
+
+#### Drop topic
+
+Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
+
+Displays a confirmation dialog, clicking on the `DROP` button drops this topic.
+
+![delete-topic](./assets/webui/delete-topic.png)
+
+### Model
+
+Click the model schema tree node on the left sidebar or the schema name link in the table cell.
+
+Displays the list model of the schema.
+
+![list-models](./assets/webui/list-models.png)
+
+#### Register model
+
+Click on the `REGISTER MODEL` button displays the dialog to register a model.
+
+![register-model](./assets/webui/register-model.png)
+
+Register a model needs these fields:
+
+1. **Name**(**_required_**): the name of the model.
+2. **Comment**(_optional_): the comment of the model.
+3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
+
+#### Show model details
+
+Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
+
+You can see the detailed information of this model in the drawer component on the right.
+
+![model-details](./assets/webui/model-details.png)
+
+#### Drop model
+
+Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
+
+Displays a confirmation dialog, clicking on the `DROP` button drops this model.
+
+![delete-model](./assets/webui/delete-model.png)
+
+### Version
+
+Click the model tree node on the left sidebar or the model name link in the table cell.
+
+Displays the list versions of the model.
+
+![list-model-versions](./assets/webui/list-model-versions.png)
+
+#### Link version
+
+Click on the `LINK VERSION` button displays the dialog to link a version.
+
+![link-version](./assets/webui/link-version.png)
+
+Link a version needs these fields:
+
+1. **URI**(**_required_**): the uri of the version.
+2. **Aliases**(**_required_**): the aliases of the version, aliase cannot be number or number string.
+3. **Comment**(_optional_): the comment of the model.
+4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
+
+#### Show version details
+
+Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
+
+You can see the detailed information of this version in the drawer component on the right.
+
+![version-details](./assets/webui/version-details.png)
+
+#### Drop version
+
+Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
+
+Displays a confirmation dialog, clicking on the `DROP` button drops this version.
+
+![delete-version](./assets/webui/delete-version.png)
 
 ## Feature capabilities
 
@@ -537,9 +707,11 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this fileset
 | Metalake | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
 | Catalog  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
 | Schema   | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
-| Table    | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
+| Table    | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
 | Fileset  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
-| Topic    | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
+| Topic    | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
+| Model    | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10008; / _`Delete`_ &#10004; |
+| Version  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10008; / _`Delete`_ &#10004; |
 
 ## E2E test
 

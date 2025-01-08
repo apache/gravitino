@@ -78,7 +78,7 @@ class TestLocalFilesystem(unittest.TestCase):
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
         actual_path = fileset_storage_location
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             local_fs = LocalFileSystem()
@@ -140,7 +140,7 @@ class TestLocalFilesystem(unittest.TestCase):
             fileset_virtual_location = "fileset/fileset_catalog/tmp/test_oauth2_auth"
             actual_path = fileset_storage_location
             with patch(
-                "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+                "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
                 return_value=actual_path,
             ):
                 local_fs = LocalFileSystem()
@@ -191,7 +191,7 @@ class TestLocalFilesystem(unittest.TestCase):
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_ls"
         actual_path = fileset_storage_location
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             local_fs = LocalFileSystem()
@@ -253,7 +253,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -261,7 +261,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/test_1"
         actual_path = fileset_storage_location + "/test_1"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             dir_info = fs.info(dir_virtual_path)
@@ -270,7 +270,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             file_info = fs.info(file_virtual_path)
@@ -295,7 +295,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -303,7 +303,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/test_1"
         actual_path = fileset_storage_location + "/test_1"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -311,7 +311,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -335,7 +335,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -344,7 +344,7 @@ class TestLocalFilesystem(unittest.TestCase):
         src_actual_path = fileset_storage_location + "/test_file_1.par"
         dst_actual_path = fileset_storage_location + "/test_cp_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[
                 src_actual_path,
                 src_actual_path,
@@ -387,7 +387,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -395,7 +395,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         src_actual_path = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=src_actual_path,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -403,7 +403,7 @@ class TestLocalFilesystem(unittest.TestCase):
         mv_file_virtual_path = fileset_virtual_location + "/test_cp_file_1.par"
         dst_actual_path = fileset_storage_location + "/test_cp_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[src_actual_path, dst_actual_path, dst_actual_path],
         ):
             fs.mv(file_virtual_path, mv_file_virtual_path)
@@ -414,7 +414,7 @@ class TestLocalFilesystem(unittest.TestCase):
         )
         dst_actual_path1 = fileset_storage_location + "/another_dir/test_file_2.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[dst_actual_path, dst_actual_path1, dst_actual_path1],
         ):
             fs.mv(mv_file_virtual_path, mv_another_dir_virtual_path)
@@ -424,7 +424,7 @@ class TestLocalFilesystem(unittest.TestCase):
         not_exist_dst_dir_path = fileset_virtual_location + "/not_exist/test_file_2.par"
         dst_actual_path2 = fileset_storage_location + "/not_exist/test_file_2.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[dst_actual_path1, dst_actual_path2],
         ):
             with self.assertRaises(FileNotFoundError):
@@ -457,7 +457,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -466,7 +466,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path1 = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -477,7 +477,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path2 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -509,7 +509,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -518,7 +518,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path1 = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -529,7 +529,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path2 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -556,7 +556,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -565,7 +565,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path1 = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -576,7 +576,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path2 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -603,7 +603,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -612,7 +612,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path1 = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -628,7 +628,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path2 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -651,7 +651,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -666,7 +666,7 @@ class TestLocalFilesystem(unittest.TestCase):
         parent_not_exist_virtual_path = fileset_virtual_location + "/not_exist/sub_dir"
         actual_path1 = fileset_storage_location + "/not_exist/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertFalse(fs.exists(parent_not_exist_virtual_path))
@@ -677,7 +677,7 @@ class TestLocalFilesystem(unittest.TestCase):
         parent_not_exist_virtual_path2 = fileset_virtual_location + "/not_exist/sub_dir"
         actual_path2 = fileset_storage_location + "/not_exist/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             self.assertFalse(fs.exists(parent_not_exist_virtual_path2))
@@ -700,7 +700,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -715,7 +715,7 @@ class TestLocalFilesystem(unittest.TestCase):
         parent_not_exist_virtual_path = fileset_virtual_location + "/not_exist/sub_dir"
         actual_path1 = fileset_storage_location + "/not_exist/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertFalse(fs.exists(parent_not_exist_virtual_path))
@@ -738,7 +738,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -747,7 +747,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path1 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -769,7 +769,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -778,7 +778,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path1 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -804,7 +804,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -813,7 +813,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path1 = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -829,7 +829,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path2 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
@@ -856,7 +856,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -865,7 +865,7 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path1 = fileset_storage_location + "/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             self.assertTrue(fs.exists(file_virtual_path))
@@ -884,7 +884,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         actual_path2 = fileset_storage_location + "/sub_dir"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             local_path = self._fileset_dir + "/local_dir"
@@ -1077,7 +1077,7 @@ class TestLocalFilesystem(unittest.TestCase):
         )
         actual_path = fileset_storage_location + "/test.parquet"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             # to parquet
@@ -1098,7 +1098,7 @@ class TestLocalFilesystem(unittest.TestCase):
         actual_path2 = fileset_storage_location + "/test.csv"
 
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[actual_path1, actual_path2, actual_path2],
         ):
             # to csv
@@ -1128,7 +1128,7 @@ class TestLocalFilesystem(unittest.TestCase):
         )
         actual_path = fileset_storage_location + "/test.parquet"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             # to parquet
@@ -1173,7 +1173,7 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
@@ -1181,7 +1181,7 @@ class TestLocalFilesystem(unittest.TestCase):
         dir_virtual_path = fileset_virtual_location + "/test_1"
         actual_path1 = fileset_storage_location + "test_1"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path1,
         ):
             dir_info = fs.info(dir_virtual_path)
@@ -1190,14 +1190,14 @@ class TestLocalFilesystem(unittest.TestCase):
         file_virtual_path = fileset_virtual_location + "/test_1/test_file_1.par"
         actual_path2 = fileset_storage_location + "test_1/test_file_1.par"
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path2,
         ):
             file_info = fs.info(file_virtual_path)
             self.assertEqual(file_info["name"], file_virtual_path)
 
         with patch(
-            "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             return_value=actual_path,
         ):
             file_status = fs.ls(fileset_virtual_location, detail=True)

@@ -1571,7 +1571,14 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(testSchemaName, schema.name());
 
     String[] schemaIdents = catalog.asSchemas().listSchemas();
-    Assertions.assertTrue(Arrays.stream(schemaIdents).anyMatch(s -> s.equals(testSchemaName)));
+    Assertions.assertTrue(Arrays.asList(schemaIdents).contains(testSchemaName));
+
+    Exception exception =
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class,
+            () -> catalog.asSchemas().createSchema(testSchemaName, null, Collections.emptyMap()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Can't create database '//'; database exists"));
 
     Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
     Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));

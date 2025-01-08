@@ -21,7 +21,9 @@ package org.apache.gravitino.cli.commands;
 
 import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
+import com.google.common.base.Joiner;
 import java.io.File;
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
 import org.apache.gravitino.cli.Main;
@@ -39,6 +41,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 public abstract class Command {
   public static final String OUTPUT_FORMAT_TABLE = "table";
   public static final String OUTPUT_FORMAT_PLAIN = "plain";
+  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
   protected static String authentication = null;
   protected static String userName = null;
@@ -46,7 +49,6 @@ public abstract class Command {
   private static final String SIMPLE_AUTH = "simple";
   private static final String OAUTH_AUTH = "oauth";
   private static final String KERBEROS_AUTH = "kerberos";
-
   private final String url;
   private final boolean ignoreVersions;
   private final String outputFormat;
@@ -99,6 +101,37 @@ public abstract class Command {
 
   /** All commands have a handle method to handle and run the required command. */
   public abstract void handle();
+
+  /**
+   * verify the arguments. All commands have a verify method to verify the arguments.
+   *
+   * @return Returns itself via argument validation, otherwise exits.
+   */
+  public Command validate() {
+    return this;
+  }
+
+  /**
+   * Validates that both property and value arguments are not null.
+   *
+   * @param property The property name to check
+   * @param value The value associated with the property
+   */
+  protected void validatePropertyAndValue(String property, String value) {
+    if (property == null && value == null) exitWithError(ErrorMessages.MISSING_PROPERTY_AND_VALUE);
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+    if (value == null) exitWithError(ErrorMessages.MISSING_VALUE);
+  }
+
+  /**
+   * Validates that the property argument is not null.
+   *
+   * @param property The property name to validate
+   */
+  protected void validateProperty(String property) {
+    if (property == null) exitWithError(ErrorMessages.MISSING_PROPERTY);
+  }
+
   /**
    * Builds a {@link GravitinoClient} instance with the provided server URL and metalake.
    *

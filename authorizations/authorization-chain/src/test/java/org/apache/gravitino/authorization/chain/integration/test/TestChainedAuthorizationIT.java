@@ -27,11 +27,15 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -49,11 +53,15 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
+import org.apache.ranger.RangerServiceException;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.commons.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,76 +158,31 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
     RangerITEnv.cleanup();
   }
 
-  private String storageLocation(String dirName) {
-    return DEFAULT_FS + "/" + dirName;
-  }
-
-  @Test
-  public void testCreateSchemaInCatalog() throws IOException {
-    // Choose a catalog
-    useCatalog();
-
-    // First, fail to create the schema
-    Exception accessControlException =
-        Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
-    Assertions.assertTrue(
-        accessControlException
-                .getMessage()
-                .contains(
-                    String.format(
-                        "Permission denied: user [%s] does not have [create] privilege",
-                        AuthConstants.ANONYMOUS_USER))
-            || accessControlException
-                .getMessage()
-                .contains(
-                    String.format(
-                        "Permission denied: user=%s, access=WRITE", AuthConstants.ANONYMOUS_USER)));
-    Path schemaPath = new Path(storageLocation(schemaName + ".db"));
-    Assertions.assertFalse(fileSystem.exists(schemaPath));
-    FileStatus fileStatus = fileSystem.getFileStatus(new Path(DEFAULT_FS));
-    Assertions.assertEquals(System.getenv(HADOOP_USER_NAME), fileStatus.getOwner());
-
-    // Second, grant the `CREATE_SCHEMA` role
-    String roleName = currentFunName();
-    SecurableObject securableObject =
-        SecurableObjects.ofCatalog(
-            catalogName, Lists.newArrayList(Privileges.CreateSchema.allow()));
-    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(roleName), AuthConstants.ANONYMOUS_USER);
-    waitForUpdatingPolicies();
-
-    // Third, succeed to create the schema
-    sparkSession.sql(SQL_CREATE_SCHEMA);
-    Assertions.assertTrue(fileSystem.exists(schemaPath));
-    FileStatus fsSchema = fileSystem.getFileStatus(schemaPath);
-    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, fsSchema.getOwner());
-
-    // Fourth, fail to create the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
-
-    // Clean up
-    catalog.asSchemas().dropSchema(schemaName, false);
-    metalake.deleteRole(roleName);
-    waitForUpdatingPolicies();
-
-    Exception accessControlException2 =
-        Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
-    Assertions.assertTrue(
-        accessControlException2
-                .getMessage()
-                .contains(
-                    String.format(
-                        "Permission denied: user [%s] does not have [create] privilege",
-                        AuthConstants.ANONYMOUS_USER))
-            || accessControlException2
-                .getMessage()
-                .contains(
-                    String.format(
-                        "Permission denied: user=%s, access=WRITE", AuthConstants.ANONYMOUS_USER)));
+  @AfterEach
+  void clean() {
+    try {
+      List<RangerPolicy> rangerHivePolicies =
+          RangerITEnv.rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME);
+      List<RangerPolicy> rangerHdfsPolicies =
+          RangerITEnv.rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
+      rangerHivePolicies.stream().forEach(policy -> LOG.info("Ranger Hive policy: {}", policy));
+      rangerHdfsPolicies.stream().forEach(policy -> LOG.info("Ranger HDFS policy: {}", policy));
+      Preconditions.condition(
+          rangerHivePolicies.size() == 0, "Ranger Hive policies should be empty");
+      Preconditions.condition(
+          rangerHdfsPolicies.size() == 0, "Ranger HDFS policies should be empty");
+    } catch (RangerServiceException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
-  public void createCatalog() {
+  protected String testUserName() {
+    return AuthConstants.ANONYMOUS_USER;
+  }
+
+  @Override
+  protected void createCatalog() {
     Map<String, String> catalogConf = new HashMap<>();
     catalogConf.put(HiveConstants.METASTORE_URIS, HIVE_METASTORE_URIS);
     catalogConf.put(IMPERSONATION_ENABLE, "true");
@@ -245,6 +208,103 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "comment", catalogConf);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
+  }
+
+  private String storageLocation(String dirName) {
+    return DEFAULT_FS + "/" + dirName;
+  }
+
+  @Test
+  public void testCreateSchemaInCatalog() throws IOException {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog(
+            catalogName, Lists.newArrayList(Privileges.CreateSchema.allow()));
+    doTestCreateSchema(currentFunName(), securableObject);
+  }
+
+  @Test
+  public void testCreateSchemaInMetalake() throws IOException {
+    SecurableObject securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateSchema.allow()));
+    doTestCreateSchema(currentFunName(), securableObject);
+  }
+
+  private void doTestCreateSchema(String roleName, SecurableObject securableObject)
+      throws IOException {
+    // Choose a catalog
+    useCatalog();
+
+    // First, fail to create the schema
+    Exception accessControlException =
+        Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertTrue(
+        accessControlException
+                .getMessage()
+                .contains(
+                    String.format(
+                        "Permission denied: user [%s] does not have [create] privilege",
+                        testUserName()))
+            || accessControlException
+                .getMessage()
+                .contains(
+                    String.format("Permission denied: user=%s, access=WRITE", testUserName())));
+    Path schemaPath = new Path(storageLocation(schemaName + ".db"));
+    Assertions.assertFalse(fileSystem.exists(schemaPath));
+    FileStatus fileStatus = fileSystem.getFileStatus(new Path(DEFAULT_FS));
+    Assertions.assertEquals(System.getenv(HADOOP_USER_NAME), fileStatus.getOwner());
+
+    // Second, grant the `CREATE_SCHEMA` role
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), AuthConstants.ANONYMOUS_USER);
+    waitForUpdatingPolicies();
+
+    // Third, succeed to create the schema
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+    Assertions.assertTrue(fileSystem.exists(schemaPath));
+    FileStatus fsSchema = fileSystem.getFileStatus(schemaPath);
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, fsSchema.getOwner());
+
+    // Fourth, fail to create the table
+    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+
+    // Clean up
+    // Set owner
+    MetadataObject schemaObject =
+        MetadataObjects.of(catalogName, schemaName, MetadataObject.Type.SCHEMA);
+    metalake.setOwner(schemaObject, testUserName(), Owner.Type.USER);
+    waitForUpdatingPolicies();
+    sparkSession.sql(SQL_DROP_SCHEMA);
+    catalog.asSchemas().dropSchema(schemaName, false);
+    Assertions.assertFalse(fileSystem.exists(schemaPath));
+
+    metalake.deleteRole(roleName);
+    waitForUpdatingPolicies();
+
+    Exception accessControlException2 =
+        Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertTrue(
+        accessControlException2
+                .getMessage()
+                .contains(
+                    String.format(
+                        "Permission denied: user [%s] does not have [create] privilege",
+                        AuthConstants.ANONYMOUS_USER))
+            || accessControlException2
+                .getMessage()
+                .contains(
+                    String.format(
+                        "Permission denied: user=%s, access=WRITE", AuthConstants.ANONYMOUS_USER)));
+  }
+
+  @Test
+  protected void testAllowUseSchemaPrivilege() throws InterruptedException {
+    // TODO
+  }
+
+  @Test
+  public void testRenameMetalakeOrCatalog() {
+    // TODO
   }
 
   @Test
@@ -304,11 +364,6 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
 
   @Test
   void testChangeOwner() throws InterruptedException {
-    // TODO
-  }
-
-  @Test
-  void testAllowUseSchemaPrivilege() throws InterruptedException {
     // TODO
   }
 

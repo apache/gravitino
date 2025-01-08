@@ -59,7 +59,7 @@ public class DeleteTag extends Command {
     }
 
     if (tags == null || tags.length == 0) {
-      System.err.println(ErrorMessages.TAG_EMPTY);
+      System.err.println(ErrorMessages.MISSING_TAG);
     } else {
       boolean hasOnlyOneTag = tags.length == 1;
       if (hasOnlyOneTag) {
@@ -115,5 +115,11 @@ public class DeleteTag extends Command {
     } else {
       System.out.println("Tag " + tags[0] + " not deleted.");
     }
+  }
+
+  @Override
+  public Command validate() {
+    if (tags == null) exitWithError(ErrorMessages.MISSING_TAG);
+    return super.validate();
   }
 }

@@ -406,7 +406,7 @@ class PermissionManager {
   }
 
   Role grantPrivilegesToRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges) {
     try {
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper =
           new AuthorizationPluginCallbackWrapper();
@@ -476,7 +476,7 @@ class PermissionManager {
       String metalake,
       String role,
       MetadataObject object,
-      List<Privilege> privileges,
+      Set<Privilege> privileges,
       RoleEntity roleEntity,
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
@@ -489,7 +489,7 @@ class PermissionManager {
       return targetObject;
     } else {
       updatePrivileges.addAll(privileges);
-      AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
+      AuthorizationUtils.checkDuplicatedNamePrivilege(updatePrivileges);
 
       SecurableObject newSecurableObject =
           SecurableObjects.parse(
@@ -513,7 +513,7 @@ class PermissionManager {
   }
 
   Role revokePrivilegesFromRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges) {
     try {
       AuthorizationPluginCallbackWrapper authorizationCallbackWrapper =
           new AuthorizationPluginCallbackWrapper();
@@ -587,9 +587,11 @@ class PermissionManager {
       String metalake,
       String role,
       MetadataObject object,
-      List<Privilege> privileges,
+      Set<Privilege> privileges,
       RoleEntity roleEntity,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
+    AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
+
     // Add a new securable object if there doesn't exist the object in the role
     SecurableObject securableObject =
         SecurableObjects.parse(object.fullName(), object.type(), Lists.newArrayList(privileges));
@@ -613,7 +615,7 @@ class PermissionManager {
       String metalake,
       String role,
       MetadataObject object,
-      List<Privilege> privileges,
+      Set<Privilege> privileges,
       RoleEntity roleEntity,
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationCallbackWrapper) {

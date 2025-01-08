@@ -86,9 +86,6 @@ public class FilesetCatalogCredentialIT extends BaseIT {
         S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE
             + ","
             + S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
-    properties.put(
-        CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
     properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
     properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
     properties.put(S3Properties.GRAVITINO_S3_ENDPOINT, "s3.ap-southeast-2.amazonaws.com");

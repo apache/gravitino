@@ -60,7 +60,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBlockSize = 64 * 1024 * 1024;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
     catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -90,7 +90,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    conf.set(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
   }
 
   @AfterAll

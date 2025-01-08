@@ -58,32 +58,51 @@ public class RangerAuthorizationPluginIT {
   public void testTranslateMetadataObject() {
     MetadataObject metalake =
         MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
-    AuthorizationMetadataObject rangerMetalake = rangerAuthPlugin.translateMetadataObject(metalake);
-    Assertions.assertEquals(1, rangerMetalake.names().size());
-    Assertions.assertEquals(RangerHelper.RESOURCE_ALL, rangerMetalake.names().get(0));
-    Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.SCHEMA, rangerMetalake.type());
+    List<AuthorizationMetadataObject> rangerMetalake =
+        rangerAuthPlugin.translateMetadataObject(metalake);
+    rangerMetalake.stream()
+        .forEach(
+            authz -> {
+              Assertions.assertEquals(1, authz.names().size());
+              Assertions.assertEquals(RangerHelper.RESOURCE_ALL, authz.names().get(0));
+              Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.SCHEMA, authz.type());
+            });
 
     MetadataObject catalog =
         MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
-    AuthorizationMetadataObject rangerCatalog = rangerAuthPlugin.translateMetadataObject(catalog);
-    Assertions.assertEquals(1, rangerCatalog.names().size());
-    Assertions.assertEquals(RangerHelper.RESOURCE_ALL, rangerCatalog.names().get(0));
-    Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.SCHEMA, rangerCatalog.type());
+    List<AuthorizationMetadataObject> rangerCatalog =
+        rangerAuthPlugin.translateMetadataObject(catalog);
+    rangerCatalog.stream()
+        .forEach(
+            authz -> {
+              Assertions.assertEquals(1, authz.names().size());
+              Assertions.assertEquals(RangerHelper.RESOURCE_ALL, authz.names().get(0));
+              Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.SCHEMA, authz.type());
+            });
 
     MetadataObject schema =
         MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
-    AuthorizationMetadataObject rangerSchema = rangerAuthPlugin.translateMetadataObject(schema);
-    Assertions.assertEquals(1, rangerSchema.names().size());
-    Assertions.assertEquals("schema1", rangerSchema.names().get(0));
-    Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.SCHEMA, rangerSchema.type());
+    List<AuthorizationMetadataObject> rangerSchema =
+        rangerAuthPlugin.translateMetadataObject(schema);
+    rangerSchema.stream()
+        .forEach(
+            authz -> {
+              Assertions.assertEquals(1, authz.names().size());
+              Assertions.assertEquals("schema1", authz.names().get(0));
+              Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.SCHEMA, authz.type());
+            });
 
     MetadataObject table =
         MetadataObjects.parse(String.format("catalog1.schema1.tab1"), MetadataObject.Type.TABLE);
-    AuthorizationMetadataObject rangerTable = rangerAuthPlugin.translateMetadataObject(table);
-    Assertions.assertEquals(2, rangerTable.names().size());
-    Assertions.assertEquals("schema1", rangerTable.names().get(0));
-    Assertions.assertEquals("tab1", rangerTable.names().get(1));
-    Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.TABLE, rangerTable.type());
+    List<AuthorizationMetadataObject> rangerTable = rangerAuthPlugin.translateMetadataObject(table);
+    rangerTable.stream()
+        .forEach(
+            authz -> {
+              Assertions.assertEquals(2, authz.names().size());
+              Assertions.assertEquals("schema1", authz.names().get(0));
+              Assertions.assertEquals("tab1", authz.names().get(1));
+              Assertions.assertEquals(RangerHadoopSQLMetadataObject.Type.TABLE, authz.type());
+            });
   }
 
   @Test

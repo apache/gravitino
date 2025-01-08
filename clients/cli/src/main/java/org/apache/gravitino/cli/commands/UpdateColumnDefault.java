@@ -103,4 +103,10 @@ public class UpdateColumnDefault extends Command {
 
     System.out.println(column + " default changed.");
   }
+
+  @Override
+  public Command validate() {
+    if (dataType == null) exitWithError(ErrorMessages.MISSING_DATATYPE);
+    return super.validate();
+  }
 }

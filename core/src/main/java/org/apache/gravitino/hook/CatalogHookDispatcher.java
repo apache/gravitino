@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -136,8 +137,11 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
     boolean dropped = dispatcher.dropCatalog(ident, force);
 
     if (dropped && catalog != null) {
-      AuthorizationUtils.removeCatalogPrivileges(catalog);
+      List<String> locations =
+          AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
+      AuthorizationUtils.removeCatalogPrivileges(catalog, locations);
     }
+
     return dropped;
   }
 

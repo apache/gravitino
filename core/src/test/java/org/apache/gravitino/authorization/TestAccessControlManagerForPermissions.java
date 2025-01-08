@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -355,7 +356,7 @@ public class TestAccessControlManagerForPermissions {
             METALAKE,
             "grantedRole",
             MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
-            Lists.newArrayList(Privileges.CreateTable.allow()));
+            Sets.newHashSet(Privileges.CreateTable.allow()));
 
     List<SecurableObject> objects = role.securableObjects();
 
@@ -370,7 +371,7 @@ public class TestAccessControlManagerForPermissions {
             METALAKE,
             "grantedRole",
             MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
-            Lists.newArrayList(Privileges.CreateTable.allow()));
+            Sets.newHashSet(Privileges.CreateTable.allow()));
     objects = role.securableObjects();
 
     Assertions.assertEquals(2, objects.size());
@@ -383,7 +384,7 @@ public class TestAccessControlManagerForPermissions {
                 METALAKE,
                 notExist,
                 MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
-                Lists.newArrayList(Privileges.CreateTable.allow())));
+                Sets.newHashSet(Privileges.CreateTable.allow())));
   }
 
   @Test
@@ -396,7 +397,7 @@ public class TestAccessControlManagerForPermissions {
             METALAKE,
             "revokedRole",
             MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
-            Lists.newArrayList(Privileges.UseCatalog.allow()));
+            Sets.newHashSet(Privileges.UseCatalog.allow()));
 
     // Test authorization plugin
     verify(authorizationPlugin).onRoleUpdated(any(), any());
@@ -411,7 +412,7 @@ public class TestAccessControlManagerForPermissions {
             METALAKE,
             "revokedRole",
             MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
-            Lists.newArrayList(Privileges.UseCatalog.allow()));
+            Sets.newHashSet(Privileges.UseCatalog.allow()));
     objects = role.securableObjects();
     Assertions.assertTrue(objects.isEmpty());
 
@@ -423,6 +424,6 @@ public class TestAccessControlManagerForPermissions {
                 METALAKE,
                 notExist,
                 MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
-                Lists.newArrayList(Privileges.CreateTable.allow())));
+                Sets.newHashSet(Privileges.CreateTable.allow())));
   }
 }

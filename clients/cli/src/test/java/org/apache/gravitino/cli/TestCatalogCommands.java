@@ -92,6 +92,7 @@ class TestCatalogCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -112,6 +113,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newCatalogDetails(
             GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo", "catalog");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -131,6 +133,7 @@ class TestCatalogCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newCatalogAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -167,8 +170,28 @@ class TestCatalogCommands {
             "postgres",
             "comment",
             map);
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateCatalogCommandWithoutProvider() {
+    Main.useExit = false;
+    CreateCatalog mockCreateCatalog =
+        spy(
+            new CreateCatalog(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                null,
+                "comment",
+                null));
+
+    assertThrows(RuntimeException.class, mockCreateCatalog::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROVIDER, errOutput);
   }
 
   @Test
@@ -186,6 +209,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newDeleteCatalog(
             GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "catalog");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -206,6 +230,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newDeleteCatalog(
             GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "catalog");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -234,8 +259,58 @@ class TestCatalogCommands {
             "catalog",
             "property",
             "value");
+    doReturn(mockSetProperty).when(mockSetProperty).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperty).handle();
+  }
+
+  @Test
+  void testSetCatalogPropertyCommandWithoutPropertyAndValue() {
+    Main.useExit = false;
+    SetCatalogProperty mockSetProperty =
+        spy(
+            new SetCatalogProperty(
+                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null));
+
+    assertThrows(RuntimeException.class, mockSetProperty::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals("Missing --property and --value options.", errOutput);
+  }
+
+  @Test
+  void testSetCatalogPropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    SetCatalogProperty mockSetProperty =
+        spy(
+            new SetCatalogProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                null,
+                "value"));
+
+    assertThrows(RuntimeException.class, mockSetProperty::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, errOutput);
+  }
+
+  @Test
+  void testSetCatalogPropertyCommandWithoutValue() {
+    Main.useExit = false;
+    SetCatalogProperty mockSetProperty =
+        spy(
+            new SetCatalogProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "property",
+                null));
+
+    assertThrows(RuntimeException.class, mockSetProperty::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_VALUE, errOutput);
   }
 
   @Test
@@ -255,8 +330,22 @@ class TestCatalogCommands {
         .when(commandLine)
         .newRemoveCatalogProperty(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "property");
+    doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
+  }
+
+  @Test
+  void testRemoveCatalogPropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    RemoveCatalogProperty mockRemoveProperty =
+        spy(
+            new RemoveCatalogProperty(
+                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null));
+
+    assertThrows(RuntimeException.class, mockRemoveProperty::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, errOutput);
   }
 
   @Test
@@ -274,6 +363,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newListCatalogProperties(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+    doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
@@ -295,6 +385,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newUpdateCatalogComment(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new comment");
+    doReturn(mockUpdateComment).when(mockUpdateComment).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
   }
@@ -317,6 +408,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newUpdateCatalogName(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new_name");
+    doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
   }
@@ -345,9 +437,9 @@ class TestCatalogCommands {
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
-        "Missing --name option."
+        ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + CommandEntities.CATALOG);
   }
 
@@ -368,6 +460,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newCatalogEnable(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
+    doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
   }
@@ -390,6 +483,7 @@ class TestCatalogCommands {
         .when(commandLine)
         .newCatalogEnable(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", true);
+    doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
   }
@@ -410,6 +504,7 @@ class TestCatalogCommands {
     doReturn(mockDisable)
         .when(commandLine)
         .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+    doReturn(mockDisable).when(mockDisable).validate();
     commandLine.handleCommandLine();
     verify(mockDisable).handle();
   }
@@ -436,6 +531,6 @@ class TestCatalogCommands {
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
     verify(commandLine, never())
         .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "melake_demo", "catalog");
-    assertTrue(errContent.toString().contains("Unable to enable and disable at the same time"));
+    assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
   }
 }

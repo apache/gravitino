@@ -89,6 +89,7 @@ class TestTopicCommands {
         .when(commandLine)
         .newListTopics(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -108,6 +109,7 @@ class TestTopicCommands {
         .when(commandLine)
         .newTopicDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -136,6 +138,7 @@ class TestTopicCommands {
             "schema",
             "topic",
             "comment");
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -161,6 +164,7 @@ class TestTopicCommands {
             "catalog",
             "schema",
             "topic");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -187,6 +191,7 @@ class TestTopicCommands {
             "catalog",
             "schema",
             "topic");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -215,6 +220,7 @@ class TestTopicCommands {
             "schema",
             "topic",
             "new comment");
+    doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
   }
@@ -235,6 +241,7 @@ class TestTopicCommands {
         .when(commandLine)
         .newListTopicProperties(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
+    doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
@@ -266,8 +273,69 @@ class TestTopicCommands {
             "topic",
             "property",
             "value");
+    doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testSetTopicPropertyCommandWithoutPropertyAndValue() {
+    Main.useExit = false;
+    SetTopicProperty spySetProperty =
+        spy(
+            new SetTopicProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "topic",
+                null,
+                null));
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY_AND_VALUE, output);
+  }
+
+  @Test
+  void testSetTopicPropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    SetTopicProperty spySetProperty =
+        spy(
+            new SetTopicProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "topic",
+                null,
+                "value"));
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, output);
+  }
+
+  @Test
+  void testSetTopicPropertyCommandWithoutValue() {
+    Main.useExit = false;
+    SetTopicProperty spySetProperty =
+        spy(
+            new SetTopicProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "topic",
+                "property",
+                null));
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_VALUE, output);
   }
 
   @Test
@@ -294,8 +362,29 @@ class TestTopicCommands {
             "schema",
             "topic",
             "property");
+    doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testRemoveTopicPropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    RemoveTopicProperty spyRemoveProperty =
+        spy(
+            new RemoveTopicProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "topic",
+                null));
+
+    assertThrows(RuntimeException.class, spyRemoveProperty::validate);
+    verify(spyRemoveProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, output);
   }
 
   @Test
@@ -317,7 +406,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.CATALOG, CommandEntities.SCHEMA)));
   }
 
@@ -342,7 +431,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA)));
   }
 
@@ -367,7 +456,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MISSING_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ")
                 .join(
                     Arrays.asList(
@@ -396,7 +485,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.TOPIC)));
   }
 
@@ -422,7 +511,7 @@ class TestTopicCommands {
         output,
         ErrorMessages.MALFORMED_NAME
             + "\n"
-            + "Missing required argument(s): "
+            + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.TOPIC)));
   }
 }

@@ -84,4 +84,19 @@ public class TestMetadataObjects {
             MetadataObjects.of(
                 Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.COLUMN));
   }
+
+  @Test
+  public void testRoleObject() {
+    MetadataObject roleObject = MetadataObjects.of(null, "role.test", MetadataObject.Type.ROLE);
+    Assertions.assertEquals("role.test", roleObject.fullName());
+
+    MetadataObject roleObject1 = MetadataObjects.of(null, "role", MetadataObject.Type.ROLE);
+    Assertions.assertEquals("role", roleObject1.fullName());
+
+    MetadataObject roleObject2 = MetadataObjects.parse("role.test", MetadataObject.Type.ROLE);
+    Assertions.assertEquals("role.test", roleObject2.fullName());
+
+    MetadataObject roleObject3 = MetadataObjects.parse("role", MetadataObject.Type.ROLE);
+    Assertions.assertEquals("role", roleObject3.fullName());
+  }
 }

@@ -33,19 +33,33 @@ public class IcebergRequestContext {
   private final String userName;
   private final String remoteHostName;
   private final Map<String, String> httpHeaders;
+  private final boolean requestCredentialVending;
 
   /**
-   * Constructs a new {@code IcebergRequestContext} with specified HTTP request and catalog name.
+   * Constructs a new {@code IcebergRequestContext} instance.
    *
    * @param httpRequest The HttpServletRequest object containing request details.
    * @param catalogName The name of the catalog to be accessed in the request.
    */
   public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
+    this(httpRequest, catalogName, false);
+  }
+
+  /**
+   * Constructs a new {@code IcebergRequestContext} instance.
+   *
+   * @param httpRequest The HttpServletRequest object containing request details.
+   * @param catalogName The name of the catalog to be accessed in the request.
+   * @param requestCredentialVending Whether the request is for credential vending.
+   */
+  public IcebergRequestContext(
+      HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
     this.httpServletRequest = httpRequest;
     this.remoteHostName = httpRequest.getRemoteHost();
     this.httpHeaders = IcebergRestUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();
+    this.requestCredentialVending = requestCredentialVending;
   }
 
   /**
@@ -82,6 +96,15 @@ public class IcebergRequestContext {
    */
   public Map<String, String> httpHeaders() {
     return httpHeaders;
+  }
+
+  /**
+   * Checks if the request is for credential vending.
+   *
+   * @return true if the request is for credential vending, false otherwise.
+   */
+  public boolean requestCredentialVending() {
+    return requestCredentialVending;
   }
 
   /**

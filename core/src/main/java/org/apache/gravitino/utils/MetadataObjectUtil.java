@@ -32,6 +32,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
@@ -125,6 +126,9 @@ public class MetadataObjectUtil {
 
     switch (object.type()) {
       case METALAKE:
+        if (!metalake.equals(object.name())) {
+          throw new IllegalMetadataObjectException("The metalake object name must be %s", metalake);
+        }
         NameIdentifierUtil.checkMetalake(identifier);
         check(env.metalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
         break;

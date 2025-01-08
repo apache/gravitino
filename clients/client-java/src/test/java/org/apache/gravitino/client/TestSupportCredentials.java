@@ -19,7 +19,6 @@
 package org.apache.gravitino.client;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
-import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -39,7 +38,6 @@ import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.NoSuchCredentialException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -153,16 +151,6 @@ public class TestSupportCredentials extends TestBase {
     buildMockResource(Method.GET, path, null, resp, SC_OK);
     credentials = supportsCredentials.getCredentials();
     Assertions.assertEquals(0, credentials.length);
-
-    // Test throw NoSuchCredentialException
-    ErrorResponse errorResp =
-        ErrorResponse.notFound(NoSuchCredentialException.class.getSimpleName(), "mock error");
-    buildMockResource(Method.GET, path, null, errorResp, SC_NOT_FOUND);
-
-    Throwable ex =
-        Assertions.assertThrows(
-            NoSuchCredentialException.class, () -> supportsCredentials.getCredentials());
-    Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test throw internal error
     ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");

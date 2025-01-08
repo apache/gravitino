@@ -104,8 +104,7 @@ public class IcebergRestTestUtil {
           StaticIcebergConfigProvider.class.getName());
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(
-          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-          DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
+          CredentialConstants.CREDENTIAL_PROVIDERS, DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface

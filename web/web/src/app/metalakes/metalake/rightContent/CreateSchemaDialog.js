@@ -131,12 +131,7 @@ const CreateSchemaDialog = props => {
   }
 
   const addFields = () => {
-    const duplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
+    const duplicateKeys = innerProps.some(item => item.hasDuplicateKey)
 
     if (duplicateKeys) {
       return
@@ -169,16 +164,9 @@ const CreateSchemaDialog = props => {
   }
 
   const onSubmit = data => {
-    const duplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
+    const hasError = innerProps.some(prop => prop.hasDuplicateKey || prop.invalid)
 
-    const invalidKeys = innerProps.some(i => i.invalid)
-
-    if (duplicateKeys || invalidKeys) {
+    if (hasError) {
       return
     }
 

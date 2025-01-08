@@ -193,7 +193,7 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
   }
 
   @Override
-  public AuthorizationMetadataObject translateMetadataObject(MetadataObject metadataObject) {
+  public List<AuthorizationMetadataObject> translateMetadataObject(MetadataObject metadataObject) {
     throw new UnsupportedOperationException("Not supported");
   }
 

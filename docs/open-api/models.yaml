@@ -122,6 +122,33 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+
+    get:
+      tags:
+        - model
+      summary: List model versions
+      operationId: listModelVersions
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionListResponse"
+        "404":
+          description: Not Found - The target model does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
     post:
       tags:
         - model
@@ -156,33 +183,6 @@ paths:
               examples:
                 ModelVersionAliasesAlreadyExistException:
                   $ref: "#/components/examples/ModelVersionAliasesAlreadyExistException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/catalog"
-      - $ref: "./openapi.yaml#/components/parameters/schema"
-      - $ref: "./openapi.yaml#/components/parameters/model"
-
-    get:
-      tags:
-        - model
-      summary: List model versions
-      operationId: listModelVersions
-      responses:
-        "200":
-          $ref: "#/components/responses/ModelVersionListResponse"
-        "404":
-          description: Not Found - The target model does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchModelException:
-                  $ref: "#/components/examples/NoSuchModelException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

@@ -19,49 +19,85 @@
 
 package org.apache.gravitino.cli;
 
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
 public class TestParseType {
 
   @Test
-  public void testParseVarcharWithLength() {
-    ParsedType parsed = ParseType.parse("varchar(10)");
-    assertNotNull(parsed);
-    assertEquals("varchar", parsed.getTypeName());
-    assertEquals(10, parsed.getLength());
-    assertNull(parsed.getScale());
-    assertNull(parsed.getPrecision());
+  public void testParseTypeVarcharWithLength() {
+    Type type = ParseType.toType("varchar(10)");
+    assertThat(type, instanceOf(Types.VarCharType.class));
+    assertEquals(10, ((Types.VarCharType) type).length());
   }
 
   @Test
-  public void testParseDecimalWithPrecisionAndScale() {
-    ParsedType parsed = ParseType.parse("decimal(10,5)");
-    assertNotNull(parsed);
-    assertEquals("decimal", parsed.getTypeName());
-    assertEquals(10, parsed.getPrecision());
-    assertEquals(5, parsed.getScale());
-    assertNull(parsed.getLength());
+  public void testParseTypeDecimalWithPrecisionAndScale() {
+    Type type = ParseType.toType("decimal(10,5)");
+    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertEquals(10, ((Types.DecimalType) type).precision());
+    assertEquals(5, ((Types.DecimalType) type).scale());
   }
 
   @Test
-  public void testParseIntegerWithoutParameters() {
-    ParsedType parsed = ParseType.parse("int()");
-    assertNull(parsed); // Expect null because the format is unsupported
+  public void testParseTypeListValidInput() {
+    Type type = ParseType.toType("list(integer)");
+    assertThat(type, instanceOf(Types.ListType.class));
+    Type elementType = ((Types.ListType) type).elementType();
+    assertThat(elementType, instanceOf(Types.IntegerType.class));
   }
 
   @Test
-  public void testParseOrdinaryInput() {
-    assertNull(ParseType.parse("string"));
-    assertNull(ParseType.parse("int"));
+  public void testParseTypeListMalformedInput() {
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list()"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list(10)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list(unknown)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list(integer,integer)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("list(integer"));
   }
 
   @Test
-  public void testParseMalformedInput() {
-    assertNull(ParseType.parse("varchar(-10)"));
-    assertNull(ParseType.parse("decimal(10,abc)"));
+  public void testParseTypeMapValidInput() {
+    Type type = ParseType.toType("map(string,integer)");
+    assertThat(type, instanceOf(Types.MapType.class));
+    Type keyType = ((Types.MapType) type).keyType();
+    Type valueType = ((Types.MapType) type).valueType();
+    assertThat(keyType, instanceOf(Types.StringType.class));
+    assertThat(valueType, instanceOf(Types.IntegerType.class));
+  }
+
+  @Test
+  public void testParseTypeMapMalformedInput() {
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map()"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(10,10)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(unknown,unknown)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(string)"));
+    assertThrows(
+        IllegalArgumentException.class, () -> ParseType.toType("map(string,integer,integer)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("map(string,integer"));
+  }
+
+  @Test
+  public void testParseTypeIntegerWithoutParameters() {
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("int()"));
+  }
+
+  @Test
+  public void testParseTypeOrdinaryInput() {
+    assertNull(ParseType.parseBasicType("string"));
+    assertNull(ParseType.parseBasicType("int"));
+  }
+
+  @Test
+  public void testParseTypeMalformedInput() {
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("varchar(-10)"));
+    assertThrows(IllegalArgumentException.class, () -> ParseType.toType("decimal(10,abc)"));
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import javax.validation.constraints.NotNull;
 
@@ -34,5 +35,28 @@ public class CatalogCredentialContext implements CredentialContext {
   @Override
   public String getUserName() {
     return userName;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(userName);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || !(o instanceof CatalogCredentialContext)) {
+      return false;
+    }
+    return Objects.equal(userName, ((CatalogCredentialContext) o).userName);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append("User name: ").append(userName);
+    return stringBuilder.toString();
   }
 }
