@@ -40,4 +40,5 @@ s3-access_key_id = "XXX_access_key"
 s3-secret_access_key = "XXX_secret_key"
 s3-region = "XXX_region"
 s3-bucket = "XXX_bucket"
+s3-endpoint = "XXX_endpoint"
 

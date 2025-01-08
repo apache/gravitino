@@ -19,7 +19,8 @@
 
 use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
-use gvfs_fuse::{gvfs_mount, gvfs_unmount, TEST_ENV_WITH_BACKGROUND};
+use gvfs_fuse::RUN_TEST_WITH_BACKEND;
+use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
 use log::{error, info};
 use std::fs::File;
 use std::path::Path;
@@ -108,9 +109,8 @@ fn test_fuse_system_with_auto() {
 
 #[test]
 fn test_fuse_system_with_manual() {
-    if std::env::var(TEST_ENV_WITH_BACKGROUND).is_err() {
-        return;
-    }
+    test_enable_with!(RUN_TEST_WITH_BACKEND);
+
     test_fuse_filesystem("target/gvfs/gvfs_test");
 }
 

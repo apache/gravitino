@@ -261,14 +261,14 @@ fn opendal_filemode_to_filetype(mode: EntryMode) -> FileType {
 mod test {
     use crate::config::AppConfig;
     use crate::s3_filesystem::extract_s3_config;
-    use crate::TEST_ENV_WITH_S3;
+    use crate::s3_filesystem::tests::s3_test_config;
+    use crate::test_enable_with;
+    use crate::RUN_TEST_WITH_S3;
     use opendal::layers::LoggingLayer;
     use opendal::{services, Builder, Operator};
 
-    fn create_opendal() -> Operator {
-        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
-        let opendal_config = extract_s3_config(&config);
-
+    fn create_opendal(config: &AppConfig) -> Operator {
+        let opendal_config = extract_s3_config(config);
         let builder = services::S3::from_map(opendal_config);
 
         // Init an operator
@@ -280,11 +280,10 @@ mod test {
 
     #[tokio::test]
     async fn test_s3_stat() {
-        if std::env::var(TEST_ENV_WITH_S3).is_err() {
-            return;
-        }
+        test_enable_with!(RUN_TEST_WITH_S3);
 
-        let op = create_opendal();
+        let config = s3_test_config();
+        let op = create_opendal(&config);
         let path = "/";
         let list = op.list(path).await;
         if let Ok(l) = list {
@@ -305,11 +304,10 @@ mod test {
 
     #[tokio::test]
     async fn test_s3_delete() {
-        if std::env::var(TEST_ENV_WITH_S3).is_err() {
-            return;
-        }
+        test_enable_with!(RUN_TEST_WITH_S3);
+        let config = s3_test_config();
 
-        let op = create_opendal();
+        let op = create_opendal(&config);
         let path = "/s1/fileset1/gvfs_test/test_dir/test_file";
 
         let meta = op.stat(path).await;

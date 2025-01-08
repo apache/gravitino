@@ -36,8 +36,18 @@ mod opened_file_manager;
 mod s3_filesystem;
 mod utils;
 
-pub const TEST_ENV_WITH_S3: &str = "RUN_TEST_WITH_S3";
-pub const TEST_ENV_WITH_BACKGROUND: &str = "RUN_TEST_WITH_BACKGROUND";
+#[macro_export]
+macro_rules! test_enable_with {
+    ($env_var:expr) => {
+        if std::env::var($env_var).is_err() {
+            println!("Test skipped because {} is not set", $env_var);
+            return;
+        }
+    };
+}
+
+pub const RUN_TEST_WITH_S3: &str = "RUN_TEST_WITH_S3";
+pub const RUN_TEST_WITH_BACKEND: &str = "RUN_TEST_WITH_BACKEND";
 
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {
     gvfs_fuse::mount(mount_to, mount_from, config).await
