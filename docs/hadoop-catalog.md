@@ -9,9 +9,9 @@ license: "This software is licensed under the Apache License version 2."
 ## Introduction
 
 Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports [S3](hadoop-catalog-with-S3.md), [GCS](hadoop-catalog-with-gcs.md), [OSS](hadoop-catalog-with-oss.md) and [Azure Blob Storage](hadoop-catalog-with-adls.md) through Hadoop catalog. 
-
-The rest of this document will use HDFS or local file as an example to illustrate how to use the Hadoop catalog. For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, please refer to the corresponding document for more details.
+the storage location of the fileset. Currently, it supports local filesystem and HDFS. For
+object storage like S3, GCS, Azure Blob Storage and OSS, you can put the hadoop object store jar like
+`gravitino-aws-bundle-{gravitino-version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory to enable the support.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Hadoop catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
@@ -57,6 +57,8 @@ Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials
 
 At the same time, you need to place the corresponding bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
+#### GCS fileset
+
 | Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
 | `filesystem-providers`        | The file system providers to add. Set it to `gs` if it's a GCS fileset, a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`.                                        | (none)          | Yes                        | 0.7.0-incubating |
@@ -80,6 +82,7 @@ In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-
 Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
 
 In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
+
 
 #### Azure Blob Storage fileset
 

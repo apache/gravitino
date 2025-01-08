@@ -54,7 +54,6 @@ import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvi
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.exceptions.NoSuchCredentialException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.storage.AzureProperties;
@@ -341,16 +340,16 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private boolean enableGravitinoCredentialProvider(
       Catalog catalog, NameIdentifier filesetIdentifier) {
-    Fileset fileset =
-        catalog
-            .asFilesetCatalog()
-            .loadFileset(
-                NameIdentifier.of(
-                    filesetIdentifier.namespace().level(2), filesetIdentifier.name()));
     try {
+      Fileset fileset =
+          catalog
+              .asFilesetCatalog()
+              .loadFileset(
+                  NameIdentifier.of(
+                      filesetIdentifier.namespace().level(2), filesetIdentifier.name()));
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
       return credentials.length > 0;
-    } catch (NoSuchCredentialException e) {
+    } catch (Exception e) {
       // No credential found, do nothing.
       return false;
     }
