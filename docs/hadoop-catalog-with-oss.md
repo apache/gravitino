@@ -414,11 +414,11 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 ## Fileset with credential
 
-Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been configured with credential, you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
+Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
 ### How to create a OSS Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-oss-hadoop-catalog](#catalog-a-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset.
+Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset.
 
 ### How to access OSS fileset with credential
 

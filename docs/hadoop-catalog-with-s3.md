@@ -418,11 +418,11 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 ## Fileset with credential
 
-Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been configured with credential, you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
+Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
 
 ### How to create a S3 Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-s3-hadoop-catalog](#catalog-a-catalog), properties needed by [s3-credential](./security/credential-vending.md#s3-credentials) should also be set to enable credential vending for S3 fileset.
+Apart from configuration method in [create-s3-hadoop-catalog](#configurations-for-s3-hadoop-catalog), properties needed by [s3-credential](./security/credential-vending.md#s3-credentials) should also be set to enable credential vending for S3 fileset.
 
 ### How to access S3 fileset with credential
 

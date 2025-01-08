@@ -385,11 +385,11 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 ## Fileset with credential
 
-Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been configured with credential, you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
+Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
 
 ### How to create a GCS Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-gcs-hadoop-catalog](#catalog-a-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset.
+Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-for-a-gcs-hadoop-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset.
 
 ### How to access GCS fileset with credential
 
