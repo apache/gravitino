@@ -405,7 +405,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. 
 
 ### How to create an ADLS Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-adls-hadoop-catalog](#configuration-for-a-adls-hadoop-catalog), properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should also be set to enable credential vending for ADLSfileset.
+Apart from configuration method in [create-adls-hadoop-catalog](#configuration-for-a-adls-hadoop-catalog), properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should also be set to enable credential vending for ADLS fileset.
 
 ### How to access ADLS fileset with credential
 
