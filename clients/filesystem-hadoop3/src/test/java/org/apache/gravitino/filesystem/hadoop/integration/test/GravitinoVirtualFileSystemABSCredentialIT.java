@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Catalog.Type;
 import org.apache.gravitino.abs.fs.AzureFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -68,7 +69,7 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 32 * 1024 * 1024;
+    defaultBlockSize = 32 * 1024 * 1024;
 
     // This value is 1 for ABS, 3 for GCS, and 1 for S3A.
     defaultReplication = 1;
@@ -94,7 +95,7 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
 
     Catalog catalog =
         metalake.createCatalog(
-            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
+            catalogName, Type.FILESET, "hadoop", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     catalog.asSchemas().createSchema(schemaName, "schema comment", properties);

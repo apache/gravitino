@@ -67,7 +67,7 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 32 * 1024 * 1024;
+    defaultBlockSize = 32 * 1024 * 1024;
 
     // The value is 1 for S3
     defaultReplication = 1;

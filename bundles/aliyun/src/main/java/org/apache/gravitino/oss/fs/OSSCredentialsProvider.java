@@ -71,7 +71,7 @@ public class OSSCredentialsProvider implements CredentialsProvider {
 
   private void refresh() {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
-    Credential credential = getCredential(gravitinoCredentials);
+    Credential credential = getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");
     }
@@ -106,7 +106,7 @@ public class OSSCredentialsProvider implements CredentialsProvider {
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  private Credential getCredential(Credential[] credentials) {
+  private Credential getSuitableCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof OSSTokenCredential) {

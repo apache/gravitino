@@ -66,7 +66,7 @@ public class GravitinoVirtualFileSystemOSSCredentialIT extends GravitinoVirtualF
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBlockSize = 64 * 1024 * 1024;
 
     // The default replication factor is 1.
     defaultReplication = 1;
