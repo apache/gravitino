@@ -27,6 +27,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.hadoop.conf.Configuration;
 
+/** Utility class for Gravitino Virtual File System. */
 public class GravitinoVirtualFileSystemUtils {
 
   /**
