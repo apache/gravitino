@@ -1206,12 +1206,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         if expire_time <= 0:
             return TIME_WITHOUT_EXPIRATION
 
-        ration = float(
+        ratio = float(
             self._options.get(
                 GVFSConfig.GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO, 0.9
             )
         )
-        return time.time() * 1000 + (expire_time - time.time() * 1000) * ration
+        return time.time() * 1000 + (expire_time - time.time() * 1000) * ratio
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)
