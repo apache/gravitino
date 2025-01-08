@@ -49,7 +49,6 @@ from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
-    NoSuchCredentialException,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
@@ -965,14 +964,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             write_lock.release()
 
     def _get_gcs_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
-        try:
-            fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(identifier.namespace().level(2), identifier.name())
-            )
-            credentials = fileset.support_credentials().get_credentials()
-        except NoSuchCredentialException as e:
-            logger.warning("Failed to get credentials from fileset: %s", e)
-            credentials = []
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
 
         credential = self._get_most_suitable_gcs_credential(credentials)
         if credential is not None:
@@ -999,16 +994,20 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
 
     def _get_s3_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
-        try:
-            fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(identifier.namespace().level(2), identifier.name())
-            )
-            credentials = fileset.support_credentials().get_credentials()
-        except NoSuchCredentialException as e:
-            logger.warning("Failed to get credentials from fileset: %s", e)
-            credentials = []
-
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
         credential = self._get_most_suitable_s3_credential(credentials)
+
+        # S3 endpoint from gravitino server, Note: the endpoint may not a real S3 endpoint
+        # it can be a simulated S3 endpoint, such as minio, so though the endpoint is not a required field
+        # for S3FileSystem, we still need to assign the endpoint to the S3FileSystem
+        s3_endpoint = fileset_catalog.properties().get("s3-endpoint", None)
+        # If the oss endpoint is not found in the fileset catalog, get it from the client options
+        if s3_endpoint is None:
+            s3_endpoint = self._options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT)
+
         if credential is not None:
             expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
             if isinstance(credential, S3TokenCredential):
@@ -1016,12 +1015,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                     key=credential.access_key_id(),
                     secret=credential.secret_access_key(),
                     token=credential.session_token(),
+                    endpoint_url=s3_endpoint,
                 )
                 return (expire_time, fs)
             if isinstance(credential, S3SecretKeyCredential):
                 fs = importlib.import_module("s3fs").S3FileSystem(
                     key=credential.access_key_id(),
                     secret=credential.secret_access_key(),
+                    endpoint_url=s3_endpoint,
                 )
                 return (expire_time, fs)
 
@@ -1042,36 +1043,29 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "AWS secret access key is not found in the options."
             )
 
-        # get 'aws_endpoint_url' from s3_options, if the key is not found, throw an exception
-        aws_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT)
-        if aws_endpoint_url is None:
-            raise GravitinoRuntimeException(
-                "AWS endpoint url is not found in the options."
-            )
-
         return (
             TIME_WITHOUT_EXPIRATION,
             importlib.import_module("s3fs").S3FileSystem(
                 key=aws_access_key_id,
                 secret=aws_secret_access_key,
-                endpoint_url=aws_endpoint_url,
+                endpoint_url=s3_endpoint,
             ),
         )
 
     def _get_oss_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
-        # Can get credential from the fileset
-        try:
-            fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(identifier.namespace().level(2), identifier.name())
-            )
-            credentials = fileset.support_credentials().get_credentials()
-        except NoSuchCredentialException as e:
-            logger.warning("Failed to get credentials from fileset: %s", e)
-            credentials = []
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
+
+        # OSS endpoint from gravitino server
+        oss_endpoint = fileset_catalog.properties().get("oss-endpoint", None)
+        # If the oss endpoint is not found in the fileset catalog, get it from the client options
+        if oss_endpoint is None:
+            oss_endpoint = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
 
         credential = self._get_most_suitable_oss_credential(credentials)
         if credential is not None:
-            oss_endpoint = fileset_catalog.properties().get("oss-endpoint", None)
             expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
             if isinstance(credential, OSSTokenCredential):
                 fs = importlib.import_module("ossfs").OSSFileSystem(
@@ -1090,12 +1084,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                         endpoint=oss_endpoint,
                     ),
                 )
-
-        oss_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
-        if oss_endpoint_url is None:
-            raise GravitinoRuntimeException(
-                "OSS endpoint url is not found in the options."
-            )
 
         # get 'oss_access_key_id' from oss options, if the key is not found, throw an exception
         oss_access_key_id = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY)
@@ -1118,19 +1106,15 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             importlib.import_module("ossfs").OSSFileSystem(
                 key=oss_access_key_id,
                 secret=oss_secret_access_key,
-                endpoint=oss_endpoint_url,
+                endpoint=oss_endpoint,
             ),
         )
 
     def _get_abs_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
-        try:
-            fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(identifier.namespace().level(2), identifier.name())
-            )
-            credentials = fileset.support_credentials().get_credentials()
-        except NoSuchCredentialException as e:
-            logger.warning("Failed to get credentials from fileset: %s", e)
-            credentials = []
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
 
         credential = self._get_most_suitable_abs_credential(credentials)
         if credential is not None:
@@ -1221,7 +1205,13 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     def _get_expire_time_by_ratio(self, expire_time: int):
         if expire_time <= 0:
             return TIME_WITHOUT_EXPIRATION
-        return time.time() * 1000 + (expire_time - time.time() * 1000) * 0.9
+
+        ration = float(
+            self._options.get(
+                GVFSConfig.GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO, 0.9
+            )
+        )
+        return time.time() * 1000 + (expire_time - time.time() * 1000) * ration
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)

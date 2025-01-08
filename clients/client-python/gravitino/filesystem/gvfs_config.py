@@ -44,3 +44,8 @@ class GVFSConfig:
 
     GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME = "abs_account_name"
     GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY = "abs_account_key"
+
+    # This configuration marks the expired time of the credential. For instance, if the credential
+    # fetched from Gravitino server has expired time of 3600 seconds, and the credential_expired_time_ration is 0.5
+    # then the credential will be considered as expired after 1800 seconds and will try to fetch a new credential.
+    GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO = "credential_expired_time_ratio"

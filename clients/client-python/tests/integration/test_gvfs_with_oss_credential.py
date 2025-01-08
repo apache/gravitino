@@ -177,3 +177,49 @@ class TestGvfsWithOSSCredential(TestGvfsWithOSS):
         file_list_with_detail = fs.ls(ls_dir, detail=True)
         self.assertEqual(1, len(file_list_with_detail))
         self.assertEqual(file_list_with_detail[0]["name"], ls_file[len("gvfs://") :])
+
+    @unittest.skip(
+        "Skip this test case because fs.info(info_file) using credential is always None"
+    )
+    def test_info(self):
+        info_dir = self.fileset_gvfs_location + "/test_info"
+        info_actual_dir = self.fileset_storage_location + "/test_info"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+
+        self.check_mkdir(info_dir, info_actual_dir, fs)
+
+        info_file = self.fileset_gvfs_location + "/test_info/test.file"
+        info_actual_file = self.fileset_storage_location + "/test_info/test.file"
+        self.fs.touch(info_actual_file)
+        self.assertTrue(self.fs.exists(info_actual_file))
+
+        ## OSS info has different behavior than S3 info. For OSS info, the name of the
+        ## directory will have a trailing slash if it's a directory and the path
+        # does not end with a slash, while S3 info will not have a trailing
+        # slash if it's a directory.
+
+        # >> > oss.info('bucket-xiaoyu/lisi')
+        # {'name': 'bucket-xiaoyu/lisi/', 'type': 'directory',
+        # 'size': 0, 'Size': 0, 'Key': 'bucket-xiaoyu/lisi/'}
+        # >> > oss.info('bucket-xiaoyu/lisi/')
+        # {'name': 'bucket-xiaoyu/lisi', 'size': 0,
+        # 'type': 'directory', 'Size': 0,
+        # 'Key': 'bucket-xiaoyu/lisi'
+
+        # >> > s3.info('paimon-bucket/lisi');
+        # {'name': 'paimon-bucket/lisi', 'type': 'directory', 'size': 0,
+        # 'StorageClass': 'DIRECTORY'}
+        # >> > s3.info('paimon-bucket/lisi/');
+        # {'name': 'paimon-bucket/lisi', 'type': 'directory', 'size': 0,
+        # 'StorageClass': 'DIRECTORY'}
+
+        dir_info = fs.info(info_dir)
+        self.assertEqual(dir_info["name"][:-1], info_dir[len("gvfs://") :])
+
+        file_info = fs.info(info_file)
+        self.assertEqual(file_info["name"], info_file[len("gvfs://") :])

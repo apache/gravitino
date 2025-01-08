@@ -121,6 +121,8 @@ class TestGvfsWithCredentialABS(TestGvfsWithABS):
             account_key=cls.azure_abs_account_key,
         )
 
+    # As the permission provided by the dynamic token is smaller compared to the permission provided by the static token
+    # like account key and account name, the test case will fail if we do not override the test case.
     def test_mkdir(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
         mkdir_actual_dir = self.fileset_storage_location + "/test_mkdir"
