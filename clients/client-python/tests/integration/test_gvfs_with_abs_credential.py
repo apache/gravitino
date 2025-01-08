@@ -54,8 +54,8 @@ def azure_abs_with_credential_is_prepared():
 class TestGvfsWithCredentialABS(TestGvfsWithABS):
     # Before running this test, please set the make sure azure-bundle-xxx.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
-    azure_abs_account_key = os.environ.get("ABS_ACCOUNT_NAME_FOR_CREDENTIAL")
-    azure_abs_account_name = os.environ.get("ABS_ACCOUNT_KEY_FOR_CREDENTIAL")
+    azure_abs_account_key = os.environ.get("ABS_ACCOUNT_KEY_FOR_CREDENTIAL")
+    azure_abs_account_name = os.environ.get("ABS_ACCOUNT_NAME_FOR_CREDENTIAL")
     azure_abs_container_name = os.environ.get("ABS_CONTAINER_NAME_FOR_CREDENTIAL")
     azure_abs_tenant_id = os.environ.get("ABS_TENANT_ID_FOR_CREDENTIAL")
     azure_abs_client_id = os.environ.get("ABS_CLIENT_ID_FOR_CREDENTIAL")
