@@ -103,9 +103,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private static final Set<String> CATALOG_NECESSARY_PROPERTIES_TO_KEEP =
       Sets.newHashSet(
           OSSProperties.GRAVITINO_OSS_ENDPOINT,
-          OSSProperties.GRAVITINO_OSS_ENDPOINT,
+          OSSProperties.GRAVITINO_OSS_REGION,
           S3Properties.GRAVITINO_S3_ENDPOINT,
-          S3Properties.GRAVITINO_S3_ENDPOINT,
+          S3Properties.GRAVITINO_S3_REGION,
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
 
   @Override
@@ -291,7 +291,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     FileSystem fs =
         internalFileSystemCache.get(
             identifier,
-            str -> {
+            ident -> {
               try {
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
                 if (provider == null) {
@@ -347,9 +347,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
       return credentials.length > 0;
     } catch (Exception e) {
-      // No credential found, do nothing.
-      Logger.warn("Failed to fetch credentials from fileset: {}", filesetIdentifier, e);
-      return false;
+      throw new RuntimeException(e);
     }
   }
 
