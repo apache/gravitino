@@ -19,9 +19,8 @@
 package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.List;
-import javax.annotation.Nullable;
+import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
@@ -44,29 +43,37 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     }
   }
 
+  private final String name;
+  private final String parent;
   private final String path;
 
   private final AuthorizationMetadataObject.Type type;
 
-  public PathBasedMetadataObject(String path, AuthorizationMetadataObject.Type type) {
+  public PathBasedMetadataObject(
+      String parent, String name, String path, AuthorizationMetadataObject.Type type) {
+    this.parent = parent;
+    this.name = name;
     this.path = path;
     this.type = type;
   }
 
-  @Nullable
-  @Override
-  public String parent() {
-    return null;
-  }
-
   @Override
   public String name() {
-    return this.path;
+    return name;
   }
 
   @Override
   public List<String> names() {
-    return ImmutableList.of(this.path);
+    return DOT_SPLITTER.splitToList(fullName());
+  }
+
+  @Override
+  public String parent() {
+    return parent;
+  }
+
+  public String path() {
+    return path;
   }
 
   @Override
@@ -81,11 +88,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         names != null && !names.isEmpty(),
         "Cannot create a path based metadata object with no names");
     Preconditions.checkArgument(
-        names.size() == 1,
-        "Cannot create a path based metadata object with the name length which is 1");
-    Preconditions.checkArgument(
-        type != null, "Cannot create a path based metadata object with no type");
-
+        path != null && !path.isEmpty(), "Cannot create a path based metadata object with no path");
     Preconditions.checkArgument(
         type == PathBasedMetadataObject.Type.PATH, "it must be the PATH type");
 
@@ -93,5 +96,34 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
       Preconditions.checkArgument(
           name != null, "Cannot create a path based metadata object with null name");
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof PathBasedMetadataObject)) {
+      return false;
+    }
+
+    PathBasedMetadataObject that = (PathBasedMetadataObject) o;
+    return Objects.equals(name, that.name)
+        && Objects.equals(parent, that.parent)
+        && Objects.equals(path, that.path)
+        && type == that.type;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(name, parent, path, type);
+  }
+
+  @Override
+  public String toString() {
+    return "MetadataObject: [fullName=" + fullName() + "],  [path=" + path == null
+        ? "null"
+        : path + "], [type=" + type + "]";
   }
 }

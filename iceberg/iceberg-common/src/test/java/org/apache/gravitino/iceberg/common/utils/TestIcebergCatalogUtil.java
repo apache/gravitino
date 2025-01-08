@@ -21,8 +21,8 @@ package org.apache.gravitino.iceberg.common.utils;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;

@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
@@ -321,7 +322,7 @@ class DTOConverters {
         .build();
   }
 
-  static List<PrivilegeDTO> toPrivileges(List<Privilege> privileges) {
+  static List<PrivilegeDTO> toPrivileges(Collection<Privilege> privileges) {
     return privileges.stream()
         .map(
             privilege ->

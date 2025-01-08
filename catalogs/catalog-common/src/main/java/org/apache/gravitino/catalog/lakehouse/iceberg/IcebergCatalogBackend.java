@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common;
+package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 public enum IcebergCatalogBackend {
   HIVE,

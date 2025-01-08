@@ -21,6 +21,8 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -111,6 +113,31 @@ public class TestIcebergPropertiesConverter {
             "rest-uri",
             IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
             "rest-warehouse"),
+        properties);
+  }
+
+  @Test
+  void testCatalogPropertiesWithCustomBackend() {
+    Map<String, String> properties =
+        icebergPropertiesConverter.toSparkCatalogProperties(
+            ImmutableMap.of(
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+                IcebergCatalogBackend.CUSTOM.name(),
+                IcebergConstants.CATALOG_BACKEND_IMPL,
+                "CustomCatalog",
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+                "custom-warehouse",
+                "key1",
+                "value1"));
+
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED,
+            "FALSE",
+            IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL,
+            "CustomCatalog",
+            IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+            "custom-warehouse"),
         properties);
   }
 }
