@@ -37,7 +37,7 @@ public class MetalakeCommandHandler extends CommandHandler {
    * Constructs a MetalakeCommandHandler instance.
    *
    * @param gravitinoCommandLine The Gravitino command line instance.
-   * @param line The command line options.
+   * @param line The command line arguments.
    * @param command The command to execute.
    * @param ignore Ignore server version mismatch.
    */
