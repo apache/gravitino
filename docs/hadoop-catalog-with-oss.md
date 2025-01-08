@@ -358,11 +358,9 @@ The following are examples of how to use the `hadoop fs` command to access the f
   </property>
 ```
 
-2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+2. Add the necessary jars to the Hadoop classpath.
 
-For OSS, you need to copy `gravitino-aliyun-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory,
-then copy hadoop-aliyun-{version}.jar and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-
+For OSS, you need to add `gravitino-aliyun-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 
 3. Run the following command to access the fileset:
 

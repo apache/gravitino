@@ -42,8 +42,7 @@ the path mapping and convert automatically.
 
 ### Prerequisites
 
-+ A Hadoop environment with HDFS running. GVFS has been tested against
-  Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.
+ - GVFS has been tested against Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.
   x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
   compatibility issues.
 
@@ -71,11 +70,11 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 
 #### S3 fileset
 
-| Configuration item     | Description                   | Default value | Required                 | Since version    |
-|------------------------|-------------------------------|---------------|--------------------------|------------------|
-| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| Configuration item     | Description                   | Default value | Required | Since version    |
+|------------------------|-------------------------------|---------------|----------|------------------|
+| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | Yes      | 0.7.0-incubating |
+| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
 
 At the same time, you need to add the corresponding bundle jar
 1. [`gravitino-aws-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the classpath if no Hadoop environment is available, or
@@ -84,9 +83,9 @@ At the same time, you need to add the corresponding bundle jar
 
 #### GCS fileset
 
-| Configuration item         | Description                                | Default value | Required                  | Since version    |
-|----------------------------|--------------------------------------------|---------------|---------------------------|------------------|
-| `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
+| Configuration item         | Description                                | Default value | Required | Since version    |
+|----------------------------|--------------------------------------------|---------------|----------|------------------|
+| `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes      | 0.7.0-incubating |
 
 In the meantime, you need to add the corresponding bundle jar
 1. [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the classpath if no hadoop environment is available, or
@@ -95,11 +94,11 @@ In the meantime, you need to add the corresponding bundle jar
 
 #### OSS fileset
 
-| Configuration item      | Description                       | Default value | Required                  | Since version    |
-|-------------------------|-----------------------------------|---------------|---------------------------|------------------|
-| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
+| Configuration item      | Description                       | Default value | Required | Since version    |
+|-------------------------|-----------------------------------|---------------|----------|------------------|
+| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
+| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
 
 
 In the meantime, you need to place the corresponding bundle jar
@@ -108,10 +107,10 @@ In the meantime, you need to place the corresponding bundle jar
 
 #### Azure Blob Storage fileset
 
-| Configuration item           | Description                             | Default value | Required                                  | Since version    |
-|------------------------------|-----------------------------------------|---------------|-------------------------------------------|------------------|
-| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
+| Configuration item           | Description                             | Default value | Required | Since version    |
+|------------------------------|-----------------------------------------|---------------|----------|------------------|
+| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes      | 0.8.0-incubating |
+| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes      | 0.8.0-incubating |
 
 Similar to the above, you need to place the corresponding bundle jar
 1. [`gravitino-azure-bundle-${gravitino-version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the classpath if no hadoop environment is available, or 
@@ -467,32 +466,32 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 
 The following properties are required if you want to access the S3 fileset via the GVFS python client:
 
-| Configuration item         | Description                  | Default value | Required                 | Since version    |
-|----------------------------|------------------------------|---------------|--------------------------|------------------|
-| `s3_endpoint`              | The endpoint of the AWS S3.  | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3_access_key_id`         | The access key of the AWS S3.| (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3_secret_access_key`     | The secret key of the AWS S3.| (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
+| Configuration item         | Description                  | Default value | Required | Since version    |
+|----------------------------|------------------------------|---------------|----------|------------------|
+| `s3_endpoint`              | The endpoint of the AWS S3.  | (none)        | Yes      | 0.7.0-incubating |
+| `s3_access_key_id`         | The access key of the AWS S3.| (none)        | Yes      | 0.7.0-incubating |
+| `s3_secret_access_key`     | The secret key of the AWS S3.| (none)        | Yes      | 0.7.0-incubating |
 
 The following properties are required if you want to access the GCS fileset via the GVFS python client:
 
-| Configuration item         | Description                               | Default value | Required                  | Since version    |
-|----------------------------|-------------------------------------------|---------------|---------------------------|------------------|
-| `gcs_service_account_file` | The path of GCS service account JSON file.| (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
+| Configuration item         | Description                               | Default value | Required | Since version    |
+|----------------------------|-------------------------------------------|---------------|----------|------------------|
+| `gcs_service_account_file` | The path of GCS service account JSON file.| (none)        | Yes      | 0.7.0-incubating |
 
 The following properties are required if you want to access the OSS fileset via the GVFS python client:
 
-| Configuration item         | Description                       | Default value | Required                   | Since version    |
-|----------------------------|-----------------------------------|---------------|----------------------------|------------------|
-| `oss_endpoint`             | The endpoint of the Aliyun OSS.   | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
+| Configuration item         | Description                       | Default value | Required | Since version    |
+|----------------------------|-----------------------------------|---------------|----------|------------------|
+| `oss_endpoint`             | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
+| `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
 
 For Azure Blob Storage fileset, you need to configure the following properties:
 
-| Configuration item | Description                            | Default value | Required                                  | Since version    |
-|--------------------|----------------------------------------|---------------|-------------------------------------------|------------------|
-| `abs_account_name` | The account name of Azure Blob Storage | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `abs_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
+| Configuration item | Description                            | Default value | Required | Since version    |
+|--------------------|----------------------------------------|---------------|----------|------------------|
+| `abs_account_name` | The account name of Azure Blob Storage | (none)        | Yes      | 0.8.0-incubating |
+| `abs_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      | 0.8.0-incubating |
 
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:

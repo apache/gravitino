@@ -365,10 +365,9 @@ The following are examples of how to use the `hadoop fs` command to access the f
   </property>
 ```
 
-2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+2. Add the necessary jars to the Hadoop classpath. 
 
-For S3, you need to copy `gravitino-aws-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory,
-then copy hadoop-aws-{version}.jar and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
+For S3, you need to add `gravitino-aws-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 
 
 3. Run the following command to access the fileset:
