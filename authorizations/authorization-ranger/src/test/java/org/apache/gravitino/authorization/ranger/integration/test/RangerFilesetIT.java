@@ -374,8 +374,7 @@ public class RangerFilesetIT extends BaseIT {
 
     catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, fileset.name()));
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
-    Assertions.assertEquals(1, policies.size());
-    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
+    Assertions.assertEquals(0, policies.size());
   }
 
   @Test
