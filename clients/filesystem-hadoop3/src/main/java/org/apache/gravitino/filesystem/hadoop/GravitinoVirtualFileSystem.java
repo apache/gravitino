@@ -50,7 +50,7 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -315,16 +315,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
                 totalProperty.putAll(getConfigMap(getConf()));
 
-                boolean enableCredentialProvider =
-                    enableGravitinoCredentialProvider(catalog, identifier);
-                if (enableCredentialProvider) {
-                  // It has enabled the credential provider
+                if (credentialVending(catalog, identifier)) {
+                  // It has enabled the credential vending, so we need to set the credential
+                  // provider
                   totalProperty.put(
-                      GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER,
-                      DefaultGravitinoFileSystemCredentialProvider.class.getCanonicalName());
+                      GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
+                      DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
                   totalProperty.put(
-                      GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER_PATH,
-                      virtualPathString);
+                      GravitinoFileSystemCredentialsProvider.GVFS_PATH, virtualPathString);
                 }
 
                 return provider.getFileSystem(filePath, totalProperty);
@@ -338,8 +336,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return new FilesetContextPair(new Path(actualFileLocation), fs);
   }
 
-  private boolean enableGravitinoCredentialProvider(
-      Catalog catalog, NameIdentifier filesetIdentifier) {
+  private boolean credentialVending(Catalog catalog, NameIdentifier filesetIdentifier) {
     try {
       Fileset fileset =
           catalog

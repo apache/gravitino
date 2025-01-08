@@ -22,14 +22,14 @@ package org.apache.gravitino.gcs.fs;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.hadoop.conf.Configuration;
 
 public class GCSCredentialsProvider implements AccessTokenProvider {
   private Configuration configuration;
-  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
+  private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
 
   private AccessToken accessToken;
   private long expirationTime = Long.MAX_VALUE;
@@ -49,7 +49,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
 
   @Override
   public void refresh() throws IOException {
-    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
 
     Credential credential = getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
@@ -73,7 +73,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
   @Override
   public void setConf(Configuration configuration) {
     this.configuration = configuration;
-    this.gravitinoFileSystemCredentialProvider =
+    this.gravitinoFileSystemCredentialsProvider =
         FileSystemUtils.getGvfsCredentialProvider(configuration);
   }
 

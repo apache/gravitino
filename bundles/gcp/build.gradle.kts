@@ -40,7 +40,6 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
-
   implementation(libs.commons.lang3)
   // runtime used
   implementation(libs.commons.logging)

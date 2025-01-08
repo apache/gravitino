@@ -18,13 +18,14 @@
  */
 package org.apache.gravitino.oss.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.enableGravitinoCredentialVending;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -61,7 +62,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
-    if (enableCredentialProvidedByGravitino(config)) {
+    if (enableGravitinoCredentialVending(config)) {
       hadoopConfMap.put(
           Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialsProvider.class.getCanonicalName());
     }
@@ -69,10 +70,6 @@ public class OSSFileSystemProvider implements FileSystemProvider {
     hadoopConfMap.forEach(configuration::set);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
-  }
-
-  private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
-    return null != config.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 
   @Override

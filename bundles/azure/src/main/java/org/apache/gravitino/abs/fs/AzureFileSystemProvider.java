@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.abs.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.enableGravitinoCredentialVending;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_IS_HNS_ENABLED;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
@@ -30,7 +31,6 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -70,7 +70,7 @@ public class AzureFileSystemProvider implements FileSystemProvider {
 
     hadoopConfMap.forEach(configuration::set);
 
-    if (enableCredentialProvidedByGravitino(hadoopConfMap)) {
+    if (enableGravitinoCredentialVending(hadoopConfMap)) {
       try {
         AzureSasCredentialsProvider azureSasCredentialsProvider = new AzureSasCredentialsProvider();
         azureSasCredentialsProvider.initialize(configuration, null);
@@ -101,10 +101,6 @@ public class AzureFileSystemProvider implements FileSystemProvider {
     }
 
     return FileSystem.get(path.toUri(), configuration);
-  }
-
-  private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
-    return null != config.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 
   @Override

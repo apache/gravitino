@@ -24,7 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.file.Fileset;
@@ -32,11 +32,11 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * Default implementation of {@link GravitinoFileSystemCredentialProvider} which provides
+ * Default implementation of {@link GravitinoFileSystemCredentialsProvider} which provides
  * credentials for Gravitino Virtual File System.
  */
-public class DefaultGravitinoFileSystemCredentialProvider
-    implements GravitinoFileSystemCredentialProvider {
+public class DefaultGravitinoFileSystemCredentialsProvider
+    implements GravitinoFileSystemCredentialsProvider {
 
   private Configuration configuration;
 
@@ -55,7 +55,7 @@ public class DefaultGravitinoFileSystemCredentialProvider
 
   @Override
   public Credential[] getCredentials() {
-    String virtualPath = configuration.get(GVFS_CREDENTIAL_PROVIDER_PATH);
+    String virtualPath = configuration.get(GVFS_PATH);
     NameIdentifier nameIdentifier = getNameIdentifierFromVirtualPath(virtualPath);
     String[] idents = nameIdentifier.namespace().levels();
     try (GravitinoClient client = GravitinoVirtualFileSystemUtils.createClient(configuration)) {

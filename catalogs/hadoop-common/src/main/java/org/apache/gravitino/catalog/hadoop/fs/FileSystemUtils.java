@@ -168,17 +168,17 @@ public class FileSystemUtils {
    * @param conf Configuration
    * @return GravitinoFileSystemCredentialProvider
    */
-  public static GravitinoFileSystemCredentialProvider getGvfsCredentialProvider(
+  public static GravitinoFileSystemCredentialsProvider getGvfsCredentialProvider(
       Configuration conf) {
     try {
-      GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider =
-          (GravitinoFileSystemCredentialProvider)
+      GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider =
+          (GravitinoFileSystemCredentialsProvider)
               Class.forName(
-                      conf.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER))
+                      conf.get(GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER))
                   .getDeclaredConstructor()
                   .newInstance();
-      gravitinoFileSystemCredentialProvider.setConf(conf);
-      return gravitinoFileSystemCredentialProvider;
+      gravitinoFileSystemCredentialsProvider.setConf(conf);
+      return gravitinoFileSystemCredentialsProvider;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
     }

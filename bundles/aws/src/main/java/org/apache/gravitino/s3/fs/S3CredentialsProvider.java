@@ -25,21 +25,21 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.hadoop.conf.Configuration;
 
 public class S3CredentialsProvider implements AWSCredentialsProvider {
-  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
+  private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
 
   private AWSCredentials basicSessionCredentials;
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public S3CredentialsProvider(final URI uri, final Configuration conf) {
-    this.gravitinoFileSystemCredentialProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
+    this.gravitinoFileSystemCredentialsProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
   }
 
   @Override
@@ -56,7 +56,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
 
   @Override
   public void refresh() {
-    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
     Credential credential = getSuitableCredential(gravitinoCredentials);
 
     if (credential == null) {

@@ -21,7 +21,7 @@ package org.apache.gravitino.abs.fs;
 
 import java.io.IOException;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
@@ -36,7 +36,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
   private String azureStorageAccountName;
   private String azureStorageAccountKey;
 
-  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
+  private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
@@ -61,7 +61,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
   @Override
   public void initialize(Configuration conf, String accountName) throws IOException {
     this.configuration = conf;
-    this.gravitinoFileSystemCredentialProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
+    this.gravitinoFileSystemCredentialsProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
   }
 
   @Override
@@ -76,7 +76,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
   }
 
   private void refresh() {
-    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
     Credential credential = getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");

@@ -25,7 +25,7 @@ import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentials;
 import java.net.URI;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
@@ -33,13 +33,13 @@ import org.apache.hadoop.conf.Configuration;
 
 public class OSSCredentialsProvider implements CredentialsProvider {
 
-  private GravitinoFileSystemCredentialProvider gravitinoFileSystemCredentialProvider;
+  private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
   private Credentials basicCredentials;
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
 
   public OSSCredentialsProvider(URI uri, Configuration conf) {
-    this.gravitinoFileSystemCredentialProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
+    this.gravitinoFileSystemCredentialsProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
   }
 
   @Override
@@ -57,7 +57,7 @@ public class OSSCredentialsProvider implements CredentialsProvider {
   }
 
   private void refresh() {
-    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialProvider.getCredentials();
+    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
     Credential credential = getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");

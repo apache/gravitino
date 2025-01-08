@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.s3.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.enableGravitinoCredentialVending;
+
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -30,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialProvider;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -67,7 +68,7 @@ public class S3FileSystemProvider implements FileSystemProvider {
       configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
 
-    if (enableCredentialProvidedByGravitino(config)) {
+    if (enableGravitinoCredentialVending(config)) {
       configuration.set(
           Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
     }
@@ -76,10 +77,6 @@ public class S3FileSystemProvider implements FileSystemProvider {
     checkAndSetCredentialProvider(configuration);
 
     return S3AFileSystem.newInstance(path.toUri(), configuration);
-  }
-
-  private boolean enableCredentialProvidedByGravitino(Map<String, String> config) {
-    return null != config.get(GravitinoFileSystemCredentialProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 
   private void checkAndSetCredentialProvider(Configuration configuration) {
