@@ -257,9 +257,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     if (authzMetadataObject.type().equals(SCHEMA)) {
-      doRemoveSchemaMetadataObject(authzMetadataObject);
+      removeSchemaMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.type().equals(TABLE)) {
-      doRemoveTableMetadataObject(authzMetadataObject);
+      removeTableMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.type().equals(COLUMN)
         || authzMetadataObject.type().equals(PATH)) {
       removePolicyByMetadataObject(authzMetadataObject);
@@ -273,7 +273,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    * Remove the SCHEMA, Need to remove these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` permissions.
    */
-  private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+  private void removeSchemaMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
@@ -307,7 +307,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                   AuthorizationMetadataObject.getLastName(names),
                                   locationPath,
                                   PATH);
-                          doRemoveSchemaMetadataObject(schemaMetadataObject);
+                          removeSchemaMetadataObject(schemaMetadataObject);
                         });
               });
     } else {
@@ -330,24 +330,24 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                           AuthorizationMetadataObject tableMetadataObject =
                               new PathBasedMetadataObject(
                                   authzMetadataObject.name(), table.name(), locationPath, PATH);
-                          doRemoveTableMetadataObject(tableMetadataObject);
+                          removeTableMetadataObject(tableMetadataObject);
                         });
-                // Remove schema
-                Schema schema =
-                    GravitinoEnv.getInstance()
-                        .schemaDispatcher()
-                        .loadSchema(NameIdentifier.of(authzMetadataObject.name()));
-                List<String> schemaLocations =
-                    AuthorizationUtils.getMetadataObjectLocation(
-                        identifier, Entity.EntityType.SCHEMA);
-                schemaLocations.stream()
-                    .forEach(
-                        locationPath -> {
-                          AuthorizationMetadataObject schemaMetadataObject =
-                              new PathBasedMetadataObject(
-                                  authzMetadataObject.name(), schema.name(), locationPath, PATH);
-                          removePolicyByMetadataObject(schemaMetadataObject);
-                        });
+              });
+      // Remove schema
+      Schema schema =
+          GravitinoEnv.getInstance()
+              .schemaDispatcher()
+              .loadSchema(NameIdentifier.of(authzMetadataObject.name()));
+      List<String> schemaLocations =
+          AuthorizationUtils.getMetadataObjectLocation(
+              NameIdentifier.parse(authzMetadataObject.fullName()), Entity.EntityType.SCHEMA);
+      schemaLocations.stream()
+          .forEach(
+              locationPath -> {
+                AuthorizationMetadataObject schemaMetadataObject =
+                    new PathBasedMetadataObject(
+                        authzMetadataObject.name(), schema.name(), locationPath, PATH);
+                removePolicyByMetadataObject(schemaMetadataObject);
               });
     }
   }
@@ -356,7 +356,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    * Remove the TABLE, Need to remove these the relevant policies, `*.{table}`, `*.{table}.{column}`
    * permissions.
    */
-  private void doRemoveTableMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+  private void removeTableMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
