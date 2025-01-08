@@ -94,8 +94,7 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
     properties.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog catalog =
-        metalake.createCatalog(
-            catalogName, Type.FILESET, "hadoop", "catalog comment", properties);
+        metalake.createCatalog(catalogName, Type.FILESET, "hadoop", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     catalog.asSchemas().createSchema(schemaName, "schema comment", properties);
