@@ -78,3 +78,31 @@ class TestPartitions(unittest.TestCase):
         self.assertEqual(["country"], partition.field_names()[1])
         self.assertEqual(Literals.date_literal(date(2008, 8, 8)), partition.values()[0])
         self.assertEqual(Literals.string_literal("us"), partition.values()[1])
+
+    def test_eq(self):
+        """
+        Test the correctness of the __eq__ method.
+        """
+        partition1 = Partitions.range(
+            "p1", Literals.NULL, Literals.integer_literal(6), {}
+        )
+        partition2 = Partitions.range(
+            "p1", Literals.NULL, Literals.integer_literal(6), {}
+        )
+        partition3 = Partitions.range(
+            "p2", Literals.NULL, Literals.integer_literal(10), {}
+        )
+
+        # Test same objects are equal
+        self.assertEqual(partition1, partition2)  # Should be equal
+        self.assertNotEqual(partition1, partition3)  # Should not be equal
+
+        # Test different objects are not equal
+        partition4 = Partitions.range(
+            "p1", Literals.NULL, Literals.integer_literal(10), {}
+        )
+        self.assertNotEqual(partition1, partition4)
+
+        # Test comparison with different types
+        self.assertNotEqual(partition1, "not_a_partition")  # Different type
+        self.assertNotEqual(partition1, None)  # NoneType

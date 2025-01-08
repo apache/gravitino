@@ -128,14 +128,14 @@ class RangePartitionImpl(RangePartition):
         return self._properties
 
     def __eq__(self, other: Any) -> bool:
-        if isinstance(other, RangePartitionImpl):
-            return (
-                self._name == other._name
-                and self._upper == other._upper
-                and self._lower == other._lower
-                and self._properties == other._properties
-            )
-        return False
+        if not isinstance(other, RangePartitionImpl):
+            return False
+        return (
+            self._name == other._name
+            and self._upper == other._upper
+            and self._lower == other._lower
+            and self._properties == other._properties
+        )
 
     def __hash__(self) -> int:
         return hash(
@@ -165,13 +165,13 @@ class ListPartitionImpl(ListPartition):
         return self._properties
 
     def __eq__(self, other: Any) -> bool:
-        if isinstance(other, ListPartitionImpl):
-            return (
-                self._name == other._name
-                and self._lists == other._lists
-                and self._properties == other._properties
-            )
-        return False
+        if not isinstance(other, ListPartitionImpl):
+            return False
+        return (
+            self._name == other._name
+            and self._lists == other._lists
+            and self._properties == other._properties
+        )
 
     def __hash__(self) -> int:
         return hash(
@@ -211,14 +211,14 @@ class IdentityPartitionImpl(IdentityPartition):
         return self._properties
 
     def __eq__(self, other: Any) -> bool:
-        if isinstance(other, IdentityPartitionImpl):
-            return (
-                self._name == other._name
-                and self._field_names == other._field_names
-                and self._values == other._values
-                and self._properties == other._properties
-            )
-        return False
+        if not isinstance(other, IdentityPartitionImpl):
+            return False
+        return (
+            self._name == other._name
+            and self._field_names == other._field_names
+            and self._values == other._values
+            and self._properties == other._properties
+        )
 
     def __hash__(self) -> int:
         return hash(
