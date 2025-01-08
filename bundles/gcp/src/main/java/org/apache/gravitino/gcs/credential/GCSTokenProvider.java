@@ -45,9 +45,7 @@ import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.config.GCSCredentialConfig;
 
-/**
- * Generate GCS access token according to the read and write paths.
- */
+/** Generate GCS access token according to the read and write paths. */
 public class GCSTokenProvider implements CredentialProvider {
 
   private static final String INITIAL_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
@@ -66,8 +64,7 @@ public class GCSTokenProvider implements CredentialProvider {
   }
 
   @Override
-  public void close() {
-  }
+  public void close() {}
 
   @Override
   public String credentialType() {
@@ -106,16 +103,17 @@ public class GCSTokenProvider implements CredentialProvider {
   @VisibleForTesting
   List<String> getReadExpressions(String bucketName, String resourcePath) {
     List<String> readExpressions = new ArrayList<>();
-    readExpressions.add(String.format(
-        "resource.name.startsWith('projects/_/buckets/%s/objects/%s')",
-        bucketName, resourcePath));
-    getAllResources(resourcePath).forEach(
-        parentResourcePath -> readExpressions.add(
-            String.format(
-                "resource.name == 'projects/_/buckets/%s/objects/%s'",
-                bucketName, parentResourcePath)
-        )
-    );
+    readExpressions.add(
+        String.format(
+            "resource.name.startsWith('projects/_/buckets/%s/objects/%s')",
+            bucketName, resourcePath));
+    getAllResources(resourcePath)
+        .forEach(
+            parentResourcePath ->
+                readExpressions.add(
+                    String.format(
+                        "resource.name == 'projects/_/buckets/%s/objects/%s'",
+                        bucketName, parentResourcePath)));
     return readExpressions;
   }
 
@@ -132,7 +130,7 @@ public class GCSTokenProvider implements CredentialProvider {
       parent += parts.get(i) + "/";
       results.add(parent);
     }
-    results.add(parent +  parts.get(parts.size() - 1));
+    results.add(parent + parts.get(parts.size() - 1));
     return results;
   }
 
@@ -196,15 +194,14 @@ public class GCSTokenProvider implements CredentialProvider {
           AccessBoundaryRule bucketInfoRule =
               AccessBoundaryRule.newBuilder()
                   .setAvailableResource(toGCSBucketResource(bucket))
-                  .setAvailablePermissions(Arrays.asList("inRole:roles/storage.insightsCollectorService"))
+                  .setAvailablePermissions(
+                      Arrays.asList("inRole:roles/storage.insightsCollectorService"))
                   .build();
           credentialAccessBoundaryBuilder.addRule(bucketInfoRule);
           List<String> readConditions = readExpressions.get(bucket);
           AccessBoundaryRule rule =
               getAccessBoundaryRule(
-                  bucket,
-                  readConditions,
-                  Arrays.asList("inRole:roles/storage.objectViewer"));
+                  bucket, readConditions, Arrays.asList("inRole:roles/storage.objectViewer"));
           if (rule == null) {
             return;
           }

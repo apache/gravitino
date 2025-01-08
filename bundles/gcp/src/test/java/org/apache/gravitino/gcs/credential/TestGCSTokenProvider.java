@@ -30,33 +30,35 @@ public class TestGCSTokenProvider {
 
   @Test
   void testGetAllResources() {
-    Map<String, List<String>> checkResults = ImmutableMap.of(
-        "a/b", Arrays.asList("a", "a/", "a/b"),
-        "a/b/", Arrays.asList("a","a/", "a/b"),
-        "a", Arrays.asList("a"),
-        "a/", Arrays.asList("a"),
-        "", Arrays.asList(),
-        "/", Arrays.asList()
-    );
+    Map<String, List<String>> checkResults =
+        ImmutableMap.of(
+            "a/b", Arrays.asList("a", "a/", "a/b"),
+            "a/b/", Arrays.asList("a", "a/", "a/b"),
+            "a", Arrays.asList("a"),
+            "a/", Arrays.asList("a"),
+            "", Arrays.asList(),
+            "/", Arrays.asList());
 
-    checkResults.forEach((key, value) -> {
-      List<String> parentResources = GCSTokenProvider.getAllResources(key);
-      Assertions.assertEquals(value, parentResources);
-    });
+    checkResults.forEach(
+        (key, value) -> {
+          List<String> parentResources = GCSTokenProvider.getAllResources(key);
+          Assertions.assertEquals(value, parentResources);
+        });
   }
 
   @Test
   void testNormalizePath() {
-    Map<String, String> checkResults = ImmutableMap.of(
-        "/a/b/", "a/b/",
-        "/a/b", "a/b/",
-        "a/b", "a/b/",
-        "a/b/", "a/b/"
-    );
+    Map<String, String> checkResults =
+        ImmutableMap.of(
+            "/a/b/", "a/b/",
+            "/a/b", "a/b/",
+            "a/b", "a/b/",
+            "a/b/", "a/b/");
 
-    checkResults.forEach((k, v) -> {
-      String normalizedPath = GCSTokenProvider.normalizeUriPath(k);
-      Assertions.assertEquals(v, normalizedPath);
-    });
+    checkResults.forEach(
+        (k, v) -> {
+          String normalizedPath = GCSTokenProvider.normalizeUriPath(k);
+          Assertions.assertEquals(v, normalizedPath);
+        });
   }
 }
