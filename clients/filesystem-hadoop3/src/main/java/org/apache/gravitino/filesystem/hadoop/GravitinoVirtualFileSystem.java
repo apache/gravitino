@@ -51,6 +51,7 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -315,16 +316,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
                 totalProperty.putAll(getConfigMap(getConf()));
 
-                if (credentialVendingEnabled(catalog, identifier)) {
-                  // If the catalog has enabled the credential vending, we need to set the
-                  // credential
-                  // provider
-                  totalProperty.put(
-                      GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
-                      DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
-                  totalProperty.put(
-                      GravitinoFileSystemCredentialsProvider.GVFS_PATH, virtualPathString);
-                }
+                totalProperty.putAll(
+                    getCredentialProperties(provider, catalog, identifier, virtualPathString));
 
                 return provider.getFileSystem(filePath, totalProperty);
               } catch (IOException ioe) {
@@ -337,7 +330,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return new FilesetContextPair(new Path(actualFileLocation), fs);
   }
 
-  private boolean credentialVendingEnabled(Catalog catalog, NameIdentifier filesetIdentifier) {
+  private Map<String, String> getCredentialProperties(
+      FileSystemProvider fileSystemProvider,
+      Catalog catalog,
+      NameIdentifier filesetIdentifier,
+      String virtualPathString) {
+    Map<String, String> maps = Maps.newHashMap();
     try {
       Fileset fileset =
           catalog
@@ -346,10 +344,21 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                   NameIdentifier.of(
                       filesetIdentifier.namespace().level(2), filesetIdentifier.name()));
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
-      return credentials.length > 0;
+      if (credentials.length > 0 && fileSystemProvider instanceof SupportsCredentialVending) {
+        maps.put(
+            GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
+            DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
+        maps.put(GravitinoFileSystemCredentialsProvider.GVFS_PATH, virtualPathString);
+
+        SupportsCredentialVending supportsCredentialVending =
+            (SupportsCredentialVending) fileSystemProvider;
+        maps.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    return maps;
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {

@@ -27,11 +27,16 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -41,7 +46,7 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class S3FileSystemProvider implements FileSystemProvider {
+public class S3FileSystemProvider implements FileSystemProvider, SupportsCredentialVending {
 
   private static final Logger LOG = LoggerFactory.getLogger(S3FileSystemProvider.class);
 
@@ -77,6 +82,18 @@ public class S3FileSystemProvider implements FileSystemProvider {
     checkAndSetCredentialProvider(configuration);
 
     return S3AFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  @Override
+  public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
+    Credential credential = S3CredentialsProvider.getSuitableCredential(credentials);
+    Map<String, String> result = Maps.newHashMap();
+    if (credential instanceof S3SecretKeyCredential || credential instanceof S3TokenCredential) {
+      result.put(
+          Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
+    }
+
+    return result;
   }
 
   private void checkAndSetCredentialProvider(Configuration configuration) {

@@ -33,20 +33,10 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   private Configuration configuration;
   private String sasToken;
-  private String azureStorageAccountName;
-  private String azureStorageAccountKey;
 
   private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
   private long expirationTime = Long.MAX_VALUE;
   private static final double EXPIRATION_TIME_FACTOR = 0.9D;
-
-  public String getAzureStorageAccountName() {
-    return azureStorageAccountName;
-  }
-
-  public String getAzureStorageAccountKey() {
-    return azureStorageAccountKey;
-  }
 
   @Override
   public void setConf(Configuration configuration) {
@@ -85,10 +75,6 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
     if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
       sasToken = adlsTokenCredential.sasToken();
-    } else if (credential instanceof AzureAccountKeyCredential) {
-      AzureAccountKeyCredential azureAccountKeyCredential = (AzureAccountKeyCredential) credential;
-      azureStorageAccountName = azureAccountKeyCredential.accountName();
-      azureStorageAccountKey = azureAccountKeyCredential.accountKey();
     }
 
     if (credential.expireTimeInMs() > 0) {
@@ -107,7 +93,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  private Credential getSuitableCredential(Credential[] credentials) {
+  static Credential getSuitableCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof ADLSTokenCredential) {

@@ -93,7 +93,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  private Credential getSuitableCredential(Credential[] credentials) {
+  static Credential getSuitableCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof S3TokenCredential) {

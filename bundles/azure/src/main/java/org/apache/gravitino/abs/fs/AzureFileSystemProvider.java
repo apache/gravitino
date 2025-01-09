@@ -19,25 +19,29 @@
 
 package org.apache.gravitino.abs.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.gravitinoCredentialVendingEnabled;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_IS_HNS_ENABLED;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.azurebfs.services.AuthType;
 
-public class AzureFileSystemProvider implements FileSystemProvider {
+public class AzureFileSystemProvider implements FileSystemProvider, SupportsCredentialVending {
 
   @VisibleForTesting public static final String ABS_PROVIDER_SCHEME = "abfss";
 
@@ -70,37 +74,32 @@ public class AzureFileSystemProvider implements FileSystemProvider {
 
     hadoopConfMap.forEach(configuration::set);
 
-    if (gravitinoCredentialVendingEnabled(hadoopConfMap)) {
-      try {
-        AzureSasCredentialsProvider azureSasCredentialsProvider = new AzureSasCredentialsProvider();
-        azureSasCredentialsProvider.initialize(configuration, null);
-        String sas = azureSasCredentialsProvider.getSASToken(null, null, null, null);
-        if (sas != null) {
-          String accountName =
-              String.format(
-                  "%s.dfs.core.windows.net",
-                  config.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+    return FileSystem.get(path.toUri(), configuration);
+  }
 
-          configuration.set(
-              FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
-          configuration.set(
-              FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
-              AzureSasCredentialsProvider.class.getName());
-          configuration.set(FS_AZURE_ACCOUNT_IS_HNS_ENABLED, "true");
-        } else if (azureSasCredentialsProvider.getAzureStorageAccountKey() != null
-            && azureSasCredentialsProvider.getAzureStorageAccountName() != null) {
-          configuration.set(
-              String.format(
-                  "fs.azure.account.key.%s.dfs.core.windows.net",
-                  azureSasCredentialsProvider.getAzureStorageAccountName()),
-              azureSasCredentialsProvider.getAzureStorageAccountKey());
-        }
-      } catch (Exception e) {
-        throw new IOException("Failed to get SAS token from AzureSasCredentialsProvider", e);
-      }
+  @Override
+  public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
+    Credential credential = AzureSasCredentialsProvider.getSuitableCredential(credentials);
+    Map<String, String> result = Maps.newHashMap();
+    if (credential instanceof ADLSTokenCredential) {
+      ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
+
+      String accountName = adlsTokenCredential.accountName();
+      result.put(FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
+      result.put(
+          FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,
+          AzureSasCredentialsProvider.class.getName());
+      result.put(FS_AZURE_ACCOUNT_IS_HNS_ENABLED, "true");
+    } else if (credential instanceof AzureAccountKeyCredential) {
+      AzureAccountKeyCredential azureAccountKeyCredential = (AzureAccountKeyCredential) credential;
+      result.put(
+          String.format(
+              "fs.azure.account.key.%s.dfs.core.windows.net",
+              azureAccountKeyCredential.accountName()),
+          azureAccountKeyCredential.accountKey());
     }
 
-    return FileSystem.get(path.toUri(), configuration);
+    return result;
   }
 
   @Override

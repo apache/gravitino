@@ -89,7 +89,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
    * @param credentials The credential array.
    * @return An credential.
    */
-  private Credential getSuitableCredential(Credential[] credentials) {
+  static Credential getSuitableCredential(Credential[] credentials) {
     for (Credential credential : credentials) {
       if (credential instanceof GCSTokenCredential) {
         return credential;
