@@ -131,7 +131,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.COLUMN)) {
       handleColumnCommand();
     } else if (entity.equals(CommandEntities.TABLE)) {
-      handleTableCommand();
+      new TableCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.SCHEMA)) {
       handleSchemaCommand();
     } else if (entity.equals(CommandEntities.CATALOG)) {
@@ -309,107 +309,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
         Main.exit(-1);
-        break;
-    }
-  }
-
-  /**
-   * Handles the command execution for Tables based on command type and the command line options.
-   */
-  private void handleTableCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-    String schema = name.getSchemaName();
-
-    Command.setAuthenticationMode(auth, userName);
-    List<String> missingEntities = Lists.newArrayList();
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
-
-    // Handle CommandActions.LIST action separately as it doesn't require the `table`
-    if (CommandActions.LIST.equals(command)) {
-      checkEntities(missingEntities);
-      newListTables(url, ignore, metalake, catalog, schema).validate().handle();
-      return;
-    }
-
-    String table = name.getTableName();
-    if (table == null) missingEntities.add(CommandEntities.TABLE);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newTableAudit(url, ignore, metalake, catalog, schema, table).validate().handle();
-        } else if (line.hasOption(GravitinoOptions.INDEX)) {
-          newListIndexes(url, ignore, metalake, catalog, schema, table).validate().handle();
-        } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
-          newTableDistribution(url, ignore, metalake, catalog, schema, table).validate().handle();
-        } else if (line.hasOption(GravitinoOptions.PARTITION)) {
-          newTablePartition(url, ignore, metalake, catalog, schema, table).validate().handle();
-        } else if (line.hasOption(GravitinoOptions.SORTORDER)) {
-          newTableSortOrder(url, ignore, metalake, catalog, schema, table).validate().handle();
-        } else {
-          newTableDetails(url, ignore, metalake, catalog, schema, table).validate().handle();
-        }
-        break;
-
-      case CommandActions.CREATE:
-        {
-          String columnFile = line.getOptionValue(GravitinoOptions.COLUMNFILE);
-          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newCreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment)
-              .validate()
-              .handle();
-          break;
-        }
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteTable(url, ignore, force, metalake, catalog, schema, table).validate().handle();
-        break;
-
-      case CommandActions.SET:
-        String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetTableProperty(url, ignore, metalake, catalog, schema, table, property, value)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.REMOVE:
-        property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.PROPERTIES:
-        newListTableProperties(url, ignore, metalake, catalog, schema, table).validate().handle();
-        break;
-
-      case CommandActions.UPDATE:
-        {
-          if (line.hasOption(GravitinoOptions.COMMENT)) {
-            String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-            newUpdateTableComment(url, ignore, metalake, catalog, schema, table, comment)
-                .validate()
-                .handle();
-          }
-          if (line.hasOption(GravitinoOptions.RENAME)) {
-            String newName = line.getOptionValue(GravitinoOptions.RENAME);
-            newUpdateTableName(url, ignore, metalake, catalog, schema, table, newName)
-                .validate()
-                .handle();
-          }
-          break;
-        }
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
         break;
     }
   }
