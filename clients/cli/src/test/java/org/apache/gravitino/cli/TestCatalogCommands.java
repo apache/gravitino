@@ -21,7 +21,6 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -49,6 +48,7 @@ import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -459,7 +459,7 @@ class TestCatalogCommands {
     doReturn(mockEnable)
         .when(commandLine)
         .newCatalogEnable(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false, false);
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -482,7 +482,7 @@ class TestCatalogCommands {
     doReturn(mockEnable)
         .when(commandLine)
         .newCatalogEnable(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", true);
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false, true);
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -513,24 +513,13 @@ class TestCatalogCommands {
   @SuppressWarnings("DefaultCharset")
   void testCatalogWithDisableAndEnableOptions() {
     Main.useExit = false;
-    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
-    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
-    when(mockCommandLine.hasOption(GravitinoOptions.DISABLE)).thenReturn(true);
-    when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
-
-    GravitinoCommandLine commandLine =
+    CatalogEnable mockCatalogEnable =
         spy(
-            new GravitinoCommandLine(
-                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
+            new CatalogEnable(
+                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", true, false));
 
-    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
-    verify(commandLine, never())
-        .newCatalogEnable(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
-    verify(commandLine, never())
-        .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "melake_demo", "catalog");
-    assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
+    assertThrows(RuntimeException.class, mockCatalogEnable::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(ErrorMessages.INVALID_ENABLE_DISABLE, errOutput);
   }
 }

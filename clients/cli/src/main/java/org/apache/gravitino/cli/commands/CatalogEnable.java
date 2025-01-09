@@ -43,7 +43,12 @@ public class CatalogEnable extends Command {
    * @param enableMetalake Whether to enable it's metalake
    */
   public CatalogEnable(
-      String url, boolean ignoreVersions, String metalake, String catalog, boolean disable, boolean enableMetalake) {
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      boolean disable,
+      boolean enableMetalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;

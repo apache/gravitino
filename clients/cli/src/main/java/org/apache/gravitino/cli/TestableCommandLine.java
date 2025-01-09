@@ -905,7 +905,12 @@ public class TestableCommandLine {
   }
 
   protected CatalogEnable newCatalogEnable(
-      String url, boolean ignore, String metalake, String catalog, boolean disable, boolean enableMetalake) {
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      boolean disable,
+      boolean enableMetalake) {
     return new CatalogEnable(url, ignore, metalake, catalog, disable, enableMetalake);
   }
 

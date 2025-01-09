@@ -39,11 +39,14 @@ public class MetalakeEnable extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param disable Whether the disable flag is also turned on
    * @param metalake The name of the metalake.
-   *
    * @param enableAllCatalogs Whether to enable all catalogs.
    */
   public MetalakeEnable(
-      String url, boolean ignoreVersions, String metalake, boolean disable, boolean enableAllCatalogs) {
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      boolean disable,
+      boolean enableAllCatalogs) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.disable = disable;
