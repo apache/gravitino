@@ -24,7 +24,7 @@ check_gravitino_server_ready() {
   local wait_time=1 # Wait time between retries (seconds)
 
   for ((i=1; i<=retries; i++)); do
-    if curl --silent --head --fail "$url" >/dev/null; then
+    if curl --silent --head --fail "$url/api/metalakes" >/dev/null; then
       echo "Gravitino server is ready."
       return 0
     else
