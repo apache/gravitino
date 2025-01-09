@@ -33,8 +33,8 @@ if [[ -z "$S3_ACCESS_KEY_ID" || -z "$S3_SECRET_ACCESS" || -z "$S3_REGION" || -z 
 fi
 
 DISABLE_LOCALSTACK=${DISABLE_LOCALSTACK:-0}
-# if S3 endpoint is an AWS endpoint, disable localstack
-if [[ "$S3_ENDPOINT" =~ amazonaws\.com ]]; then
+# if S3 endpoint is not default value. disable localstack
+if [[ "$S3_ENDPOINT" != "http://127.0.0.1:4566" ]]; then
   echo "AWS S3 endpoint detected, disabling localstack"
   DISABLE_LOCALSTACK=1
 fi
