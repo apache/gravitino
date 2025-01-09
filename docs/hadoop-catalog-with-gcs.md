@@ -18,7 +18,8 @@ To set up a Hadoop catalog with OSS, follow these steps:
 ```bash
 $ bin/gravitino-server.sh start
 ```
-Once the server is up and running, you can proceed to configure the Hadoop catalog with GCS.
+Once the server is up and running, you can proceed to configure the Hadoop catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please 
+replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with GCS
 
@@ -63,7 +64,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "gcs-service-account-file": "path_of_gcs_service_account_file",
     "filesystem-providers": "gcs"
   }
-}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs
+}' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
 </TabItem>
@@ -71,7 +72,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("${GRAVITINO_SERVER_IP:PORT}")
+    .builder("http://localhost:8090")
     .withMetalake("metalake")
     .build();
 
@@ -94,7 +95,7 @@ Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 gcs_properties = {
     "location": "gs://bucket/root",
     "gcs-service-account-file": "path_of_gcs_service_account_file",
@@ -127,7 +128,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "gs://bucket/root/schema"
   }
-}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs/test_catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
 ```
 
 </TabItem>
@@ -180,7 +181,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' ${GRAVITINO_SERVER_IP:PORT}/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
 ```
 
 </TabItem>
@@ -188,7 +189,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("${GRAVITINO_SERVER_IP:PORT}")
+    .builder("http://localhost:8090")
     .withMetalake("metalake")
     .build();
 
@@ -212,7 +213,7 @@ filesetCatalog.createFileset(
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
@@ -231,13 +232,21 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
 
+Before running the following code, you need to install required packages:
+
+```bash
+pip install pyspark==3.1.3
+pip install gravitino==0.8.0-incubating
+```
+Then you can run the following code:
+
 ```python
 import logging
 from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
 from pyspark.sql import SparkSession
 import os
 
-gravitino_url = "${GRAVITINO_SERVER_IP:PORT}"
+gravitino_url = "http://localhost:8090"
 metalake_name = "test"
 
 catalog_name = "your_gcs_catalog"
@@ -249,7 +258,7 @@ spark = SparkSession.builder
 .appName("gcs_fielset_test")
 .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
 .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_URL}")
+.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
 .config("spark.hadoop.fs.gravitino.client.metalake", "test_metalake")
 .config("spark.hadoop.gcs-service-account-file", "/path/to/gcs-service-account-file.json")
 .config("spark.driver.memory", "2g")
@@ -285,13 +294,13 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Using Gravitino virtual file system Java client to access the fileset
+### Using the GVFS Java client to access the fileset
 
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 conf.set("gcs-service-account-file", "/path/your-service-account-file.json");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
@@ -299,6 +308,50 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ...
 ```
+
+
+If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
+
+```xml
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-common</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+  <dependency>
+    <groupId>com.google.cloud.bigdataoss</groupId>
+    <artifactId>gcs-connector</artifactId>
+    <version>${GCS_CONNECTOR_VERSION}</version>
+  </dependency>
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-gcp</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
+Or use the bundle jar with Hadoop environment:
+
+```xml
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-gcp-bundle</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
 
 Similar to Spark configurations, you need to add GCS bundle jars to the classpath according to your environment.
 
@@ -321,7 +374,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>${GRAVITINO_SERVER_IP:PORT}</value>
+    <value>http://localhost:8090</value>
   </property>
 
   <property>
@@ -342,7 +395,7 @@ Then copy `hadoop-gcp-${version}.jar` and other possible dependencies to the `${
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For GCS, you need to add `gravitino-gcp-${gravitino-version}.jar` and `gcs-connector-hadoop3-2.2.22-shaded.jar` can be found [here](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar)  to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
+For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and `gcs-connector-hadoop3-2.2.22-shaded.jar` can be found [here](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 
 3. Run the following command to access the fileset:
 
@@ -351,8 +404,13 @@ hadoop dfs -ls gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 ```
 
+### Using the GVFS Python client to access a fileset
 
-### Using the Gravitino virtual file system Python client to access a fileset
+Please install the `gravitino` package before running the following code:
+
+```bash
+pip install gravitino==0.8.0-incubating
+```
 
 ```python
 from gravitino import gvfs
@@ -362,7 +420,7 @@ options = {
     "auth_type": "simple",
     "gcs_service_account_file": "path_of_gcs_service_account_file.json",
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="test_metalake", options=options)
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
@@ -374,7 +432,7 @@ The following are examples of how to use the pandas library to access the GCS fi
 import pandas as pd
 
 storage_options = {
-    "server_uri": "${GRAVITINO_SERVER_IP:PORT}", 
+    "server_uri": "http://localhost:8090", 
     "metalake_name": "test",
     "options": {
         "gcs_service_account_file": "path_of_gcs_service_account_file.json",
@@ -405,7 +463,7 @@ GVFS Java client:
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // No need to set gcs-service-account-file
 Path filesetPath = new Path("gvfs://fileset/gcs_test_catalog/test_schema/test_fileset/new_dir");
@@ -421,7 +479,7 @@ spark = SparkSession.builder
   .appName("gcs_fileset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_IP:PORT}")
+  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   # No need to set gcs-service-account-file
   .config("spark.driver.memory", "2g")

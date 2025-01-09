@@ -19,7 +19,8 @@ To set up a Hadoop catalog with OSS, follow these steps:
 ```bash
 $ bin/gravitino-server.sh start
 ```
-Once the server is up and running, you can proceed to configure the Hadoop catalog with OSS.
+Once the server is up and running, you can proceed to configure the Hadoop catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please
+replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with OSS
 
@@ -241,6 +242,14 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
 
+Before running the following code, you need to install required packages:
+
+```bash
+pip install pyspark==3.1.3
+pip install gravitino==0.8.0-incubating
+```
+Then you can run the following code:
+
 ```python
 import logging
 from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
@@ -259,7 +268,7 @@ spark = SparkSession.builder
 .appName("oss_fielset_test")
 .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
 .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_URL}")
+.config("spark.hadoop.fs.gravitino.server.uri", "${_URL}")
 .config("spark.hadoop.fs.gravitino.client.metalake", "test")
 .config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
 .config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
@@ -297,7 +306,7 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Using Gravitino virtual file system Java client to access the fileset
+### Using the GVFS Java client to access the fileset
 
 ```java
 Configuration conf = new Configuration();
@@ -305,7 +314,7 @@ conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hado
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
-conf.set("oss-endpoint", "${GRAVITINO_SERVER_IP:PORT}");
+conf.set("oss-endpoint", "http://localhost:8090");
 conf.set("oss-access-key-id", "minio");
 conf.set("oss-secret-access-key", "minio123"); 
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
@@ -315,6 +324,48 @@ fs.mkdirs(filesetPath);
 ```
 
 Similar to Spark configurations, you need to add OSS bundle jars to the classpath according to your environment.
+
+```xml
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-common</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-aliyun</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aliyun</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
+Or use the bundle jar with Hadoop environment:
+
+```xml
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aliyun-bundle</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
 
 ### Accessing a fileset using the Hadoop fs command
 
@@ -335,7 +386,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>${GRAVITINO_SERVER_IP:PORT}</value>
+    <value>http://localhost:8090</value>
   </property>
 
   <property>
@@ -361,7 +412,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For OSS, you need to add `gravitino-aliyun-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
+For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aliyun-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 
 3. Run the following command to access the fileset:
 
@@ -371,7 +422,13 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/oss_filese
 ```
 
 
-### Using Gravitino virtual file system Python client to access a fileset
+### Using the GVFS Python client to access a fileset
+
+Please install the `gravitino` package before running the following code:
+
+```bash
+pip install gravitino==0.8.0-incubating
+```
 
 ```python
 from gravitino import gvfs
@@ -379,11 +436,11 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "oss_endpoint": "${GRAVITINO_SERVER_IP:PORT}",
+    "oss_endpoint": "http://localhost:8090",
     "oss_access_key_id": "minio",
     "oss_secret_access_key": "minio123"
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="test_metalake", options=options)
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
@@ -397,7 +454,7 @@ The following are examples of how to use the pandas library to access the OSS fi
 import pandas as pd
 
 storage_options = {
-    "server_uri": "${GRAVITINO_SERVER_IP:PORT}", 
+    "server_uri": "http://localhost:8090", 
     "metalake_name": "test",
     "options": {
         "oss_access_key_id": "access_key",
@@ -429,7 +486,7 @@ GVFS Java client:
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // No need to set oss-access-key-id and oss-secret-access-key
 Path filesetPath = new Path("gvfs://fileset/oss_test_catalog/test_schema/test_fileset/new_dir");
@@ -445,7 +502,7 @@ spark = SparkSession.builder
   .appName("oss_fileset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_IP:PORT}")
+  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   # No need to set oss-access-key-id and oss-secret-access-key
   .config("spark.driver.memory", "2g")

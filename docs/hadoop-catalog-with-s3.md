@@ -20,8 +20,8 @@ To create a Hadoop catalog with S3, follow these steps:
 $ bin/gravitino-server.sh start
 ```
 
-Once the server is running, you can proceed to create the Hadoop catalog with S3.
-
+Once the server is up and running, you can proceed to configure the Hadoop catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please
+replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with S3
 
@@ -247,6 +247,14 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 
 The following Python code demonstrates how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
 
+Before running the following code, you need to install required packages:
+
+```bash
+pip install pyspark==3.1.3
+pip install gravitino==0.8.0-incubating
+```
+Then you can run the following code:
+
 ```python
 import logging
 from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
@@ -265,7 +273,7 @@ spark = SparkSession.builder
   .appName("s3_fielset_test")
   .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
   .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "${GRAVITINO_SERVER_URL}")
+  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
   .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   .config("spark.hadoop.s3-access-key-id", os.environ["S3_ACCESS_KEY_ID"])
   .config("spark.hadoop.s3-secret-access-key", os.environ["S3_SECRET_ACCESS_KEY"])
@@ -302,16 +310,16 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Using Gravitino virtual file system Java client to access the fileset
+### Using the GVFS Java client to access the fileset
 
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","${GRAVITINO_SERVER_IP:PORT}");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 
-conf.set("s3-endpoint", "${GRAVITINO_SERVER_IP:PORT}");
+conf.set("s3-endpoint", "http://localhost:8090");
 conf.set("s3-access-key-id", "minio");
 conf.set("s3-secret-access-key", "minio123");
 
@@ -322,6 +330,48 @@ fs.mkdirs(filesetPath);
 ```
 
 Similar to Spark configurations, you need to add S3 (bundle) jars to the classpath according to your environment.
+
+```xml
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-common</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-aws</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aws</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
+Or use the bundle jar with Hadoop environment:
+
+```xml
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aws-bundle</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
 
 ### Accessing a fileset using the Hadoop fs command
 
@@ -342,7 +392,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
   <property>
     <name>fs.gravitino.server.uri</name>
-    <value>${GRAVITINO_SERVER_IP:PORT}</value>
+    <value>http://localhost:8090</value>
   </property>
 
   <property>
@@ -368,7 +418,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath. 
 
-For S3, you need to add `gravitino-aws-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
+For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aws-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 
 
 3. Run the following command to access the fileset:
@@ -378,7 +428,7 @@ hadoop dfs -ls gvfs://fileset/s3_catalog/s3_schema/s3_fileset
 hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
 ```
 
-### Using the Gravitino virtual file system Python client to access a fileset
+### Using the GVFS Python client to access a fileset
 
 ```python
 from gravitino import gvfs
@@ -386,7 +436,7 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "s3_endpoint": "${GRAVITINO_SERVER_IP:PORT}",
+    "s3_endpoint": "http://localhost:8090",
     "s3_access_key_id": "minio",
     "s3_secret_access_key": "minio123"
 }
