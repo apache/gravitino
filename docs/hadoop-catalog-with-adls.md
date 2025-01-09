@@ -21,10 +21,6 @@ $ bin/gravitino-server.sh start
 ```
 Once the server is up and running, you can proceed to configure the Hadoop catalog with ADLS.
 
-```bash
-$ bin/gravitino-server.sh start
-```
-
 ## Configurations for creating a Hadoop catalog with ADLS
 
 ### Configuration for a ADLS Hadoop catalog
