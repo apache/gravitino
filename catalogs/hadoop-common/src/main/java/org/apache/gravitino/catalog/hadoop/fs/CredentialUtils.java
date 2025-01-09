@@ -30,7 +30,7 @@ public class CredentialUtils {
    * @param config The configuration for Gravitino Virtual File System.
    * @return true if Gravitino credential vending is enabled, false otherwise.
    */
-  public static boolean enableGravitinoCredentialVending(Map<String, String> config) {
+  public static boolean gravitinoCredentialVendingEnabled(Map<String, String> config) {
     return null != config.get(GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER);
   }
 }

@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.oss.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.enableGravitinoCredentialVending;
+import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.gravitinoCredentialVendingEnabled;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -62,7 +62,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
-    if (enableGravitinoCredentialVending(config)) {
+    if (gravitinoCredentialVendingEnabled(config)) {
       hadoopConfMap.put(
           Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialsProvider.class.getCanonicalName());
     }

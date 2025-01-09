@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.s3.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.enableGravitinoCredentialVending;
+import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.gravitinoCredentialVendingEnabled;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.google.common.annotations.VisibleForTesting;
@@ -68,7 +68,7 @@ public class S3FileSystemProvider implements FileSystemProvider {
       configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
 
-    if (enableGravitinoCredentialVending(config)) {
+    if (gravitinoCredentialVendingEnabled(config)) {
       configuration.set(
           Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
     }

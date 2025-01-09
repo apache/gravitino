@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.gcs.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.enableGravitinoCredentialVending;
+import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.gravitinoCredentialVendingEnabled;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -47,7 +47,7 @@ public class GCSFileSystemProvider implements FileSystemProvider {
     FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY)
         .forEach(configuration::set);
 
-    if (enableGravitinoCredentialVending(config)) {
+    if (gravitinoCredentialVendingEnabled(config)) {
       configuration.set(GCS_TOKEN_PROVIDER_IMPL, GCSCredentialsProvider.class.getName());
     }
 

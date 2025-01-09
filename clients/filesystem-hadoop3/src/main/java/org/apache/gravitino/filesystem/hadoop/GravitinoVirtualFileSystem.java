@@ -315,8 +315,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
                 totalProperty.putAll(getConfigMap(getConf()));
 
-                if (credentialVending(catalog, identifier)) {
-                  // It has enabled the credential vending, so we need to set the credential
+                if (credentialVendingEnabled(catalog, identifier)) {
+                  // If the catalog has enabled the credential vending, we need to set the
+                  // credential
                   // provider
                   totalProperty.put(
                       GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
@@ -336,7 +337,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return new FilesetContextPair(new Path(actualFileLocation), fs);
   }
 
-  private boolean credentialVending(Catalog catalog, NameIdentifier filesetIdentifier) {
+  private boolean credentialVendingEnabled(Catalog catalog, NameIdentifier filesetIdentifier) {
     try {
       Fileset fileset =
           catalog
