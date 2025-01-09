@@ -31,8 +31,8 @@ TEST_CONFIG_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
 start_servers() {
   start_localstack
   start_gravitino_server
-  start_gvfs_fuse
   generate_test_config
+  start_gvfs_fuse
 }
 
 stop_servers() {
