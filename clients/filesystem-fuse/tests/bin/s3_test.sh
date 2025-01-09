@@ -23,20 +23,14 @@ cd "$SCRIPT_DIR"
 
 source ./env.sh
 
-source ./gravitino_server.sh
-source ./gvfs_fuse.sh
 source ./localstatck.sh
 
 start_servers() {
   start_localstack
-  start_gravitino_server
-  start_gvfs_fuse
 }
 
 stop_servers() {
   set +e
-  stop_gvfs_fuse
-  stop_gravitino_server
   stop_localstack
 }
 
@@ -47,16 +41,19 @@ if [ "$1" == "test" ]; then
   # Run the integration test
   echo "Running tests..."
   cd $CLIENT_FUSE_DIR
-  export RUN_TEST_WITH_FUSE=1
-  cargo test --test fuse_test fuse_it_
+  export RUN_TEST_WITH_S3=1
+  cargo test s3_ut_ --lib
+
 elif [ "$1" == "start" ]; then
   # Start the servers
   echo "Starting servers..."
   start_servers
+
 elif [ "$1" == "stop" ]; then
   # Stop the servers
   echo "Stopping servers..."
   stop_servers
+
 else
   echo "Usage: $0 {test|start|stop}"
   exit 1

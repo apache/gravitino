@@ -86,7 +86,7 @@ impl Drop for FuseTest {
 }
 
 #[test]
-fn test_fuse_system_with_auto() {
+fn test_fuse_with_memory_fs() {
     tracing_subscriber::fmt().init();
 
     panic::set_hook(Box::new(|info| {
