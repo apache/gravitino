@@ -412,7 +412,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aliyun-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` and related dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
+For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aliyun-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
 
 3. Run the following command to access the fileset:
 

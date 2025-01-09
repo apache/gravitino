@@ -383,14 +383,9 @@ The following are examples of how to use the `hadoop fs` command to access the f
   </property>
 ```
 
-2. Copy the necessary jars to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-
-For GCS, you need to copy `gravitino-gcp-{version}.jar` to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-Then copy `hadoop-gcp-${version}.jar` and other possible dependencies to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory. Those jars can be found in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory, you can add all the jars in the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory to the `${HADOOP_HOME}/share/hadoop/common/lib` directory.
-
 2. Add the necessary jars to the Hadoop classpath.
 
-For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
+For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
 
 3. Run the following command to access the fileset:
 
