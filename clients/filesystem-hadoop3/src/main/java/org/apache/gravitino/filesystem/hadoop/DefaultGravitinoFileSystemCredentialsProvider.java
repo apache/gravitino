@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.filesystem.hadoop;
 
-import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.client.GravitinoClient;
