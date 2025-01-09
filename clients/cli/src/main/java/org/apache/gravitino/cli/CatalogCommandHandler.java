@@ -37,7 +37,7 @@ public class CatalogCommandHandler extends CommandHandler {
   private final String url;
   private final FullName name;
   private final String metalake;
-  private final String catalog;
+  private String catalog;
   private final String outputFormat;
 
   /**
@@ -58,7 +58,6 @@ public class CatalogCommandHandler extends CommandHandler {
     this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
-    this.catalog = name.getCatalogName();
     this.outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
   }
 
@@ -74,6 +73,7 @@ public class CatalogCommandHandler extends CommandHandler {
       return;
     }
 
+    this.catalog = name.getCatalogName();
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
     checkEntities(missingEntities);
 
