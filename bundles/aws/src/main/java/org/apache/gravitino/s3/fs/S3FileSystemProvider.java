@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.s3.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.CredentialUtils.gravitinoCredentialVendingEnabled;
-
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -71,11 +69,6 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     hadoopConfMap.forEach(configuration::set);
     if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
       configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
-    }
-
-    if (gravitinoCredentialVendingEnabled(config)) {
-      configuration.set(
-          Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
     }
 
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
