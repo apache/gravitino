@@ -76,7 +76,6 @@ public class TableCommandHandler extends CommandHandler {
       return;
     }
 
-    String table = name.getTableName();
     if (table == null) missingEntities.add(CommandEntities.TABLE);
     checkEntities(missingEntities);
 
