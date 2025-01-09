@@ -36,7 +36,7 @@ public class ModelCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private final String schema;
-  private final String model;
+  private String model;
 
   /**
    * Constructs a {@link ModelCommandHandler} instance.
@@ -58,7 +58,6 @@ public class ModelCommandHandler extends CommandHandler {
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
     this.schema = name.getSchemaName();
-    this.model = name.getModelName();
   }
 
   /** Handles the command execution logic based on the provided command. */
@@ -78,6 +77,7 @@ public class ModelCommandHandler extends CommandHandler {
       return;
     }
 
+    this.model = name.getModelName();
     if (model == null) missingEntities.add(CommandEntities.MODEL);
     checkEntities(missingEntities);
 
