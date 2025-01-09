@@ -32,6 +32,7 @@ public class MetalakeCommandHandler extends CommandHandler {
   private final String command;
   private final boolean ignore;
   private final String url;
+  private String metalake;
 
   /**
    * Constructs a MetalakeCommandHandler instance.
@@ -61,9 +62,9 @@ public class MetalakeCommandHandler extends CommandHandler {
       return;
     }
 
-    String metalake = name.getMetalakeName();
+    metalake = name.getMetalakeName();
 
-    if (!executeCommand(metalake)) {
+    if (!executeCommand()) {
       System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
       Main.exit(-1);
     }
@@ -72,37 +73,36 @@ public class MetalakeCommandHandler extends CommandHandler {
   /**
    * Executes the specific command based on the command type.
    *
-   * @param metalake the name of the metalake
    * @return true if the command is supported, false otherwise
    */
-  private boolean executeCommand(String metalake) {
+  private boolean executeCommand() {
     switch (command) {
       case CommandActions.DETAILS:
-        handleDetailsCommand(metalake);
+        handleDetailsCommand();
         return true;
 
       case CommandActions.CREATE:
-        handleCreateCommand(metalake);
+        handleCreateCommand();
         return true;
 
       case CommandActions.DELETE:
-        handleDeleteCommand(metalake);
+        handleDeleteCommand();
         return true;
 
       case CommandActions.SET:
-        handleSetCommand(metalake);
+        handleSetCommand();
         return true;
 
       case CommandActions.REMOVE:
-        handleRemoveCommand(metalake);
+        handleRemoveCommand();
         return true;
 
       case CommandActions.PROPERTIES:
-        handlePropertiesCommand(metalake);
+        handlePropertiesCommand();
         return true;
 
       case CommandActions.UPDATE:
-        handleUpdateCommand(metalake);
+        handleUpdateCommand();
         return true;
 
       default:
@@ -116,12 +116,8 @@ public class MetalakeCommandHandler extends CommandHandler {
     gravitinoCommandLine.newListMetalakes(url, ignore, outputFormat).validate().handle();
   }
 
-  /**
-   * Handles the "DETAILS" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handleDetailsCommand(String metalake) {
+  /** Handles the "DETAILS" command. */
+  private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine.newMetalakeAudit(url, ignore, metalake).validate().handle();
     } else {
@@ -133,32 +129,20 @@ public class MetalakeCommandHandler extends CommandHandler {
     }
   }
 
-  /**
-   * Handles the "CREATE" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handleCreateCommand(String metalake) {
+  /** Handles the "CREATE" command. */
+  private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine.newCreateMetalake(url, ignore, metalake, comment).validate().handle();
   }
 
-  /**
-   * Handles the "DELETE" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handleDeleteCommand(String metalake) {
+  /** Handles the "DELETE" command. */
+  private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine.newDeleteMetalake(url, ignore, force, metalake).validate().handle();
   }
 
-  /**
-   * Handles the "SET" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handleSetCommand(String metalake) {
+  /** Handles the "SET" command. */
+  private void handleSetCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
@@ -167,12 +151,8 @@ public class MetalakeCommandHandler extends CommandHandler {
         .handle();
   }
 
-  /**
-   * Handles the "REMOVE" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handleRemoveCommand(String metalake) {
+  /** Handles the "REMOVE" command. */
+  private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
         .newRemoveMetalakeProperty(url, ignore, metalake, property)
@@ -180,21 +160,13 @@ public class MetalakeCommandHandler extends CommandHandler {
         .handle();
   }
 
-  /**
-   * Handles the "PROPERTIES" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handlePropertiesCommand(String metalake) {
+  /** Handles the "PROPERTIES" command. */
+  private void handlePropertiesCommand() {
     gravitinoCommandLine.newListMetalakeProperties(url, ignore, metalake).validate().handle();
   }
 
-  /**
-   * Handles the "UPDATE" command.
-   *
-   * @param metalake the name of the metalake
-   */
-  private void handleUpdateCommand(String metalake) {
+  /** Handles the "UPDATE" command. */
+  private void handleUpdateCommand() {
     if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
       System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
       Main.exit(-1);
