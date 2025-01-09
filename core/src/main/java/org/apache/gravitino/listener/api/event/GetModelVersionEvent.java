@@ -24,7 +24,7 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /** Represents an event triggered upon the successful getting the version of a model. */
 public class GetModelVersionEvent extends ModelEvent {
-  public final ModelInfo GetModelVersionInfo;
+  public final ModelInfo getModelVersionInfo;
 
   /**
    * Constructs an instance of {@code GetModelVersionEvent}.
@@ -36,7 +36,7 @@ public class GetModelVersionEvent extends ModelEvent {
   public GetModelVersionEvent(
       String user, NameIdentifier identifier, ModelInfo getModelVersionInfo) {
     super(user, identifier);
-    GetModelVersionInfo = getModelVersionInfo;
+    this.getModelVersionInfo = getModelVersionInfo;
   }
 
   /**
@@ -46,7 +46,7 @@ public class GetModelVersionEvent extends ModelEvent {
    * @return A {@link ModelInfo} instance encapsulating the details of the model version.
    */
   public ModelInfo getModelVersionInfo() {
-    return GetModelVersionInfo;
+    return getModelVersionInfo;
   }
 
   /**

@@ -53,15 +53,15 @@ public class ModelInfo {
    * Constructs model information based on a given model and model versions.
    *
    * @param model the model to expose information for.
-   * @param modelVersion the versions of the model.
+   * @param modelVersions the versions of the model.
    */
-  public ModelInfo(Model model, ModelVersion[] modelVersion) {
+  public ModelInfo(Model model, ModelVersion[] modelVersions) {
     this.name = model.name();
     this.properties = model.properties();
     this.comment = model.comment();
     this.audit = model.auditInfo();
     this.lastVersion = model.latestVersion();
-    this.versions = modelVersion;
+    this.versions = modelVersions;
   }
 
   /**
