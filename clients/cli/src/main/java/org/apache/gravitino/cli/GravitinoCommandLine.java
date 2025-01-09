@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -150,7 +149,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.TAG)) {
       handleTagCommand();
     } else if (entity.equals(CommandEntities.ROLE)) {
-      handleRoleCommand();
+      new RoleCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
       handleModelCommand();
     }
@@ -741,74 +740,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       Main.exit(-1);
     }
     return tags[0];
-  }
-
-  /** Handles the command execution for Roles based on command type and the command line options. */
-  protected void handleRoleCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
-    if (roles == null && !CommandActions.LIST.equals(command)) {
-      System.err.println(ErrorMessages.MISSING_ROLE);
-      Main.exit(-1);
-    }
-
-    if (roles != null) {
-      roles = Arrays.stream(roles).distinct().toArray(String[]::new);
-    }
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newRoleAudit(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
-        } else {
-          newRoleDetails(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS)).handle();
-        }
-        break;
-
-      case CommandActions.LIST:
-        newListRoles(url, ignore, metalake).handle();
-        break;
-
-      case CommandActions.CREATE:
-        newCreateRole(url, ignore, metalake, roles).handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteRole(url, ignore, forceDelete, metalake, roles).handle();
-        break;
-
-      case CommandActions.GRANT:
-        newGrantPrivilegesToRole(
-                url, ignore, metalake, getOneRole(roles, CommandActions.GRANT), name, privileges)
-            .handle();
-        break;
-
-      case CommandActions.REVOKE:
-        newRevokePrivilegesFromRole(
-                url, ignore, metalake, getOneRole(roles, CommandActions.REMOVE), name, privileges)
-            .handle();
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  private String getOneRole(String[] roles, String command) {
-    Preconditions.checkArgument(
-        roles.length == 1, command + " requires only one role, but multiple are currently passed.");
-    return roles[0];
   }
 
   /**
