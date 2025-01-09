@@ -20,8 +20,7 @@ To create a Hadoop catalog with S3, follow these steps:
 $ bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Hadoop catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please
-replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Hadoop catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with S3
 
@@ -169,7 +168,7 @@ Schema schema = supportsSchemas.createSchema("test_schema",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_schemas().create_schema(name="test_schema",
                                    comment="This is a S3 schema",
@@ -300,7 +299,7 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment and `hadoop-aws` jar.
+- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment(3.3.1) and `hadoop-aws` jar.
 - [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed version of the Gravitino AWS bundle jar without Hadoop environment and `hadoop-aws` jar.
 - `hadoop-aws-3.2.0.jar` and `aws-java-sdk-bundle-1.11.375.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory. 
 

@@ -18,8 +18,7 @@ To set up a Hadoop catalog with OSS, follow these steps:
 ```bash
 $ bin/gravitino-server.sh start
 ```
-Once the server is up and running, you can proceed to configure the Hadoop catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please 
-replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Hadoop catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with GCS
 
@@ -153,7 +152,7 @@ Schema schema = supportsSchemas.createSchema("test_schema",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_schemas().create_schema(name="test_schema",
                                    comment="This is a GCS schema",
@@ -284,9 +283,8 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment and `gcs-connector`.
-- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and `gcs-connector`.
-- `gcs-connector-hadoop3-2.2.22-shaded.jar` can be found [here](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
+- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and [`gcs-connector`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
 
 Please choose the correct jar according to your environment.
 
@@ -309,7 +307,7 @@ fs.mkdirs(filesetPath);
 ...
 ```
 
-
+Similar to Spark configurations, you need to add GCS bundle jars to the classpath according to your environment.
 If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
 
 ```xml
@@ -352,9 +350,6 @@ Or use the bundle jar with Hadoop environment:
   </dependency>
 ```
 
-
-Similar to Spark configurations, you need to add GCS bundle jars to the classpath according to your environment.
-
 ### Accessing a fileset using the Hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
@@ -395,7 +390,7 @@ Then copy `hadoop-gcp-${version}.jar` and other possible dependencies to the `${
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and `gcs-connector-hadoop3-2.2.22-shaded.jar` can be found [here](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
+For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to the `${HADOOP_HOME}/share/hadoop/tools/lib/` directory.
 
 3. Run the following command to access the fileset:
 
