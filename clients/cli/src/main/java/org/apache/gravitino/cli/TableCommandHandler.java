@@ -35,7 +35,7 @@ public class TableCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private final String schema;
-  private final String table;
+  private String table;
 
   /**
    * Constructs a {@link TableCommandHandler} instance.
@@ -57,7 +57,6 @@ public class TableCommandHandler extends CommandHandler {
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
     this.schema = name.getSchemaName();
-    this.table = name.getTableName();
   }
 
   /** Handles the command execution logic based on the provided command. */
@@ -76,6 +75,7 @@ public class TableCommandHandler extends CommandHandler {
       return;
     }
 
+    this.table = name.getTableName();
     if (table == null) missingEntities.add(CommandEntities.TABLE);
     checkEntities(missingEntities);
 
