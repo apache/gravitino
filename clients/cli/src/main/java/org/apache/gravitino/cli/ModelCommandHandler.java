@@ -78,7 +78,6 @@ public class ModelCommandHandler extends CommandHandler {
       return;
     }
 
-    String model = name.getModelName();
     if (model == null) missingEntities.add(CommandEntities.MODEL);
     checkEntities(missingEntities);
 
