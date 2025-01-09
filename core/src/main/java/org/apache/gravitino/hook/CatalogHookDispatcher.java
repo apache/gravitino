@@ -127,11 +127,22 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
-    List<String> locations =
-        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.CATALOG, locations);
-    return dispatcher.dropCatalog(ident, force);
+    if (!dispatcher.catalogExists(ident)) {
+      return false;
+    }
+
+    // If we call the authorization plugin after dropping catalog, we can't load the plugin of the
+    // catalog
+    Catalog catalog = dispatcher.loadCatalog(ident);
+    boolean dropped = dispatcher.dropCatalog(ident, force);
+
+    if (dropped && catalog != null) {
+      List<String> locations =
+          AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
+      AuthorizationUtils.removeCatalogPrivileges(catalog, locations);
+    }
+
+    return dropped;
   }
 
   @Override
