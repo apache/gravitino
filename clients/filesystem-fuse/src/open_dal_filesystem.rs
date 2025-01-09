@@ -279,7 +279,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_s3_stat() {
+    async fn s3_ut_test_s3_stat() {
         test_enable_with!(RUN_TEST_WITH_S3);
 
         let config = s3_test_config();
@@ -303,7 +303,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_s3_delete() {
+    async fn s3_ut_test_s3_delete() {
         test_enable_with!(RUN_TEST_WITH_S3);
         let config = s3_test_config();
 

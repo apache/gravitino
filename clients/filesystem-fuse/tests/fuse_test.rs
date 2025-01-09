@@ -19,7 +19,7 @@
 
 use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
-use gvfs_fuse::RUN_TEST_WITH_BACKEND;
+use gvfs_fuse::RUN_TEST_WITH_FUSE;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
 use log::{error, info};
 use std::fs::File;
@@ -86,7 +86,7 @@ impl Drop for FuseTest {
 }
 
 #[test]
-fn test_fuse_system_with_auto() {
+fn test_fuse_with_memory_fs() {
     tracing_subscriber::fmt().init();
 
     panic::set_hook(Box::new(|info| {
@@ -108,8 +108,8 @@ fn test_fuse_system_with_auto() {
 }
 
 #[test]
-fn test_fuse_system_with_manual() {
-    test_enable_with!(RUN_TEST_WITH_BACKEND);
+fn fuse_it_test_fuse() {
+    test_enable_with!(RUN_TEST_WITH_FUSE);
 
     test_fuse_filesystem("target/gvfs/gvfs_test");
 }

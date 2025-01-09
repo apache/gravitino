@@ -1,0 +1,45 @@
+#!/bin/bash
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-test}
+S3_SECRET_ACCESS=${S3_SECRET_ACCESS:-test}
+S3_REGION=${S3_REGION:-ap-southeast-2}
+S3_BUCKET=${S3_BUCKET:-my-bucket}
+S3_ENDPOINT=${S3_ENDPOINT:-http://127.0.0.1:4566}
+
+# Check required environment variables
+if [[ -z "$S3_ACCESS_KEY_ID" || -z "$S3_SECRET_ACCESS" || -z "$S3_REGION" || -z "$S3_BUCKET" || -z "$S3_ENDPOINT" ]]; then
+  echo "Error: One or more required S3 environment variables are not set."
+  echo "Please set: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS, S3_REGION, S3_BUCKET, S3_ENDPOINT."
+  exit 1
+fi
+
+DISABLE_LOCALSTACK=${DISABLE_LOCALSTACK:-0}
+# if S3 endpoint is an AWS endpoint, disable localstack
+if [[ "$S3_ENDPOINT" =~ amazonaws\.com ]]; then
+  echo "AWS S3 endpoint detected, disabling localstack"
+  DISABLE_LOCALSTACK=1
+fi
+
+GRAVITINO_HOME=../../../..
+GRAVITINO_HOME=$(cd $GRAVITINO_HOME && pwd)
+GRAVITINO_SERVER_DIR=$GRAVITINO_HOME/distribution/package
+CLIENT_FUSE_DIR=$GRAVITINO_HOME/clients/filesystem-fuse

@@ -218,7 +218,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fileset_file_system() {
+    async fn s3_ut_test_fileset_file_system() {
         test_enable_with!(RUN_TEST_WITH_S3);
 
         let config = s3_test_config();
@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fileset_with_raw_file_system() {
+    async fn s3_ut_test_fileset_with_raw_file_system() {
         test_enable_with!(RUN_TEST_WITH_S3);
 
         let config = s3_test_config();
