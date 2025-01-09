@@ -25,13 +25,13 @@ fi
   docker run -d -p 4566:4566 -p 4571:4571 --name localstack localstack/localstack
   echo "Localstack started"
 
-  docker exec -it localstack sh -c "\
+  docker exec localstack sh -c "\
     aws configure set aws_access_key_id $S3_ACCESS_KEY_ID && \
     aws configure set aws_secret_access_key $S3_SECRET_ACCESS && \
     aws configure set region $S3_REGION && \
     aws configure set output json"
 
-  docker exec -it localstack awslocal s3 mb s3://$S3_BUCKET
+  docker exec localstack awslocal s3 mb s3://$S3_BUCKET
 }
 
 stop_localstack() {
