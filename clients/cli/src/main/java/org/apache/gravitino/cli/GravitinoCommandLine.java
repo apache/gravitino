@@ -151,7 +151,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.ROLE)) {
       handleRoleCommand();
     } else if (entity.equals(CommandEntities.MODEL)) {
-      handleModelCommand();
+      new ModelCommandHandler(this, line, command, ignore).handle();
     }
   }
 
@@ -982,86 +982,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           }
           break;
         }
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
-        break;
-    }
-  }
-
-  /**
-   * Handles the command execution for Models based on command type and the command line options.
-   */
-  private void handleModelCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-    String schema = name.getSchemaName();
-
-    Command.setAuthenticationMode(auth, userName);
-
-    List<String> missingEntities = Lists.newArrayList();
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
-
-    // Handle CommandActions.LIST action separately as it doesn't require the `model`
-    if (CommandActions.LIST.equals(command)) {
-      checkEntities(missingEntities);
-      newListModel(url, ignore, metalake, catalog, schema).validate().handle();
-      return;
-    }
-
-    String model = name.getModelName();
-    if (model == null) missingEntities.add(CommandEntities.MODEL);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newModelAudit(url, ignore, metalake, catalog, schema, model).validate().handle();
-        } else {
-          newModelDetails(url, ignore, metalake, catalog, schema, model).validate().handle();
-        }
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteModel(url, ignore, force, metalake, catalog, schema, model).validate().handle();
-        break;
-
-      case CommandActions.CREATE:
-        String createComment = line.getOptionValue(GravitinoOptions.COMMENT);
-        String[] createProperties = line.getOptionValues(GravitinoOptions.PROPERTIES);
-        Map<String, String> createPropertyMap = new Properties().parse(createProperties);
-        newCreateModel(
-                url, ignore, metalake, catalog, schema, model, createComment, createPropertyMap)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.UPDATE:
-        String[] alias = line.getOptionValues(GravitinoOptions.ALIAS);
-        String uri = line.getOptionValue(GravitinoOptions.URI);
-        String linkComment = line.getOptionValue(GravitinoOptions.COMMENT);
-        String[] linkProperties = line.getOptionValues(CommandActions.PROPERTIES);
-        Map<String, String> linkPropertityMap = new Properties().parse(linkProperties);
-        newLinkModel(
-                url,
-                ignore,
-                metalake,
-                catalog,
-                schema,
-                model,
-                uri,
-                alias,
-                linkComment,
-                linkPropertityMap)
-            .validate()
-            .handle();
-        break;
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
