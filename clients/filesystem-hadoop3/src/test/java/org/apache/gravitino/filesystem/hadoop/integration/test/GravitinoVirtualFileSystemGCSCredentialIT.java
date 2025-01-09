@@ -76,7 +76,6 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
     Map<String, String> properties = Maps.newHashMap();
     properties.put(FILESYSTEM_PROVIDERS, "gcs");
     properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
-    properties.put("gcs-credential-file-path", SERVICE_ACCOUNT_FILE);
     properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, "gcs-token");
 
     Catalog catalog =
