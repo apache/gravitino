@@ -74,7 +74,7 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
 
     hadoopConfMap.forEach(configuration::set);
 
-    return FileSystem.get(path.toUri(), configuration);
+    return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
@@ -84,7 +84,8 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
     if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
 
-      String accountName = adlsTokenCredential.accountName();
+      String accountName =
+          String.format("%s.dfs.core.windows.net", adlsTokenCredential.accountName());
       result.put(FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME + "." + accountName, AuthType.SAS.name());
       result.put(
           FS_AZURE_SAS_TOKEN_PROVIDER_TYPE + "." + accountName,

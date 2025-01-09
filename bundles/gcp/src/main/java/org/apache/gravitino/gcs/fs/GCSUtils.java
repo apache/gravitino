@@ -24,8 +24,8 @@ import org.apache.gravitino.credential.GCSTokenCredential;
 
 public class GCSUtils {
   /**
-   * Get the credential from the credential array. Using dynamic credential first, if not found,
-   * uses static credential.
+   * Get the credential from the credential array. If the dynamic credential is not found, return
+   * null.
    *
    * @param credentials The credential array.
    * @return An credential.

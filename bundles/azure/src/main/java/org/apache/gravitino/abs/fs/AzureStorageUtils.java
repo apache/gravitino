@@ -25,8 +25,8 @@ import org.apache.gravitino.credential.Credential;
 public class AzureStorageUtils {
 
   /**
-   * Get the credential from the credential array. Using dynamic credential first, if not found,
-   * uses static credential.
+   * Get the ADLS credential from the credential array. If the dynamic credential is not found,
+   * return null.
    *
    * @param credentials The credential array.
    * @return A credential. Null if not found.
