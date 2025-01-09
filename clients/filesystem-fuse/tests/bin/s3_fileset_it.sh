@@ -22,15 +22,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 source ./env.sh
-
 source ./gravitino_server.sh
 source ./gvfs_fuse.sh
 source ./localstatck.sh
+
+TEST_CONFIG_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
 
 start_servers() {
   start_localstack
   start_gravitino_server
   start_gvfs_fuse
+  generate_test_config
 }
 
 stop_servers() {
@@ -49,14 +51,17 @@ if [ "$1" == "test" ]; then
   cd $CLIENT_FUSE_DIR
   export RUN_TEST_WITH_FUSE=1
   cargo test --test fuse_test fuse_it_
+
 elif [ "$1" == "start" ]; then
   # Start the servers
   echo "Starting servers..."
   start_servers
+
 elif [ "$1" == "stop" ]; then
   # Stop the servers
   echo "Stopping servers..."
   stop_servers
+
 else
   echo "Usage: $0 {test|start|stop}"
   exit 1

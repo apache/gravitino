@@ -43,3 +43,23 @@ GRAVITINO_HOME=../../../..
 GRAVITINO_HOME=$(cd $GRAVITINO_HOME && pwd)
 GRAVITINO_SERVER_DIR=$GRAVITINO_HOME/distribution/package
 CLIENT_FUSE_DIR=$GRAVITINO_HOME/clients/filesystem-fuse
+
+generate_test_config() {
+  local config_dir
+  config_dir=$(dirname "$TEST_CONFIG_FILE")
+  mkdir -p "$config_dir"
+
+  awk -v access_key="$S3_ACCESS_KEY_ID" \
+      -v secret_key="$S3_SECRET_ACCESS" \
+      -v region="$S3_REGION" \
+      -v bucket="$S3_BUCKET" \
+      -v endpoint="$S3_ENDPOINT" \
+      'BEGIN { in_extend_config = 0 }
+      /^\[extend_config\]/ { in_extend_config = 1 }
+      in_extend_config && /s3-access_key_id/ { $0 = "s3-access_key_id = \"" access_key "\"" }
+      in_extend_config && /s3-secret_access_key/ { $0 = "s3-secret_access_key = \"" secret_key "\"" }
+      in_extend_config && /s3-region/ { $0 = "s3-region = \"" region "\"" }
+      in_extend_config && /s3-bucket/ { $0 = "s3-bucket = \"" bucket "\"" }
+      in_extend_config && /s3-endpoint/ { $0 = "s3-endpoint = \"" endpoint "\"" }
+      { print }' $CLIENT_FUSE_DIR/tests/conf/gvfs_fuse_s3.toml > "$TEST_CONFIG_FILE"
+}
