@@ -92,5 +92,7 @@ jobs:
         with:
           name: Gvfs-fuse integrate-test-reports-${{ matrix.java-version }}
           path: |
-            clients/filesystem-fuse/build/test/log/*.log
+            clients/filesystem-fuse/target/debug/fuse.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
 
