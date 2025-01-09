@@ -138,7 +138,7 @@ Additionally, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains O
 1. Use [Gravitino Aliyun bundle jar with hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle).
 2. Use [Aliyun JAVA SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and extract `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` jars.
 
-Please place the above packages in the classpath of Iceberg REST server, please refer to [server management](#server-management) for classpath details.
+Please place the above jars in the classpath of Iceberg REST server, please refer to [server management](#server-management) for classpath details.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. 
