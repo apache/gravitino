@@ -135,7 +135,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.SCHEMA)) {
       handleSchemaCommand();
     } else if (entity.equals(CommandEntities.CATALOG)) {
-      handleCatalogCommand();
+      new CatalogCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
     } else if (entity.equals(CommandEntities.TOPIC)) {
@@ -231,101 +231,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           newUpdateMetalakeName(url, ignore, force, metalake, newName).validate().handle();
         }
 
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  /**
-   * Handles the command execution for Catalogs based on command type and the command line options.
-   */
-  private void handleCatalogCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
-
-    Command.setAuthenticationMode(auth, userName);
-    List<String> missingEntities = Lists.newArrayList();
-
-    // Handle the CommandActions.LIST action separately as it doesn't use `catalog`
-    if (CommandActions.LIST.equals(command)) {
-      newListCatalogs(url, ignore, outputFormat, metalake).validate().handle();
-      return;
-    }
-
-    String catalog = name.getCatalogName();
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newCatalogAudit(url, ignore, metalake, catalog).validate().handle();
-        } else {
-          newCatalogDetails(url, ignore, outputFormat, metalake, catalog).validate().handle();
-        }
-        break;
-
-      case CommandActions.CREATE:
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
-        String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
-        Map<String, String> propertyMap = new Properties().parse(properties);
-        newCreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteCatalog(url, ignore, force, metalake, catalog).validate().handle();
-        break;
-
-      case CommandActions.SET:
-        String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetCatalogProperty(url, ignore, metalake, catalog, property, value).validate().handle();
-        break;
-
-      case CommandActions.REMOVE:
-        property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveCatalogProperty(url, ignore, metalake, catalog, property).validate().handle();
-        break;
-
-      case CommandActions.PROPERTIES:
-        newListCatalogProperties(url, ignore, metalake, catalog).validate().handle();
-        break;
-
-      case CommandActions.UPDATE:
-        if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-          System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
-          Main.exit(-1);
-        }
-        if (line.hasOption(GravitinoOptions.ENABLE)) {
-          boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
-          newCatalogEnable(url, ignore, metalake, catalog, enableMetalake).validate().handle();
-        }
-        if (line.hasOption(GravitinoOptions.DISABLE)) {
-          newCatalogDisable(url, ignore, metalake, catalog).validate().handle();
-        }
-
-        if (line.hasOption(GravitinoOptions.COMMENT)) {
-          String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment)
-              .validate()
-              .handle();
-        }
-        if (line.hasOption(GravitinoOptions.RENAME)) {
-          String newName = line.getOptionValue(GravitinoOptions.RENAME);
-          newUpdateCatalogName(url, ignore, metalake, catalog, newName).validate().handle();
-        }
         break;
 
       default:
