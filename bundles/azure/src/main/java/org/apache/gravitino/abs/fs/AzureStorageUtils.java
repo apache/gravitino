@@ -17,22 +17,27 @@
  *  under the License.
  */
 
-package org.apache.gravitino.catalog.hadoop.fs;
+package org.apache.gravitino.abs.fs;
 
+import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.Credential;
-import org.apache.hadoop.conf.Configurable;
 
-/** Interface for providing credentials for Gravitino Virtual File System. */
-public interface GravitinoFileSystemCredentialsProvider extends Configurable {
-
-  String GVFS_CREDENTIAL_PROVIDER = "fs.gvfs.credential.provider";
-
-  String GVFS_NAME_IDENTIFIER = "fs.gvfs.name.identifier";
+public class AzureStorageUtils {
 
   /**
-   * Get credentials for Gravitino Virtual File System.
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
    *
-   * @return credentials for Gravitino Virtual File System
+   * @param credentials The credential array.
+   * @return A credential. Null if not found.
    */
-  Credential[] getCredentials();
+  static Credential getSuitableCredential(Credential[] credentials) {
+    // Use dynamic credential if found.
+    for (Credential credential : credentials) {
+      if (credential instanceof ADLSTokenCredential) {
+        return credential;
+      }
+    }
+    return null;
+  }
 }

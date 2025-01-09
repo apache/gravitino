@@ -47,12 +47,12 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
   private static final Logger LOG =
       LoggerFactory.getLogger(GravitinoVirtualFileSystemS3CredentialIT.class);
 
-  public static final String BUCKET_NAME = System.getenv("S3_STS_BUCKET_NAME");
-  public static final String S3_ACCESS_KEY = System.getenv("S3_STS_ACCESS_KEY_ID");
-  public static final String S3_SECRET_KEY = System.getenv("S3_STS_SECRET_ACCESS_KEY");
-  public static final String S3_ENDPOINT = System.getenv("S3_STS_ENDPOINT");
-  public static final String S3_REGION = System.getenv("S3_STS_REGION");
-  public static final String S3_ROLE_ARN = System.getenv("S3_STS_ROLE_ARN");
+  public static final String BUCKET_NAME = System.getenv("S3_BUCKET_NAME_FOR_CREDENTIAL");
+  public static final String S3_ACCESS_KEY = System.getenv("S3_ACCESS_KEY_ID_FOR_CREDENTIAL");
+  public static final String S3_SECRET_KEY = System.getenv("S3_SECRET_ACCESS_KEY_FOR_CREDENTIAL");
+  public static final String S3_ENDPOINT = System.getenv("S3_ENDPOINT_FOR_CREDENTIAL");
+  public static final String S3_REGION = System.getenv("S3_REGION_FOR_CREDENTIAL");
+  public static final String S3_ROLE_ARN = System.getenv("S3_ROLE_ARN_FOR_CREDENTIAL");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -163,11 +163,11 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
   public void testAppend() throws IOException {}
 
   protected static boolean s3IsConfigured() {
-    return StringUtils.isNotBlank(System.getenv("S3_STS_ACCESS_KEY_ID"))
-        && StringUtils.isNotBlank(System.getenv("S3_STS_SECRET_ACCESS_KEY"))
-        && StringUtils.isNotBlank(System.getenv("S3_STS_ENDPOINT"))
-        && StringUtils.isNotBlank(System.getenv("S3_STS_BUCKET_NAME"))
-        && StringUtils.isNotBlank(System.getenv("S3_STS_REGION"))
-        && StringUtils.isNotBlank(System.getenv("S3_STS_ROLE_ARN"));
+    return StringUtils.isNotBlank(System.getenv("S3_ACCESS_KEY_ID_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_SECRET_ACCESS_KEY_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_ENDPOINT_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_BUCKET_NAME_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_REGION_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_ROLE_ARN_FOR_CREDENTIAL"));
   }
 }

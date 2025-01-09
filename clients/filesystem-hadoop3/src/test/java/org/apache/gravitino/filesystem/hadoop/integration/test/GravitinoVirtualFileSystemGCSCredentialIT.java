@@ -137,7 +137,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("gs://%s/%s", BUCKET_NAME, fileset);
+    return String.format("gs://%s/dir1/dir2/%s/", BUCKET_NAME, fileset);
   }
 
   @Disabled(

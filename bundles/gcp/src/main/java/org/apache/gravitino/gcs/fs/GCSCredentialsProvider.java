@@ -33,7 +33,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
 
   private AccessToken accessToken;
   private long expirationTime = Long.MAX_VALUE;
-  private static final double EXPIRATION_TIME_FACTOR = 0.9D;
+  private static final double EXPIRATION_TIME_FACTOR = 0.5D;
 
   @Override
   public AccessToken getAccessToken() {
@@ -51,7 +51,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
   public void refresh() throws IOException {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
 
-    Credential credential = getSuitableCredential(gravitinoCredentials);
+    Credential credential = GCSUtils.getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");
     }
@@ -80,22 +80,5 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
   @Override
   public Configuration getConf() {
     return configuration;
-  }
-
-  /**
-   * Get the credential from the credential array. Using dynamic credential first, if not found,
-   * uses static credential.
-   *
-   * @param credentials The credential array.
-   * @return An credential.
-   */
-  static Credential getSuitableCredential(Credential[] credentials) {
-    for (Credential credential : credentials) {
-      if (credential instanceof GCSTokenCredential) {
-        return credential;
-      }
-    }
-
-    return null;
   }
 }

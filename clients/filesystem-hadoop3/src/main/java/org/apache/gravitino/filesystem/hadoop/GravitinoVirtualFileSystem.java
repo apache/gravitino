@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -316,8 +317,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
                 totalProperty.putAll(getConfigMap(getConf()));
 
-                totalProperty.putAll(
-                    getCredentialProperties(provider, catalog, identifier, virtualPathString));
+                totalProperty.putAll(getCredentialProperties(provider, catalog, identifier));
 
                 return provider.getFileSystem(filePath, totalProperty);
               } catch (IOException ioe) {
@@ -331,11 +331,13 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private Map<String, String> getCredentialProperties(
-      FileSystemProvider fileSystemProvider,
-      Catalog catalog,
-      NameIdentifier filesetIdentifier,
-      String virtualPathString) {
-    Map<String, String> maps = Maps.newHashMap();
+      FileSystemProvider fileSystemProvider, Catalog catalog, NameIdentifier filesetIdentifier) {
+    // Do not support credential vending, we do not need to add any credential properties.
+    if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
+      return ImmutableMap.of();
+    }
+
+    ImmutableMap.Builder<String, String> mapBuilder = ImmutableMap.builder();
     try {
       Fileset fileset =
           catalog
@@ -344,21 +346,23 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                   NameIdentifier.of(
                       filesetIdentifier.namespace().level(2), filesetIdentifier.name()));
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
-      if (credentials.length > 0 && fileSystemProvider instanceof SupportsCredentialVending) {
-        maps.put(
+      if (credentials.length > 0) {
+        mapBuilder.put(
             GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
             DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
-        maps.put(GravitinoFileSystemCredentialsProvider.GVFS_PATH, virtualPathString);
+        mapBuilder.put(
+            GravitinoFileSystemCredentialsProvider.GVFS_NAME_IDENTIFIER,
+            filesetIdentifier.toString());
 
         SupportsCredentialVending supportsCredentialVending =
             (SupportsCredentialVending) fileSystemProvider;
-        maps.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
+        mapBuilder.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
-    return maps;
+    return mapBuilder.build();
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {

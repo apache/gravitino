@@ -23,7 +23,6 @@ import java.io.IOException;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.ADLSTokenCredential;
-import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
@@ -36,7 +35,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
   private long expirationTime = Long.MAX_VALUE;
-  private static final double EXPIRATION_TIME_FACTOR = 0.9D;
+  private static final double EXPIRATION_TIME_FACTOR = 0.5D;
 
   @Override
   public void setConf(Configuration configuration) {
@@ -67,7 +66,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   private void refresh() {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
-    Credential credential = getSuitableCredential(gravitinoCredentials);
+    Credential credential = AzureStorageUtils.getSuitableCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");
     }
@@ -84,30 +83,5 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
                   ((credential.expireTimeInMs() - System.currentTimeMillis())
                       * EXPIRATION_TIME_FACTOR);
     }
-  }
-
-  /**
-   * Get the credential from the credential array. Using dynamic credential first, if not found,
-   * uses static credential.
-   *
-   * @param credentials The credential array.
-   * @return A credential. Null if not found.
-   */
-  static Credential getSuitableCredential(Credential[] credentials) {
-    // Use dynamic credential if found.
-    for (Credential credential : credentials) {
-      if (credential instanceof ADLSTokenCredential) {
-        return credential;
-      }
-    }
-
-    // If dynamic credential not found, use the static one
-    for (Credential credential : credentials) {
-      if (credential instanceof AzureAccountKeyCredential) {
-        return credential;
-      }
-    }
-
-    return null;
   }
 }

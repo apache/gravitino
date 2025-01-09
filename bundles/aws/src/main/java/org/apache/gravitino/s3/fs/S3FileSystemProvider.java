@@ -79,7 +79,7 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
 
   @Override
   public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
-    Credential credential = S3CredentialsProvider.getSuitableCredential(credentials);
+    Credential credential = S3Utils.getSuitableCredential(credentials);
     Map<String, String> result = Maps.newHashMap();
     if (credential instanceof S3SecretKeyCredential || credential instanceof S3TokenCredential) {
       result.put(

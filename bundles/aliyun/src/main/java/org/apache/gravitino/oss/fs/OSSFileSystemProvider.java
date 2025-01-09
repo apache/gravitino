@@ -72,7 +72,7 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
 
   @Override
   public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
-    Credential credential = OSSCredentialsProvider.getSuitableCredential(credentials);
+    Credential credential = OSSUtils.getSuitableCredential(credentials);
     Map<String, String> result = Maps.newHashMap();
     if (credential instanceof OSSSecretKeyCredential || credential instanceof OSSTokenCredential) {
       result.put(

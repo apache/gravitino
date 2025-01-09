@@ -79,7 +79,7 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
 
   @Override
   public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
-    Credential credential = AzureSasCredentialsProvider.getSuitableCredential(credentials);
+    Credential credential = AzureStorageUtils.getSuitableCredential(credentials);
     Map<String, String> result = Maps.newHashMap();
     if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;

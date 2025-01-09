@@ -17,22 +17,26 @@
  *  under the License.
  */
 
-package org.apache.gravitino.catalog.hadoop.fs;
+package org.apache.gravitino.gcs.fs;
 
 import org.apache.gravitino.credential.Credential;
-import org.apache.hadoop.conf.Configurable;
+import org.apache.gravitino.credential.GCSTokenCredential;
 
-/** Interface for providing credentials for Gravitino Virtual File System. */
-public interface GravitinoFileSystemCredentialsProvider extends Configurable {
-
-  String GVFS_CREDENTIAL_PROVIDER = "fs.gvfs.credential.provider";
-
-  String GVFS_NAME_IDENTIFIER = "fs.gvfs.name.identifier";
-
+public class GCSUtils {
   /**
-   * Get credentials for Gravitino Virtual File System.
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
    *
-   * @return credentials for Gravitino Virtual File System
+   * @param credentials The credential array.
+   * @return An credential.
    */
-  Credential[] getCredentials();
+  static Credential getSuitableCredential(Credential[] credentials) {
+    for (Credential credential : credentials) {
+      if (credential instanceof GCSTokenCredential) {
+        return credential;
+      }
+    }
+
+    return null;
+  }
 }

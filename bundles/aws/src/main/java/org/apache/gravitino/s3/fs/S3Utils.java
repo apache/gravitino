@@ -17,22 +17,35 @@
  *  under the License.
  */
 
-package org.apache.gravitino.catalog.hadoop.fs;
+package org.apache.gravitino.s3.fs;
 
 import org.apache.gravitino.credential.Credential;
-import org.apache.hadoop.conf.Configurable;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 
-/** Interface for providing credentials for Gravitino Virtual File System. */
-public interface GravitinoFileSystemCredentialsProvider extends Configurable {
-
-  String GVFS_CREDENTIAL_PROVIDER = "fs.gvfs.credential.provider";
-
-  String GVFS_NAME_IDENTIFIER = "fs.gvfs.name.identifier";
+public class S3Utils {
 
   /**
-   * Get credentials for Gravitino Virtual File System.
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
    *
-   * @return credentials for Gravitino Virtual File System
+   * @param credentials The credential array.
+   * @return A credential. Null if not found.
    */
-  Credential[] getCredentials();
+  static Credential getSuitableCredential(Credential[] credentials) {
+    // Use dynamic credential if found.
+    for (Credential credential : credentials) {
+      if (credential instanceof S3TokenCredential) {
+        return credential;
+      }
+    }
+
+    // If dynamic credential not found, use the static one
+    for (Credential credential : credentials) {
+      if (credential instanceof S3SecretKeyCredential) {
+        return credential;
+      }
+    }
+    return null;
+  }
 }

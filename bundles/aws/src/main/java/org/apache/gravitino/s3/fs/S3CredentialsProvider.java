@@ -36,7 +36,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
 
   private AWSCredentials basicSessionCredentials;
   private long expirationTime = Long.MAX_VALUE;
-  private static final double EXPIRATION_TIME_FACTOR = 0.9D;
+  private static final double EXPIRATION_TIME_FACTOR = 0.5D;
 
   public S3CredentialsProvider(final URI uri, final Configuration conf) {
     this.gravitinoFileSystemCredentialsProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
@@ -57,7 +57,7 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
   @Override
   public void refresh() {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
-    Credential credential = getSuitableCredential(gravitinoCredentials);
+    Credential credential = S3Utils.getSuitableCredential(gravitinoCredentials);
 
     if (credential == null) {
       throw new RuntimeException("No suitable credential for S3 found...");
@@ -84,29 +84,5 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
                   ((credential.expireTimeInMs() - System.currentTimeMillis())
                       * EXPIRATION_TIME_FACTOR);
     }
-  }
-
-  /**
-   * Get the credential from the credential array. Using dynamic credential first, if not found,
-   * uses static credential.
-   *
-   * @param credentials The credential array.
-   * @return A credential. Null if not found.
-   */
-  static Credential getSuitableCredential(Credential[] credentials) {
-    // Use dynamic credential if found.
-    for (Credential credential : credentials) {
-      if (credential instanceof S3TokenCredential) {
-        return credential;
-      }
-    }
-
-    // If dynamic credential not found, use the static one
-    for (Credential credential : credentials) {
-      if (credential instanceof S3SecretKeyCredential) {
-        return credential;
-      }
-    }
-    return null;
   }
 }

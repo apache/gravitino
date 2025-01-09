@@ -47,12 +47,12 @@ public class GravitinoVirtualFileSystemOSSCredentialIT extends GravitinoVirtualF
   private static final Logger LOG =
       LoggerFactory.getLogger(GravitinoVirtualFileSystemOSSCredentialIT.class);
 
-  public static final String BUCKET_NAME = System.getenv("OSS_STS_BUCKET_NAME");
-  public static final String OSS_ACCESS_KEY = System.getenv("OSS_STS_ACCESS_KEY_ID");
-  public static final String OSS_SECRET_KEY = System.getenv("OSS_STS_SECRET_ACCESS_KEY");
-  public static final String OSS_ENDPOINT = System.getenv("OSS_STS_ENDPOINT");
-  public static final String OSS_REGION = System.getenv("OSS_STS_REGION");
-  public static final String OSS_ROLE_ARN = System.getenv("OSS_STS_ROLE_ARN");
+  public static final String BUCKET_NAME = System.getenv("OSS_BUCKET_NAME_FOR_CREDENTIAL");
+  public static final String OSS_ACCESS_KEY = System.getenv("OSS_ACCESS_KEY_ID_FOR_CREDENTIAL");
+  public static final String OSS_SECRET_KEY = System.getenv("OSS_SECRET_ACCESS_KEY_FOR_CREDENTIAL");
+  public static final String OSS_ENDPOINT = System.getenv("OSS_ENDPOINT_FOR_CREDENTIAL");
+  public static final String OSS_REGION = System.getenv("OSS_REGION_FOR_CREDENTIAL");
+  public static final String OSS_ROLE_ARN = System.getenv("OSS_ROLE_ARN_FOR_CREDENTIAL");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -158,11 +158,11 @@ public class GravitinoVirtualFileSystemOSSCredentialIT extends GravitinoVirtualF
   public void testAppend() throws IOException {}
 
   protected static boolean ossIsConfigured() {
-    return StringUtils.isNotBlank(System.getenv("OSS_STS_ACCESS_KEY_ID"))
-        && StringUtils.isNotBlank(System.getenv("OSS_STS_SECRET_ACCESS_KEY"))
-        && StringUtils.isNotBlank(System.getenv("OSS_STS_ENDPOINT"))
-        && StringUtils.isNotBlank(System.getenv("OSS_STS_BUCKET_NAME"))
-        && StringUtils.isNotBlank(System.getenv("OSS_STS_REGION"))
-        && StringUtils.isNotBlank(System.getenv("OSS_STS_ROLE_ARN"));
+    return StringUtils.isNotBlank(System.getenv("OSS_ACCESS_KEY_ID_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("OSS_SECRET_ACCESS_KEY_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("OSS_ENDPOINT_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("OSS_BUCKET_NAME_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("OSS_REGION_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("OSS_ROLE_ARN_FOR_CREDENTIAL"));
   }
 }
