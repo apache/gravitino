@@ -29,13 +29,13 @@ Once the server is running, you can proceed to create the Hadoop catalog with S3
 
 In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are necessary to configure a Hadoop catalog with S3:
 
-| Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                  | Since version    |
-|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                      | (none)          | Yes                       | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location. | `builtin-local` | No                        | 0.7.0-incubating |
-| `s3-endpoint`                 | The endpoint of the AWS S3.                                                                                                                                                                                                  | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required | Since version    |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`        | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                      | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location. | `builtin-local` | No       | 0.7.0-incubating |
+| `s3-endpoint`                 | The endpoint of the AWS S3.                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes      | 0.7.0-incubating |
 
 ### Configurations for a schema
 
@@ -62,7 +62,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_catalog",
   "type": "FILESET",
-  "comment": "comment",
+  "comment": "This is a S3 fileset catalog",
   "provider": "hadoop",
   "properties": {
     "location": "s3a://bucket/root",
@@ -109,7 +109,8 @@ s3_properties = {
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key"
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+    "filesystem-providers": "s3"
 }
 
 s3_catalog = gravitino_client.create_catalog(name="test_catalog",
@@ -138,7 +139,7 @@ Once your Hadoop catalog with S3 is created, you can create a schema under the c
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_schema",
-  "comment": "comment",
+  "comment": "This is a S3 schema",
   "properties": {
     "location": "s3a://bucket/root/schema"
   }
@@ -158,7 +159,7 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "s3a://bucket/root/schema")
     .build();
 Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a schema",
+    "This is a S3 schema",
     schemaProperties
 );
 // ...
@@ -171,7 +172,7 @@ Schema schema = supportsSchemas.createSchema("test_schema",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a schema",
+                                   comment="This is a S3 schema",
                                    properties={"location": "s3a://bucket/root/schema"})
 ```
 

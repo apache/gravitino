@@ -27,13 +27,13 @@ Once the server is up and running, you can proceed to configure the Hadoop catal
 
 In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
 
-| Configuration item            | Description                                                                                                                                                                                                                   | Default value   | Required                   | Since version    |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                               | (none)          | Yes                        | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
-| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                               | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                   | Default value   | Required | Since version    |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`        | The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                               | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location. | `builtin-local` | No       | 0.7.0-incubating |
+| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                               | (none)          | Yes      | 0.7.0-incubating |
+| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes      | 0.7.0-incubating |
+| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes      | 0.7.0-incubating |
 
 ### Configurations for a schema
 
@@ -59,7 +59,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_catalog",
   "type": "FILESET",
-  "comment": "comment",
+  "comment": "This is a OSS fileset catalog",
   "provider": "hadoop",
   "properties": {
     "location": "oss://bucket/root",
@@ -106,7 +106,8 @@ oss_properties = {
     "location": "oss://bucket/root",
     "oss-access-key-id": "access_key"
     "oss-secret-access-key": "secret_key",
-    "oss-endpoint": "ossProperties"
+    "oss-endpoint": "ossProperties",
+    "filesystem-providers": "oss"
 }
 
 oss_catalog = gravitino_client.create_catalog(name="test_catalog",
@@ -131,7 +132,7 @@ Once the Hadoop catalog with OSS is created, you can create a schema inside that
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_schema",
-  "comment": "comment",
+  "comment": "This is a OSS schema",
   "properties": {
     "location": "oss://bucket/root/schema"
   }
@@ -150,7 +151,7 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "oss://bucket/root/schema")
     .build();
 Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a schema",
+    "This is a OSS schema",
     schemaProperties
 );
 // ...
@@ -163,7 +164,7 @@ Schema schema = supportsSchemas.createSchema("test_schema",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a schema",
+                                   comment="This is a OSS schema",
                                    properties={"location": "oss://bucket/root/schema"})
 ```
 

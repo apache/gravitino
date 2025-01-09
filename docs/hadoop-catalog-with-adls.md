@@ -27,12 +27,12 @@ Once the server is up and running, you can proceed to configure the Hadoop catal
 
 Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with ADLS:
 
-| Configuration item                | Description                                                                                                                                                                                                                                    | Default value   | Required                                  | Since version    |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------|------------------|
-| `filesystem-providers`            | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                | (none)          | Yes                                       | 0.8.0-incubating |
-| `default-filesystem-provider`     | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location. | `builtin-local` | No                                        | 0.8.0-incubating |
-| `azure-storage-account-name `     | The account name of Azure Blob Storage.                                                                                                                                                                                                        | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                                                         | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
+| Configuration item                | Description                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`            | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                | (none)          | Yes      | 0.8.0-incubating |
+| `default-filesystem-provider`     | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location. | `builtin-local` | No       | 0.8.0-incubating |
+| `azure-storage-account-name `     | The account name of Azure Blob Storage.                                                                                                                                                                                                        | (none)          | Yes      | 0.8.0-incubating |
+| `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                                                         | (none)          | Yes      | 0.8.0-incubating |
 
 ### Configurations for a schema
 
@@ -58,7 +58,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "example_catalog",
   "type": "FILESET",
-  "comment": "comment",
+  "comment": "This is a ADLS fileset catalog",
   "provider": "hadoop",
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
@@ -101,8 +101,9 @@ Catalog adlsCatalog = gravitinoClient.createCatalog("example_catalog",
 gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
 adls_properties = {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
-    "azure_storage_account_name": "azure storage account name",
-    "azure_storage_account_key": "azure storage account key"
+    "azure-storage-account-name": "azure storage account name",
+    "azure-storage-account-key": "azure storage account key",
+    "filesystem-providers": "abs"
 }
 
 adls_properties = gravitino_client.create_catalog(name="example_catalog",
@@ -127,7 +128,7 @@ Once the catalog is created, you can create a schema. The following example show
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_schema",
-  "comment": "comment",
+  "comment": "This is a ADLS schema",
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path"
   }
@@ -146,7 +147,7 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "abfss://container@account-name.dfs.core.windows.net/path")
     .build();
 Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a schema",
+    "This is a ADLS schema",
     schemaProperties
 );
 // ...
@@ -159,7 +160,7 @@ Schema schema = supportsSchemas.createSchema("test_schema",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a schema",
+                                   comment="This is a ADLS schema",
                                    properties={"location": "abfss://container@account-name.dfs.core.windows.net/path"})
 ```
 

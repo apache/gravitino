@@ -26,11 +26,11 @@ Once the server is up and running, you can proceed to configure the Hadoop catal
 
 Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
 
-| Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
-|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                    | (none)          | Yes                        | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
-| `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a GCS fileset. | 0.7.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required | Since version    |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                    | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No       | 0.7.0-incubating |
+| `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
 
 ### Configurations for a schema
 
@@ -56,7 +56,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_catalog",
   "type": "FILESET",
-  "comment": "comment",
+  "comment": "This is a GCS fileset catalog",
   "provider": "hadoop",
   "properties": {
     "location": "gs://bucket/root",
@@ -97,7 +97,8 @@ Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
 gravitino_client: GravitinoClient = GravitinoClient(uri="${GRAVITINO_SERVER_IP:PORT}", metalake_name="metalake")
 gcs_properties = {
     "location": "gs://bucket/root",
-    "gcs-service-account-file": "path_of_gcs_service_account_file"
+    "gcs-service-account-file": "path_of_gcs_service_account_file",
+    "filesystem-providers": "gcs"
 }
 
 gcs_properties = gravitino_client.create_catalog(name="test_catalog",
@@ -122,7 +123,7 @@ Once you have created a Hadoop catalog with GCS, you can create a schema. The fo
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_schema",
-  "comment": "comment",
+  "comment": "This is a GCS schema",
   "properties": {
     "location": "gs://bucket/root/schema"
   }
@@ -141,7 +142,7 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "gs://bucket/root/schema")
     .build();
 Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a schema",
+    "This is a GCS schema",
     schemaProperties
 );
 // ...
@@ -154,7 +155,7 @@ Schema schema = supportsSchemas.createSchema("test_schema",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
 catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a schema",
+                                   comment="This is a GCS schema",
                                    properties={"location": "gs://bucket/root/schema"})
 ```
 
