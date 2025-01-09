@@ -19,9 +19,12 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Joiner;
+import java.util.List;
 import org.apache.commons.cli.CommandLine;
 
-public class CommandHandler {
+public abstract class CommandHandler {
+  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
   public static final String DEFAULT_URL = "http://localhost:8090";
 
@@ -34,6 +37,7 @@ public class CommandHandler {
    * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
    * variable or the Gravitio config file.
    *
+   * @param line The command line instance.
    * @return The Gravitinno URL, or null if not found.
    */
   public String getUrl(CommandLine line) {
@@ -72,6 +76,7 @@ public class CommandHandler {
    * Retrieves the Gravitinno authentication from the command line options or the GRAVITINO_AUTH
    * environment variable or the Gravitio config file.
    *
+   * @param line The command line instance.
    * @return The Gravitinno authentication, or null if not found.
    */
   public String getAuth(CommandLine line) {
@@ -102,5 +107,14 @@ public class CommandHandler {
     }
 
     return null;
+  }
+
+  protected abstract void handle();
+
+  protected void checkEntities(List<String> entities) {
+    if (!entities.isEmpty()) {
+      System.err.println(ErrorMessages.MISSING_ENTITIES + COMMA_JOINER.join(entities));
+      Main.exit(-1);
+    }
   }
 }

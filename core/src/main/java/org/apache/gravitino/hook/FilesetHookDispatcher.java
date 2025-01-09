@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -103,8 +104,11 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.FILESET);
     boolean dropped = dispatcher.dropFileset(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.FILESET);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        ident, Entity.EntityType.FILESET, locations);
     return dropped;
   }
 

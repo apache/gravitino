@@ -229,7 +229,10 @@ public class CatalogHiveIT extends BaseIT {
                 catalog.asSchemas().dropSchema(schema, true);
               }));
       Arrays.stream(metalake.listCatalogs())
-          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
+          .forEach(
+              catalogName -> {
+                metalake.dropCatalog(catalogName, true);
+              });
       client.dropMetalake(metalakeName, true);
     }
     if (hiveClientPool != null) {

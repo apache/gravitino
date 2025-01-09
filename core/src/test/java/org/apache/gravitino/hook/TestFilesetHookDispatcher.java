@@ -18,12 +18,28 @@
  */
 package org.apache.gravitino.hook;
 
+import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
+import static org.apache.gravitino.Configs.ENTITY_STORE;
+import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.Configs.SERVICE_ADMINS;
+import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
+import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -35,6 +51,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.lock.LockManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -75,14 +92,36 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "filesetNAME1");
     filesetHookDispatcher.createFileset(
         filesetIdent, "comment", Fileset.Type.MANAGED, "fileset41", props);
-    Mockito.reset(authorizationPlugin);
 
-    filesetHookDispatcher.dropFileset(filesetIdent);
-    Mockito.verify(authorizationPlugin).onMetadataUpdated(any());
-
-    Mockito.reset(authorizationPlugin);
-    schemaHookDispatcher.dropSchema(NameIdentifier.of(filesetNs.levels()), true);
-    Mockito.verify(authorizationPlugin).onMetadataUpdated(any());
+    withMockedAuthorizationUtils(
+        () -> {
+          filesetHookDispatcher.dropFileset(filesetIdent);
+          Config config = Mockito.mock(Config.class);
+          Mockito.when(config.get(SERVICE_ADMINS))
+              .thenReturn(Lists.newArrayList("admin1", "admin2"));
+          Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
+          Mockito.when(config.get(ENTITY_RELATIONAL_STORE))
+              .thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+          Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
+              .thenReturn(
+                  String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", "/tmp/testdb"));
+          Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+              .thenReturn("org.h2.Driver");
+          Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+          Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+          Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+          Mockito.when(config.get(CATALOG_CACHE_EVICTION_INTERVAL_MS)).thenReturn(1000L);
+          Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+          Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+          Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+          try {
+            FieldUtils.writeField(
+                GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+          } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+          }
+          schemaHookDispatcher.dropSchema(NameIdentifier.of(filesetNs.levels()), true);
+        });
   }
 
   @Test
