@@ -133,7 +133,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.TABLE)) {
       new TableCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.SCHEMA)) {
-      handleSchemaCommand();
+      new SchemaCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.CATALOG)) {
       new CatalogCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
@@ -231,79 +231,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           newUpdateMetalakeName(url, ignore, force, metalake, newName).validate().handle();
         }
 
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  /**
-   * Handles the command execution for Schemas based on command type and the command line options.
-   */
-  private void handleSchemaCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-
-    Command.setAuthenticationMode(auth, userName);
-
-    List<String> missingEntities = Lists.newArrayList();
-    if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-
-    // Handle the CommandActions.LIST action separately as it doesn't use `schema`
-    if (CommandActions.LIST.equals(command)) {
-      checkEntities(missingEntities);
-      newListSchema(url, ignore, metalake, catalog).validate().handle();
-      return;
-    }
-
-    String schema = name.getSchemaName();
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newSchemaAudit(url, ignore, metalake, catalog, schema).validate().handle();
-        } else {
-          newSchemaDetails(url, ignore, metalake, catalog, schema).validate().handle();
-        }
-        break;
-
-      case CommandActions.CREATE:
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newCreateSchema(url, ignore, metalake, catalog, schema, comment).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteSchema(url, ignore, force, metalake, catalog, schema).validate().handle();
-        break;
-
-      case CommandActions.SET:
-        String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetSchemaProperty(url, ignore, metalake, catalog, schema, property, value)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.REMOVE:
-        property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveSchemaProperty(url, ignore, metalake, catalog, schema, property)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.PROPERTIES:
-        newListSchemaProperties(url, ignore, metalake, catalog, schema).validate().handle();
         break;
 
       default:

@@ -34,11 +34,11 @@ public abstract class CommandHandler {
   private boolean authSet = false;
 
   /**
-   * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
-   * variable or the Gravitio config file.
+   * Retrieves the Gravitino URL from the command line options or the GRAVITINO_URL environment
+   * variable or the Gravitino config file.
    *
    * @param line The command line instance.
-   * @return The Gravitinno URL, or null if not found.
+   * @return The Gravitino URL, or null if not found.
    */
   public String getUrl(CommandLine line) {
     GravitinoConfig config = new GravitinoConfig(null);
@@ -73,11 +73,11 @@ public abstract class CommandHandler {
   }
 
   /**
-   * Retrieves the Gravitinno authentication from the command line options or the GRAVITINO_AUTH
-   * environment variable or the Gravitio config file.
+   * Retrieves the Gravitino authentication from the command line options or the GRAVITINO_AUTH
+   * environment variable or the Gravitino config file.
    *
    * @param line The command line instance.
-   * @return The Gravitinno authentication, or null if not found.
+   * @return The Gravitino authentication, or null if not found.
    */
   public String getAuth(CommandLine line) {
     // If specified on the command line use that
