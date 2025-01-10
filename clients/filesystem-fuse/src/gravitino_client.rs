@@ -223,7 +223,7 @@ impl GravitinoClient {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
     use mockito::mock;
 
