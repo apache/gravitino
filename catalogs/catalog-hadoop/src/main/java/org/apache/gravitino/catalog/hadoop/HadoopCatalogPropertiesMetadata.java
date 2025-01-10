@@ -53,8 +53,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
 
-  static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS =
-      "filesystem-connection-timeout-seconds";
+  static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
   public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";

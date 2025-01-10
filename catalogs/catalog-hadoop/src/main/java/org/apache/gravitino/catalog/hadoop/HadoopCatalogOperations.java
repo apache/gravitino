@@ -778,7 +778,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     } catch (ConditionTimeoutException e) {
       throw new IOException(
           String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s seconds, please check the configuration or increase the "
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s "
+                  + "seconds, please check the configuration or increase the "
                   + "file system connection timeout time by setting catalog property: %s",
               path,
               scheme,
