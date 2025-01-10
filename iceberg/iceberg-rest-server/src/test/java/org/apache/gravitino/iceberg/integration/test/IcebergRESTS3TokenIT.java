@@ -40,7 +40,7 @@ import org.junit.platform.commons.util.StringUtils;
 
 @SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
-public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
+public class IcebergRESTS3TokenIT extends IcebergRESTJdbcCatalogIT {
 
   private String s3Warehouse;
   private String accessKey;
@@ -124,7 +124,7 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
   private void copyS3BundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aws-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("aws", targetDir);
   }
 
   /**
