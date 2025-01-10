@@ -294,6 +294,16 @@ In some Spark versions, a Hadoop environment is needed by the driver, adding the
 
 ### Using the GVFS Java client to access the fileset
 
+To access fileset with GCS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item         | Description                                | Default value | Required | Since version    |
+|----------------------------|--------------------------------------------|---------------|----------|------------------|
+| `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes      | 0.7.0-incubating |
+
+:::
+If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
+
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
@@ -395,6 +405,16 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_ex
 ```
 
 ### Using the GVFS Python client to access a fileset
+
+In order to access fileset with GCS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item         | Description                               | Default value | Required | Since version    |
+|----------------------------|-------------------------------------------|---------------|----------|------------------|
+| `gcs_service_account_file` | The path of GCS service account JSON file.| (none)        | Yes      | 0.7.0-incubating |
+
+:::note
+If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
 
 Please install the `gravitino` package before running the following code:
 

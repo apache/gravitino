@@ -311,6 +311,19 @@ In some Spark versions, a Hadoop environment is needed by the driver, adding the
 
 ### Using the GVFS Java client to access the fileset
 
+To access fileset with S3 using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item     | Description                   | Default value | Required | Since version    |
+|------------------------|-------------------------------|---------------|----------|------------------|
+| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | No       | 0.7.0-incubating |
+| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+
+:::
+- `s3-endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
+- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
+
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
@@ -427,6 +440,25 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_files
 ```
 
 ### Using the GVFS Python client to access a fileset
+
+In order to access fileset with S3 using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item         | Description                   | Default value | Required | Since version    |
+|----------------------------|-------------------------------|---------------|----------|------------------|
+| `s3_endpoint`              | The endpoint of the AWS S3.   | (none)        | No       | 0.7.0-incubating |
+| `s3_access_key_id`         | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+| `s3_secret_access_key`     | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+
+:::
+- `s3_endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
+- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
+
+Please install the `gravitino` package before running the following code:
+
+```bash
+pip install gravitino==0.8.0-incubating
+```
 
 ```python
 from gravitino import gvfs

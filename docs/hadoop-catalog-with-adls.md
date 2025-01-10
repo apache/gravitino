@@ -302,6 +302,17 @@ In some Spark versions, a Hadoop environment is necessary for the driver, adding
 
 ### Using the GVFS Java client to access the fileset
 
+To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item           | Description                             | Default value | Required | Since version    |
+|------------------------------|-----------------------------------------|---------------|----------|------------------|
+| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes      | 0.8.0-incubating |
+| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes      | 0.8.0-incubating |
+
+:::note
+If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
+
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
@@ -411,6 +422,17 @@ hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/adls
 ```
 
 ### Using the GVFS Python client to access a fileset
+
+In order to access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item | Description                            | Default value | Required | Since version    |
+|--------------------|----------------------------------------|---------------|----------|------------------|
+| `abs_account_name` | The account name of Azure Blob Storage | (none)        | Yes      | 0.8.0-incubating |
+| `abs_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      | 0.8.0-incubating |
+
+:::
+If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
 
 Please install the `gravitino` package before running the following code:
 
