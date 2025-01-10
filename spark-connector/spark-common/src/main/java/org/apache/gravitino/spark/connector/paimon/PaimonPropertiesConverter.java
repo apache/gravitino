@@ -22,7 +22,6 @@ package org.apache.gravitino.spark.connector.paimon;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -42,14 +41,7 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
   @Override
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Paimon Catalog properties should not be null");
-    Map<String, String> all = PaimonPropertiesUtils.toPaimonCatalogProperties(properties);
-    String catalogBackend = all.remove(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_BACKEND);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogBackend),
-        String.format(
-            "%s should not be empty", PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_BACKEND));
-    all.put(PaimonPropertiesConstants.PAIMON_CATALOG_METASTORE, catalogBackend);
-    return all;
+    return PaimonPropertiesUtils.toPaimonCatalogProperties(properties);
   }
 
   @Override
