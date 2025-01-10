@@ -30,7 +30,7 @@ public class GCSUtils {
    * @param credentials The credential array.
    * @return An credential.
    */
-  static Credential getSuitableCredential(Credential[] credentials) {
+  static Credential getGCSTokenCredential(Credential[] credentials) {
     for (Credential credential : credentials) {
       if (credential instanceof GCSTokenCredential) {
         return credential;

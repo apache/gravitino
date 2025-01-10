@@ -66,7 +66,7 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   private void refresh() {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
-    Credential credential = AzureStorageUtils.getSuitableCredential(gravitinoCredentials);
+    Credential credential = AzureStorageUtils.getAzureStorageTokenCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");
     }

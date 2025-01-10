@@ -54,7 +54,7 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
 
   @Override
   public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
-    Credential credential = GCSUtils.getSuitableCredential(credentials);
+    Credential credential = GCSUtils.getGCSTokenCredential(credentials);
     Map<String, String> result = Maps.newHashMap();
     if (credential instanceof GCSTokenCredential) {
       result.put(GCS_TOKEN_PROVIDER_IMPL, GCSCredentialsProvider.class.getName());

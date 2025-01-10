@@ -51,7 +51,7 @@ public class GCSCredentialsProvider implements AccessTokenProvider {
   public void refresh() throws IOException {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
 
-    Credential credential = GCSUtils.getSuitableCredential(gravitinoCredentials);
+    Credential credential = GCSUtils.getGCSTokenCredential(gravitinoCredentials);
     if (credential == null) {
       throw new RuntimeException("No suitable credential for OSS found...");
     }

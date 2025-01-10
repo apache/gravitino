@@ -31,7 +31,7 @@ public class AzureStorageUtils {
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  static Credential getSuitableCredential(Credential[] credentials) {
+  static Credential getAzureStorageTokenCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof ADLSTokenCredential) {
