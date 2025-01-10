@@ -184,14 +184,6 @@ zlib in pure Java, which can be obtained at:
   * HOMEPAGE:
     * http://www.jcraft.com/jzlib/
 
-This product optionally depends on 'Protocol Buffers', Google's data
-interchange format, which can be obtained at:
-
-  * LICENSE:
-    * license/LICENSE.protobuf.txt (New BSD License)
-  * HOMEPAGE:
-    * http://code.google.com/p/protobuf/
-
 This product optionally depends on 'SLF4J', a simple logging facade for Java,
 which can be obtained at:
 
