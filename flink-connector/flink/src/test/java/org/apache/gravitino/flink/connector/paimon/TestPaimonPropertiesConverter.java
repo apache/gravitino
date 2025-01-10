@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -59,24 +60,20 @@ public class TestPaimonPropertiesConverter {
             PaimonConfig.CATALOG_JDBC_PASSWORD.getKey(),
             testPassword,
             PaimonConfig.CATALOG_URI.getKey(),
-            testUri);
+            testUri,
+            "flink.bypass.key",
+            "value");
     Map<String, String> flinkCatalogProperties =
         CONVERTER.toFlinkCatalogProperties(catalogProperties);
     Assertions.assertEquals(
         GravitinoPaimonCatalogFactoryOptions.IDENTIFIER, flinkCatalogProperties.get("type"));
+    Assertions.assertEquals(localWarehouse, flinkCatalogProperties.get(PaimonConstants.WAREHOUSE));
+    Assertions.assertEquals(testUser, flinkCatalogProperties.get(PaimonConstants.PAIMON_JDBC_USER));
     Assertions.assertEquals(
-        localWarehouse,
-        flinkCatalogProperties.get(GravitinoPaimonCatalogFactoryOptions.WAREHOUSE.key()));
-    Assertions.assertEquals(
-        testUser, flinkCatalogProperties.get(GravitinoPaimonCatalogFactoryOptions.JDBC_USER.key()));
-    Assertions.assertEquals(
-        testPassword,
-        flinkCatalogProperties.get(GravitinoPaimonCatalogFactoryOptions.JDBC_PASSWORD.key()));
-    Assertions.assertEquals(
-        "jdbc",
-        flinkCatalogProperties.get(GravitinoPaimonCatalogFactoryOptions.CATALOG_BACKEND.key()));
-    Assertions.assertEquals(
-        testUri, flinkCatalogProperties.get(GravitinoPaimonCatalogFactoryOptions.URI.key()));
+        testPassword, flinkCatalogProperties.get(PaimonConstants.PAIMON_JDBC_PASSWORD));
+    Assertions.assertEquals("jdbc", flinkCatalogProperties.get(PaimonConstants.METASTORE));
+    Assertions.assertEquals(testUri, flinkCatalogProperties.get(PaimonConstants.URI));
+    Assertions.assertEquals("value", flinkCatalogProperties.get("key"));
   }
 
   @Test
@@ -84,18 +81,19 @@ public class TestPaimonPropertiesConverter {
     String testUser = "testUser";
     String testPassword = "testPassword";
     String testUri = "testUri";
+    String testBackend = "jdbc";
     Configuration configuration =
         Configuration.fromMap(
             ImmutableMap.of(
-                GravitinoPaimonCatalogFactoryOptions.WAREHOUSE.key(),
+                PaimonConstants.WAREHOUSE,
                 localWarehouse,
-                GravitinoPaimonCatalogFactoryOptions.CATALOG_BACKEND.key(),
-                "jdbc",
-                GravitinoPaimonCatalogFactoryOptions.JDBC_USER.key(),
+                PaimonConstants.METASTORE,
+                testBackend,
+                PaimonConstants.PAIMON_JDBC_USER,
                 testUser,
-                GravitinoPaimonCatalogFactoryOptions.JDBC_PASSWORD.key(),
+                PaimonConstants.PAIMON_JDBC_PASSWORD,
                 testPassword,
-                GravitinoPaimonCatalogFactoryOptions.URI.key(),
+                PaimonConstants.URI,
                 testUri));
     Map<String, String> properties = CONVERTER.toGravitinoCatalogProperties(configuration);
     Assertions.assertEquals(
@@ -104,5 +102,6 @@ public class TestPaimonPropertiesConverter {
     Assertions.assertEquals(
         testPassword, properties.get(PaimonConfig.CATALOG_JDBC_PASSWORD.getKey()));
     Assertions.assertEquals(testUri, properties.get(PaimonConfig.CATALOG_URI.getKey()));
+    Assertions.assertEquals(testBackend, properties.get(PaimonConstants.CATALOG_BACKEND));
   }
 }

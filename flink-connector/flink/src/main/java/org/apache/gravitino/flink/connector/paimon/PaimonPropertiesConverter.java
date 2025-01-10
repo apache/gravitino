@@ -23,11 +23,10 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
-import org.apache.paimon.options.CatalogOptions;
+import org.apache.paimon.catalog.FileSystemCatalogFactory;
 
 public class PaimonPropertiesConverter implements PropertiesConverter {
 
@@ -37,54 +36,42 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
-    Map<String, String> gravitinoCatalogProperties = flinkConf.toMap();
-    String warehouse = flinkConf.get(GravitinoPaimonCatalogFactoryOptions.WAREHOUSE);
-    gravitinoCatalogProperties.put(PaimonConfig.CATALOG_WAREHOUSE.getKey(), warehouse);
-    String backendType = flinkConf.get(GravitinoPaimonCatalogFactoryOptions.CATALOG_BACKEND);
-    gravitinoCatalogProperties.put(
-        PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, backendType);
-    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(backendType)) {
-      gravitinoCatalogProperties.put(
-          PaimonConfig.CATALOG_URI.getKey(),
-          flinkConf.get(GravitinoPaimonCatalogFactoryOptions.URI));
-      gravitinoCatalogProperties.put(
-          PaimonConfig.CATALOG_JDBC_USER.getKey(),
-          flinkConf.get(GravitinoPaimonCatalogFactoryOptions.JDBC_USER));
-      gravitinoCatalogProperties.put(
-          PaimonConfig.CATALOG_JDBC_PASSWORD.getKey(),
-          flinkConf.get(GravitinoPaimonCatalogFactoryOptions.JDBC_PASSWORD));
-    } else if (PaimonCatalogBackend.HIVE.name().equalsIgnoreCase(backendType)) {
-      throw new UnsupportedOperationException(
-          "The Gravitino Connector does not currently support creating a Paimon Catalog that uses Hive Metastore.");
+    Map<String, String> gravitinoProperties = Maps.newHashMap();
+    Map<String, String> flinkConfMap = flinkConf.toMap();
+    for (Map.Entry<String, String> entry : flinkConfMap.entrySet()) {
+      String gravitinoKey =
+          PaimonPropertiesUtils.PAIMON_CATALOG_CONFIG_TO_GRAVITINO.get(entry.getKey());
+      if (gravitinoKey != null) {
+        gravitinoProperties.put(gravitinoKey, entry.getValue());
+      } else if (!entry.getKey().startsWith(FLINK_PROPERTY_PREFIX)) {
+        gravitinoProperties.put(FLINK_PROPERTY_PREFIX + entry.getKey(), entry.getValue());
+      } else {
+        gravitinoProperties.put(entry.getKey(), entry.getValue());
+      }
     }
-    return gravitinoCatalogProperties;
+    gravitinoProperties.put(
+        PaimonConstants.CATALOG_BACKEND,
+        flinkConfMap.getOrDefault(PaimonConstants.METASTORE, FileSystemCatalogFactory.IDENTIFIER));
+    return gravitinoProperties;
   }
 
   @Override
   public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> flinkCatalogProperties = Maps.newHashMap();
-    flinkCatalogProperties.putAll(gravitinoProperties);
-    String backendType =
-        flinkCatalogProperties.get(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND);
-    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(backendType)) {
-      flinkCatalogProperties.put(CatalogOptions.METASTORE.key(), backendType);
-      flinkCatalogProperties.put(
-          GravitinoPaimonCatalogFactoryOptions.URI.key(),
-          gravitinoProperties.get(PaimonConfig.CATALOG_URI.getKey()));
-      flinkCatalogProperties.put(
-          GravitinoPaimonCatalogFactoryOptions.JDBC_USER.key(),
-          gravitinoProperties.get(PaimonConfig.CATALOG_JDBC_USER.getKey()));
-      flinkCatalogProperties.put(
-          GravitinoPaimonCatalogFactoryOptions.JDBC_PASSWORD.key(),
-          gravitinoProperties.get(PaimonConfig.CATALOG_JDBC_PASSWORD.getKey()));
-    } else if (PaimonCatalogBackend.HIVE.name().equalsIgnoreCase(backendType)) {
-      throw new UnsupportedOperationException(
-          "The Gravitino Connector does not currently support creating a Paimon Catalog that uses Hive Metastore.");
-    }
-    flinkCatalogProperties.put(
-        GravitinoPaimonCatalogFactoryOptions.CATALOG_BACKEND.key(), backendType);
     flinkCatalogProperties.put(
         CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoPaimonCatalogFactoryOptions.IDENTIFIER);
+    gravitinoProperties.forEach(
+        (key, value) -> {
+          String flinkConfigKey = key;
+          if (key.startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX)) {
+            flinkConfigKey = key.substring(PropertiesConverter.FLINK_PROPERTY_PREFIX.length());
+          }
+          flinkCatalogProperties.put(
+              PaimonPropertiesUtils.GRAVITINO_CONFIG_TO_PAIMON.getOrDefault(
+                  flinkConfigKey, flinkConfigKey),
+              value);
+        });
+
     return flinkCatalogProperties;
   }
 }

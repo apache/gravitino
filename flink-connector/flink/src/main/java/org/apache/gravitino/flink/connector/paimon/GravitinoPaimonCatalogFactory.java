@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
@@ -51,7 +50,7 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
-    return ImmutableSet.of(GravitinoPaimonCatalogFactoryOptions.CATALOG_BACKEND);
+    return Collections.emptySet();
   }
 
   @Override

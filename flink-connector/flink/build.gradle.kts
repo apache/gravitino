@@ -38,10 +38,6 @@ val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
-tasks.compileJava {
-  dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
-}
-
 dependencies {
   implementation(project(":core"))
   implementation(project(":catalogs:catalog-common"))
@@ -49,7 +45,6 @@ dependencies {
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
-  compileOnly(project(":catalogs:catalog-lakehouse-paimon"))
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")

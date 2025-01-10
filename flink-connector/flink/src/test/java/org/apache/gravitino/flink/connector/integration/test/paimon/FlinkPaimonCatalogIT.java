@@ -20,6 +20,7 @@ package org.apache.gravitino.flink.connector.integration.test.paimon;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.nio.file.Path;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
@@ -27,9 +28,14 @@ import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+@Tag("gravitino-docker-test")
 public class FlinkPaimonCatalogIT extends FlinkCommonIT {
+
+  @TempDir private static Path warehouseDir;
 
   private static final String DEFAULT_PAIMON_CATALOG =
       "test_flink_paimon_filesystem_schema_catalog";
@@ -78,7 +84,7 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
                 PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
                 "filesystem",
                 "warehouse",
-                "/tmp/gravitino/paimon"));
+                warehouseDir.toString()));
   }
 
   @Test
@@ -86,7 +92,7 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
     tableEnv.useCatalog(DEFAULT_CATALOG);
     int numCatalogs = tableEnv.listCatalogs().length;
     String catalogName = "gravitino_hive_sql";
-    String warehouse = "/tmp/gravitino/paimon";
+    String warehouse = warehouseDir.toString();
     tableEnv.executeSql(
         String.format(
             "create catalog %s with ("

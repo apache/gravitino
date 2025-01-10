@@ -19,28 +19,8 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
-import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
-
 public class GravitinoPaimonCatalogFactoryOptions {
 
   /** Identifier for the {@link GravitinoPaimonCatalog}. */
   public static final String IDENTIFIER = "gravitino-paimon";
-
-  public static ConfigOption<String> CATALOG_BACKEND =
-      ConfigOptions.key("catalog.backend")
-          .stringType()
-          .defaultValue("fileSystem")
-          .withDescription("");
-
-  public static ConfigOption<String> WAREHOUSE =
-      ConfigOptions.key("warehouse").stringType().noDefaultValue();
-
-  public static ConfigOption<String> URI = ConfigOptions.key("uri").stringType().noDefaultValue();
-
-  public static ConfigOption<String> JDBC_USER =
-      ConfigOptions.key("jdbc.user").stringType().noDefaultValue();
-
-  public static ConfigOption<String> JDBC_PASSWORD =
-      ConfigOptions.key("jdbc.password").stringType().noDefaultValue();
 }
