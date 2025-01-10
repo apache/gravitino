@@ -45,8 +45,8 @@ cd ${gravitino_home}
 cd ${iceberg_rest_server_dir}
 mkdir -p bundles
 cp ${gravitino_home}/bundles/gcp/build/libs/gravitino-gcp-*.jar bundles/
-cp ${gravitino_home}/bundles/aws/build/libs/gravitino-aws-bundle-*.jar bundles/
-cp ${gravitino_home}/bundles/azure/build/libs/gravitino-azure-bundle-*.jar bundles/
+cp ${gravitino_home}/bundles/aws/build/libs/gravitino-aws-*.jar bundles/
+cp ${gravitino_home}/bundles/azure/build/libs/gravitino-azure-*.jar bundles/
 cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-*.jar bundles/
 
 iceberg_gcp_bundle="iceberg-gcp-bundle-1.5.2.jar"
