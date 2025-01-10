@@ -237,6 +237,80 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 ## Accessing a fileset with OSS
 
+### Using the GVFS Java client to access the fileset
+
+To access fileset with OSS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item      | Description                       | Default value | Required | Since version    |
+|-------------------------|-----------------------------------|---------------|----------|------------------|
+| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
+| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+
+:::note
+If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+:::
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("oss-endpoint", "http://localhost:8090");
+conf.set("oss-access-key-id", "minio");
+conf.set("oss-secret-access-key", "minio123"); 
+Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+FileSystem fs = filesetPath.getFileSystem(conf);
+fs.mkdirs(filesetPath);
+...
+```
+
+Similar to Spark configurations, you need to add OSS bundle jars to the classpath according to your environment.
+If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
+
+```xml
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-common</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-aliyun</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aliyun</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
+Or use the bundle jar with Hadoop environment:
+
+```xml
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aliyun-bundle</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
 ### Using Spark to access the fileset
 
 The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
@@ -304,80 +378,6 @@ Please choose the correct jar according to your environment.
 :::note
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
-
-### Using the GVFS Java client to access the fileset
-
-To access fileset with OSS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
-
-| Configuration item      | Description                       | Default value | Required | Since version    |
-|-------------------------|-----------------------------------|---------------|----------|------------------|
-| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
-| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
-
-:::note 
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
-:::
-
-```java
-Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
-conf.set("oss-endpoint", "http://localhost:8090");
-conf.set("oss-access-key-id", "minio");
-conf.set("oss-secret-access-key", "minio123"); 
-Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
-FileSystem fs = filesetPath.getFileSystem(conf);
-fs.mkdirs(filesetPath);
-...
-```
-
-Similar to Spark configurations, you need to add OSS bundle jars to the classpath according to your environment.
-If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
-
-```xml
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-common</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-aliyun</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aliyun</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-```
-
-Or use the bundle jar with Hadoop environment:
-
-```xml
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aliyun-bundle</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-```
 
 ### Accessing a fileset using the Hadoop fs command
 

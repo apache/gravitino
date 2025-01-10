@@ -231,75 +231,6 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 ## Accessing a fileset with ADLS
 
-### Using Spark to access the fileset
-
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
-
-Before running the following code, you need to install required packages:
-
-```bash
-pip install pyspark==3.1.3
-pip install gravitino==0.8.0-incubating
-```
-Then you can run the following code:
-
-```python
-import logging
-from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
-from pyspark.sql import SparkSession
-import os
-
-gravitino_url = "http://localhost:8090"
-metalake_name = "test"
-
-catalog_name = "your_adls_catalog"
-schema_name = "your_adls_schema"
-fileset_name = "your_adls_fileset"
-
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.2.0.jar,/path/to/azure-storage-7.0.0.jar,/path/to/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"
-spark = SparkSession.builder
-.appName("adls_fileset_test")
-.config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-.config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-.config("spark.hadoop.fs.gravitino.client.metalake", "test")
-.config("spark.hadoop.azure-storage-account-name", "azure_account_name")
-.config("spark.hadoop.azure-storage-account-key", "azure_account_name")
-.config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
-.config("spark.driver.memory", "2g")
-.config("spark.driver.port", "2048")
-.getOrCreate()
-
-data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
-columns = ["Name", "Age"]
-spark_df = spark.createDataFrame(data, schema=columns)
-gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
-
-spark_df.coalesce(1).write
-.mode("overwrite")
-.option("header", "true")
-.csv(gvfs_path)
-```
-
-If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
-
-```python
-## Replace the following code snippet with the above code snippet with the same environment variables
-
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar --master local[1] pyspark-shell"
-```
-
-- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1) and `hadoop-azure` jar.
-- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure` jar.
-- `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
-
-
-Please choose the correct jar according to your environment.
-
-:::note
-In some Spark versions, a Hadoop environment is necessary for the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
-:::
-
 ### Using the GVFS Java client to access the fileset
 
 To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
@@ -372,6 +303,75 @@ Or use the bundle jar with Hadoop environment:
     <version>0.8.0-incubating-SNAPSHOT</version>
   </dependency>
 ```
+
+### Using Spark to access the fileset
+
+The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+
+Before running the following code, you need to install required packages:
+
+```bash
+pip install pyspark==3.1.3
+pip install gravitino==0.8.0-incubating
+```
+Then you can run the following code:
+
+```python
+import logging
+from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
+from pyspark.sql import SparkSession
+import os
+
+gravitino_url = "http://localhost:8090"
+metalake_name = "test"
+
+catalog_name = "your_adls_catalog"
+schema_name = "your_adls_schema"
+fileset_name = "your_adls_fileset"
+
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.2.0.jar,/path/to/azure-storage-7.0.0.jar,/path/to/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"
+spark = SparkSession.builder
+.appName("adls_fileset_test")
+.config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+.config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+.config("spark.hadoop.fs.gravitino.client.metalake", "test")
+.config("spark.hadoop.azure-storage-account-name", "azure_account_name")
+.config("spark.hadoop.azure-storage-account-key", "azure_account_name")
+.config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
+.config("spark.driver.memory", "2g")
+.config("spark.driver.port", "2048")
+.getOrCreate()
+
+data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
+columns = ["Name", "Age"]
+spark_df = spark.createDataFrame(data, schema=columns)
+gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
+
+spark_df.coalesce(1).write
+.mode("overwrite")
+.option("header", "true")
+.csv(gvfs_path)
+```
+
+If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
+
+```python
+## Replace the following code snippet with the above code snippet with the same environment variables
+
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar --master local[1] pyspark-shell"
+```
+
+- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1) and `hadoop-azure` jar.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure` jar.
+- `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+
+
+Please choose the correct jar according to your environment.
+
+:::note
+In some Spark versions, a Hadoop environment is necessary for the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
+:::
 
 ### Accessing a fileset using the Hadoop fs command
 

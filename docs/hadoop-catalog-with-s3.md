@@ -242,6 +242,82 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 
 ## Accessing a fileset with S3
 
+### Using the GVFS Java client to access the fileset
+
+To access fileset with S3 using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+
+| Configuration item     | Description                   | Default value | Required | Since version    |
+|------------------------|-------------------------------|---------------|----------|------------------|
+| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | No       | 0.7.0-incubating |
+| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+
+:::
+- `s3-endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
+- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+  :::
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+
+conf.set("s3-endpoint", "http://localhost:8090");
+conf.set("s3-access-key-id", "minio");
+conf.set("s3-secret-access-key", "minio123");
+
+Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/adls_fileset/new_dir");
+FileSystem fs = filesetPath.getFileSystem(conf);
+fs.mkdirs(filesetPath);
+...
+```
+
+Similar to Spark configurations, you need to add S3 (bundle) jars to the classpath according to your environment.
+
+```xml
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-common</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-aws</artifactId>
+    <version>${HADOOP_VERSION}</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aws</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
+Or use the bundle jar with Hadoop environment:
+
+```xml
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>gravitino-aws-bundle</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+
+  <dependency>
+    <groupId>org.apache.gravitino</groupId>
+    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <version>0.8.0-incubating-SNAPSHOT</version>
+  </dependency>
+```
+
 ### Using Spark to access the fileset
 
 The following Python code demonstrates how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
@@ -308,82 +384,6 @@ Please choose the correct jar according to your environment.
 :::note
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
-
-### Using the GVFS Java client to access the fileset
-
-To access fileset with S3 using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
-
-| Configuration item     | Description                   | Default value | Required | Since version    |
-|------------------------|-------------------------------|---------------|----------|------------------|
-| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | No       | 0.7.0-incubating |
-| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
-| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
-
-:::
-- `s3-endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
-- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
-:::
-
-```java
-Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
-
-conf.set("s3-endpoint", "http://localhost:8090");
-conf.set("s3-access-key-id", "minio");
-conf.set("s3-secret-access-key", "minio123");
-
-Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/adls_fileset/new_dir");
-FileSystem fs = filesetPath.getFileSystem(conf);
-fs.mkdirs(filesetPath);
-...
-```
-
-Similar to Spark configurations, you need to add S3 (bundle) jars to the classpath according to your environment.
-
-```xml
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-common</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-aws</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aws</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-```
-
-Or use the bundle jar with Hadoop environment:
-
-```xml
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aws-bundle</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
-  </dependency>
-```
 
 ### Accessing a fileset using the Hadoop fs command
 
