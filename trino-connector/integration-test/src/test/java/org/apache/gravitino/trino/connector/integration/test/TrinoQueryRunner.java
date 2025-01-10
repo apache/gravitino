@@ -112,7 +112,7 @@ class TrinoQueryRunner {
     }
 
     // avoid the ide capturing the error message as failure
-    String err_message = errorStream.toString().replace("Error: ", "");
+    String err_message = errorStream.toString().replace("\nCaused by:", "\n-Caused by:");
     String out_message = outputStream.toString();
     return err_message + out_message;
   }
