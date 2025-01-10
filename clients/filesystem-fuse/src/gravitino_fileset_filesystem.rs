@@ -144,7 +144,8 @@ mod tests {
     use crate::default_raw_filesystem::DefaultRawFileSystem;
     use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
     use crate::filesystem::{FileSystemContext, PathFileSystem, RawFileSystem};
-    use crate::gravitino_client::{Catalog, Fileset, GravitinoClient};
+    use crate::gravitino_client::tests::{create_test_catalog, create_test_fileset};
+    use crate::gravitino_client::GravitinoClient;
     use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
     use crate::gvfs_creator::create_fs_with_fileset;
     use crate::memory_filesystem::MemoryFileSystem;
@@ -191,8 +192,9 @@ mod tests {
         let bucket = opendal_config.get("bucket").expect("Bucket must exist");
         let endpoint = opendal_config.get("endpoint").expect("Endpoint must exist");
 
-        let catalog = Catalog::new(
+        let catalog = create_test_catalog(
             "c1",
+            "s3",
             vec![
                 ("location".to_string(), format!("s3a://{}", bucket)),
                 ("s3-endpoint".to_string(), endpoint.to_string()),
@@ -201,7 +203,7 @@ mod tests {
             .collect::<HashMap<String, String>>(),
         );
         let file_set_location = format!("s3a://{}{}", bucket, path.to_string_lossy());
-        let file_set = Fileset::new("fileset1", &file_set_location);
+        let file_set = create_test_fileset("fileset1", &file_set_location);
 
         let fs_context = FileSystemContext::default();
         let inner_fs = create_fs_with_fileset(&catalog, &file_set, config, &fs_context)
