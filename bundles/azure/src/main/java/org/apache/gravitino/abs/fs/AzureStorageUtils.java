@@ -33,7 +33,6 @@ public class AzureStorageUtils {
    * @return A credential. Null if not found.
    */
   static Credential getSuitableCredential(Credential[] credentials) {
-    // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof ADLSTokenCredential) {
         return credential;
@@ -42,6 +41,22 @@ public class AzureStorageUtils {
 
     for (Credential credential : credentials) {
       if (credential instanceof AzureAccountKeyCredential) {
+        return credential;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get the ADLS token credential from the credential array. Null if not found.
+   *
+   * @param credentials The credential array.
+   * @return A credential. Null if not found.
+   */
+  static Credential getADLSTokenCredential(Credential[] credentials) {
+    for (Credential credential : credentials) {
+      if (credential instanceof ADLSTokenCredential) {
         return credential;
       }
     }

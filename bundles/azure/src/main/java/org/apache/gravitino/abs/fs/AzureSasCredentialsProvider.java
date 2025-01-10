@@ -66,22 +66,22 @@ public class AzureSasCredentialsProvider implements SASTokenProvider, Configurab
 
   private void refresh() {
     Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
-    Credential credential = AzureStorageUtils.getSuitableCredential(gravitinoCredentials);
+    Credential credential = AzureStorageUtils.getADLSTokenCredential(gravitinoCredentials);
     if (credential == null) {
-      throw new RuntimeException("No suitable credential for OSS found...");
+      throw new RuntimeException("No token credential for OSS found...");
     }
 
     if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
       sasToken = adlsTokenCredential.sasToken();
-    }
 
-    if (credential.expireTimeInMs() > 0) {
-      expirationTime =
-          System.currentTimeMillis()
-              + (long)
-                  ((credential.expireTimeInMs() - System.currentTimeMillis())
-                      * EXPIRATION_TIME_FACTOR);
+      if (credential.expireTimeInMs() > 0) {
+        expirationTime =
+            System.currentTimeMillis()
+                + (long)
+                    ((credential.expireTimeInMs() - System.currentTimeMillis())
+                        * EXPIRATION_TIME_FACTOR);
+      }
     }
   }
 }
