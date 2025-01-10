@@ -63,10 +63,10 @@ unit-test: doc-test
 	cargo test --no-fail-fast --lib --all-features --workspace
 
 test-fuse:
-	@bash ./tests/bin/s3_fileset_it.sh test
+	@bash ./tests/bin/run_fuse_testers.sh test
 
 test-s3:
-	@bash ./tests/bin/s3_test.sh test
+	@bash ./tests/bin/run_s3fs_testers.sh test
 
 test: doc-test
 	cargo test --no-fail-fast --all-targets --all-features --workspace

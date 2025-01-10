@@ -203,7 +203,11 @@ pub(crate) mod tests {
     use super::*;
     use mockito::mock;
 
-    pub(crate) fn create_test_catalog(name: &str, provider: &str, properties: HashMap<String, String>)-> Catalog {
+    pub(crate) fn create_test_catalog(
+        name: &str,
+        provider: &str,
+        properties: HashMap<String, String>,
+    ) -> Catalog {
         Catalog {
             name: name.to_string(),
             catalog_type: "fileset".to_string(),
