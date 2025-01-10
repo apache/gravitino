@@ -25,6 +25,7 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -85,7 +86,18 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public Metalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    return dispatcher.alterMetalake(ident, changes);
+    Metalake alterMetalake = dispatcher.alterMetalake(ident, changes);
+    MetalakeChange.RenameMetalake lastRenameChange = null;
+    for (MetalakeChange change : changes) {
+      if (change instanceof MetalakeChange.RenameMetalake) {
+        lastRenameChange = (MetalakeChange.RenameMetalake) change;
+      }
+    }
+    if (lastRenameChange != null) {
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.METALAKE, lastRenameChange.getNewName());
+    }
+    return alterMetalake;
   }
 
   @Override
@@ -102,6 +114,12 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     dispatcher.disableMetalake(ident);
+  }
+
+  public boolean dropMetalake(NameIdentifier ident) {
+    // For metalake, we don't clear all the privileges of catalog authorization plugin.
+    // we just remove metalake.
+    return dispatcher.dropMetalake(ident);
   }
 
   @Override

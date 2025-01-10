@@ -24,8 +24,9 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represent a failure event when do Iceberg table operation failed. */
 @DeveloperApi
-public class IcebergTableFailureEvent extends IcebergFailureEvent {
-  protected IcebergTableFailureEvent(String user, NameIdentifier nameIdentifier, Exception e) {
-    super(user, nameIdentifier, e);
+public abstract class IcebergTableFailureEvent extends IcebergFailureEvent {
+  protected IcebergTableFailureEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
+    super(icebergRequestContext, nameIdentifier, e);
   }
 }

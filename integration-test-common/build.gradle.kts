@@ -53,7 +53,10 @@ dependencies {
     exclude("org.elasticsearch")
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
+    exclude("org.apache.hadoop", "hadoop-common")
   }
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
 
   testImplementation(platform("org.junit:junit-bom:5.9.1"))
   testImplementation("org.junit.jupiter:junit-jupiter")

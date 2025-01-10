@@ -117,6 +117,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsSchemaEvolution();
 
+  protected abstract boolean supportsReplaceColumns();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -146,7 +148,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
       throw e;
     }
     sql("USE " + getCatalogName());
-    createDatabaseIfNotExists(getDefaultDatabase());
+    createDatabaseIfNotExists(getDefaultDatabase(), getProvider());
   }
 
   @BeforeEach
@@ -187,7 +189,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateAndLoadSchema() {
+  protected void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
@@ -216,7 +218,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterSchema() {
+  protected void testAlterSchema() {
     String testDatabaseName = "t_alter";
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
@@ -240,6 +242,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   void testDropSchema() {
     String testDatabaseName = "t_drop";
+    dropDatabaseIfExists(testDatabaseName);
     Set<String> databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
 
@@ -277,7 +280,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     // test db.table as table identifier
     String databaseName = "db1";
     String tableName = "table1";
-    createDatabaseIfNotExists(databaseName);
+    createDatabaseIfNotExists(databaseName, getProvider());
     String tableIdentifier = String.join(".", databaseName, tableName);
 
     dropTableIfExists(tableIdentifier);
@@ -291,7 +294,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     // use db then create table with table name
     databaseName = "db2";
     tableName = "table2";
-    createDatabaseIfNotExists(databaseName);
+    createDatabaseIfNotExists(databaseName, getProvider());
 
     sql("USE " + databaseName);
     dropTableIfExists(tableName);
@@ -379,7 +382,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String database = "db_list";
     String table3 = "list3";
     String table4 = "list4";
-    createDatabaseIfNotExists(database);
+    createDatabaseIfNotExists(database, getProvider());
     dropTableIfExists(String.join(".", database, table3));
     dropTableIfExists(String.join(".", database, table4));
     createSimpleTable(String.join(".", database, table3));
@@ -550,7 +553,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testAlterTableReplaceColumns() {
+  @EnabledIf("supportsReplaceColumns")
+  protected void testAlterTableReplaceColumns() {
     String tableName = "test_replace_columns_table";
     dropTableIfExists(tableName);
 
@@ -563,7 +567,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "ALTER TABLE %S REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
+            "ALTER TABLE %s REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
             tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>();
     // change comment for id

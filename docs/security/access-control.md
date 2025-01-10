@@ -202,11 +202,11 @@ and `USE_SCHEMA` privileges on its parent schema.
 
 ### Table privileges
 
-| Name         | Supports Securable Object         | Operation                                      |
-|--------------|-----------------------------------|------------------------------------------------|
-| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                 |
-| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Use the SQL `UPDATE`,`DELETE`,`INSERT` a table |
-| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Use the SQL `SELECT` data from a table         |
+| Name         | Supports Securable Object         | Operation                                        |
+|--------------|-----------------------------------|--------------------------------------------------|
+| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                   |
+| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Write data to a table or modify the table schema |
+| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                         |
 
 ### Topic privileges
 
@@ -561,10 +561,10 @@ The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObj
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/roles
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/roles
 ```
 
 </TabItem>

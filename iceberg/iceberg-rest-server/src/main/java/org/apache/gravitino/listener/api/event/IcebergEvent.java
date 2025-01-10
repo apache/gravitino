@@ -19,13 +19,42 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an abstract post event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergEvent extends Event {
-  protected IcebergEvent(String user, NameIdentifier resourceIdentifier) {
-    super(user, resourceIdentifier);
+  private IcebergRequestContext icebergRequestContext;
+
+  protected IcebergEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
+    super(icebergRequestContext.userName(), resourceIdentifier);
+    this.icebergRequestContext = icebergRequestContext;
+  }
+
+  @Override
+  public EventSource eventSource() {
+    return EventSource.GRAVITINO_ICEBERG_REST_SERVER;
+  }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
+
+  public IcebergRequestContext icebergRequestContext() {
+    return icebergRequestContext;
+  }
+
+  @Override
+  public String remoteAddress() {
+    return icebergRequestContext.remoteHostName();
+  }
+
+  @Override
+  public Map<String, String> customInfo() {
+    return icebergRequestContext.httpHeaders();
   }
 }

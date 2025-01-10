@@ -1,0 +1,21 @@
+gcli schema [list|details|create|properties]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
+
+Example commands
+
+Show all schemas in a catalog
+gcli schema list --name catalog_postgres
+
+Show schema details
+gcli schema details --name catalog_postgres.hr
+
+Show schema audit information
+gcli schema details --name catalog_postgres.hr --audit
+
+Create a schema
+gcli schema create --name catalog_postgres.new_db
+
+Display schema properties
+gcli schema properties --name catalog_postgres.hr

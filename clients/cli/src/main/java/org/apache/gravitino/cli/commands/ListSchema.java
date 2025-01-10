@@ -46,23 +46,21 @@ public class ListSchema extends Command {
   }
 
   /** List all schema names in a schema. */
+  @Override
   public void handle() {
     String[] schemas = new String[0];
     try {
       GravitinoClient client = buildClient(metalake);
       schemas = client.loadCatalog(catalog).asSchemas().listSchemas();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
-    String all = Joiner.on(",").join(schemas);
+    String all = schemas.length == 0 ? "No schemas exist." : Joiner.on(",").join(schemas);
 
     System.out.println(all.toString());
   }

@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.slf4j.Logger;
@@ -37,17 +38,18 @@ import org.slf4j.LoggerFactory;
 public class FileAuditWriter implements AuditLogWriter {
   private static final Logger Log = LoggerFactory.getLogger(FileAuditWriter.class);
 
-  public static final String AUDIT_LOG_FILE_NAME = "fileName";
+  private static final String AUDIT_LOG_FILE_NAME = "fileName";
+  private static final String APPEND = "append";
+  private static final String FLUSH_INTERVAL_SECS = "flushIntervalSecs";
+  private static final String LINE_SEPARATOR = System.lineSeparator();
 
-  public static final String APPEND = "append";
-
-  public static final String LINE_SEPARATOR = System.lineSeparator();
-
-  Formatter formatter;
   @VisibleForTesting Writer outWriter;
   @VisibleForTesting String fileName;
 
-  boolean append;
+  private Formatter formatter;
+  private boolean append;
+  private int flushIntervalSecs;
+  private Instant nextFlushTime = Instant.now();
 
   @Override
   public Formatter getFormatter() {
@@ -62,6 +64,7 @@ public class FileAuditWriter implements AuditLogWriter {
             + "/"
             + properties.getOrDefault(AUDIT_LOG_FILE_NAME, "gravitino_audit.log");
     this.append = Boolean.parseBoolean(properties.getOrDefault(APPEND, "true"));
+    this.flushIntervalSecs = Integer.parseInt(properties.getOrDefault(FLUSH_INTERVAL_SECS, "10"));
     try {
       OutputStream outputStream = new FileOutputStream(fileName, append);
       this.outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
@@ -76,6 +79,7 @@ public class FileAuditWriter implements AuditLogWriter {
     String log = auditLog.toString();
     try {
       outWriter.write(log + LINE_SEPARATOR);
+      tryFlush();
     } catch (Exception e) {
       Log.warn("Failed to write audit log: {}", log, e);
     }
@@ -95,5 +99,23 @@ public class FileAuditWriter implements AuditLogWriter {
   @Override
   public String name() {
     return "file";
+  }
+
+  private void tryFlush() {
+    Instant now = Instant.now();
+    if (now.isAfter(nextFlushTime)) {
+      nextFlushTime = now.plusSeconds(flushIntervalSecs);
+      doFlush();
+    }
+  }
+
+  private void doFlush() {
+    if (outWriter != null) {
+      try {
+        outWriter.flush();
+      } catch (Exception e) {
+        Log.warn("Flush audit log failed,", e);
+      }
+    }
   }
 }

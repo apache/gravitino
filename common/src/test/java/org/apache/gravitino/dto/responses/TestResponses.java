@@ -26,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privileges;
@@ -41,6 +43,8 @@ import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
+import org.apache.gravitino.dto.model.ModelDTO;
+import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
@@ -389,5 +393,77 @@ public class TestResponses {
   void testFileLocationResponseException() {
     FileLocationResponse response = new FileLocationResponse();
     assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
+
+  @Test
+  void testModelResponse() throws JsonProcessingException {
+    Map<String, String> props = ImmutableMap.of("key", "value");
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+
+    ModelDTO modelDTO =
+        ModelDTO.builder()
+            .withName("model1")
+            .withLatestVersion(0)
+            .withComment("comment1")
+            .withProperties(props)
+            .withAudit(audit)
+            .build();
+
+    ModelResponse response = new ModelResponse(modelDTO);
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    ModelResponse deserResponse = JsonUtils.objectMapper().readValue(serJson, ModelResponse.class);
+
+    assertEquals(response, deserResponse);
+
+    ModelResponse response1 = new ModelResponse();
+    assertThrows(IllegalArgumentException.class, response1::validate);
+  }
+
+  @Test
+  void testModelVersionListResponse() throws JsonProcessingException {
+    ModelVersionListResponse response1 = new ModelVersionListResponse(new int[] {});
+    assertDoesNotThrow(response1::validate);
+
+    String serJson1 = JsonUtils.objectMapper().writeValueAsString(response1);
+    ModelVersionListResponse deserResponse1 =
+        JsonUtils.objectMapper().readValue(serJson1, ModelVersionListResponse.class);
+    assertEquals(response1, deserResponse1);
+    assertArrayEquals(new int[] {}, deserResponse1.getVersions());
+
+    ModelVersionListResponse response2 = new ModelVersionListResponse(new int[] {1, 2});
+    assertDoesNotThrow(response2::validate);
+
+    String serJson2 = JsonUtils.objectMapper().writeValueAsString(response2);
+    ModelVersionListResponse deserResponse2 =
+        JsonUtils.objectMapper().readValue(serJson2, ModelVersionListResponse.class);
+    assertEquals(response2, deserResponse2);
+    assertArrayEquals(new int[] {1, 2}, deserResponse2.getVersions());
+  }
+
+  @Test
+  void testModelVersionResponse() throws JsonProcessingException {
+    Map<String, String> props = ImmutableMap.of("key", "value");
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+
+    ModelVersionDTO modelVersionDTO =
+        ModelVersionDTO.builder()
+            .withVersion(0)
+            .withComment("model version comment")
+            .withAliases(new String[] {"alias1", "alias2"})
+            .withUri("uri")
+            .withProperties(props)
+            .withAudit(audit)
+            .build();
+
+    ModelVersionResponse response = new ModelVersionResponse(modelVersionDTO);
+    response.validate(); // No exception thrown
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    ModelVersionResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, ModelVersionResponse.class);
+    assertEquals(response, deserResponse);
+
+    ModelVersionResponse response1 = new ModelVersionResponse();
+    assertThrows(IllegalArgumentException.class, response1::validate);
   }
 }

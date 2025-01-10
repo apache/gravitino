@@ -33,7 +33,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -213,7 +215,7 @@ public class TableMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             deleteResult.set(
-                SessionUtils.doWithCommitAndFetchResult(
+                SessionUtils.doWithoutCommitAndFetchResult(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
         () -> {
@@ -223,11 +225,20 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         tableId, MetadataObject.Type.TABLE.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
             TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        tableId, MetadataObject.Type.TABLE.name()));
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                        tableId, MetadataObject.Type.TABLE.name()));
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tableId));
           }
         });
 
@@ -242,27 +253,11 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    Long parentEntityId = null;
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
-      switch (level) {
-        case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
-        case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
-          continue;
-        case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          builder.withSchemaId(parentEntityId);
-          break;
-      }
-    }
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    builder.withMetalakeId(parentEntityIds[0]);
+    builder.withCatalogId(parentEntityIds[1]);
+    builder.withSchemaId(parentEntityIds[2]);
   }
 
   private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {

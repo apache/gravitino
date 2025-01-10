@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 public class TestGravitinoOptions {
 
   @Test
-  public void testCreateSimpleOption() {
+  public void createSimpleOption() {
     GravitinoOptions gravitinoOptions = new GravitinoOptions();
     Option helpOption =
         gravitinoOptions.createSimpleOption("h", GravitinoOptions.HELP, "help message");
@@ -44,7 +44,7 @@ public class TestGravitinoOptions {
   }
 
   @Test
-  public void testCreateArgOption() {
+  public void createArgOption() {
     GravitinoOptions gravitinoOptions = new GravitinoOptions();
     Option urlOption = gravitinoOptions.createArgOption("u", GravitinoOptions.URL, "url argument");
 

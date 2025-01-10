@@ -135,8 +135,15 @@ public class TestPermissionOperations extends JerseyTest {
             .build();
     when(manager.grantRolesToUser(any(), any(), any())).thenReturn(userEntity);
 
-    RoleGrantRequest request = new RoleGrantRequest(Lists.newArrayList("role1"));
+    RoleGrantRequest illegalReq = new RoleGrantRequest(null);
+    Response illegalResp =
+        target("/metalakes/metalake1/permissions/users/user/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
 
+    RoleGrantRequest request = new RoleGrantRequest(Lists.newArrayList("role1"));
     Response resp =
         target("/metalakes/metalake1/permissions/users/user/grant")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -231,6 +238,15 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.grantRolesToGroup(any(), any(), any())).thenReturn(groupEntity);
+
+    // Test with Illegal request
+    RoleGrantRequest illegalReq = new RoleGrantRequest(null);
+    Response illegalResp =
+        target("/metalakes/metalake1/permissions/groups/group/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
 
     RoleGrantRequest request = new RoleGrantRequest(Lists.newArrayList("role1"));
 
@@ -331,6 +347,16 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.revokeRolesFromUser(any(), any(), any())).thenReturn(userEntity);
+
+    // Test with illegal request
+    RoleRevokeRequest illegalReq = new RoleRevokeRequest(null);
+    Response illegalResp =
+        target("/metalakes/metalake1/permissions/users/user1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
     RoleRevokeRequest request = new RoleRevokeRequest(Lists.newArrayList("role1"));
 
     Response resp =
@@ -393,6 +419,15 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.revokeRolesFromGroup(any(), any(), any())).thenReturn(groupEntity);
+    // Test with illegal request
+    RoleRevokeRequest illegalReq = new RoleRevokeRequest(null);
+    Response illegalResp =
+        target("/metalakes/metalake1/permissions/groups/group1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
     RoleRevokeRequest request = new RoleRevokeRequest(Lists.newArrayList("role1"));
 
     Response resp =
@@ -538,6 +573,16 @@ public class TestPermissionOperations extends JerseyTest {
             .build();
     when(manager.revokePrivilegesFromRole(any(), any(), any(), any())).thenReturn(roleEntity);
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    // Test with illegal request
+    PrivilegeRevokeRequest illegalReq = new PrivilegeRevokeRequest(null);
+    Response illegalResp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
     PrivilegeRevokeRequest request =
         new PrivilegeRevokeRequest(
             Lists.newArrayList(

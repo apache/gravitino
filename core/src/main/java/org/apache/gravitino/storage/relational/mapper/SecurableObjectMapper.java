@@ -58,8 +58,25 @@ public interface SecurableObjectMapper {
 
   @UpdateProvider(
       type = SecurableObjectSQLProviderFactory.class,
-      method = "softDeleteRoleMetasByMetalakeId")
-  void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteSecurableObjectsByMetalakeId")
+  void softDeleteSecurableObjectsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "softDeleteObjectRelsByMetadataObject")
+  void softDeleteObjectRelsByMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "softDeleteObjectRelsByCatalogId")
+  void softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId);
+
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "softDeleteObjectRelsBySchemaId")
+  void softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId);
 
   @SelectProvider(
       type = SecurableObjectSQLProviderFactory.class,

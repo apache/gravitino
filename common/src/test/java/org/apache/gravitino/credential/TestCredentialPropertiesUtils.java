@@ -28,7 +28,7 @@ public class TestCredentialPropertiesUtils {
 
   @Test
   void testToIcebergProperties() {
-    S3TokenCredential s3TokenCredential = new S3TokenCredential("key", "secret", "token", 0);
+    S3TokenCredential s3TokenCredential = new S3TokenCredential("key", "secret", "token", 100);
     Map<String, String> icebergProperties =
         CredentialPropertyUtils.toIcebergProperties(s3TokenCredential);
     Map<String, String> expectedProperties =
@@ -49,6 +49,45 @@ public class TestCredentialPropertiesUtils {
             "key",
             CredentialPropertyUtils.ICEBERG_S3_SECRET_ACCESS_KEY,
             "secret");
+    Assertions.assertEquals(expectedProperties, icebergProperties);
+  }
+
+  @Test
+  void testToIcebergPropertiesForOSS() {
+    OSSTokenCredential ossTokenCredential =
+        new OSSTokenCredential("key", "secret", "security-token", 100);
+    Map<String, String> icebergProperties =
+        CredentialPropertyUtils.toIcebergProperties(ossTokenCredential);
+    Map<String, String> expectedProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_ID,
+            "key",
+            CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_SECRET,
+            "secret",
+            CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN,
+            "security-token");
+    Assertions.assertEquals(expectedProperties, icebergProperties);
+  }
+
+  @Test
+  void testToIcebergPropertiesForADLS() {
+    String storageAccountName = "storage-account-name";
+    String sasToken = "sas-token";
+    long expireTimeInMS = 100;
+
+    ADLSTokenCredential adlsTokenCredential =
+        new ADLSTokenCredential(storageAccountName, sasToken, expireTimeInMS);
+    Map<String, String> icebergProperties =
+        CredentialPropertyUtils.toIcebergProperties(adlsTokenCredential);
+
+    String sasTokenKey =
+        String.format(
+            "%s.%s.%s",
+            CredentialPropertyUtils.ICEBERG_ADLS_TOKEN,
+            storageAccountName,
+            ADLSTokenCredential.ADLS_DOMAIN);
+
+    Map<String, String> expectedProperties = ImmutableMap.of(sasTokenKey, sasToken);
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
 }

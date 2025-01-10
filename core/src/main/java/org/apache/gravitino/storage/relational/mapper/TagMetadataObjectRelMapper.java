@@ -75,6 +75,28 @@ public interface TagMetadataObjectRelMapper {
       method = "softDeleteTagMetadataObjectRelsByMetalakeId")
   void softDeleteTagMetadataObjectRelsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByMetadataObject")
+  void softDeleteTagMetadataObjectRelsByMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByCatalogId")
+  void softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsBySchemaId")
+  void softDeleteTagMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByTableId")
+  void softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId);
+
   @DeleteProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "deleteTagEntityRelsByLegacyTimeline")

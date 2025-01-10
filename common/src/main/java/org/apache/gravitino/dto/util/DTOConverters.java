@@ -36,6 +36,8 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialFactory;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -46,8 +48,11 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
+import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
+import org.apache.gravitino.dto.model.ModelDTO;
+import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -77,6 +82,8 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -517,6 +524,31 @@ public class DTOConverters {
   }
 
   /**
+   * Converts credentials to CredentialDTOs.
+   *
+   * @param credentials the credentials to be converted.
+   * @return The credential DTOs.
+   */
+  public static CredentialDTO[] toDTO(Credential[] credentials) {
+    return Arrays.stream(credentials).map(DTOConverters::toDTO).toArray(CredentialDTO[]::new);
+  }
+
+  /**
+   * Converts a Credential to a CredentialDTO.
+   *
+   * @param credential the credential to be converted.
+   * @return The credential DTO.
+   */
+  public static CredentialDTO toDTO(Credential credential) {
+    CredentialDTO.Builder builder =
+        CredentialDTO.builder()
+            .withCredentialType(credential.credentialType())
+            .withExpireTimeInMs(credential.expireTimeInMs())
+            .withCredentialInfo(credential.credentialInfo());
+    return builder.build();
+  }
+
+  /**
    * Converts an Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
@@ -598,6 +630,39 @@ public class DTOConverters {
         .withComment(topic.comment())
         .withProperties(topic.properties())
         .withAudit(toDTO(topic.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a Model to a ModelDTO.
+   *
+   * @param model The model to be converted.
+   * @return The model DTO.
+   */
+  public static ModelDTO toDTO(Model model) {
+    return ModelDTO.builder()
+        .withName(model.name())
+        .withComment(model.comment())
+        .withProperties(model.properties())
+        .withLatestVersion(model.latestVersion())
+        .withAudit(toDTO(model.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a ModelVersion to a ModelVersionDTO.
+   *
+   * @param modelVersion The model version to be converted.
+   * @return The model version DTO.
+   */
+  public static ModelVersionDTO toDTO(ModelVersion modelVersion) {
+    return ModelVersionDTO.builder()
+        .withVersion(modelVersion.version())
+        .withComment(modelVersion.comment())
+        .withAliases(modelVersion.aliases())
+        .withUri(modelVersion.uri())
+        .withProperties(modelVersion.properties())
+        .withAudit(toDTO(modelVersion.auditInfo()))
         .build();
   }
 
@@ -879,6 +944,30 @@ public class DTOConverters {
       return new Column[0];
     }
     return Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(Column[]::new);
+  }
+
+  /**
+   * Converts CredentialDTO array to credential array.
+   *
+   * @param credentials The credential DTO array to be converted.
+   * @return The credential array.
+   */
+  public static Credential[] fromDTO(CredentialDTO[] credentials) {
+    if (ArrayUtils.isEmpty(credentials)) {
+      return new Credential[0];
+    }
+    return Arrays.stream(credentials).map(DTOConverters::fromDTO).toArray(Credential[]::new);
+  }
+
+  /**
+   * Converts a CredentialDTO to a credential.
+   *
+   * @param credential The credential DTO to be converted.
+   * @return The credential.
+   */
+  public static Credential fromDTO(CredentialDTO credential) {
+    return CredentialFactory.create(
+        credential.credentialType(), credential.credentialInfo(), credential.expireTimeInMs());
   }
 
   /**

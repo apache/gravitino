@@ -28,7 +28,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableCatalog;
 
 /* Common code for all table commands. */
-public class TableCommand extends Command {
+public class TableCommand extends AuditCommand {
 
   protected final String metalake;
   protected final String catalog;
@@ -48,6 +48,7 @@ public class TableCommand extends Command {
   }
 
   /* Overridden in parent - do nothing  */
+  @Override
   public void handle() {}
 
   /**
@@ -60,15 +61,15 @@ public class TableCommand extends Command {
       GravitinoClient client = buildClient(metalake);
       return client.loadMetalake(metalake).loadCatalog(catalog).asTableCatalog();
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TABLE);
+      exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
+      exitWithError(exp.getMessage());
     }
 
     return null;

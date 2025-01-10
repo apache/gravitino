@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -47,6 +48,8 @@ import org.apache.iceberg.hive.HiveClientPool;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.ThreadPools;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Referred from Apache Iceberg's CachedClientPool implementation
@@ -78,6 +81,8 @@ import org.apache.thrift.TException;
  */
 public class IcebergHiveCachedClientPool
     implements ClientPool<IMetaStoreClient, TException>, Closeable {
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergHiveCachedClientPool.class);
+
   private static final String CONF_ELEMENT_PREFIX = "conf:";
 
   private static Cache<Key, HiveClientPool> clientPoolCache;
@@ -107,7 +112,13 @@ public class IcebergHiveCachedClientPool
   @VisibleForTesting
   HiveClientPool clientPool() {
     Key key = extractKey(properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS), conf);
-    return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
+    return clientPoolCache.get(
+        key,
+        k -> {
+          HiveClientPool hiveClientPool = new HiveClientPool(clientPoolSize, conf);
+          LOG.info("Created a new HiveClientPool instance: {} for Key: {}", hiveClientPool, key);
+          return hiveClientPool;
+        });
   }
 
   private synchronized void init() {
@@ -118,7 +129,17 @@ public class IcebergHiveCachedClientPool
       clientPoolCache =
           Caffeine.newBuilder()
               .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
-              .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
+              .removalListener(
+                  (key, value, cause) -> {
+                    HiveClientPool hiveClientPool = (HiveClientPool) value;
+                    if (hiveClientPool != null) {
+                      LOG.info(
+                          "Removing an expired HiveClientPool instance: {} for Key: {}",
+                          hiveClientPool,
+                          key);
+                      hiveClientPool.close();
+                    }
+                  })
               .scheduler(Scheduler.forScheduledExecutorService(scheduledExecutorService))
               .build();
     }
@@ -210,6 +231,23 @@ public class IcebergHiveCachedClientPool
 
     static Key of(List<Object> elements) {
       return new Key(elements);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || !(o instanceof Key)) {
+        return false;
+      }
+      Key key = (Key) o;
+      return Objects.equals(elements, key.elements);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(elements);
     }
   }
 

@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -61,6 +62,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,7 +127,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -207,7 +209,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Case 1: The table is not created by Gravitino.
     if (stringId == null) {
       return EntityCombinedTable.of(alteredTable)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   getCatalogIdentifier(ident),
                   HasPropertyMetadata::tablePropertiesMetadata,
@@ -251,7 +253,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             stringId.id());
 
     return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -268,33 +270,41 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    boolean droppedFromCatalog =
-        doWithCatalog(
-            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
+    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        schemaIdentifier,
+        LockType.WRITE,
+        () -> {
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean droppedFromCatalog =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                  RuntimeException.class);
 
-    // For unmanaged table, it could happen that the table:
-    // 1. Is not found in the catalog (dropped directly from underlying sources)
-    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-    // 3. Is found in the catalog and the store (managed by Gravitino)
-    // 4. Neither found in the catalog nor in the store.
-    // In all situations, we try to delete the schema from the store, but we don't take the
-    // return value of the store operation into account. We only take the return value of the
-    // catalog into account.
-    //
-    // For managed table, we should take the return value of the store operation into account.
-    boolean droppedFromStore = false;
-    try {
-      droppedFromStore = store.delete(ident, TABLE);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+          // For unmanaged table, it could happen that the table:
+          // 1. Is not found in the catalog (dropped directly from underlying sources)
+          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // 4. Neither found in the catalog nor in the store.
+          // In all situations, we try to delete the schema from the store, but we don't take the
+          // return value of the store operation into account. We only take the return value of the
+          // catalog into account.
+          //
+          // For managed table, we should take the return value of the store operation into account.
+          boolean droppedFromStore = false;
+          try {
+            droppedFromStore = store.delete(ident, TABLE);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
 
-    return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
-        ? droppedFromStore
-        : droppedFromCatalog;
+          return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
+              ? droppedFromStore
+              : droppedFromCatalog;
+        });
   }
 
   /**
@@ -313,37 +323,43 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    boolean droppedFromCatalog =
-        doWithCatalog(
-            catalogIdent,
-            c -> c.doWithTableOps(t -> t.purgeTable(ident)),
-            RuntimeException.class,
-            UnsupportedOperationException.class);
+    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        schemaIdentifier,
+        LockType.WRITE,
+        () -> {
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean droppedFromCatalog =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithTableOps(t -> t.purgeTable(ident)),
+                  RuntimeException.class,
+                  UnsupportedOperationException.class);
 
-    // For unmanaged table, it could happen that the table:
-    // 1. Is not found in the catalog (dropped directly from underlying sources)
-    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-    // 3. Is found in the catalog and the store (managed by Gravitino)
-    // 4. Neither found in the catalog nor in the store.
-    // In all situations, we try to delete the schema from the store, but we don't take the
-    // return value of the store operation into account. We only take the return value of the
-    // catalog into account.
-    //
-    // For managed table, we should take the return value of the store operation into account.
-    boolean droppedFromStore = false;
-    try {
-      droppedFromStore = store.delete(ident, TABLE);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-      return false;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+          // For unmanaged table, it could happen that the table:
+          // 1. Is not found in the catalog (dropped directly from underlying sources)
+          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // 4. Neither found in the catalog nor in the store.
+          // In all situations, we try to delete the schema from the store, but we don't take the
+          // return value of the store operation into account. We only take the return value of the
+          // catalog into account.
+          //
+          // For managed table, we should take the return value of the store operation into account.
+          boolean droppedFromStore = false;
+          try {
+            droppedFromStore = store.delete(ident, TABLE);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
 
-    return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
-        ? droppedFromStore
-        : droppedFromCatalog;
+          return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
+              ? droppedFromStore
+              : droppedFromCatalog;
+        });
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
@@ -394,13 +410,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .build();
     try {
       store.put(tableEntity, true);
+    } catch (EntityAlreadyExistsException e) {
+      LOG.error("Failed to import table {} with id {} to the store.", identifier, uid, e);
+      throw new UnsupportedOperationException(
+          "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+              + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import the table entity to the store.", e);
     }
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(identifier),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -420,7 +441,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // string identifier.
     if (stringId == null) {
       return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
@@ -439,7 +460,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             stringId.id());
 
     return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdentifier,
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -518,13 +539,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
 
     return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
   }

@@ -20,6 +20,7 @@ package org.apache.gravitino.hook;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -188,14 +189,14 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   @Override
   public Role grantPrivilegeToRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
     return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
   }
 
   @Override
   public Role revokePrivilegesFromRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
     return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
   }

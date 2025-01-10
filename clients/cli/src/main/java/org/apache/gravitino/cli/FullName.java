@@ -29,6 +29,8 @@ public class FullName {
   private final CommandLine line;
   private String metalakeEnv;
   private boolean matalakeSet = false;
+  private boolean hasDisplayedMissingNameInfo = true;
+  private boolean hasDisplayedMalformedInfo = true;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -41,11 +43,13 @@ public class FullName {
 
   /**
    * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
-   * variable.
+   * variable or the Gravitino config file.
    *
    * @return The metalake name, or null if not found.
    */
   public String getMetalakeName() {
+    GravitinoConfig config = new GravitinoConfig(null);
+
     // If specified on the command line use that
     if (line.hasOption(GravitinoOptions.METALAKE)) {
       return line.getOptionValue(GravitinoOptions.METALAKE);
@@ -60,13 +64,23 @@ public class FullName {
     // Check if the metalake name is set as an environment variable
     if (metalakeEnv != null) {
       return metalakeEnv;
+      // Check if the metalake name is specified in the configuration file
+    } else if (config.fileExists()) {
+      config.read();
+      String configName = config.getMetalakeName();
+      if (configName != null) {
+        return configName;
+      }
     }
+
+    System.err.println(ErrorMessages.MISSING_METALAKE);
+    Main.exit(-1);
 
     return null;
   }
 
   /**
-   * Retrieves the catalog name from the second part of the full name option.
+   * Retrieves the catalog name from the first part of the full name option.
    *
    * @return The catalog name, or null if not found.
    */
@@ -75,7 +89,7 @@ public class FullName {
   }
 
   /**
-   * Retrieves the schema name from the third part of the full name option.
+   * Retrieves the schema name from the second part of the full name option.
    *
    * @return The schema name, or null if not found.
    */
@@ -84,12 +98,70 @@ public class FullName {
   }
 
   /**
-   * Retrieves the table name from the fourth part of the full name option.
+   * Retrieves the model name from the second part of the full name option.
+   *
+   * @return The model name, or null if not found.
+   */
+  public String getModelName() {
+    return getNamePart(2);
+  }
+
+  /**
+   * Retrieves the table name from the third part of the full name option.
    *
    * @return The table name, or null if not found.
    */
   public String getTableName() {
     return getNamePart(2);
+  }
+
+  /**
+   * Retrieves the topic name from the third part of the full name option.
+   *
+   * @return The topic name, or null if not found.
+   */
+  public String getTopicName() {
+    return getNamePart(2);
+  }
+
+  /**
+   * Retrieves the fileset name from the third part of the full name option.
+   *
+   * @return The fileset name, or null if not found.
+   */
+  public String getFilesetName() {
+    return getNamePart(2);
+  }
+
+  /**
+   * Retrieves the column name from the fourth part of the full name option.
+   *
+   * @return The column name, or null if not found.
+   */
+  public String getColumnName() {
+    return getNamePart(3);
+  }
+
+  /**
+   * Retrieves the name from the command line options.
+   *
+   * @return The name, or null if not found.
+   */
+  public String getName() {
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      return line.getOptionValue(GravitinoOptions.NAME);
+    }
+
+    return null;
+  }
+
+  /**
+   * Are there any names that can be retrieved?
+   *
+   * @return True if the name exists, or false if it does not.
+   */
+  public Boolean hasName() {
+    return line.hasOption(GravitinoOptions.NAME);
   }
 
   /**
@@ -105,14 +177,83 @@ public class FullName {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
       if (names.length <= position) {
-        System.err.println(ErrorMessages.MALFORMED_NAME);
+        showMalformedInfo();
         return null;
       }
 
       return names[position];
     }
 
-    System.err.println(ErrorMessages.MISSING_NAME);
+    showMissingNameInfo();
     return null;
+  }
+
+  /**
+   * Helper method to determine a specific part of the full name exits.
+   *
+   * @param partNo The part of the name to obtain.
+   * @return True if the part exitsts.
+   */
+  public boolean hasNamePart(int partNo) {
+    /* Extract the name part from the full name if available. */
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      int length = names.length;
+      int position = partNo;
+
+      return position <= length;
+    }
+
+    return false;
+  }
+
+  /**
+   * Does the catalog name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasCatalogName() {
+    return hasNamePart(1);
+  }
+
+  /**
+   * Does the schema name exist?
+   *
+   * @return True if the schema name exists, or false if it does not.
+   */
+  public boolean hasSchemaName() {
+    return hasNamePart(2);
+  }
+
+  /**
+   * Does the table name exist?
+   *
+   * @return True if the table name exists, or false if it does not.
+   */
+  public boolean hasTableName() {
+    return hasNamePart(3);
+  }
+
+  /**
+   * Does the column name exist?
+   *
+   * @return True if the column name exists, or false if it does not.
+   */
+  public boolean hasColumnName() {
+    return hasNamePart(4);
+  }
+
+  private void showMissingNameInfo() {
+    if (hasDisplayedMissingNameInfo) {
+      System.err.println(ErrorMessages.MISSING_NAME);
+      hasDisplayedMissingNameInfo = false;
+    }
+  }
+
+  private void showMalformedInfo() {
+    if (hasDisplayedMalformedInfo) {
+      System.err.println(ErrorMessages.MALFORMED_NAME);
+      hasDisplayedMalformedInfo = false;
+    }
   }
 }

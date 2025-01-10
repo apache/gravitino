@@ -19,22 +19,34 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Locale;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-/* Entry point for teh Gravitino command line. */
+/* Entry point for the Gravitino command line. */
 public class Main {
+
+  public static boolean useExit = true;
 
   public static void main(String[] args) {
     CommandLineParser parser = new DefaultParser();
     Options options = new GravitinoOptions().options();
+    if (args.length == 0) {
+      GravitinoCommandLine.displayHelp(options);
+      return;
+    }
 
     try {
       CommandLine line = parser.parse(options, args);
       String entity = resolveEntity(line);
+      String[] extra = line.getArgs();
+      if (extra.length > 2) {
+        System.err.println(ErrorMessages.TOO_MANY_ARGUMENTS);
+        exit(-1);
+      }
       String command = resolveCommand(line);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
 
@@ -44,8 +56,26 @@ public class Main {
         commandLine.handleSimpleLine();
       }
     } catch (ParseException exp) {
-      System.err.println("Error parsing command line: " + exp.getMessage());
+      System.err.println(ErrorMessages.PARSE_ERROR + exp.getMessage());
       GravitinoCommandLine.displayHelp(options);
+      exit(-1);
+    }
+  }
+
+  /**
+   * Exits the application with the specified exit code.
+   *
+   * <p>If the {@code useExit} flag is set to {@code true}, the application will terminate using
+   * {@link System#exit(int)}. Otherwise, a {@link RuntimeException} is thrown with a message
+   * containing the exit code. Helps with testing.
+   *
+   * @param code the exit code to use when exiting the application
+   */
+  public static void exit(int code) {
+    if (useExit) {
+      System.exit(code);
+    } else {
+      throw new RuntimeException("Exit with code " + code);
     }
   }
 
@@ -61,18 +91,20 @@ public class Main {
     String[] args = line.getArgs();
 
     if (args.length == 2) {
-      String action = args[1];
+      String action = args[1].toLowerCase(Locale.ENGLISH);
       if (CommandActions.isValidCommand(action)) {
         return action;
       }
     } else if (args.length == 1) {
-      return CommandActions.DETAILS; /* Default to 'details' command. */
+      /* Default to 'details' command. */
+      return line.hasOption(GravitinoOptions.HELP) ? CommandActions.HELP : CommandActions.DETAILS;
     } else if (args.length == 0) {
       return null;
     }
 
     System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-    return null;
+    exit(-1);
+    return null; // not needed but gives error if not here
   }
 
   /**
@@ -86,12 +118,12 @@ public class Main {
     String[] args = line.getArgs();
 
     if (args.length >= 1) {
-      String entity = args[0];
+      String entity = args[0].toLowerCase(Locale.ENGLISH);
       if (CommandEntities.isValidEntity(entity)) {
         return entity;
       } else {
         System.err.println(ErrorMessages.UNKNOWN_ENTITY);
-        return null;
+        exit(-1);
       }
     }
 

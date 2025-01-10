@@ -24,6 +24,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import java.time.Instant;
 import java.util.Map;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -124,7 +125,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -148,7 +149,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -157,7 +158,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedSchema.of(schema, schemaEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::schemaPropertiesMetadata, schema.properties()));
   }
@@ -213,7 +214,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(alteredSchema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -224,7 +225,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Case 1: The schema is not created by Gravitino.
     if (stringId == null) {
       return EntityCombinedSchema.of(alteredSchema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -257,7 +258,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             stringId.id());
 
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::schemaPropertiesMetadata,
@@ -276,35 +277,40 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    boolean droppedFromCatalog =
-        doWithCatalog(
-            catalogIdent,
-            c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-            NonEmptySchemaException.class,
-            RuntimeException.class);
+    return TreeLockUtils.doWithTreeLock(
+        catalogIdent,
+        LockType.WRITE,
+        () -> {
+          boolean droppedFromCatalog =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
+                  NonEmptySchemaException.class,
+                  RuntimeException.class);
 
-    // For unmanaged schema, it could happen that the schema:
-    // 1. Is not found in the catalog (dropped directly from underlying sources)
-    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-    // 3. Is found in the catalog and the store (managed by Gravitino)
-    // 4. Neither found in the catalog nor in the store.
-    // In all situations, we try to delete the schema from the store, but we don't take the
-    // return value of the store operation into account. We only take the return value of the
-    // catalog into account.
-    //
-    // For managed schema, we should take the return value of the store operation into account.
-    boolean droppedFromStore = false;
-    try {
-      droppedFromStore = store.delete(ident, SCHEMA, cascade);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+          // For managed schema, we don't need to drop the schema from the store again.
+          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
+          if (isManagedSchema) {
+            return droppedFromCatalog;
+          }
 
-    return isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
-        ? droppedFromStore
-        : droppedFromCatalog;
+          // For unmanaged schema, it could happen that the schema:
+          // 1. Is not found in the catalog (dropped directly from underlying sources)
+          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // 4. Neither found in the catalog nor in the store.
+          // In all situations, we try to delete the schema from the store, but we don't take the
+          // return value of the store operation into account. We only take the return value of the
+          // catalog into account.
+          try {
+            store.delete(ident, SCHEMA, cascade);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+          return droppedFromCatalog;
+        });
   }
 
   private void importSchema(NameIdentifier identifier) {
@@ -350,6 +356,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .build();
     try {
       store.put(schemaEntity, true);
+    } catch (EntityAlreadyExistsException e) {
+      LOG.error("Failed to import schema {} with id {} to the store.", identifier, uid, e);
+      throw new UnsupportedOperationException(
+          "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+              + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import schema entity to the store.", e);
@@ -368,7 +379,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -382,7 +393,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // storing string identifiers.
     if (stringId == null) {
       return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
@@ -401,7 +412,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             stringId.id());
 
     return EntityCombinedSchema.of(schema, schemaEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdentifier,
                 HasPropertyMetadata::schemaPropertiesMetadata,

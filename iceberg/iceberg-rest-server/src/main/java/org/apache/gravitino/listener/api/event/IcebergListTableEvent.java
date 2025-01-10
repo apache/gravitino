@@ -31,7 +31,13 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class IcebergListTableEvent extends IcebergTableEvent {
-  public IcebergListTableEvent(String user, NameIdentifier resourceIdentifier) {
-    super(user, resourceIdentifier);
+  public IcebergListTableEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
+    super(icebergRequestContext, resourceIdentifier);
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TABLE;
   }
 }

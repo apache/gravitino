@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -96,17 +97,41 @@ public class TableHookDispatcher implements TableDispatcher {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    return dispatcher.alterTable(ident, changes);
+
+    Table alteredTable = dispatcher.alterTable(ident, changes);
+    TableChange.RenameTable lastRenameChange = null;
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.RenameTable) {
+        lastRenameChange = (TableChange.RenameTable) change;
+      }
+    }
+
+    if (lastRenameChange != null) {
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.TABLE, lastRenameChange.getNewName());
+    }
+
+    return alteredTable;
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return dispatcher.dropTable(ident);
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
+    boolean dropped = dispatcher.dropTable(ident);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        ident, Entity.EntityType.TABLE, locations);
+    return dropped;
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return dispatcher.purgeTable(ident);
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
+    boolean purged = dispatcher.purgeTable(ident);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        ident, Entity.EntityType.TABLE, locations);
+    return purged;
   }
 
   @Override

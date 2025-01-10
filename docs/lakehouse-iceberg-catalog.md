@@ -28,11 +28,8 @@ Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `
 - Works as a catalog proxy, supporting `Hive`, `JDBC` and `REST` as catalog backend.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
-- Supports multi storage.
-  - S3
-  - HDFS
-  - OSS
-- Supports Kerberos or simple authentication for Iceberg catalog with Hive backend. 
+- Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
+- Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
 
 ### Catalog properties
 
@@ -83,7 +80,7 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
-To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle]([Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### OSS
@@ -116,7 +113,23 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
 
 :::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+:::
+
+#### ADLS 
+
+Supports using Azure account name and secret key to access ADLS data.
+
+| Configuration item           | Description                                                                                               | Default value | Required | Since Version    |
+|------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `io-impl`                    | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS. | (none)        | No       | 0.6.0-incubating |
+| `azure-storage-account-name` | The static storage account name used to access ADLS data.                                                 | (none)        | No       | 0.8.0-incubating |
+| `azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                  | (none)        | No       | 0.8.0-incubating |
+
+For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
+
+:::info
+Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 #### Other storages
@@ -151,7 +164,7 @@ Users can use the following properties to configure the security of the catalog 
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
-## Schema 
+## Schema
 
 ### Schema capabilities
 
@@ -165,7 +178,7 @@ You could put properties except `comment`.
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
-## Table 
+## Table
 
 ### Table capabilities
 
@@ -313,23 +326,25 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 
 You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configuration/) to Gravitino when creating an Iceberg table.
 
-The Gravitino server doesn't allow passing the following reserved fields.
+:::note
+**Reserved**: Fields that cannot be passed to the Gravitino server.
 
-| Configuration item        | Description                                                                          | Since Version |
-|---------------------------|--------------------------------------------------------------------------------------|---------------|
-| `comment`                 | The table comment, please use `comment` field in table meta instead.                 | 0.2.0         |
-| `creator`                 | The table creator.                                                                   | 0.2.0         |
-| `current-snapshot-id`     | The snapshot represents the current state of the table.                              | 0.2.0         |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                  | 0.2.0         |
-| `sort-order`              | Iceberg table sort order, please use `SortOrder` in table meta instead.              | 0.2.0         |
-| `identifier-fields`       | The identifier fields for defining the table.                                        | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data, please use `distribution` in table meta instead. | 0.2.0         |
+**Immutable**: Fields that cannot be modified once set.
+:::
 
-Gravitino server doesn't allow to change such properties:
-
-| Configuration item | Description                                  | Default value | Required | Since Version |
-|--------------------|----------------------------------------------|---------------|----------|---------------|
-| `location`         | Iceberg location for table storage.          | None          | No       | 0.2.0         |
+| Configuration item        | Description                                                                           | Default value | Required | Reserved | Immutable | Since Version |
+|---------------------------|---------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
+| `location`                | Iceberg location for table storage.                                                   | (none)        | No       | No       | Yes       | 0.2.0         |
+| `provider`                | The storage provider for table storage.                                               | (none)        | No       | No       | Yes       | 0.2.0         |
+| `format`                  | The format of table storage.                                                          | (none)        | No       | No       | Yes       | 0.2.0         |
+| `format-version`          | The format version of table storage.                                                  | (none)        | No       | No       | Yes       | 0.2.0         |
+| `comment`                 | The table comment, please use `comment` field in table meta instead.                  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `creator`                 | The table creator.                                                                    | (none)        | No       | Yes      | No        | 0.2.0         |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                               | (none)        | No       | Yes      | No        | 0.2.0         |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                   | (none)        | No       | Yes      | No        | 0.2.0         |
+| `sort-order`              | Iceberg table sort order, please use `SortOrder` in table meta instead.               | (none)        | No       | Yes      | No        | 0.2.0         |
+| `identifier-fields`       | The identifier fields for defining the table.                                         | (none)        | No       | Yes      | No        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data, please use `distribution` in table meta instead.  | (none)        | No       | Yes      | No        | 0.2.0         |
 
 ### Table indexes
 

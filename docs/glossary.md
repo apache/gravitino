@@ -300,10 +300,6 @@ license: "This software is licensed under the Apache License version 2."
 
 - A set of rules and conventions for building and interacting with web services using standard HTTP methods.
 
-## RocksDB
-
-- An open source key-value pair storage database.
-
 ## Schema
 
 - A logical container for organizing tables in a database.

@@ -22,6 +22,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -45,12 +46,12 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -66,8 +67,10 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.awaitility.Awaitility;
@@ -75,7 +78,8 @@ import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
+public class HadoopCatalogOperations extends ManagedSchemaOperations
+    implements CatalogOperations, FilesetCatalog {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
@@ -93,7 +97,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private CatalogInfo catalogInfo;
 
-  private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+  private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
 
@@ -105,7 +109,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this(GravitinoEnv.getInstance().entityStore());
   }
 
-  public EntityStore getStore() {
+  @Override
+  public EntityStore store() {
     return store;
   }
 
@@ -137,7 +142,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
-    this.fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
+    this.fileSystemProvidersMap =
+        ImmutableMap.<String, FileSystemProvider>builder()
+            .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
+            .build();
 
     String defaultFileSystemProviderName =
         (String)
@@ -450,19 +458,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    try {
-      List<SchemaEntity> schemas =
-          store.list(namespace, SchemaEntity.class, Entity.EntityType.SCHEMA);
-      return schemas.stream()
-          .map(s -> NameIdentifier.of(namespace, s.name()))
-          .toArray(NameIdentifier[]::new);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to list schemas under namespace " + namespace, e);
-    }
-  }
-
-  @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
@@ -494,53 +489,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       }
     }
 
-    StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-    Preconditions.checkNotNull(stringId, "Property String identifier should not be null");
-
-    SchemaEntity schemaEntity =
-        SchemaEntity.builder()
-            .withName(ident.name())
-            .withId(stringId.id())
-            .withNamespace(ident.namespace())
-            .withComment(comment)
-            .withProperties(properties)
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .build();
-    try {
-      store.put(schemaEntity, true /* overwrite */);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to create schema " + ident, ioe);
-    }
-
-    return HadoopSchema.builder()
-        .withName(ident.name())
-        .withComment(comment)
-        .withProperties(schemaEntity.properties())
-        .withAuditInfo(schemaEntity.auditInfo())
-        .build();
-  }
-
-  @Override
-  public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    try {
-      SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
-
-      return HadoopSchema.builder()
-          .withName(ident.name())
-          .withComment(schemaEntity.comment())
-          .withProperties(schemaEntity.properties())
-          .withAuditInfo(schemaEntity.auditInfo())
-          .build();
-
-    } catch (NoSuchEntityException exception) {
-      throw new NoSuchSchemaException(exception, SCHEMA_DOES_NOT_EXIST_MSG, ident);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load schema " + ident, ioe);
-    }
+    return super.createSchema(ident, comment, properties);
   }
 
   @Override
@@ -554,62 +503,94 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
     }
 
-    try {
-      SchemaEntity entity =
-          store.update(
-              ident,
-              SchemaEntity.class,
-              Entity.EntityType.SCHEMA,
-              schemaEntity -> updateSchemaEntity(ident, schemaEntity, changes));
-
-      return HadoopSchema.builder()
-          .withName(ident.name())
-          .withComment(entity.comment())
-          .withProperties(entity.properties())
-          .withAuditInfo(entity.auditInfo())
-          .build();
-
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to update schema " + ident, ioe);
-    } catch (NoSuchEntityException nsee) {
-      throw new NoSuchSchemaException(nsee, SCHEMA_DOES_NOT_EXIST_MSG, ident);
-    } catch (AlreadyExistsException aee) {
-      throw new RuntimeException(
-          "Schema with the same name "
-              + ident.name()
-              + " already exists, this is unexpected because schema doesn't support rename",
-          aee);
-    }
+    return super.alterSchema(ident, changes);
   }
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
+      Namespace filesetNs =
+          NamespaceUtil.ofFileset(
+              ident.namespace().level(0), // metalake name
+              ident.namespace().level(1), // catalog name
+              ident.name() // schema name
+              );
+
+      List<FilesetEntity> filesets =
+          store.list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+      if (!filesets.isEmpty() && !cascade) {
+        throw new NonEmptySchemaException("Schema %s is not empty", ident);
+      }
+
       SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
-
       Path schemaPath = getSchemaPath(ident.name(), properties);
-      // Nothing to delete if the schema path is not set.
-      if (schemaPath == null) {
-        return false;
-      }
-      FileSystem fs = getFileSystem(schemaPath, conf);
-      // Nothing to delete if the schema path does not exist.
-      if (!fs.exists(schemaPath)) {
+
+      boolean dropped = super.dropSchema(ident, cascade);
+      if (!dropped) {
         return false;
       }
 
-      if (fs.listStatus(schemaPath).length > 0 && !cascade) {
-        throw new NonEmptySchemaException(
-            "Schema %s with location %s is not empty", ident, schemaPath);
-      } else {
-        fs.delete(schemaPath, true);
+      // Delete all the managed filesets no matter whether the storage location is under the
+      // schema path or not.
+      // The reason why we delete the managed fileset's storage location one by one is because we
+      // may mis-delete the storage location of the external fileset if it happens to be under
+      // the schema path.
+      ClassLoader cl = Thread.currentThread().getContextClassLoader();
+      filesets
+          .parallelStream()
+          .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
+          .forEach(
+              f -> {
+                ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
+                try {
+                  // parallelStream uses forkjoin thread pool, which has a different classloader
+                  // than the catalog thread. We need to set the context classloader to the
+                  // catalog's classloader to avoid classloading issues.
+                  Thread.currentThread().setContextClassLoader(cl);
+                  Path filesetPath = new Path(f.storageLocation());
+                  FileSystem fs = getFileSystem(filesetPath, conf);
+                  if (fs.exists(filesetPath)) {
+                    if (!fs.delete(filesetPath, true)) {
+                      LOG.warn("Failed to delete fileset {} location {}", f.name(), filesetPath);
+                    }
+                  }
+                } catch (IOException ioe) {
+                  LOG.warn(
+                      "Failed to delete fileset {} location {}",
+                      f.name(),
+                      f.storageLocation(),
+                      ioe);
+                } finally {
+                  Thread.currentThread().setContextClassLoader(oldCl);
+                }
+              });
+
+      // Delete the schema path if it exists and is empty.
+      if (schemaPath != null) {
+        FileSystem fs = getFileSystem(schemaPath, conf);
+        if (fs.exists(schemaPath)) {
+          FileStatus[] statuses = fs.listStatus(schemaPath);
+          if (statuses.length == 0) {
+            if (fs.delete(schemaPath, true)) {
+              LOG.info("Deleted schema {} location {}", ident, schemaPath);
+            } else {
+              LOG.warn(
+                  "Failed to delete schema {} because it has files/folders under location {}",
+                  ident,
+                  schemaPath);
+            }
+          }
+        }
       }
 
-      LOG.info("Deleted schema {} location {}", ident, schemaPath);
+      LOG.info("Deleted schema {}", ident);
       return true;
 
+    } catch (NoSuchEntityException ne) {
+      LOG.warn("Schema {} does not exist", ident);
+      return false;
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident + " location", ioe);
     }

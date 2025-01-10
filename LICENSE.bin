@@ -285,6 +285,7 @@
    Apache Hadoop Aliyun connector
    Apache Hadoop GCS connector
    Apache Hadoop AWS connector
+   Apache Hadoop Azure connector
    Apache Hadoop Annotatations
    Apache Hadoop Auth
    Apache Hadoop Client Aggregator
@@ -303,6 +304,7 @@
    Apache Iceberg Aliyun
    Apache Iceberg api
    Apache Iceberg AWS
+   Apache Iceberg Azure
    Apache Iceberg core
    Apache Iceberg Hive metastore
    Apache Iceberg GCP
@@ -312,6 +314,7 @@
    Apache Log4j API
    Apache Log4j Core
    Apache Log4j SLF4J 2.0 Binding
+   Apache Log4j Layout For Templated JSON Encoding
    Apache ORC
    Apache Parquet Hadoop Bundle
    Apache Thrift
@@ -383,7 +386,6 @@
 
    JSR305
    LevelDB JNI
-   RocksDB JNI
    JCraft
    Javolution
    ANTLR4

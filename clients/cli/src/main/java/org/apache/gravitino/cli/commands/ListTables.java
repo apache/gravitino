@@ -46,14 +46,14 @@ public class ListTables extends TableCommand {
   }
 
   /** List the names of all tables in a schema. */
+  @Override
   public void handle() {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
     try {
       tables = tableCatalog().listTables(name);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     List<String> tableNames = new ArrayList<>();
@@ -61,7 +61,10 @@ public class ListTables extends TableCommand {
       tableNames.add(tables[i].name());
     }
 
-    String all = Joiner.on(System.lineSeparator()).join(tableNames);
+    String all =
+        tableNames.isEmpty()
+            ? "No tables exist."
+            : Joiner.on(System.lineSeparator()).join(tableNames);
 
     System.out.println(all.toString());
   }

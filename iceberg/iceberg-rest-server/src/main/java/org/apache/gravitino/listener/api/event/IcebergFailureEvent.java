@@ -19,13 +19,42 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an abstract failure event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergFailureEvent extends FailureEvent {
-  protected IcebergFailureEvent(String user, NameIdentifier nameIdentifier, Exception e) {
-    super(user, nameIdentifier, e);
+  private IcebergRequestContext icebergRequestContext;
+
+  protected IcebergFailureEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
+    super(icebergRequestContext.userName(), nameIdentifier, e);
+    this.icebergRequestContext = icebergRequestContext;
+  }
+
+  @Override
+  public EventSource eventSource() {
+    return EventSource.GRAVITINO_ICEBERG_REST_SERVER;
+  }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.FAILURE;
+  }
+
+  public IcebergRequestContext icebergRequestContext() {
+    return icebergRequestContext;
+  }
+
+  @Override
+  public String remoteAddress() {
+    return icebergRequestContext.remoteHostName();
+  }
+
+  @Override
+  public Map<String, String> customInfo() {
+    return icebergRequestContext.httpHeaders();
   }
 }

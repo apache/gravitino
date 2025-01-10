@@ -50,6 +50,14 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
   }
 
+  public static FilesetOperationDispatcher getFilesetOperationDispatcher() {
+    return filesetOperationDispatcher;
+  }
+
+  public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
+    return schemaOperationDispatcher;
+  }
+
   @Test
   public void testCreateAndListFilesets() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema81");

@@ -88,7 +88,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 - Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
-#### Table column types
+### Table column types
 
 | Gravitino Type | PostgreSQL Type |
 |----------------|-----------------|
@@ -114,7 +114,7 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `Inter
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-#### Table column auto-increment
+### Table column auto-increment
 
 - Supports setting auto-increment.
 

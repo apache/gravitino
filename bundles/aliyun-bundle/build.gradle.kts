@@ -25,19 +25,12 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.common)
+  implementation(project(":bundles:aliyun"))
+  implementation(libs.commons.collections3)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.oss)
-
-  // oss needs StringUtils from commons-lang or the following error will occur in 3.1.0
-  // java.lang.NoClassDefFoundError: org/apache/commons/lang/StringUtils
-  // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystemStore.initialize(AliyunOSSFileSystemStore.java:111)
-  // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
-  // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
-  implementation(libs.commons.lang)
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
+  implementation(libs.httpclient)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -47,8 +40,12 @@ tasks.withType(ShadowJar::class.java) {
   mergeServiceFiles()
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.jdom", "org.apache.gravitino.shaded.org.jdom")
-  relocate("org.apache.commons.lang", "org.apache.gravitino.shaded.org.apache.commons.lang")
+  relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.aliyun.shaded.org.apache.commons.lang3")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
+  relocate("com.google.common", "org.apache.gravitino.aliyun.shaded.com.google.common")
+  relocate("org.apache.http", "org.apache.gravitino.aliyun.shaded.org.apache.http")
+  relocate("org.apache.commons.collections", "org.apache.gravitino.aliyun.shaded.org.apache.commons.collections")
 }
 
 tasks.jar {

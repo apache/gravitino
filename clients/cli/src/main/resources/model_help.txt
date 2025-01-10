@@ -1,0 +1,41 @@
+gcli model [list|details|create|update|delete]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Register a model
+gcli model create --name hadoop.schema.model
+
+Register a model with comment
+gcli model create --name hadoop.schema.model --comment comment
+
+Register a model with properties
+gcli model create --name hadoop.schema.model --properties key1=val1 key2=val2
+
+Register a model with properties" and comment
+gcli model create --name hadoop.schema.model --properties key1=val1 key2=val2 --comment comment
+
+List models
+gcli model list --name hadoop.schema
+
+Show a model's details
+gcli model details --name hadoop.schema.model
+
+Show model audit information
+gcli model details --name hadoop.schema.model --audit
+
+Link a model
+gcli model update --name hadoop.schema.model --uri file:///tmp/file
+
+Link a model with alias
+gcli model update --name hadoop.schema.model --uri file:///tmp/file  --alias aliasA aliasB
+
+Link a model with all component
+gcli model update --name hadoop.schema.model --uri file:///tmp/file  --alias aliasA aliasB --comment comment --properties key1=val1 key2=val2
+
+Link a model without uri
+gcli model update --name hadoop.schema.model
+
+Delete a model
+gcli model delete --name hadoop.schema.model

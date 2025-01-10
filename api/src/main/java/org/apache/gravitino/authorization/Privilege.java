@@ -61,7 +61,7 @@ public interface Privilege {
     USE_SCHEMA(0L, 1L << 4),
     /** The privilege to create a table. */
     CREATE_TABLE(0L, 1L << 5),
-    /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
+    /** The privilege to write data to a table or modify the table schema. */
     MODIFY_TABLE(0L, 1L << 6),
     /** The privilege to select data from a table. */
     SELECT_TABLE(0L, 1L << 7),

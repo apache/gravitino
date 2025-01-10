@@ -20,12 +20,12 @@
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.gcs.fs.GCSFileSystemProvider;
@@ -36,17 +36,16 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Disabled(
-    "Disabled due to we don't have a real GCP account to test. If you have a GCP account,"
-        + "please change the configuration(YOUR_KEY_FILE, YOUR_BUCKET) and enable this test.")
+@EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured")
 public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemGCSIT.class);
 
-  public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
+  public static final String BUCKET_NAME = System.getenv("GCS_BUCKET_NAME");
+  public static final String SERVICE_ACCOUNT_FILE = System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -61,7 +60,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBlockSize = 64 * 1024 * 1024;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
     catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -91,16 +90,15 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
-    conf.set(FS_FILESYSTEM_PROVIDERS, "gcs");
+    conf.set(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
   }
 
   @AfterAll
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();
@@ -141,4 +139,9 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
   @Disabled(
       "GCS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
+
+  private static boolean isGCPConfigured() {
+    return StringUtils.isNotBlank(System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH"))
+        && StringUtils.isNotBlank(System.getenv("GCS_BUCKET_NAME"));
+  }
 }

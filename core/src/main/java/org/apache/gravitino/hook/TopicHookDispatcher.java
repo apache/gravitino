@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -88,7 +89,12 @@ public class TopicHookDispatcher implements TopicDispatcher {
 
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    return dispatcher.dropTopic(ident);
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TOPIC);
+    boolean dropped = dispatcher.dropTopic(ident);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        ident, Entity.EntityType.TOPIC, locations);
+    return dropped;
   }
 
   @Override

@@ -22,6 +22,11 @@ import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapp
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -73,7 +78,7 @@ public class SecurableObjectBaseSQLProvider {
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
-  public String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteSecurableObjectsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -82,6 +87,78 @@ public class SecurableObjectBaseSQLProvider {
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
         + " AND ro.deleted_at = 0) AND ob.deleted_at = 0";
+  }
+
+  public String softDeleteObjectRelsByMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
+        + " AND type = #{metadataObjectType}";
+  }
+
+  public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " SELECT ct.catalog_id FROM "
+        + CatalogMetaMapper.TABLE_NAME
+        + " ct WHERE ct.catalog_id = #{catalogId}  AND "
+        + " ct.catalog_id = sect.metadata_object_id AND sect.type = 'CATALOG'"
+        + " UNION "
+        + " SELECT st.catalog_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.catalog_id = #{catalogId} AND "
+        + " st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION "
+        + " SELECT tt.catalog_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.catalog_id = #{catalogId} AND "
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION "
+        + " SELECT tat.catalog_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.catalog_id = #{catalogId} AND "
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION "
+        + " SELECT ft.catalog_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.catalog_id = #{catalogId} AND"
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + ")";
+  }
+
+  public String softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " SELECT st.schema_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.schema_id = #{schemaId} "
+        + " AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION "
+        + " SELECT tt.schema_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.schema_id = #{schemaId} AND "
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION "
+        + " SELECT tat.schema_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.schema_id = #{schemaId} AND "
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION "
+        + " SELECT ft.schema_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.schema_id = #{schemaId} AND "
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + ")";
   }
 
   public String listSecurableObjectsByRoleId(@Param("roleId") Long roleId) {

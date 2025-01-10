@@ -19,13 +19,14 @@
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.storage.GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH;
+import static org.apache.gravitino.storage.GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -36,18 +37,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
-@Tag("gravitino-docker-test")
-@Disabled(
-    "Disabled due to we don't have a real GCP account to test. If you have a GCP account,"
-        + "please change the configuration(YOUR_KEY_FILE, YOUR_BUCKET) and enable this test.")
+@EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured.")
 public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
-  public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
+  public static final String BUCKET_NAME = System.getenv("GCS_BUCKET_NAME");
+  public static final String SERVICE_ACCOUNT_FILE = System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH");
 
   @Override
   public void startIntegrationTest() throws Exception {
@@ -102,7 +99,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put(GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    map.put(GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
     map.put(FILESYSTEM_PROVIDERS, "gcs");
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
@@ -120,7 +117,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
     String ossLocation = String.format("gs://%s", BUCKET_NAME);
     Map<String, String> catalogProps = Maps.newHashMap();
     catalogProps.put("location", ossLocation);
-    catalogProps.put(GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    catalogProps.put(GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
     catalogProps.put(FILESYSTEM_PROVIDERS, "gcs");
 
     Catalog localCatalog =
@@ -171,5 +168,10 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
     // Delete catalog
     metalake.dropCatalog(localCatalogName, true);
+  }
+
+  private static boolean isGCPConfigured() {
+    return StringUtils.isNotBlank(System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH"))
+        && StringUtils.isNotBlank(System.getenv("GCS_BUCKET_NAME"));
   }
 }

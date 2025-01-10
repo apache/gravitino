@@ -19,14 +19,59 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.collect.ImmutableSet;
-import org.apache.gravitino.utils.PrincipalUtils;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class CredentialUtils {
-  public static Credential vendCredential(CredentialProvider credentialProvider, String path) {
-    PathBasedCredentialContext pathBasedCredentialContext =
-        new PathBasedCredentialContext(
-            PrincipalUtils.getCurrentUserName(), ImmutableSet.of(path), ImmutableSet.of());
-    return credentialProvider.getCredential(pathBasedCredentialContext);
+
+  public static Map<String, CredentialProvider> loadCredentialProviders(
+      Map<String, String> catalogProperties) {
+    CredentialConfig credentialConfig = new CredentialConfig(catalogProperties);
+    List<String> credentialProviders = credentialConfig.get(CredentialConfig.CREDENTIAL_PROVIDERS);
+
+    return credentialProviders.stream()
+        .collect(
+            Collectors.toMap(
+                String::toString,
+                credentialType ->
+                    CredentialProviderFactory.create(credentialType, catalogProperties)));
+  }
+
+  /**
+   * Get Credential providers from properties supplier.
+   *
+   * <p>If there are multiple properties suppliers, will try to get the credential providers in the
+   * input order.
+   *
+   * @param propertiesSuppliers The properties suppliers.
+   * @return A set of credential providers.
+   */
+  public static Set<String> getCredentialProvidersByOrder(
+      Supplier<Map<String, String>>... propertiesSuppliers) {
+
+    for (Supplier<Map<String, String>> supplier : propertiesSuppliers) {
+      Map<String, String> properties = supplier.get();
+      Set<String> providers = getCredentialProvidersFromProperties(properties);
+      if (!providers.isEmpty()) {
+        return providers;
+      }
+    }
+
+    return Collections.emptySet();
+  }
+
+  private static Set<String> getCredentialProvidersFromProperties(Map<String, String> properties) {
+    if (properties == null) {
+      return Collections.emptySet();
+    }
+
+    CredentialConfig credentialConfig = new CredentialConfig(properties);
+    return credentialConfig.get(CredentialConfig.CREDENTIAL_PROVIDERS).stream()
+        .collect(Collectors.toSet());
   }
 }

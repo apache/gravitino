@@ -20,7 +20,6 @@
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -36,19 +35,19 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Disabled(
-    "Disabled due to we don't have a real OSS account to test. If you have a GCP account,"
-        + "please change the configuration(BUCKET_NAME, OSS_ACCESS_KEY, OSS_SECRET_KEY, OSS_ENDPOINT) and enable this test.")
+@EnabledIf(value = "ossIsConfigured", disabledReason = "OSS is not prepared")
 public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemOSSIT.class);
 
-  public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String OSS_ACCESS_KEY = "YOUR_OSS_ACCESS_KEY";
-  public static final String OSS_SECRET_KEY = "YOUR_OSS_SECRET_KEY";
-  public static final String OSS_ENDPOINT = "YOUR_OSS_ENDPOINT";
+  public static final String BUCKET_NAME = System.getenv("OSS_BUCKET_NAME");
+  public static final String OSS_ACCESS_KEY = System.getenv("OSS_ACCESS_KEY_ID");
+  public static final String OSS_SECRET_KEY = System.getenv("OSS_SECRET_ACCESS_KEY");
+  public static final String OSS_ENDPOINT = System.getenv("OSS_ENDPOINT");
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -62,7 +61,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBlockSize = 64 * 1024 * 1024;
 
     // The default replication factor is 1.
     defaultReplication = 1;
@@ -100,7 +99,6 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
     conf.set(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
     conf.set("fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
-    conf.set(FS_FILESYSTEM_PROVIDERS, "oss");
   }
 
   @AfterAll
@@ -149,4 +147,11 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
   @Disabled(
       "OSS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
+
+  protected static boolean ossIsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("OSS_ACCESS_KEY_ID"))
+        && StringUtils.isNotBlank(System.getenv("OSS_SECRET_ACCESS_KEY"))
+        && StringUtils.isNotBlank(System.getenv("OSS_ENDPOINT"))
+        && StringUtils.isNotBlank(System.getenv("OSS_BUCKET_NAME"));
+  }
 }

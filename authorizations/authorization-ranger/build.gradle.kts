@@ -26,7 +26,10 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
-val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
+val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val icebergVersion: String = libs.versions.iceberg4spark.get()
+val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
   implementation(project(":api")) {
@@ -35,7 +38,12 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
-
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":authorizations:authorization-common")) {
+    exclude(group = "*")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -44,10 +52,8 @@ dependencies {
   }
   implementation(libs.javax.ws.rs.api)
   implementation(libs.jettison)
-  compileOnly(libs.lombok)
   implementation(libs.mail)
   implementation(libs.ranger.intg) {
-    exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
     exclude("org.apache.lucene")
     exclude("org.apache.solr")
@@ -61,18 +67,23 @@ dependencies {
     exclude("net.java.dev.jna")
     exclude("javax.ws.rs")
     exclude("org.eclipse.jetty")
+    // Conflicts with hadoop-client-api used in hadoop-catalog.
+    exclude("org.apache.hadoop", "hadoop-common")
   }
-  implementation(libs.rome)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 
+  implementation(libs.rome)
+  compileOnly(libs.lombok)
+  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
-  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.postgresql.driver)
@@ -84,19 +95,17 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation("org.apache.kyuubi:kyuubi-spark-authz_$scalaVersion:$kyuubiVersion") {
+  testImplementation("org.apache.kyuubi:kyuubi-spark-authz-shaded_$scalaVersion:$kyuubiVersion") {
     exclude("com.sun.jersey")
   }
-  testImplementation(libs.hadoop3.client)
-  testImplementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-  }
+
   testImplementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
 }
 
 tasks {
@@ -126,9 +135,9 @@ tasks {
 
 tasks.test {
   doFirst {
-    environment("HADOOP_USER_NAME", "test")
+    environment("HADOOP_USER_NAME", "gravitino")
   }
-  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars", ":catalogs:catalog-lakehouse-paimon:jar", ":catalogs:catalog-lakehouse-paimon:runtimeJars", ":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
@@ -137,4 +146,17 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
   }
+}
+
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  from(sourceSets["test"].output)
+}
+
+configurations {
+  create("testArtifacts")
+}
+
+artifacts {
+  add("testArtifacts", testJar)
 }

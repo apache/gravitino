@@ -2,7 +2,7 @@ CREATE SCHEMA gt_hive.gt_db1;
 
 USE gt_hive.gt_db1;
 
--- Unsupported Type: TIME
+-- Unsupported Type: TIME, TIMESTAMP WITH TIME ZONE
 CREATE TABLE tb01 (
     f1 VARCHAR(200),
     f2 CHAR(20),

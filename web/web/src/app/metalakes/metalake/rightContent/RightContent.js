@@ -27,6 +27,10 @@ import MetalakePath from './MetalakePath'
 import CreateCatalogDialog from './CreateCatalogDialog'
 import CreateSchemaDialog from './CreateSchemaDialog'
 import CreateFilesetDialog from './CreateFilesetDialog'
+import CreateTopicDialog from './CreateTopicDialog'
+import CreateTableDialog from './CreateTableDialog'
+import RegisterModelDialog from './RegisterModelDialog'
+import LinkVersionDialog from './LinkVersionDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
 import { useAppSelector } from '@/lib/hooks/useStore'
@@ -35,10 +39,18 @@ const RightContent = () => {
   const [open, setOpen] = useState(false)
   const [openSchema, setOpenSchema] = useState(false)
   const [openFileset, setOpenFileset] = useState(false)
+  const [openTopic, setOpenTopic] = useState(false)
+  const [openTable, setOpenTable] = useState(false)
+  const [openModel, setOpenModel] = useState(false)
+  const [openVersion, setOpenVersion] = useState(false)
   const searchParams = useSearchParams()
   const [isShowBtn, setBtnVisible] = useState(true)
   const [isShowSchemaBtn, setSchemaBtnVisible] = useState(false)
   const [isShowFilesetBtn, setFilesetBtnVisible] = useState(false)
+  const [isShowTopicBtn, setTopicBtnVisible] = useState(false)
+  const [isShowTableBtn, setTableBtnVisible] = useState(false)
+  const [isShowModelBtn, setModelBtnVisible] = useState(false)
+  const [isShowVersionBtn, setVersionBtnVisible] = useState(false)
   const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
@@ -53,6 +65,22 @@ const RightContent = () => {
     setOpenFileset(true)
   }
 
+  const handleCreateTopic = () => {
+    setOpenTopic(true)
+  }
+
+  const handleCreateTable = () => {
+    setOpenTable(true)
+  }
+
+  const handleRegisterModel = () => {
+    setOpenModel(true)
+  }
+
+  const handleLinkVersion = () => {
+    setOpenVersion(true)
+  }
+
   useEffect(() => {
     const paramsSize = [...searchParams.keys()].length
     const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
@@ -62,9 +90,34 @@ const RightContent = () => {
       paramsSize == 4 &&
       searchParams.has('metalake') &&
       searchParams.has('catalog') &&
-      searchParams.get('type') === 'fileset'
-    searchParams.has('schema')
+      searchParams.get('type') === 'fileset' &&
+      searchParams.has('schema')
     setFilesetBtnVisible(isFilesetList)
+
+    const isTopicList =
+      paramsSize == 4 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'messaging' &&
+      searchParams.has('schema')
+    setTopicBtnVisible(isTopicList)
+
+    const isModelList =
+      paramsSize == 4 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'model' &&
+      searchParams.has('schema')
+    setModelBtnVisible(isModelList)
+
+    const isVersionList =
+      paramsSize == 5 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'model' &&
+      searchParams.has('schema') &&
+      searchParams.has('model')
+    setVersionBtnVisible(isVersionList)
 
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
@@ -76,6 +129,15 @@ const RightContent = () => {
         searchParams.has('type') &&
         !['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider)
       setSchemaBtnVisible(isSchemaList)
+
+      const isTableList =
+        paramsSize == 4 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.get('type') === 'relational' &&
+        searchParams.has('schema') &&
+        'lakehouse-hudi' !== currentCatalog?.provider
+      setTableBtnVisible(isTableList)
     }
   }, [searchParams, store.catalogs, store.catalogs.length])
 
@@ -133,11 +195,67 @@ const RightContent = () => {
               startIcon={<Icon icon='mdi:plus-box' />}
               onClick={handleCreateFileset}
               sx={{ width: 200 }}
-              data-refer='create-schema-btn'
+              data-refer='create-fileset-btn'
             >
               Create Fileset
             </Button>
             <CreateFilesetDialog open={openFileset} setOpen={setOpenFileset} />
+          </Box>
+        )}
+        {isShowTopicBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateTopic}
+              sx={{ width: 200 }}
+              data-refer='create-topic-btn'
+            >
+              Create Topic
+            </Button>
+            <CreateTopicDialog open={openTopic} setOpen={setOpenTopic} />
+          </Box>
+        )}
+        {isShowTableBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateTable}
+              sx={{ width: 200 }}
+              data-refer='create-table-btn'
+            >
+              Create Table
+            </Button>
+            <CreateTableDialog open={openTable} setOpen={setOpenTable} />
+          </Box>
+        )}
+        {isShowModelBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleRegisterModel}
+              sx={{ width: 200 }}
+              data-refer='register-model-btn'
+            >
+              Register Model
+            </Button>
+            <RegisterModelDialog open={openModel} setOpen={setOpenModel} />
+          </Box>
+        )}
+        {isShowVersionBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleLinkVersion}
+              sx={{ width: 200 }}
+              data-refer='link-version-btn'
+            >
+              Link Version
+            </Button>
+            <LinkVersionDialog open={openVersion} setOpen={setOpenVersion} />
           </Box>
         )}
       </Box>

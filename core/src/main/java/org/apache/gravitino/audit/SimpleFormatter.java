@@ -23,10 +23,16 @@ import org.apache.gravitino.audit.AuditLog.Status;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 
-/** The default formatter implementation of the audit log. */
+/**
+ * The first version of formatter implementation of the audit log.
+ *
+ * @deprecated since 0.8.0, please use {@link org.apache.gravitino.audit.v2.SimpleFormatterV2}
+ */
+@Deprecated
 public class SimpleFormatter implements Formatter {
 
   @Override
+  @SuppressWarnings("deprecation")
   public SimpleAuditLog format(Event event) {
     Status status = event instanceof FailureEvent ? Status.FAILURE : Status.SUCCESS;
     return SimpleAuditLog.builder()

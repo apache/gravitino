@@ -60,11 +60,12 @@ dependencies {
   implementation(libs.metrics.jersey2)
 
   annotationProcessor(libs.lombok)
-
   compileOnly(libs.lombok)
 
-  testImplementation(project(":bundles:aws-bundle"))
-  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun"))
+  testImplementation(project(":bundles:aws"))
+  testImplementation(project(":bundles:gcp", configuration = "shadow"))
+  testImplementation(project(":bundles:azure", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -79,6 +80,13 @@ dependencies {
 
   testImplementation(libs.iceberg.aws.bundle)
   testImplementation(libs.iceberg.gcp.bundle)
+  // Prevent netty conflict
+  testImplementation(libs.reactor.netty.http)
+  testImplementation(libs.reactor.netty.core)
+  testImplementation(libs.iceberg.azure.bundle) {
+    exclude("io.netty")
+    exclude("com.google.guava", "guava")
+  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }

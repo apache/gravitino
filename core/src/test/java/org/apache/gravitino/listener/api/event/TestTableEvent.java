@@ -84,22 +84,42 @@ public class TestTableEvent {
         table.distribution(),
         table.sortOrder(),
         table.index());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTableEvent.class, event.getClass());
     TableInfo tableInfo = ((CreateTableEvent) event).createdTableInfo();
     checkTableInfo(tableInfo, table);
+    Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateTablePreEvent.class, preEvent.getClass());
+    tableInfo = ((CreateTablePreEvent) preEvent).createTableRequest();
+    checkTableInfo(tableInfo, table);
+    Assertions.assertEquals(OperationType.CREATE_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testLoadTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.loadTable(identifier);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTableEvent.class, event.getClass());
     TableInfo tableInfo = ((LoadTableEvent) event).loadedTableInfo();
     checkTableInfo(tableInfo, table);
+    Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -107,6 +127,7 @@ public class TestTableEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     TableChange change = TableChange.setProperty("a", "b");
     dispatcher.alterTable(identifier, change);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTableEvent.class, event.getClass());
@@ -114,41 +135,79 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(1, ((AlterTableEvent) event).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTableEvent) event).tableChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(1, ((AlterTablePreEvent) preEvent).tableChanges().length);
+    Assertions.assertEquals(change, ((AlterTablePreEvent) preEvent).tableChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testDropTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.dropTable(identifier);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropTableEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testPurgeTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.purgeTable(identifier);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgeTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((PurgeTableEvent) event).isExists());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(PurgeTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testListTableEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTables(namespace);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTableEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTableEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListTablePreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testCreateTableFailureEvent() {
-    NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () ->
@@ -167,6 +226,8 @@ public class TestTableEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((CreateTableFailureEvent) event).exception().getClass());
     checkTableInfo(((CreateTableFailureEvent) event).createTableRequest(), table);
+    Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -179,6 +240,8 @@ public class TestTableEvent {
     Assertions.assertEquals(LoadTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadTableFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -194,6 +257,8 @@ public class TestTableEvent {
         GravitinoRuntimeException.class, ((AlterTableFailureEvent) event).exception().getClass());
     Assertions.assertEquals(1, ((AlterTableFailureEvent) event).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTableFailureEvent) event).tableChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -206,6 +271,8 @@ public class TestTableEvent {
     Assertions.assertEquals(DropTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropTableFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DROP_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -218,6 +285,8 @@ public class TestTableEvent {
     Assertions.assertEquals(PurgeTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((PurgeTableFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -231,6 +300,8 @@ public class TestTableEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListTableFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListTableFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkTableInfo(TableInfo tableInfo, Table table) {

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -36,6 +37,7 @@ public class IcebergPropertiesUtils {
   static {
     Map<String, String> map = new HashMap();
     map.put(IcebergConstants.CATALOG_BACKEND, IcebergConstants.CATALOG_BACKEND);
+    map.put(IcebergConstants.CATALOG_BACKEND_IMPL, IcebergConstants.CATALOG_BACKEND_IMPL);
     map.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, IcebergConstants.GRAVITINO_JDBC_DRIVER);
     map.put(IcebergConstants.GRAVITINO_JDBC_USER, IcebergConstants.ICEBERG_JDBC_USER);
     map.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, IcebergConstants.ICEBERG_JDBC_PASSWORD);
@@ -55,6 +57,13 @@ public class IcebergPropertiesUtils {
     map.put(
         OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
         IcebergConstants.ICEBERG_OSS_ACCESS_KEY_SECRET);
+    // ADLS
+    map.put(
+        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+        IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME);
+    map.put(
+        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+        IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
   }
 

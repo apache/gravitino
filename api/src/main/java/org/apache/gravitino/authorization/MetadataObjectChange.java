@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
@@ -44,10 +45,11 @@ public interface MetadataObjectChange {
    * Remove a metadata entity MetadataObjectChange.
    *
    * @param metadataObject The metadata object.
+   * @param locations The locations of the metadata object.
    * @return return a MetadataObjectChange for the remove metadata object.
    */
-  static MetadataObjectChange remove(MetadataObject metadataObject) {
-    return new RemoveMetadataObject(metadataObject);
+  static MetadataObjectChange remove(MetadataObject metadataObject, List<String> locations) {
+    return new RemoveMetadataObject(metadataObject, locations);
   }
 
   /** A RenameMetadataObject is to rename securable object's metadata entity. */
@@ -127,9 +129,11 @@ public interface MetadataObjectChange {
   /** A RemoveMetadataObject is to remove securable object's metadata entity. */
   final class RemoveMetadataObject implements MetadataObjectChange {
     private final MetadataObject metadataObject;
+    private final List<String> locations;
 
-    private RemoveMetadataObject(MetadataObject metadataObject) {
+    private RemoveMetadataObject(MetadataObject metadataObject, List<String> locations) {
       this.metadataObject = metadataObject;
+      this.locations = locations;
     }
 
     /**
@@ -139,6 +143,15 @@ public interface MetadataObjectChange {
      */
     public MetadataObject metadataObject() {
       return metadataObject;
+    }
+
+    /**
+     * Returns the location path of the metadata object.
+     *
+     * @return return a location path.
+     */
+    public List<String> getLocations() {
+      return locations;
     }
 
     /**

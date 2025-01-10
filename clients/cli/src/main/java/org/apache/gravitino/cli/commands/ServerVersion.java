@@ -35,14 +35,14 @@ public class ServerVersion extends Command {
   }
 
   /** Displays the server version. */
+  @Override
   public void handle() {
     String version = "unknown";
     try {
       GravitinoAdminClient client = buildAdminClient();
       version = client.serverVersion().version();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println("Apache Gravitino " + version);

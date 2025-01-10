@@ -14,9 +14,15 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import logging
+import sys
+
+# Disable C0302: Too many lines in module
+# pylint: disable=C0302
+import time
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 import re
 import importlib
 import fsspec
@@ -28,6 +34,9 @@ from fsspec.implementations.arrow import ArrowFSWrapper
 from fsspec.utils import infer_storage_options
 
 from readerwriterlock import rwlock
+
+from gravitino.api.catalog import Catalog
+from gravitino.api.credential.credential import Credential
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
@@ -35,13 +44,30 @@ from gravitino.audit.internal_client_type import InternalClientType
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
-from gravitino.catalog.fileset_catalog import FilesetCatalog
+from gravitino.client.generic_fileset import GenericFileset
+from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
+)
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
 
+from gravitino.api.credential.adls_token_credential import ADLSTokenCredential
+from gravitino.api.credential.azure_account_key_credential import (
+    AzureAccountKeyCredential,
+)
+from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
+from gravitino.api.credential.oss_secret_key_credential import OSSSecretKeyCredential
+from gravitino.api.credential.oss_token_credential import OSSTokenCredential
+from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
+from gravitino.api.credential.s3_token_credential import S3TokenCredential
+
+logger = logging.getLogger(__name__)
+
 PROTOCOL_NAME = "gvfs"
+
+TIME_WITHOUT_EXPIRATION = sys.maxsize
 
 
 class StorageType(Enum):
@@ -50,6 +76,7 @@ class StorageType(Enum):
     GCS = "gs"
     S3A = "s3a"
     OSS = "oss"
+    ABS = "abfss"
 
 
 class FilesetContextPair:
@@ -320,6 +347,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             StorageType.GCS,
             StorageType.S3A,
             StorageType.OSS,
+            StorageType.ABS,
         ]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
@@ -577,6 +605,21 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 )
 
             actual_prefix = ops["host"] + ops["path"]
+        elif storage_location.startswith(f"{StorageType.ABS.value}://"):
+            ops = infer_storage_options(storage_location)
+            if "username" not in ops or "host" not in ops or "path" not in ops:
+                raise GravitinoRuntimeException(
+                    f"Storage location:{storage_location} doesn't support now, the username,"
+                    f"host and path are required in the storage location."
+                )
+            actual_prefix = f"{StorageType.ABS.value}://{ops['username']}@{ops['host']}{ops['path']}"
+
+            # the actual path may be '{container}/{path}', we need to add the host and username
+            # get the path from {container}/{path}
+            if not actual_path.startswith(f"{StorageType.ABS}"):
+                path_without_username = actual_path[actual_path.index("/") + 1 :]
+                actual_path = f"{StorageType.ABS.value}://{ops['username']}@{ops['host']}/{path_without_username}"
+
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
         else:
@@ -613,33 +656,22 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             entry["name"], storage_location, virtual_location
         )
 
-        # if entry contains 'mtime', then return the entry with 'mtime' else
-        # if entry contains 'LastModified', then return the entry with 'LastModified'
-
+        last_modified = None
         if "mtime" in entry:
             # HDFS and GCS
-            return {
-                "name": path,
-                "size": entry["size"],
-                "type": entry["type"],
-                "mtime": entry["mtime"],
-            }
-
-        if "LastModified" in entry:
+            last_modified = entry["mtime"]
+        elif "LastModified" in entry:
             # S3 and OSS
-            return {
-                "name": path,
-                "size": entry["size"],
-                "type": entry["type"],
-                "mtime": entry["LastModified"],
-            }
+            last_modified = entry["LastModified"]
+        elif "last_modified" in entry:
+            # Azure Blob Storage
+            last_modified = entry["last_modified"]
 
-        # Unknown
         return {
             "name": path,
             "size": entry["size"],
             "type": entry["type"],
-            "mtime": None,
+            "mtime": last_modified,
         }
 
     def _get_fileset_context(self, virtual_path: str, operation: FilesetDataOperation):
@@ -671,8 +703,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
             sub_path,
         )
+
         return FilesetContextPair(
-            actual_file_location, self._get_filesystem(actual_file_location)
+            actual_file_location,
+            self._get_filesystem(actual_file_location, fileset_catalog, identifier),
         )
 
     def _extract_identifier(self, path):
@@ -745,6 +779,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return StorageType.S3A
         if path.startswith(f"{StorageType.OSS.value}://"):
             return StorageType.OSS
+        if path.startswith(f"{StorageType.ABS.value}://"):
+            return StorageType.ABS
         raise GravitinoRuntimeException(
             f"Storage type doesn't support now. Path:{path}"
         )
@@ -801,6 +837,13 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
 
+        ## We need to remove the protocol and accout from the path, for instance,
+        # the path can be converted from 'abfss://container@account/path' to
+        # 'container/path'.
+        if storage_type == StorageType.ABS:
+            ops = infer_storage_options(path)
+            return ops["username"] + ops["path"]
+
         # OSS has different behavior than S3 and GCS, if we do not remove the
         # protocol, it will always return an empty array.
         if storage_type == StorageType.OSS:
@@ -851,48 +894,90 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         finally:
             write_lock.release()
 
-    def _get_filesystem(self, actual_file_location: str):
+    def _file_system_expired(self, expire_time: int):
+        return expire_time <= time.time() * 1000
+
+    # Disable Too many branches (13/12) (too-many-branches)
+    # pylint: disable=R0912
+    def _get_filesystem(
+        self,
+        actual_file_location: str,
+        fileset_catalog: Catalog,
+        name_identifier: NameIdentifier,
+    ):
         storage_type = self._recognize_storage_type(actual_file_location)
         read_lock = self._cache_lock.gen_rlock()
         try:
             read_lock.acquire()
-            cache_value: Tuple[StorageType, AbstractFileSystem] = self._cache.get(
-                storage_type
+            cache_value: Tuple[int, AbstractFileSystem] = self._cache.get(
+                name_identifier
             )
             if cache_value is not None:
-                return cache_value
+                if not self._file_system_expired(cache_value[0]):
+                    return cache_value[1]
         finally:
             read_lock.release()
 
         write_lock = self._cache_lock.gen_wlock()
         try:
             write_lock.acquire()
-            cache_value: Tuple[StorageType, AbstractFileSystem] = self._cache.get(
-                storage_type
+            cache_value: Tuple[int, AbstractFileSystem] = self._cache.get(
+                name_identifier
             )
+
             if cache_value is not None:
-                return cache_value
+                if not self._file_system_expired(cache_value[0]):
+                    return cache_value[1]
+
+            new_cache_value: Tuple[int, AbstractFileSystem]
             if storage_type == StorageType.HDFS:
                 fs_class = importlib.import_module("pyarrow.fs").HadoopFileSystem
-                fs = ArrowFSWrapper(fs_class.from_uri(actual_file_location))
+                new_cache_value = (
+                    TIME_WITHOUT_EXPIRATION,
+                    ArrowFSWrapper(fs_class.from_uri(actual_file_location)),
+                )
             elif storage_type == StorageType.LOCAL:
-                fs = LocalFileSystem()
+                new_cache_value = (TIME_WITHOUT_EXPIRATION, LocalFileSystem())
             elif storage_type == StorageType.GCS:
-                fs = self._get_gcs_filesystem()
+                new_cache_value = self._get_gcs_filesystem(
+                    fileset_catalog, name_identifier
+                )
             elif storage_type == StorageType.S3A:
-                fs = self._get_s3_filesystem()
+                new_cache_value = self._get_s3_filesystem(
+                    fileset_catalog, name_identifier
+                )
             elif storage_type == StorageType.OSS:
-                fs = self._get_oss_filesystem()
+                new_cache_value = self._get_oss_filesystem(
+                    fileset_catalog, name_identifier
+                )
+            elif storage_type == StorageType.ABS:
+                new_cache_value = self._get_abs_filesystem(
+                    fileset_catalog, name_identifier
+                )
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
                 )
-            self._cache[storage_type] = fs
-            return fs
+            self._cache[name_identifier] = new_cache_value
+            return new_cache_value[1]
         finally:
             write_lock.release()
 
-    def _get_gcs_filesystem(self):
+    def _get_gcs_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
+
+        credential = self._get_most_suitable_gcs_credential(credentials)
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, GCSTokenCredential):
+                fs = importlib.import_module("gcsfs").GCSFileSystem(
+                    token=credential.token()
+                )
+                return (expire_time, fs)
+
         # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
         service_account_key_path = self._options.get(
             GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE
@@ -901,11 +986,47 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             raise GravitinoRuntimeException(
                 "Service account key is not found in the options."
             )
-        return importlib.import_module("gcsfs").GCSFileSystem(
-            token=service_account_key_path
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            importlib.import_module("gcsfs").GCSFileSystem(
+                token=service_account_key_path
+            ),
         )
 
-    def _get_s3_filesystem(self):
+    def _get_s3_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
+        credential = self._get_most_suitable_s3_credential(credentials)
+
+        # S3 endpoint from gravitino server, Note: the endpoint may not a real S3 endpoint
+        # it can be a simulated S3 endpoint, such as minio, so though the endpoint is not a required field
+        # for S3FileSystem, we still need to assign the endpoint to the S3FileSystem
+        s3_endpoint = fileset_catalog.properties().get("s3-endpoint", None)
+        # If the oss endpoint is not found in the fileset catalog, get it from the client options
+        if s3_endpoint is None:
+            s3_endpoint = self._options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT)
+
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, S3TokenCredential):
+                fs = importlib.import_module("s3fs").S3FileSystem(
+                    key=credential.access_key_id(),
+                    secret=credential.secret_access_key(),
+                    token=credential.session_token(),
+                    endpoint_url=s3_endpoint,
+                )
+                return (expire_time, fs)
+            if isinstance(credential, S3SecretKeyCredential):
+                fs = importlib.import_module("s3fs").S3FileSystem(
+                    key=credential.access_key_id(),
+                    secret=credential.secret_access_key(),
+                    endpoint_url=s3_endpoint,
+                )
+                return (expire_time, fs)
+
+        # this is the old way to get the s3 file system
         # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception
         aws_access_key_id = self._options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY)
         if aws_access_key_id is None:
@@ -922,20 +1043,48 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "AWS secret access key is not found in the options."
             )
 
-        # get 'aws_endpoint_url' from s3_options, if the key is not found, throw an exception
-        aws_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT)
-        if aws_endpoint_url is None:
-            raise GravitinoRuntimeException(
-                "AWS endpoint url is not found in the options."
-            )
-
-        return importlib.import_module("s3fs").S3FileSystem(
-            key=aws_access_key_id,
-            secret=aws_secret_access_key,
-            endpoint_url=aws_endpoint_url,
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            importlib.import_module("s3fs").S3FileSystem(
+                key=aws_access_key_id,
+                secret=aws_secret_access_key,
+                endpoint_url=s3_endpoint,
+            ),
         )
 
-    def _get_oss_filesystem(self):
+    def _get_oss_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
+
+        # OSS endpoint from gravitino server
+        oss_endpoint = fileset_catalog.properties().get("oss-endpoint", None)
+        # If the oss endpoint is not found in the fileset catalog, get it from the client options
+        if oss_endpoint is None:
+            oss_endpoint = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
+
+        credential = self._get_most_suitable_oss_credential(credentials)
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, OSSTokenCredential):
+                fs = importlib.import_module("ossfs").OSSFileSystem(
+                    key=credential.access_key_id(),
+                    secret=credential.secret_access_key(),
+                    token=credential.security_token(),
+                    endpoint=oss_endpoint,
+                )
+                return (expire_time, fs)
+            if isinstance(credential, OSSSecretKeyCredential):
+                return (
+                    expire_time,
+                    importlib.import_module("ossfs").OSSFileSystem(
+                        key=credential.access_key_id(),
+                        secret=credential.secret_access_key(),
+                        endpoint=oss_endpoint,
+                    ),
+                )
+
         # get 'oss_access_key_id' from oss options, if the key is not found, throw an exception
         oss_access_key_id = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY)
         if oss_access_key_id is None:
@@ -952,18 +1101,118 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "OSS secret access key is not found in the options."
             )
 
-        # get 'oss_endpoint_url' from oss options, if the key is not found, throw an exception
-        oss_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
-        if oss_endpoint_url is None:
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            importlib.import_module("ossfs").OSSFileSystem(
+                key=oss_access_key_id,
+                secret=oss_secret_access_key,
+                endpoint=oss_endpoint,
+            ),
+        )
+
+    def _get_abs_filesystem(self, fileset_catalog: Catalog, identifier: NameIdentifier):
+        fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
+        credentials = fileset.support_credentials().get_credentials()
+
+        credential = self._get_most_suitable_abs_credential(credentials)
+        if credential is not None:
+            expire_time = self._get_expire_time_by_ratio(credential.expire_time_in_ms())
+            if isinstance(credential, ADLSTokenCredential):
+                fs = importlib.import_module("adlfs").AzureBlobFileSystem(
+                    account_name=credential.account_name(),
+                    sas_token=credential.sas_token(),
+                )
+                return (expire_time, fs)
+
+            if isinstance(credential, AzureAccountKeyCredential):
+                fs = importlib.import_module("adlfs").AzureBlobFileSystem(
+                    account_name=credential.account_name(),
+                    account_key=credential.account_key(),
+                )
+                return (expire_time, fs)
+
+        # get 'abs_account_name' from abs options, if the key is not found, throw an exception
+        abs_account_name = self._options.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME
+        )
+        if abs_account_name is None:
             raise GravitinoRuntimeException(
-                "OSS endpoint url is not found in the options."
+                "ABS account name is not found in the options."
             )
 
-        return importlib.import_module("ossfs").OSSFileSystem(
-            key=oss_access_key_id,
-            secret=oss_secret_access_key,
-            endpoint=oss_endpoint_url,
+        # get 'abs_account_key' from abs options, if the key is not found, throw an exception
+        abs_account_key = self._options.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY
         )
+        if abs_account_key is None:
+            raise GravitinoRuntimeException(
+                "ABS account key is not found in the options."
+            )
+
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            importlib.import_module("adlfs").AzureBlobFileSystem(
+                account_name=abs_account_name,
+                account_key=abs_account_key,
+            ),
+        )
+
+    def _get_most_suitable_s3_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if it does not exist, use the
+            # secret key credential.
+            if isinstance(credential, S3TokenCredential):
+                return credential
+
+        for credential in credentials:
+            if isinstance(credential, S3SecretKeyCredential):
+                return credential
+        return None
+
+    def _get_most_suitable_oss_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if it does not exist, use the
+            # secret key credential.
+            if isinstance(credential, OSSTokenCredential):
+                return credential
+
+        for credential in credentials:
+            if isinstance(credential, OSSSecretKeyCredential):
+                return credential
+        return None
+
+    def _get_most_suitable_gcs_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if it does not exist, return None.
+            if isinstance(credential, GCSTokenCredential):
+                return credential
+        return None
+
+    def _get_most_suitable_abs_credential(self, credentials: List[Credential]):
+        for credential in credentials:
+            # Prefer to use the token credential, if it does not exist, use the
+            # account key credential
+            if isinstance(credential, ADLSTokenCredential):
+                return credential
+
+        for credential in credentials:
+            if isinstance(credential, AzureAccountKeyCredential):
+                return credential
+        return None
+
+    def _get_expire_time_by_ratio(self, expire_time: int):
+        if expire_time <= 0:
+            return TIME_WITHOUT_EXPIRATION
+
+        ratio = float(
+            self._options.get(
+                GVFSConfig.GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO,
+                GVFSConfig.DEFAULT_CREDENTIAL_EXPIRED_TIME_RATIO,
+            )
+        )
+        return time.time() * 1000 + (expire_time - time.time() * 1000) * ratio
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)

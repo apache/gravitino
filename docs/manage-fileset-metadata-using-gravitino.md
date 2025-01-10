@@ -49,7 +49,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "file:/tmp/root"
+    "location": "file:///tmp/root"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 
@@ -61,13 +61,16 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "oss:/bucket/root",
+    "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
     "filesystem-providers": "s3"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -80,7 +83,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 Map<String, String> properties = ImmutableMap.<String, String>builder()
-    .put("location", "file:/tmp/root")
+    .put("location", "file:///tmp/root")
     // Property "location" is optional. If specified, a managed fileset without
     // a storage location will be stored under this location.
     .build();
@@ -93,10 +96,10 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 
 // create a S3 catalog
 s3Properties = ImmutableMap.<String, String>builder()
-    .put("location", "oss:/bucket/root")
+    .put("location", "s3a://bucket/root")
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
-    .put("s3-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+    .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
     .put("filesystem-providers", "s3")
     .build();
 
@@ -106,6 +109,9 @@ Catalog s3Catalog = gravitinoClient.createCatalog("catalog",
     "This is a S3 fileset catalog",
     s3Properties);
 // ...
+
+// For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+// The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -121,10 +127,10 @@ catalog = gravitino_client.create_catalog(name="catalog",
 
 # create a S3 catalog
 s3_properties = {
-    "location": "oss:/bucket/root",
+    "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key"
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
 }
 
 s3_catalog = gravitino_client.create_catalog(name="catalog",
@@ -132,6 +138,9 @@ s3_catalog = gravitino_client.create_catalog(name="catalog",
                                              provider="hadoop",
                                              comment="This is a S3 fileset catalog",
                                              properties=s3_properties)
+
+# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -196,7 +205,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "schema",
   "comment": "comment",
   "properties": {
-    "location": "file:/tmp/root/schema"
+    "location": "file:///tmp/root/schema"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
@@ -218,7 +227,7 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     // Property "location" is optional, if specified all the managed fileset without
     // specifying storage location will be stored under this location.
-    .put("location", "file:/tmp/root/schema")
+    .put("location", "file:///tmp/root/schema")
     .build();
 Schema schema = supportsSchemas.createSchema("schema",
     "This is a schema",
@@ -266,8 +275,10 @@ Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#
 in relational catalog for more details. For a fileset catalog, the schema drop operation is the
 same.
 
-Note that the drop operation will also remove all of the filesets as well as the managed files
-under this schema path if `cascade` is set to `true`.
+Note that the drop operation will delete all the fileset metadata under this schema if `cascade`
+set to `true`. Besides, for `MANAGED` fileset, this drop operation will also **remove** all the
+files/directories of this fileset; for `EXTERNAL` fileset, this drop operation will only delete
+the metadata of this fileset.
 
 ### List all schemas under a catalog
 
@@ -297,7 +308,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "example_fileset",
   "comment": "This is an example fileset",
   "type": "MANAGED",
-  "storageLocation": "file:/tmp/root/schema/example_fileset",
+  "storageLocation": "file:///tmp/root/schema/example_fileset",
   "properties": {
     "k1": "v1"
   }
@@ -324,7 +335,7 @@ filesetCatalog.createFileset(
   NameIdentifier.of("schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
-  "file:/tmp/root/schema/example_fileset",
+  "file:///tmp/root/schema/example_fileset",
   propertiesMap,
 );
 ```
@@ -362,7 +373,7 @@ when creating a fileset, or follow the rules of the catalog/schema location if n
 The value of `storageLocation` depends on the configuration settings of the catalog:
 - If this is a S3 fileset catalog, the `storageLocation` should be in the format of `s3a://bucket-name/path/to/fileset`.
 - If this is an OSS fileset catalog, the `storageLocation` should be in the format of `oss://bucket-name/path/to/fileset`.
-- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:/path/to/fileset`.
+- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
 - If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
 - If this is a GCS fileset catalog, the `storageLocation` should be in the format of `gs://bucket-name/path/to/fileset`.
 

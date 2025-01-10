@@ -66,8 +66,23 @@ public class SecurableObjectSQLProviderFactory {
     return getProvider().softDeleteSecurableObjectsByRoleId(roleId);
   }
 
-  public static String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteRoleMetasByMetalakeId(metalakeId);
+  public static String softDeleteSecurableObjectsByMetalakeId(
+      @Param("metalakeId") Long metalakeId) {
+    return getProvider().softDeleteSecurableObjectsByMetalakeId(metalakeId);
+  }
+
+  public static String softDeleteObjectRelsByMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider().softDeleteObjectRelsByMetadataObject(metadataObjectId, metadataObjectType);
+  }
+
+  public static String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteObjectRelsByCatalogId(catalogId);
+  }
+
+  public static String softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().softDeleteObjectRelsBySchemaId(schemaId);
   }
 
   public static String listSecurableObjectsByRoleId(@Param("roleId") Long roleId) {

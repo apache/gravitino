@@ -25,7 +25,7 @@ rootProject.name = "gravitino"
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"].toString()
 
-include("api", "common", "core", "meta", "server", "server-common")
+include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
 include("catalogs:hive-metastore-common")
@@ -41,6 +41,7 @@ include(
 )
 include("catalogs:catalog-hadoop")
 include("catalogs:catalog-kafka")
+include("catalogs:catalog-model")
 include(
   "clients:client-java",
   "clients:client-java-runtime",
@@ -49,9 +50,14 @@ include(
   "clients:client-python",
   "clients:cli"
 )
+if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
+  include("clients:filesystem-fuse")
+} else {
+  println("Skipping filesystem-fuse module since enableFuse is set to false")
+}
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
-include("authorizations:authorization-ranger")
+include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")
 // kyuubi hive connector doesn't support 2.13 for Spark3.3
@@ -71,6 +77,8 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
-include(":bundles:aws-bundle")
-include(":bundles:gcp-bundle")
-include(":bundles:aliyun-bundle")
+include(":bundles:aws", ":bundles:aws-bundle")
+include(":bundles:gcp", ":bundles:gcp-bundle")
+include(":bundles:aliyun", ":bundles:aliyun-bundle")
+include(":bundles:azure", ":bundles:azure-bundle")
+include(":catalogs:hadoop-common")

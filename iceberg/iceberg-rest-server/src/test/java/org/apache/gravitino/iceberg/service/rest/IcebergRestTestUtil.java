@@ -19,26 +19,39 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
@@ -64,10 +77,11 @@ public class IcebergRestTestUtil {
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
 
   public static ResourceConfig getIcebergResourceConfig(Class c) {
-    return getIcebergResourceConfig(c, true);
+    return getIcebergResourceConfig(c, true, Arrays.asList());
   }
 
-  public static ResourceConfig getIcebergResourceConfig(Class c, boolean bindIcebergTableOps) {
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c, boolean bindIcebergTableOps, List<EventListenerPlugin> eventListenerPlugins) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
     resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
@@ -90,21 +104,30 @@ public class IcebergRestTestUtil {
           StaticIcebergConfigProvider.class.getName());
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(
-          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-          DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
+          CredentialConstants.CREDENTIAL_PROVIDERS, DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);
 
-      EventBus eventBus = new EventBus(Arrays.asList());
+      EventBus eventBus = new EventBus(eventListenerPlugins);
 
       IcebergTableOperationExecutor icebergTableOperationExecutor =
           new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
       IcebergTableEventDispatcher icebergTableEventDispatcher =
           new IcebergTableEventDispatcher(
               icebergTableOperationExecutor, eventBus, configProvider.getMetalakeName());
+      IcebergViewOperationExecutor icebergViewOperationExecutor =
+          new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
+      IcebergViewEventDispatcher icebergViewEventDispatcher =
+          new IcebergViewEventDispatcher(
+              icebergViewOperationExecutor, eventBus, configProvider.getMetalakeName());
+      IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
+          new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+      IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+          new IcebergNamespaceEventDispatcher(
+              icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
@@ -114,9 +137,20 @@ public class IcebergRestTestUtil {
               bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
               bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(2);
+              bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(2);
+              bind(icebergNamespaceEventDispatcher)
+                  .to(IcebergNamespaceOperationDispatcher.class)
+                  .ranked(2);
             }
           });
     }
     return resourceConfig;
+  }
+
+  static HttpServletRequest createMockHttpRequest() {
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    when(mockRequest.getRemoteHost()).thenReturn("localhost");
+    when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
+    return mockRequest;
   }
 }

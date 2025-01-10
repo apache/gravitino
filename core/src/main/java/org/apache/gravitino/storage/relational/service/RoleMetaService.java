@@ -84,7 +84,7 @@ public class RoleMetaService {
         RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
   }
 
-  public List<RoleEntity> listRolesByMetadataObjectIdentAndType(
+  public List<RoleEntity> listRolesByMetadataObject(
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
     long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);

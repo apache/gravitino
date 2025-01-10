@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
@@ -52,6 +52,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
@@ -228,7 +229,10 @@ public class CatalogHiveIT extends BaseIT {
                 catalog.asSchemas().dropSchema(schema, true);
               }));
       Arrays.stream(metalake.listCatalogs())
-          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
+          .forEach(
+              catalogName -> {
+                metalake.dropCatalog(catalogName, true);
+              });
       client.dropMetalake(metalakeName, true);
     }
     if (hiveClientPool != null) {
@@ -611,6 +615,29 @@ public class CatalogHiveIT extends BaseIT {
               tableCatalog.alterTable(id, change);
             });
     Assertions.assertTrue(exception.getMessage().contains("cannot be set"));
+  }
+
+  @Test
+  public void testListTables() {
+    // mock iceberg, paimon, and hudi tables
+    NameIdentifier icebergTable = NameIdentifier.of(schemaName, "iceberg_table");
+    NameIdentifier paimonTable = NameIdentifier.of(schemaName, "paimon_table");
+    NameIdentifier hudiTable = NameIdentifier.of(schemaName, "hudi_table");
+    NameIdentifier hiveTable = NameIdentifier.of(schemaName, "hive_table");
+    catalog
+        .asTableCatalog()
+        .createTable(icebergTable, createColumns(), null, ImmutableMap.of("table_type", "ICEBERG"));
+    catalog
+        .asTableCatalog()
+        .createTable(paimonTable, createColumns(), null, ImmutableMap.of("table_type", "PAIMON"));
+    catalog
+        .asTableCatalog()
+        .createTable(hudiTable, createColumns(), null, ImmutableMap.of("provider", "hudi"));
+    catalog
+        .asTableCatalog()
+        .createTable(hiveTable, createColumns(), null, ImmutableMap.of("provider", "hive"));
+    NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of(schemaName));
+    Assertions.assertEquals(1, tables.length);
   }
 
   @Test

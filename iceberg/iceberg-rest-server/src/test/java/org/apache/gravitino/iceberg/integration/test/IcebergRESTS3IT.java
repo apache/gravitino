@@ -19,20 +19,26 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
+import org.apache.iceberg.TableProperties;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
 
+@SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
 public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
 
@@ -46,12 +52,13 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
   @Override
   void initEnv() {
     this.s3Warehouse =
-        String.format("s3://%s/test1", getFromEnvOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
-    this.accessKey = getFromEnvOrDefault("GRAVITINO_S3_ACCESS_KEY", "{ACCESS_KEY}");
-    this.secretKey = getFromEnvOrDefault("GRAVITINO_S3_SECRET_KEY", "{SECRET_KEY}");
-    this.region = getFromEnvOrDefault("GRAVITINO_S3_REGION", "ap-southeast-2");
-    this.roleArn = getFromEnvOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
-    this.externalId = getFromEnvOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
+        String.format(
+            "s3://%s/test1", System.getenv().getOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
+    this.accessKey = System.getenv().getOrDefault("GRAVITINO_S3_ACCESS_KEY", "{ACCESS_KEY}");
+    this.secretKey = System.getenv().getOrDefault("GRAVITINO_S3_SECRET_KEY", "{SECRET_KEY}");
+    this.region = System.getenv().getOrDefault("GRAVITINO_S3_REGION", "ap-southeast-2");
+    this.roleArn = System.getenv().getOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
+    this.externalId = System.getenv().getOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
     if (ITUtils.isEmbedded()) {
       return;
     }
@@ -80,8 +87,8 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.S3_TOKEN_CREDENTIAL_PROVIDER);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
+        S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + S3Properties.GRAVITINO_S3_REGION, region);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
@@ -120,8 +127,69 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
     BaseIT.copyBundleJarsToDirectory("aws-bundle", targetDir);
   }
 
-  private String getFromEnvOrDefault(String envVar, String defaultValue) {
-    String envValue = System.getenv(envVar);
-    return Optional.ofNullable(envValue).orElse(defaultValue);
+  /**
+   * Parses a string representing table properties into a map of key-value pairs.
+   *
+   * @param tableProperties A string representing the table properties in the format:
+   *     "[key1=value1,key2=value2,...]"
+   * @return A Map where each key is a property name (String) and the corresponding value is the
+   *     property value (String). Example input:
+   *     "[write.data.path=path/to/data,write.metadata.path=path/to/metadata]" Example output: {
+   *     "write.data.path" -> "path/to/data", "write.metadata.path" -> "path/to/metadata" }
+   */
+  private Map<String, String> parseTableProperties(String tableProperties) {
+    Map<String, String> propertiesMap = new HashMap<>();
+    String[] pairs = tableProperties.substring(1, tableProperties.length() - 1).split(",");
+    for (String pair : pairs) {
+      String[] keyValue = pair.split("=", 2); // Split at most once
+      if (keyValue.length == 2) {
+        propertiesMap.put(keyValue[0].trim(), keyValue[1].trim());
+      }
+    }
+    return propertiesMap;
+  }
+
+  @Test
+  void testCredentialWithMultiLocations() {
+    String namespaceName = ICEBERG_REST_NS_PREFIX + "credential";
+    String tableName = namespaceName + ".multi_location";
+
+    String writeDataPath = this.s3Warehouse + "/test_data_location";
+    String writeMetaDataPath = this.s3Warehouse + "/test_metadata_location";
+
+    sql("CREATE DATABASE IF NOT EXISTS " + namespaceName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id bigint) USING iceberg OPTIONS ('%s' = '%s', '%s' = '%s')",
+            tableName,
+            TableProperties.WRITE_DATA_LOCATION,
+            writeDataPath,
+            TableProperties.WRITE_METADATA_LOCATION,
+            writeMetaDataPath));
+
+    Map<String, String> tableDetails =
+        convertToStringMap(sql("DESCRIBE TABLE EXTENDED " + tableName));
+    String tableProperties = tableDetails.get("Table Properties");
+    Assertions.assertNotNull(tableProperties, "Table Properties should not be null");
+
+    Map<String, String> propertiesMap = parseTableProperties(tableProperties);
+    Assertions.assertEquals(
+        writeDataPath,
+        propertiesMap.get(TableProperties.WRITE_DATA_LOCATION),
+        String.format(
+            "Expected write.data.path to be '%s', but was '%s'",
+            writeDataPath, propertiesMap.get(TableProperties.WRITE_DATA_LOCATION)));
+    Assertions.assertEquals(
+        writeMetaDataPath,
+        propertiesMap.get(TableProperties.WRITE_METADATA_LOCATION),
+        String.format(
+            "Expected write.metadata.path to be '%s', but was '%s'",
+            writeMetaDataPath, propertiesMap.get(TableProperties.WRITE_METADATA_LOCATION)));
+
+    String value1 = "1";
+    String value2 = "2";
+    sql(String.format("INSERT INTO %s VALUES (%s), (%s);", tableName, value1, value2));
+    List<String> result = convertToStringList(sql(String.format("SELECT * FROM %s", tableName)), 0);
+    Assertions.assertEquals(result, ImmutableList.of((value1), (value2)));
   }
 }

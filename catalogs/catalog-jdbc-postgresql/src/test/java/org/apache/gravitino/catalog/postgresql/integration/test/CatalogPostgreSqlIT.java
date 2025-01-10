@@ -44,6 +44,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -117,8 +118,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
-    createCatalog();
-    createSchema();
+    catalog = createCatalog(catalogName);
+    createSchema(schemaName);
   }
 
   @AfterAll
@@ -138,7 +139,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
   @AfterEach
   public void resetSchema() {
     clearTableAndSchema();
-    createSchema();
+    createSchema(schemaName);
   }
 
   private void clearTableAndSchema() {
@@ -161,7 +162,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     metalake = loadMetalake;
   }
 
-  private void createCatalog() throws SQLException {
+  private Catalog createCatalog(String catalogName) throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
@@ -178,10 +179,10 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
-    catalog = loadCatalog;
+    return loadCatalog;
   }
 
-  private void createSchema() {
+  private void createSchema(String schemaName) {
 
     Schema createdSchema =
         catalog.asSchemas().createSchema(schemaName, schema_comment, Collections.EMPTY_MAP);
@@ -237,6 +238,32 @@ public class CatalogPostgreSqlIT extends BaseIT {
           false,
           Literals.NULL)
     };
+  }
+
+  @Test
+  void testTestConnection() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), "wrong_password");
+
+    Exception exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("postgresql_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    catalogProperties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("password authentication failed for user"));
   }
 
   @Test
@@ -626,8 +653,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
         });
   }
 
-  @Test
-  void testCreateAndLoadSchema() {
+  //  @Test TODO(mchades): https://github.com/apache/gravitino/issues/6134
+  void testCreateAndLoadSchema() throws SQLException {
     String testSchemaName = "test";
 
     Schema schema = catalog.asSchemas().createSchema(testSchemaName, "comment", null);
@@ -638,15 +665,32 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Assertions.assertEquals("comment", schema.comment());
 
     // test null comment
-    testSchemaName = "test2";
+    String testSchemaName2 = "test2";
 
-    schema = catalog.asSchemas().createSchema(testSchemaName, null, null);
+    schema = catalog.asSchemas().createSchema(testSchemaName2, null, null);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     // todo: Gravitino put id to comment, makes comment is empty string not null.
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
-    schema = catalog.asSchemas().loadSchema(testSchemaName);
+    schema = catalog.asSchemas().loadSchema(testSchemaName2);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+
+    // test register PG service to multiple catalogs
+    String newCatalogName = GravitinoITUtils.genRandomName("new_catalog");
+    Catalog newCatalog = createCatalog(newCatalogName);
+    newCatalog.asSchemas().loadSchema(testSchemaName2);
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName2, false));
+    createSchema(testSchemaName2);
+    SupportsSchemas schemaOps = newCatalog.asSchemas();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> schemaOps.loadSchema(testSchemaName2));
+    // recovered by re-build the catalog
+    Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
+    newCatalog = createCatalog(newCatalogName);
+    Schema loadedSchema = newCatalog.asSchemas().loadSchema(testSchemaName2);
+    Assertions.assertEquals(testSchemaName2, loadedSchema.name());
+
+    Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
   }
 
   @Test

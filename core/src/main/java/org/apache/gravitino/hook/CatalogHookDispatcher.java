@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -104,18 +105,44 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    return dispatcher.alterCatalog(ident, changes);
+    Catalog alteredCatalog = dispatcher.alterCatalog(ident, changes);
+    CatalogChange.RenameCatalog lastRenameChange = null;
+    for (CatalogChange change : changes) {
+      if (change instanceof CatalogChange.RenameCatalog) {
+        lastRenameChange = (CatalogChange.RenameCatalog) change;
+      }
+    }
+    if (lastRenameChange != null) {
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.CATALOG, lastRenameChange.getNewName());
+    }
+    return alteredCatalog;
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
-    return dispatcher.dropCatalog(ident);
+    return dropCatalog(ident, false /* force */);
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
-    return dispatcher.dropCatalog(ident, force);
+    if (!dispatcher.catalogExists(ident)) {
+      return false;
+    }
+
+    // If we call the authorization plugin after dropping catalog, we can't load the plugin of the
+    // catalog
+    Catalog catalog = dispatcher.loadCatalog(ident);
+    boolean dropped = dispatcher.dropCatalog(ident, force);
+
+    if (dropped && catalog != null) {
+      List<String> locations =
+          AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
+      AuthorizationUtils.removeCatalogPrivileges(catalog, locations);
+    }
+
+    return dropped;
   }
 
   @Override

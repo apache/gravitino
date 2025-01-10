@@ -22,23 +22,52 @@
 if [[ "${HIVE_RUNTIME_VERSION}" == "hive3" ]]; then
   ln -s ${HIVE3_HOME} ${HIVE_HOME}
   ln -s ${HADOOP3_HOME} ${HADOOP_HOME}
+
+  # Remove guava jar from Hive lib directory and copy from Hadoop as Hive 3.x is not compatible with guava 19
+  rm -rf ${HIVE_HOME}/lib/guava*.jar
+  cp ${HADOOP_HOME}/share/hadoop/common/lib/guava*.jar ${HIVE_HOME}/lib
 else
   ln -s ${HIVE2_HOME} ${HIVE_HOME}
   ln -s ${HADOOP2_HOME} ${HADOOP_HOME}
 fi
 
- cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 
 # Copy Hadoop and Hive configuration file and update hostname
 cp -f ${HADOOP_TMP_CONF_DIR}/* ${HADOOP_CONF_DIR}
 cp -f ${HIVE_TMP_CONF_DIR}/* ${HIVE_CONF_DIR}
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
+
+if [[ -n "${ENABLE_SQL_BASE_AUTHORIZATION}" ]]; then
+  if [[ -n "${RANGER_HIVE_REPOSITORY_NAME}" && -n "${RANGER_SERVER_URL}" ]]; then
+    echo "You can't set ENABLE_SQL_BASE_AUTHORIZATION and RANGER_HIVE_REPOSITORY_NAME at the same time."
+    exit -1
+  fi
+  cp -f ${HIVE_CONF_DIR}/hive-site-for-sql-base-auth.xml ${HIVE_CONF_DIR}/hive-site.xml
+  cp -f ${HIVE_CONF_DIR}/hiveserver2-site-for-sql-base-auth.xml ${HIVE_CONF_DIR}/hiveserver2-site.xml
+fi
+
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
 
-sed -i "s|S3_ACCESS_KEY_ID|${S3_ACCESS_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
-sed -i "s|S3_SECRET_KEY_ID|${S3_SECRET_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
-sed -i "s|S3_ENDPOINT_ID|${S3_ENDPOINT}|g" ${HIVE_CONF_DIR}/hive-site.xml
+# whether S3 is set
+if [[ -n "${S3_ACCESS_KEY}" && -n "${S3_SECRET_KEY}" && -n "${S3_ENDPOINT}" ]]; then
+  sed -i "s|S3_ACCESS_KEY_ID|${S3_ACCESS_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|S3_SECRET_KEY_ID|${S3_SECRET_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|S3_ENDPOINT_ID|${S3_ENDPOINT}|g" ${HIVE_CONF_DIR}/hive-site.xml
+fi
+
+# whether ADLS is set
+if [[ -n "${ABS_ACCOUNT_NAME}" && -n "${ABS_ACCOUNT_KEY}" ]]; then
+  sed -i "s|ABS_ACCOUNT_NAME|${ABS_ACCOUNT_NAME}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|ABS_ACCOUNT_KEY|${ABS_ACCOUNT_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+fi
+
+# whether GCS is set
+if [[ -n "$SERVICE_ACCOUNT_FILE" ]]; then
+  sed -i "s|SERVICE_ACCOUNT_FILE|${SERVICE_ACCOUNT_FILE}|g" ${HIVE_CONF_DIR}/hive-site.xml
+fi
 
 # Link mysql-connector-java after deciding where HIVE_HOME symbolic link points to.
 ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.jar ${HIVE_HOME}/lib

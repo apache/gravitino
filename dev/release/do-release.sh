@@ -33,7 +33,7 @@ done
 DRY_RUN=${DRY_RUN:-0}
 export DRY_RUN
 
-cmds=("git" "gpg" "svn" "twine" "shasum" "sha1sum" "jq")
+cmds=("git" "gpg" "svn" "twine" "shasum" "sha1sum" "jq" "make")
 for cmd in "${cmds[@]}"; do
   if ! command -v $cmd &> /dev/null; then
     echo "$cmd is required to run this script."

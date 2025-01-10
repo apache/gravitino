@@ -26,13 +26,18 @@ import shutil
 import requests
 
 from gravitino.exceptions.base import GravitinoRuntimeException
+from tests.integration.config import Config
 
 logger = logging.getLogger(__name__)
 
 
 def get_gravitino_server_version(**kwargs):
     try:
-        response = requests.get("http://localhost:8090/api/version", **kwargs)
+        response = requests.get(
+            "http://localhost:8090/api/version",
+            timeout=Config.REQUEST["TIMEOUT"],
+            **kwargs,
+        )
         response.raise_for_status()  # raise an exception for bad status codes
         response.close()
         return True
@@ -62,7 +67,10 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if os.environ.get("START_EXTERNAL_GRAVITINO") is not None:
+        if (
+            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
+            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
+        ):
             # Maybe Gravitino server already startup by Gradle test command or developer manual startup.
             if not check_gravitino_server_status():
                 logger.error("ERROR: Can't find online Gravitino server!")
@@ -107,7 +115,10 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if os.environ.get("START_EXTERNAL_GRAVITINO") is not None:
+        if (
+            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
+            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
+        ):
             return
 
         logger.info("Stop integration test environment...")

@@ -22,6 +22,7 @@ import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
@@ -231,7 +232,7 @@ public class TestPermission extends TestBase {
     MetadataObject object = MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
     Role grantedRole =
         gravitinoClient.grantPrivilegesToRole(
-            role, object, Lists.newArrayList(Privileges.CreateTable.allow()));
+            role, object, Sets.newHashSet(Privileges.CreateTable.allow()));
     Assertions.assertEquals(grantedRole.name(), role);
     Assertions.assertEquals(1, grantedRole.securableObjects().size());
     SecurableObject securableObject = grantedRole.securableObjects().get(0);
@@ -249,7 +250,7 @@ public class TestPermission extends TestBase {
         RuntimeException.class,
         () ->
             gravitinoClient.grantPrivilegesToRole(
-                role, object, Lists.newArrayList(Privileges.CreateTable.allow())));
+                role, object, Sets.newHashSet(Privileges.CreateTable.allow())));
   }
 
   @Test
@@ -280,7 +281,7 @@ public class TestPermission extends TestBase {
     MetadataObject object = MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
     Role revokedRole =
         gravitinoClient.revokePrivilegesFromRole(
-            role, object, Lists.newArrayList(Privileges.CreateTable.allow()));
+            role, object, Sets.newHashSet(Privileges.CreateTable.allow()));
     Assertions.assertEquals(revokedRole.name(), role);
     Assertions.assertTrue(revokedRole.securableObjects().isEmpty());
 
@@ -291,6 +292,6 @@ public class TestPermission extends TestBase {
         RuntimeException.class,
         () ->
             gravitinoClient.revokePrivilegesFromRole(
-                role, object, Lists.newArrayList(Privileges.CreateTable.allow())));
+                role, object, Sets.newHashSet(Privileges.CreateTable.allow())));
   }
 }

@@ -38,14 +38,14 @@ public class AllMetalakeDetails extends Command {
   }
 
   /** Displays the name and comment of all metalakes. */
+  @Override
   public void handle() {
     Metalake[] metalakes = new Metalake[0];
     try {
       GravitinoAdminClient client = buildAdminClient();
       metalakes = client.listMetalakes();
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     List<String> metalakeDetails = new ArrayList<>();

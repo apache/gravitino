@@ -28,6 +28,7 @@ jobs:
               - clients/client-java/**
               - clients/client-java-runtime/**
               - clients/filesystem-hadoop3/**
+              - clients/cli/**
               - common/**
               - conf/**
               - core/**
@@ -38,6 +39,7 @@ jobs:
               - meta/**
               - scripts/**
               - server/**
+              - bundles/**
               - server-common/**
               - build.gradle.kts
               - gradle.properties

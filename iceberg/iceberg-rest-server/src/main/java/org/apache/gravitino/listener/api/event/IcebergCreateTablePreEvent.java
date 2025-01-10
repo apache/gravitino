@@ -26,12 +26,19 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 /** Represent a pre event before creating Iceberg table. */
 @DeveloperApi
 public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
-  private CreateTableRequest createTableRequest;
+  private final CreateTableRequest createTableRequest;
 
   public IcebergCreateTablePreEvent(
-      String user, NameIdentifier resourceIdentifier, CreateTableRequest createTableRequest) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      CreateTableRequest createTableRequest) {
+    super(icebergRequestContext, resourceIdentifier);
     this.createTableRequest = createTableRequest;
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
   }
 
   public CreateTableRequest createTableRequest() {

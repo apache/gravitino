@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.annotations.VisibleForTesting;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -32,6 +33,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.slf4j.Logger;
@@ -43,9 +45,7 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableRenameOperations {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
 
-  @SuppressWarnings("UnusedVariable")
-  @Context
-  private HttpServletRequest httpRequest;
+  @Context private HttpServletRequest httpRequest;
 
   private IcebergTableOperationDispatcher tableOperationDispatcher;
 
@@ -66,7 +66,14 @@ public class IcebergTableRenameOperations {
         catalogName,
         renameTableRequest.source(),
         renameTableRequest.destination());
-    tableOperationDispatcher.renameTable(catalogName, renameTableRequest);
-    return IcebergRestUtils.okWithoutContent();
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
+    tableOperationDispatcher.renameTable(context, renameTableRequest);
+    return IcebergRestUtils.noContent();
+  }
+
+  // HTTP request is null in Jersey test, override with a mock request when testing.
+  @VisibleForTesting
+  HttpServletRequest httpServletRequest() {
+    return httpRequest;
   }
 }

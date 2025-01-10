@@ -102,12 +102,16 @@ Please refer to
 | `FixedChar`    | `Char`     |
 | `String`       | `String`   |
 
-Doris doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's
-**[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that
-represents an unresolvable data type since 0.5.0.
 
-#### Table column auto-increment
+Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
+
+:::note
+Gravitino can not load Doris `array`, `map` and `struct` type correctly, because Doris doesn't support these types in JDBC.
+:::
+
+
+### Table column auto-increment
 
 Unsupported for now.
 
@@ -149,7 +153,7 @@ Unsupported for now.
     </TabItem>
     </Tabs>
 
-### Table partitions
+### Table partitioning
 
 The Doris catalog supports partitioned tables. 
 Users can create partitioned tables in the Doris catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating Doris tables. 

@@ -21,11 +21,12 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
+import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.Privilege;
 
 public class RangerPrivileges {
   /** Ranger Hive privileges enumeration. */
-  public enum RangerHivePrivilege implements RangerPrivilege {
+  public enum RangerHadoopSQLPrivilege implements AuthorizationPrivilege {
     ALL("all"),
     SELECT("select"),
     UPDATE("update"),
@@ -41,7 +42,7 @@ public class RangerPrivileges {
 
     private final String name; // Access a type in the Ranger policy item
 
-    RangerHivePrivilege(String name) {
+    RangerHadoopSQLPrivilege(String name) {
       this.name = name;
     }
 
@@ -61,12 +62,12 @@ public class RangerPrivileges {
     }
   }
 
-  public static class RangerHivePrivilegeImpl implements RangerPrivilege {
-    private RangerPrivilege rangerHivePrivilege;
+  public static class RangerHivePrivilegeImpl implements AuthorizationPrivilege {
+    private AuthorizationPrivilege rangerHivePrivilege;
     private Privilege.Condition condition;
 
     public RangerHivePrivilegeImpl(
-        RangerPrivilege rangerHivePrivilege, Privilege.Condition condition) {
+        AuthorizationPrivilege rangerHivePrivilege, Privilege.Condition condition) {
       this.rangerHivePrivilege = rangerHivePrivilege;
       this.condition = condition;
     }
@@ -88,7 +89,7 @@ public class RangerPrivileges {
   }
 
   /** Ranger HDFS privileges enumeration. */
-  public enum RangerHdfsPrivilege implements RangerPrivilege {
+  public enum RangerHdfsPrivilege implements AuthorizationPrivilege {
     READ("read"),
     WRITE("write"),
     EXECUTE("execute");
@@ -115,18 +116,44 @@ public class RangerPrivileges {
     }
   }
 
-  static List<Class<? extends Enum<? extends RangerPrivilege>>> allRangerPrivileges =
-      Lists.newArrayList(
-          RangerPrivileges.RangerHivePrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
+  public static class RangerHDFSPrivilegeImpl implements AuthorizationPrivilege {
+    private AuthorizationPrivilege rangerHDFSPrivilege;
+    private Privilege.Condition condition;
 
-  public static RangerPrivilege valueOf(String name) {
+    public RangerHDFSPrivilegeImpl(
+        AuthorizationPrivilege rangerHivePrivilege, Privilege.Condition condition) {
+      this.rangerHDFSPrivilege = rangerHivePrivilege;
+      this.condition = condition;
+    }
+
+    @Override
+    public String getName() {
+      return rangerHDFSPrivilege.getName();
+    }
+
+    @Override
+    public Privilege.Condition condition() {
+      return condition;
+    }
+
+    @Override
+    public boolean equalsTo(String value) {
+      return rangerHDFSPrivilege.equalsTo(value);
+    }
+  }
+
+  static List<Class<? extends Enum<? extends AuthorizationPrivilege>>> allRangerPrivileges =
+      Lists.newArrayList(
+          RangerHadoopSQLPrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
+
+  public static AuthorizationPrivilege valueOf(String name) {
     Preconditions.checkArgument(name != null, "Privilege name string cannot be null!");
 
     String strPrivilege = name.trim().toLowerCase();
-    for (Class<? extends Enum<? extends RangerPrivilege>> enumClass : allRangerPrivileges) {
-      for (Enum<? extends RangerPrivilege> privilege : enumClass.getEnumConstants()) {
-        if (((RangerPrivilege) privilege).equalsTo(strPrivilege)) {
-          return (RangerPrivilege) privilege;
+    for (Class<? extends Enum<? extends AuthorizationPrivilege>> enumClass : allRangerPrivileges) {
+      for (Enum<? extends AuthorizationPrivilege> privilege : enumClass.getEnumConstants()) {
+        if (((AuthorizationPrivilege) privilege).equalsTo(strPrivilege)) {
+          return (AuthorizationPrivilege) privilege;
         }
       }
     }

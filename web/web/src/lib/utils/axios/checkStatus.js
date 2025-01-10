@@ -51,19 +51,19 @@ export function checkStatus(status, msg, errorMessageMode = 'message') {
       break
 
     case 403:
-      errMessage = 'The user is authorized, but access is forbidden!'
+      errMessage = msg || 'The user is authorized, but access is forbidden!'
       break
 
     case 404:
-      errMessage = 'Network request error, the resource was not found!'
+      errMessage = msg || 'Network request error, the resource was not found!'
       break
 
     case 405:
-      errMessage = 'Network request error, request method not allowed!'
+      errMessage = msg || 'Network request error, request method not allowed!'
       break
 
     case 408:
-      errMessage = 'Network request timed out!'
+      errMessage = msg || 'Network request timed out!'
       break
 
     case 409:
@@ -75,23 +75,23 @@ export function checkStatus(status, msg, errorMessageMode = 'message') {
       break
 
     case 501:
-      errMessage = 'The network is not implemented!'
+      errMessage = msg || 'The network is not implemented!'
       break
 
     case 502:
-      errMessage = 'Network Error!'
+      errMessage = msg || 'Network Error!'
       break
 
     case 503:
-      errMessage = 'The service is unavailable, the server is temporarily overloaded or maintained!'
+      errMessage = msg || 'The service is unavailable, the server is temporarily overloaded or maintained!'
       break
 
     case 504:
-      errMessage = 'Network timeout!'
+      errMessage = msg || 'Network timeout!'
       break
 
     case 505:
-      errMessage = 'The http version does not support the request!'
+      errMessage = msg || 'The http version does not support the request!'
       break
 
     default:

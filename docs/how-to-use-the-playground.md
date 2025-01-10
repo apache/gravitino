@@ -13,7 +13,7 @@ Depending on your network and computer, startup time may take 3-5 minutes. Once 
 
 ## Prerequisites
 
-Install Git, Docker, Docker Compose.
+Install Git (optional), Docker, Docker Compose.
 
 ## System Resource Requirements
 
@@ -24,34 +24,50 @@ Install Git, Docker, Docker Compose.
 The playground runs several services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
 | Docker container      | Ports used             |
-|-----------------------|------------------------|
+| --------------------- | ---------------------- |
 | playground-gravitino  | 8090 9001              |
 | playground-hive       | 3307 19000 19083 60070 |
 | playground-mysql      | 13306                  |
 | playground-postgresql | 15342                  |
 | playground-trino      | 18080                  |
 | playground-jupyter    | 18888                  |
+| playground-prometheus | 19090                  |
+| playground-grafana    | 13000                  |
 
 ## Playground usage
 
-### Launch playground
+### Curl command to launch the playground
+
+```shell
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
+```
+
+### Using git to download and launch the playground
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
+```
+
+#### Start
+
+```
 ./playground.sh start
 ```
 
-### Check status
+#### Check status
+
 ```shell 
 ./playground.sh status
 ```
-### Stop playground
+
+#### Stop playground
+
 ```shell
 ./playground.sh stop
 ```
 
-## Using Apache Gravitino with Trino SQL
+## Experiencing Apache Gravitino with Trino SQL
 
 ### Using Trino CLI in Docker Container
 
@@ -86,8 +102,16 @@ docker exec -it playground-spark bash
 2. Open the Spark SQL client in the container.
 
 ```shell
-spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql 
+spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 ```
+
+## Monitoring Gravitino
+
+1. Open the Grafana in the browser at [http://localhost:13000](http://localhost:13000).
+
+2. In the navigation menu, click **Dashboards** -> **Gravitino Playground**.
+
+3. Experiment with the default template.
 
 ## Example
 
@@ -164,7 +188,7 @@ GROUP BY e.employee_id,  given_name, family_name;
 
 ### Using Spark and Trino
 
-You might consider generating data with SparkSQL and then querying this data using Trino. Give it a try with Gravitino:
+Consider generating data with SparkSQL and then querying this data using Trino. Give it a try with Gravitino:
 
 1. Login Spark container and execute the SQLs:
 
@@ -193,6 +217,8 @@ INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'M
 SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
 ```
 
+The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
+demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
 ### Using Apache Iceberg REST service
 
@@ -210,7 +236,7 @@ spark.sql.catalog.catalog_rest.uri http://gravitino:9001/iceberg/
 spark.locality.wait.node 0
 ```
 
-Please note that `catalog_rest` in SparkSQL and `catalog_iceberg` in Gravitino and Trino share the same Iceberg JDBC backend, which implies that they can access the same dataset.
+Please note that `catalog_rest` in SparkSQL and `catalog_iceberg` in Gravitino and Trino share the same Iceberg JDBC backend, implying they can access the same dataset.
 
 1. Login Spark container and execute the steps.
 
@@ -249,6 +275,9 @@ union
 select * from catalog_iceberg.sales.customers;
 ```
 
+The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
+demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
+
 ### Using Gravitino with LlamaIndex
 
 The Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
@@ -262,9 +291,9 @@ demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 The scenario of this demo is that basic structured city statistics data is stored in MySQL, and
 detailed city introductions are stored in PDF files. The user wants to find answers about cities in the structured data and the PDF files.
 
-In this demo, you will use Gravitino to manage the MySQL table using a relational catalog, pdf
+In this demo, you will use Gravitino to manage the MySQL table using a relational catalog, and pdf
 files using a fileset catalog, treating Gravitino as a unified data source for LlamaIndex to build
-indexes on both tabular and non-tabular data. Then you will use LLM to query the data using natural
+indexes on both tabular and non-tabular data. Then, you can use LLM to query the data using natural
 language queries.
 
 Note: to run this demo, you need to set `OPENAI_API_KEY` in the `gravitino_llama_index_demo.ipynb`,

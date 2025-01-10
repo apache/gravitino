@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -83,8 +84,9 @@ public class MetadataObjects {
         names.size() != 3
             || type == MetadataObject.Type.FILESET
             || type == MetadataObject.Type.TABLE
-            || type == MetadataObject.Type.TOPIC,
-        "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
+            || type == MetadataObject.Type.TOPIC
+            || type == MetadataObject.Type.MODEL,
+        "If the length of names is 3, it must be FILESET, TABLE, TOPIC or MODEL");
 
     Preconditions.checkArgument(
         names.size() != 4 || type == MetadataObject.Type.COLUMN,
@@ -150,6 +152,9 @@ public class MetadataObjects {
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
+    if (type == MetadataObject.Type.ROLE) {
+      return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.ROLE);
+    }
 
     return MetadataObjects.of(parts, type);
   }

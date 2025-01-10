@@ -55,6 +55,7 @@ import org.apache.gravitino.tag.Tag;
  */
 abstract class BaseSchemaCatalog extends CatalogDTO
     implements Catalog, SupportsSchemas, SupportsTags, SupportsRoles {
+
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
 
@@ -63,6 +64,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
+  protected final MetadataObjectCredentialOperations objectCredentialOperations;
 
   BaseSchemaCatalog(
       Namespace catalogNamespace,
@@ -88,6 +90,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO
         new MetadataObjectTagOperations(catalogNamespace.level(0), metadataObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(catalogNamespace.level(0), metadataObject, restClient);
+    this.objectCredentialOperations =
+        new MetadataObjectCredentialOperations(
+            catalogNamespace.level(0), metadataObject, restClient);
   }
 
   @Override
@@ -139,8 +144,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    SchemaCreateRequest req =
-        new SchemaCreateRequest(RESTUtils.encodeString(schemaName), comment, properties);
+    SchemaCreateRequest req = new SchemaCreateRequest(schemaName, comment, properties);
     req.validate();
 
     SchemaResponse resp =
@@ -274,9 +278,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   static String formatSchemaRequestPath(Namespace ns) {
     return new StringBuilder()
         .append("api/metalakes/")
-        .append(ns.level(0))
+        .append(RESTUtils.encodeString(ns.level(0)))
         .append("/catalogs/")
-        .append(ns.level(1))
+        .append(RESTUtils.encodeString(ns.level(1)))
         .append("/schemas")
         .toString();
   }

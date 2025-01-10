@@ -51,4 +51,14 @@ public final class CreateTableEvent extends TableEvent {
   public TableInfo createdTableInfo() {
     return createdTableInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
+  }
 }
