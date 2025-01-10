@@ -52,7 +52,6 @@ public class LockManager {
 
   static final NameIdentifier ROOT = NameIdentifier.of("/");
 
-
   private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
   @VisibleForTesting TreeLockNode treeLockRootNode;
@@ -144,7 +143,7 @@ public class LockManager {
                         + "check if some dead lock or thread hang like io-connection hangs",
                     threadIdentifier,
                     node,
-                    node.getHoldingThreadTimestamp());
+                    DATE_FORMAT.format(node.getHoldingThreadTimestamp()));
               }
             });
   }
