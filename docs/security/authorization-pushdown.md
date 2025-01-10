@@ -69,15 +69,15 @@ When a user performs an authorization operation on data within a catalog, the ch
 
 In order to use the chained authorization plugin, you need to configure the following properties:
 
-| Property Name                                             | Description                                                                               | Default Value | Required                    | Since Version    |
-|-----------------------------------------------------------|-------------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|
-| `authorization-provider`                                  | Providers to use to implement authorization plugin such as `chain`                        | (none)        | No                          | 0.8.0-incubating |
-| `authorization.chain.plugins`                             | The comma-separated list of plugin names, like `${plugin-name1},${plugin-name2},...` | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.admin.url`     | The Ranger authorization plugin properties of the `${plugin-name}`                        | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.service.type`  | The Ranger authorization plugin properties of the `${plugin-name}`                        | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.service.name`  | The Ranger authorization plugin properties of the `${plugin-name}`                        | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.username`      | The Ranger authorization plugin properties of the `${plugin-name}`                        | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.password`      | The Ranger authorization plugin properties of the `${plugin-name}`                        | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| Property Name                                             | Description                                                                            | Default Value | Required                    | Since Version    |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|
+| `authorization-provider`                                  | Providers to use to implement authorization plugin such as `chain`                     | (none)        | No                          | 0.8.0-incubating |
+| `authorization.chain.plugins`                             | The comma-separated list of plugin names, like `${plugin-name1},${plugin-name2},...`   | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.admin.url`     | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.service.type`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.service.name`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.username`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.password`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
 
 :::caution
 The Gravitino chain authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
