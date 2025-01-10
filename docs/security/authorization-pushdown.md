@@ -81,7 +81,7 @@ In order to use the chained authorization plugin, you need to configure the foll
 
 :::caution
 The Gravitino chain authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
-The properties of every chained plugin in the authorization should be configured with the `authorization.chain.${plugin-name}` as the prefix.
+The properties of every chained authorization plugin should use `authorization.chain.${plugin-name}` as the prefix.
 :::
 
 #### Example of using the chain authorization Plugin
