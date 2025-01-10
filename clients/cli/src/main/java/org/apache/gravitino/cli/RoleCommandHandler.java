@@ -1,6 +1,24 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.gravitino.cli;
 
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
@@ -13,6 +31,8 @@ public class RoleCommandHandler extends CommandHandler {
   private final boolean ignore;
   private final String url;
   private String metalake;
+  private String[] roles;
+  private String[] privileges;
 
   public RoleCommandHandler(
       GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
@@ -31,7 +51,7 @@ public class RoleCommandHandler extends CommandHandler {
 
     metalake = new FullName(line).getMetalakeName();
 
-    String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
+    roles = line.getOptionValues(GravitinoOptions.ROLE);
     if (roles == null && !CommandActions.LIST.equals(command)) {
       System.err.println(ErrorMessages.MISSING_ROLE);
       Main.exit(-1);
@@ -40,9 +60,9 @@ public class RoleCommandHandler extends CommandHandler {
       roles = Arrays.stream(roles).distinct().toArray(String[]::new);
     }
 
-    String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
+    privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
 
-    if (!executeCommand(roles, privileges)) {
+    if (!executeCommand()) {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
       Main.exit(-1);
     }
@@ -53,10 +73,10 @@ public class RoleCommandHandler extends CommandHandler {
    *
    * @return true if the command is supported, false otherwise
    */
-  private boolean executeCommand(String[] roles, String[] privileges) {
+  private boolean executeCommand() {
     switch (command) {
       case CommandActions.DETAILS:
-        handleDetailsCommand(roles);
+        handleDetailsCommand();
         return true;
 
       case CommandActions.LIST:
@@ -64,19 +84,19 @@ public class RoleCommandHandler extends CommandHandler {
         return true;
 
       case CommandActions.CREATE:
-        handleCreateCommand(roles);
+        handleCreateCommand();
         return true;
 
       case CommandActions.DELETE:
-        handleDeleteCommand(roles);
+        handleDeleteCommand();
         return true;
 
       case CommandActions.GRANT:
-        handleGrantCommand(roles, privileges);
+        handleGrantCommand();
         return true;
 
       case CommandActions.REVOKE:
-        handleRevokeCommand(roles, privileges);
+        handleRevokeCommand();
         return true;
 
       default:
@@ -84,59 +104,52 @@ public class RoleCommandHandler extends CommandHandler {
     }
   }
 
-  private void handleDetailsCommand(String[] roles) {
+  private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
-      gravitinoCommandLine
-          .newRoleAudit(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS))
-          .handle();
+      gravitinoCommandLine.newRoleAudit(url, ignore, metalake, getOneRole()).validate().handle();
     } else {
-      gravitinoCommandLine
-          .newRoleDetails(url, ignore, metalake, getOneRole(roles, CommandActions.DETAILS))
-          .handle();
+      gravitinoCommandLine.newRoleDetails(url, ignore, metalake, getOneRole()).validate().handle();
     }
   }
 
   private void handleListCommand() {
-    gravitinoCommandLine.newListRoles(url, ignore, metalake).handle();
+    gravitinoCommandLine.newListRoles(url, ignore, metalake).validate().handle();
   }
 
-  private void handleCreateCommand(String[] roles) {
-    gravitinoCommandLine.newCreateRole(url, ignore, metalake, roles).handle();
+  private void handleCreateCommand() {
+    gravitinoCommandLine.newCreateRole(url, ignore, metalake, roles).validate().handle();
   }
 
-  private void handleDeleteCommand(String[] roles) {
+  private void handleDeleteCommand() {
     boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine.newDeleteRole(url, ignore, forceDelete, metalake, roles).handle();
+    gravitinoCommandLine
+        .newDeleteRole(url, ignore, forceDelete, metalake, roles)
+        .validate()
+        .handle();
   }
 
-  private void handleGrantCommand(String[] roles, String[] privileges) {
+  private void handleGrantCommand() {
     gravitinoCommandLine
         .newGrantPrivilegesToRole(
-            url,
-            ignore,
-            metalake,
-            getOneRole(roles, CommandActions.GRANT),
-            new FullName(line),
-            privileges)
+            url, ignore, metalake, getOneRole(), new FullName(line), privileges)
+        .validate()
         .handle();
   }
 
-  private void handleRevokeCommand(String[] roles, String[] privileges) {
+  private void handleRevokeCommand() {
     gravitinoCommandLine
         .newRevokePrivilegesFromRole(
-            url,
-            ignore,
-            metalake,
-            getOneRole(roles, CommandActions.REMOVE),
-            new FullName(line),
-            privileges)
+            url, ignore, metalake, getOneRole(), new FullName(line), privileges)
+        .validate()
         .handle();
   }
 
-  private String getOneRole(String[] roles, String command) {
-    Preconditions.checkArgument(
-        roles != null && roles.length == 1,
-        command + " requires exactly one role, but multiple are currently passed.");
+  private String getOneRole() {
+    if (roles == null || roles.length != 1) {
+      System.err.println(ErrorMessages.MULTIPLE_ROLE_COMMAND_ERROR);
+      Main.exit(-1);
+    }
+
     return roles[0];
   }
 }
