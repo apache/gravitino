@@ -26,14 +26,14 @@ class S3SecretKeyCredential(Credential, ABC):
     """Represents S3 secret key credential."""
 
     S3_SECRET_KEY_CREDENTIAL_TYPE: str = "s3-secret-key"
-    _GRAVITINO_S3_STATIC_ACCESS_KEY_ID: str = "s3-access-key-id"
-    _GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: str = "s3-secret-access-key"
+    _STATIC_ACCESS_KEY_ID: str = "s3-access-key-id"
+    _STATIC_SECRET_ACCESS_KEY: str = "s3-secret-access-key"
 
     def __init__(self, credential_info: Dict[str, str], expire_time: int):
-        self._access_key_id = credential_info[self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID]
-        self._secret_access_key = credential_info[
-            self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY
-        ]
+        self._access_key_id = credential_info.get(self._STATIC_ACCESS_KEY_ID, None)
+        self._secret_access_key = credential_info.get(
+            self._STATIC_SECRET_ACCESS_KEY, None
+        )
         Precondition.check_string_not_empty(
             self._access_key_id, "S3 access key id should not be empty"
         )
@@ -70,8 +70,8 @@ class S3SecretKeyCredential(Credential, ABC):
              The credential information.
         """
         return {
-            self._GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
-            self._GRAVITINO_S3_STATIC_ACCESS_KEY_ID: self._access_key_id,
+            self._STATIC_ACCESS_KEY_ID: self._access_key_id,
+            self._STATIC_SECRET_ACCESS_KEY: self._secret_access_key,
         }
 
     def access_key_id(self) -> str:

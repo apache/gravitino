@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -32,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 public class UntagEntity extends Command {
+  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
   protected final String metalake;
   protected final FullName name;
   protected final String[] tags;
@@ -91,7 +93,7 @@ public class UntagEntity extends Command {
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      exitWithError(ErrorMessages.UNKNOWN_TABLE);
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
       exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (Exception exp) {
@@ -110,5 +112,11 @@ public class UntagEntity extends Command {
     } else {
       System.out.println(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
     }
+  }
+
+  @Override
+  public Command validate() {
+    if (name == null || !name.hasName()) exitWithError(ErrorMessages.MISSING_NAME);
+    return super.validate();
   }
 }

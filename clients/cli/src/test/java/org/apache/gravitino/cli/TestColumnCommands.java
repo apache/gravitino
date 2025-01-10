@@ -19,12 +19,20 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.base.Joiner;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AddColumn;
@@ -38,17 +46,35 @@ import org.apache.gravitino.cli.commands.UpdateColumnDefault;
 import org.apache.gravitino.cli.commands.UpdateColumnName;
 import org.apache.gravitino.cli.commands.UpdateColumnNullability;
 import org.apache.gravitino.cli.commands.UpdateColumnPosition;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestColumnCommands {
   private CommandLine mockCommandLine;
   private Options mockOptions;
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
 
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  void restoreExitFlg() {
+    Main.useExit = true;
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -67,6 +93,7 @@ class TestColumnCommands {
         .when(commandLine)
         .newListColumns(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -94,8 +121,37 @@ class TestColumnCommands {
             "schema",
             "users",
             "name");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
+  }
+
+  @Test
+  void testColumnDetailsCommand() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.users.name");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newColumnAudit(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "name");
+
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.UNSUPPORTED_ACTION);
   }
 
   @Test
@@ -133,6 +189,7 @@ class TestColumnCommands {
             true,
             false,
             null);
+    doReturn(mockAddColumn).when(mockAddColumn).validate();
     commandLine.handleCommandLine();
     verify(mockAddColumn).handle();
   }
@@ -160,6 +217,7 @@ class TestColumnCommands {
             "schema",
             "users",
             "name");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -192,6 +250,7 @@ class TestColumnCommands {
             "users",
             "name",
             "new comment");
+    doReturn(mockUpdateColumn).when(mockUpdateColumn).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateColumn).handle();
   }
@@ -224,6 +283,7 @@ class TestColumnCommands {
             "users",
             "name",
             "renamed");
+    doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
   }
@@ -256,6 +316,7 @@ class TestColumnCommands {
             "users",
             "name",
             "varchar(250)");
+    doReturn(mockUpdateDatatype).when(mockUpdateDatatype).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateDatatype).handle();
   }
@@ -288,6 +349,7 @@ class TestColumnCommands {
             "users",
             "name",
             "first");
+    doReturn(mockUpdatePosition).when(mockUpdatePosition).validate();
     commandLine.handleCommandLine();
     verify(mockUpdatePosition).handle();
   }
@@ -319,6 +381,7 @@ class TestColumnCommands {
             "users",
             "name",
             true);
+    doReturn(mockUpdateNull).when(mockUpdateNull).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateNull).handle();
   }
@@ -350,6 +413,7 @@ class TestColumnCommands {
             "users",
             "name",
             true);
+    doReturn(mockUpdateAuto).when(mockUpdateAuto).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateAuto).handle();
   }
@@ -385,7 +449,234 @@ class TestColumnCommands {
             "name",
             "Fred Smith",
             "varchar(100)");
+    doReturn(mockUpdateDefault).when(mockUpdateDefault).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateDefault).handle();
+  }
+
+  @Test
+  void testUpdateColumnDefaultWithoutDataType() {
+    Main.useExit = false;
+    UpdateColumnDefault spyUpdate =
+        spy(
+            new UpdateColumnDefault(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "user",
+                "name",
+                "",
+                null));
+
+    assertThrows(RuntimeException.class, spyUpdate::validate);
+    verify(spyUpdate, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_DATATYPE, output);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + Joiner.on(", ")
+                .join(
+                    Arrays.asList(
+                        CommandEntities.CATALOG,
+                        CommandEntities.SCHEMA,
+                        CommandEntities.TABLE,
+                        CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutSchema() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + Joiner.on(", ")
+                .join(
+                    Arrays.asList(
+                        CommandEntities.SCHEMA, CommandEntities.TABLE, CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutTable() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            null,
+            null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + Joiner.on(", ").join(Arrays.asList(CommandEntities.TABLE, CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteColumnCommandWithoutColumn() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.users");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteColumn(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + Joiner.on(", ").join(Arrays.asList(CommandEntities.COLUMN)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListColumnCommandWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListColumns(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + Joiner.on(", ")
+                .join(
+                    Arrays.asList(
+                        CommandEntities.CATALOG, CommandEntities.SCHEMA, CommandEntities.TABLE)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListColumnCommandWithoutSchema() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListColumns(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + Joiner.on(", ").join(Arrays.asList(CommandEntities.SCHEMA, CommandEntities.TABLE)));
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListColumnCommandWithoutTable() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.COLUMN, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListColumns(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + CommandEntities.TABLE);
   }
 }

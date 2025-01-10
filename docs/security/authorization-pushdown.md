@@ -21,11 +21,15 @@ In order to use the Ranger Hadoop SQL Plugin, you need to configure the followin
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `authorization-provider`            | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)        | No       | 0.6.0-incubating |
 | `authorization.ranger.admin.url`    | The Apache Ranger web URIs.                                                                                                                          | (none)        | No       | 0.6.0-incubating |
+| `authorization.ranger.service.type` | The Apache Ranger service type, Currently only supports `HadoopSQL` or `HDFS`                                                                        | (none)        | No       | 0.8.0-incubating |
 | `authorization.ranger.auth.type`    | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`      | No       | 0.6.0-incubating |
 | `authorization.ranger.username`     | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)        | No       | 0.6.0-incubating |
 | `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.6.0-incubating |
-| `authorization.ranger.service.type` | The Apache Ranger service type.                                                                                                                      | (none)        | No       | 0.8.0-incubating |
 | `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0-incubating |
+
+:::caution
+The Gravitino Ranger authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
+:::
 
 Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
 
@@ -56,3 +60,48 @@ Gravitino 0.8.0 only supports the authorization Apache Ranger Hive service , Apa
 Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the plugin can't support to update or delete data for Paimon catalog.
 More data source authorization is under development.
 :::
+
+### chain authorization plugin
+
+Gravitino supports chaining multiple authorization plugins to secure one catalog.
+The authorization plugin chain is defined in the `authorization.chain.plugins` property, with the plugin names separated by commas.
+When a user performs an authorization operation on data within a catalog, the chained plugin will apply the authorization rules for every plugin defined in the chain.
+
+In order to use the chained authorization plugin, you need to configure the following properties:
+
+| Property Name                                             | Description                                                                            | Default Value | Required                    | Since Version    |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|
+| `authorization-provider`                                  | Providers to use to implement authorization plugin such as `chain`                     | (none)        | No                          | 0.8.0-incubating |
+| `authorization.chain.plugins`                             | The comma-separated list of plugin names, like `${plugin-name1},${plugin-name2},...`   | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.admin.url`     | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.service.type`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.service.name`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.username`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| `authorization.chain.${plugin-name}.ranger.password`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+
+:::caution
+The Gravitino chain authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
+The properties of every chained authorization plugin should use `authorization.chain.${plugin-name}` as the prefix.
+:::
+
+#### Example of using the chain authorization Plugin
+
+Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
+The Apache Hive service will use HDFS to store its data. You have created a `hdfsRepo` in Apache Ranger to manage HDFS's permissions.
+
+```properties
+authorization-provider=chain
+authorization.chain.plugins=hive,hdfs
+authorization.chain.hive.ranger.admin.url=http://ranger-service:6080
+authorization.chain.hive.ranger.service.type=HadoopSQL
+authorization.chain.hive.ranger.service.name=hiveRepo
+authorization.chain.hive.ranger.auth.type=simple
+authorization.chain.hive.ranger.username=Jack
+authorization.chain.hive.ranger.password=PWD123
+authorization.chain.hdfs.ranger.admin.url=http://ranger-service:6080
+authorization.chain.hdfs.ranger.service.type=HDFS
+authorization.chain.hdfs.ranger.service.name=hdfsRepo
+authorization.chain.hdfs.ranger.auth.type=simple
+authorization.chain.hdfs.ranger.username=Jack
+authorization.chain.hdfs.ranger.password=PWD123
+```

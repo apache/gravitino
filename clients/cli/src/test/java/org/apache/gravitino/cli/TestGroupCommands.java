@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AddRoleToGroup;
@@ -34,17 +40,35 @@ import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestGroupCommands {
   private CommandLine mockCommandLine;
   private Options mockOptions;
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
 
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  void restoreExitFlg() {
+    Main.useExit = true;
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -59,6 +83,7 @@ class TestGroupCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListGroups(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -77,6 +102,7 @@ class TestGroupCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newGroupDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -96,6 +122,7 @@ class TestGroupCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newGroupAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "group");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -114,6 +141,7 @@ class TestGroupCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateGroup(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA");
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -132,6 +160,7 @@ class TestGroupCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteGroup(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "groupA");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -151,6 +180,7 @@ class TestGroupCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteGroup(GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "groupA");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -222,6 +252,8 @@ class TestGroupCommands {
         .newRemoveRoleFromGroup(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA", "role1");
 
+    doReturn(mockRemoveFirstRole).when(mockRemoveFirstRole).validate();
+    doReturn(mockRemoveSecondRole).when(mockRemoveSecondRole).validate();
     commandLine.handleCommandLine();
 
     verify(mockRemoveFirstRole).handle();
@@ -255,9 +287,30 @@ class TestGroupCommands {
         .newAddRoleToGroup(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA", "role1");
 
+    doReturn(mockAddFirstRole).when(mockAddFirstRole).validate();
+    doReturn(mockAddSecondRole).when(mockAddSecondRole).validate();
     commandLine.handleCommandLine();
 
     verify(mockAddSecondRole).handle();
     verify(mockAddFirstRole).handle();
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDeleteGroupCommandWithoutGroupOption() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.GROUP, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteGroup(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MISSING_GROUP);
   }
 }

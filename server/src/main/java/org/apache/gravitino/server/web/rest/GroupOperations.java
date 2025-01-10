@@ -103,11 +103,13 @@ public class GroupOperations {
               TreeLockUtils.doWithTreeLock(
                   NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
                   LockType.WRITE,
-                  () ->
-                      Utils.ok(
-                          new GroupResponse(
-                              DTOConverters.toDTO(
-                                  accessControlManager.addGroup(metalake, request.getName()))))));
+                  () -> {
+                    request.validate();
+                    return Utils.ok(
+                        new GroupResponse(
+                            DTOConverters.toDTO(
+                                accessControlManager.addGroup(metalake, request.getName()))));
+                  }));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
           OperationType.ADD, request.getName(), metalake, e);

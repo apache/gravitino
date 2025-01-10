@@ -28,7 +28,6 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
-import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
@@ -47,6 +46,7 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
@@ -108,7 +108,7 @@ public class GravitinoEnv {
 
   private MetalakeDispatcher metalakeDispatcher;
 
-  private CredentialManager credentialManager;
+  private CredentialOperationDispatcher credentialOperationDispatcher;
 
   private TagDispatcher tagDispatcher;
 
@@ -264,12 +264,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the {@link CredentialManager} associated with the Gravitino environment.
+   * Get the {@link CredentialOperationDispatcher} associated with the Gravitino environment.
    *
-   * @return The {@link CredentialManager} instance.
+   * @return The {@link CredentialOperationDispatcher} instance.
    */
-  public CredentialManager credentialManager() {
-    return credentialManager;
+  public CredentialOperationDispatcher credentialOperationDispatcher() {
+    return credentialOperationDispatcher;
   }
 
   /**
@@ -432,7 +432,8 @@ public class GravitinoEnv {
         new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
-    this.credentialManager = new CredentialManager(catalogManager, entityStore, idGenerator);
+    this.credentialOperationDispatcher =
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);

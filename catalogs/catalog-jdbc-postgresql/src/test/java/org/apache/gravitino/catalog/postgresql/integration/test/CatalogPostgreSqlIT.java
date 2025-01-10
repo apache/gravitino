@@ -653,7 +653,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
         });
   }
 
-  @Test
+  //  @Test TODO(mchades): https://github.com/apache/gravitino/issues/6134
   void testCreateAndLoadSchema() throws SQLException {
     String testSchemaName = "test";
 

@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateTable;
@@ -41,6 +47,7 @@ import org.apache.gravitino.cli.commands.TablePartition;
 import org.apache.gravitino.cli.commands.TableSortOrder;
 import org.apache.gravitino.cli.commands.UpdateTableComment;
 import org.apache.gravitino.cli.commands.UpdateTableName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -48,10 +55,28 @@ class TestTableCommands {
   private CommandLine mockCommandLine;
   private Options mockOptions;
 
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  void restoreExitFlg() {
+    Main.useExit = true;
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -70,6 +95,7 @@ class TestTableCommands {
         .when(commandLine)
         .newListTables(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -90,6 +116,7 @@ class TestTableCommands {
         .when(commandLine)
         .newTableDetails(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -110,6 +137,7 @@ class TestTableCommands {
         .when(commandLine)
         .newListIndexes(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockIndex).when(mockIndex).validate();
     commandLine.handleCommandLine();
     verify(mockIndex).handle();
   }
@@ -130,6 +158,7 @@ class TestTableCommands {
         .when(commandLine)
         .newTablePartition(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockPartition).when(mockPartition).validate();
     commandLine.handleCommandLine();
     verify(mockPartition).handle();
   }
@@ -150,6 +179,7 @@ class TestTableCommands {
         .when(commandLine)
         .newTableDistribution(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockDistribution).when(mockDistribution).validate();
     commandLine.handleCommandLine();
     verify(mockDistribution).handle();
   }
@@ -172,7 +202,7 @@ class TestTableCommands {
         .when(commandLine)
         .newTableSortOrder(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
-
+    doReturn(mockSortOrder).when(mockSortOrder).validate();
     commandLine.handleCommandLine();
     verify(mockSortOrder).handle();
   }
@@ -193,6 +223,7 @@ class TestTableCommands {
         .when(commandLine)
         .newTableAudit(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -218,6 +249,7 @@ class TestTableCommands {
             "catalog",
             "schema",
             "users");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -244,6 +276,7 @@ class TestTableCommands {
             "catalog",
             "schema",
             "users");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -264,12 +297,13 @@ class TestTableCommands {
         .when(commandLine)
         .newListTableProperties(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+    doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
   }
 
   @Test
-  void testSetFilesetPropertyCommand() {
+  void testSetTablePropertyCommand() {
     SetTableProperty mockSetProperties = mock(SetTableProperty.class);
 
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
@@ -295,8 +329,72 @@ class TestTableCommands {
             "user",
             "property",
             "value");
+    doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testSetTablePropertyCommandWithoutPropertyAndValue() {
+    Main.useExit = false;
+    SetTableProperty spySetProperty =
+        spy(
+            new SetTableProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "table",
+                null,
+                null));
+
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY_AND_VALUE, output);
+  }
+
+  @Test
+  void testSetTablePropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    SetTableProperty spySetProperty =
+        spy(
+            new SetTableProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "table",
+                null,
+                "value"));
+
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, output);
+  }
+
+  @Test
+  void testSetTablePropertyCommandWithoutValue() {
+    Main.useExit = false;
+    SetTableProperty spySetProperty =
+        spy(
+            new SetTableProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "table",
+                "property",
+                null));
+
+    assertThrows(RuntimeException.class, spySetProperty::validate);
+    verify(spySetProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_VALUE, output);
   }
 
   @Test
@@ -323,8 +421,29 @@ class TestTableCommands {
             "schema",
             "users",
             "property");
+    doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
+  }
+
+  @Test
+  void testRemoveTablePropertyCommandWithoutProperty() {
+    Main.useExit = false;
+    RemoveTableProperty spyRemoveProperty =
+        spy(
+            new RemoveTableProperty(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "table",
+                null));
+
+    assertThrows(RuntimeException.class, spyRemoveProperty::validate);
+    verify(spyRemoveProperty, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_PROPERTY, output);
   }
 
   @Test
@@ -350,6 +469,7 @@ class TestTableCommands {
             "schema",
             "users",
             "New comment");
+    doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
   }
@@ -377,6 +497,7 @@ class TestTableCommands {
             "schema",
             "users",
             "people");
+    doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
   }
@@ -407,7 +528,165 @@ class TestTableCommands {
             "users",
             "users.csv",
             "comment");
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateTableWithoutFile() {
+    Main.useExit = false;
+    CreateTable spyCreate =
+        spy(
+            new CreateTable(
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "table",
+                null,
+                "comment"));
+
+    assertThrows(RuntimeException.class, spyCreate::validate);
+    verify(spyCreate, never()).handle();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.MISSING_COLUMN_FILE, output);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListTableWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(false);
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + CommandEntities.CATALOG
+            + ", "
+            + CommandEntities.SCHEMA);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testListTableWithoutSchema() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.LIST));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newListTables(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + CommandEntities.SCHEMA);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailTableWithoutCatalog() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newTableDetails(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MISSING_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + CommandEntities.CATALOG
+            + ", "
+            + CommandEntities.SCHEMA
+            + ", "
+            + CommandEntities.TABLE);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailTableWithoutSchema() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newTableDetails(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + CommandEntities.SCHEMA
+            + ", "
+            + CommandEntities.TABLE);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testDetailTableWithoutTable() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.TABLE, CommandActions.DETAILS));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newTableDetails(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        output,
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + CommandEntities.TABLE);
   }
 }

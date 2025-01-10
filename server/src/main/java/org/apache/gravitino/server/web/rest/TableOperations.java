@@ -228,11 +228,7 @@ public class TableOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
-            boolean dropped =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () -> purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident));
+            boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
             if (!dropped) {
               LOG.warn("Failed to drop table {} under schema {}", table, schema);
             }

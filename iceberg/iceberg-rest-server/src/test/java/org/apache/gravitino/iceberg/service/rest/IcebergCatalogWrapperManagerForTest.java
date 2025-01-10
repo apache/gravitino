@@ -21,7 +21,7 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
@@ -33,7 +33,8 @@ public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperMa
   }
 
   @Override
-  public IcebergCatalogWrapper createIcebergCatalogWrapper(IcebergConfig icebergConfig) {
-    return new IcebergCatalogWrapperForTest(icebergConfig);
+  public CatalogWrapperForREST createCatalogWrapper(
+      String catalogName, IcebergConfig icebergConfig) {
+    return new CatalogWrapperForTest(catalogName, icebergConfig);
   }
 }

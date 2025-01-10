@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
@@ -34,17 +40,35 @@ import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.UserAudit;
 import org.apache.gravitino.cli.commands.UserDetails;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestUserCommands {
   private CommandLine mockCommandLine;
   private Options mockOptions;
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
 
   @BeforeEach
   void setUp() {
     mockCommandLine = mock(CommandLine.class);
     mockOptions = mock(Options.class);
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  void restoreExitFlg() {
+    Main.useExit = true;
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -59,6 +83,7 @@ class TestUserCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListUsers(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -77,6 +102,7 @@ class TestUserCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newUserDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -96,6 +122,7 @@ class TestUserCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newUserAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -114,6 +141,7 @@ class TestUserCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateUser(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user");
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -132,6 +160,7 @@ class TestUserCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteUser(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "user");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -151,6 +180,7 @@ class TestUserCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteUser(GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "user");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -223,6 +253,8 @@ class TestUserCommands {
         .newRemoveRoleFromUser(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "role1");
 
+    doReturn(mockRemoveFirstRole).when(mockRemoveFirstRole).validate();
+    doReturn(mockRemoveSecondRole).when(mockRemoveSecondRole).validate();
     commandLine.handleCommandLine();
 
     verify(mockRemoveSecondRole).handle();
@@ -257,9 +289,29 @@ class TestUserCommands {
         .newAddRoleToUser(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "user", "role1");
 
+    doReturn(mockAddFirstRole).when(mockAddFirstRole).validate();
+    doReturn(mockAddSecondRole).when(mockAddSecondRole).validate();
     commandLine.handleCommandLine();
 
     verify(mockAddFirstRole).handle();
     verify(mockAddSecondRole).handle();
+  }
+
+  @Test
+  void testDeleteUserWithoutUserOption() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(false);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.USER, CommandActions.DELETE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    verify(commandLine, never())
+        .newDeleteUser(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", null);
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MISSING_USER);
   }
 }

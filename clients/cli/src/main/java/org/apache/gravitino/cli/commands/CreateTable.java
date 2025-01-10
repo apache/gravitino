@@ -108,4 +108,10 @@ public class CreateTable extends Command {
 
     System.out.println(table + " created");
   }
+
+  @Override
+  public Command validate() {
+    if (columnFile == null) exitWithError(ErrorMessages.MISSING_COLUMN_FILE);
+    return super.validate();
+  }
 }

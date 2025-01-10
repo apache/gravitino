@@ -53,7 +53,7 @@ public class ListGroups extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", groups);
+    String all = groups.length == 0 ? "No groups exist." : String.join(",", groups);
 
     System.out.println(all.toString());
   }

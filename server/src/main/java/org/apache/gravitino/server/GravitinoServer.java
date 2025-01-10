@@ -26,12 +26,13 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
-import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -115,7 +116,10 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
-            bind(gravitinoEnv.credentialManager()).to(CredentialManager.class).ranked(1);
+            bind(gravitinoEnv.credentialOperationDispatcher())
+                .to(CredentialOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
@@ -164,9 +168,9 @@ public class GravitinoServer extends ResourceConfig {
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = loadConfig(confPath);
     GravitinoServer server = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
-    server.initialize();
 
     try {
+      server.initialize();
       // Instantiates GravitinoServer
       server.start();
     } catch (Exception e) {

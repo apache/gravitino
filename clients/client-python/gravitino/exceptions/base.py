@@ -73,6 +73,14 @@ class NoSuchCatalogException(NotFoundException):
     """An exception thrown when a catalog is not found."""
 
 
+class NoSuchModelException(NotFoundException):
+    """An exception thrown when a model is not found."""
+
+
+class NoSuchModelVersionException(NotFoundException):
+    """An exception thrown when a model version is not found."""
+
+
 class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
 
@@ -87,6 +95,14 @@ class SchemaAlreadyExistsException(AlreadyExistsException):
 
 class CatalogAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a resource already exists."""
+
+
+class ModelAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a model already exists."""
+
+
+class ModelVersionAliasesAlreadyExistException(AlreadyExistsException):
+    """An exception thrown when model version with aliases already exists."""
 
 
 class NotEmptyException(GravitinoRuntimeException):

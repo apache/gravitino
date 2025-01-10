@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import java.util.List;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -26,9 +29,9 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
 public class DeleteRole extends Command {
-
+  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
   protected String metalake;
-  protected String role;
+  protected String[] roles;
   protected boolean force;
 
   /**
@@ -38,28 +41,30 @@ public class DeleteRole extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param role The name of the role.
+   * @param roles The name of the role.
    */
   public DeleteRole(
-      String url, boolean ignoreVersions, boolean force, String metalake, String role) {
+      String url, boolean ignoreVersions, boolean force, String metalake, String[] roles) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.force = force;
-    this.role = role;
+    this.roles = roles;
   }
 
   /** Delete a role. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
     if (!AreYouSure.really(force)) {
       return;
     }
+    List<String> failedRoles = Lists.newArrayList();
+    List<String> successRoles = Lists.newArrayList();
 
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.deleteRole(role);
+      for (String role : roles) {
+        (client.deleteRole(role) ? successRoles : failedRoles).add(role);
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
@@ -68,10 +73,15 @@ public class DeleteRole extends Command {
       exitWithError(exp.getMessage());
     }
 
-    if (deleted) {
-      System.out.println(role + " deleted.");
+    if (failedRoles.isEmpty()) {
+      System.out.println(COMMA_JOINER.join(successRoles) + " deleted.");
     } else {
-      System.out.println(role + " not deleted.");
+      System.err.println(
+          COMMA_JOINER.join(successRoles)
+              + " deleted, "
+              + "but "
+              + COMMA_JOINER.join(failedRoles)
+              + " is not deleted.");
     }
   }
 }

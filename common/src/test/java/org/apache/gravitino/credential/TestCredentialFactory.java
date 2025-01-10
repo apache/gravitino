@@ -153,16 +153,41 @@ public class TestCredentialFactory {
     long expireTime = 100;
     Credential credential =
         CredentialFactory.create(
-            ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE,
-            adlsTokenCredentialInfo,
-            expireTime);
+            ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE, adlsTokenCredentialInfo, expireTime);
     Assertions.assertEquals(
-        ADLSTokenCredential.ADLS_SAS_TOKEN_CREDENTIAL_TYPE, credential.credentialType());
+        ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE, credential.credentialType());
     Assertions.assertInstanceOf(ADLSTokenCredential.class, credential);
 
     ADLSTokenCredential adlsTokenCredential = (ADLSTokenCredential) credential;
     Assertions.assertEquals(storageAccountName, adlsTokenCredential.accountName());
     Assertions.assertEquals(sasToken, adlsTokenCredential.sasToken());
     Assertions.assertEquals(expireTime, adlsTokenCredential.expireTimeInMs());
+  }
+
+  @Test
+  void testAzureAccountKeyCredential() {
+    String storageAccountName = "storage-account-name";
+    String storageAccountKey = "storage-account-key";
+
+    Map<String, String> azureAccountKeyCredentialInfo =
+        ImmutableMap.of(
+            AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            storageAccountName,
+            AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+            storageAccountKey);
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
+            azureAccountKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(AzureAccountKeyCredential.class, credential);
+
+    AzureAccountKeyCredential azureAccountKeyCredential = (AzureAccountKeyCredential) credential;
+    Assertions.assertEquals(storageAccountName, azureAccountKeyCredential.accountName());
+    Assertions.assertEquals(storageAccountKey, azureAccountKeyCredential.accountKey());
+    Assertions.assertEquals(expireTime, azureAccountKeyCredential.expireTimeInMs());
   }
 }

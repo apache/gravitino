@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.rel.Table;
 
 public class TagEntity extends Command {
@@ -94,12 +95,20 @@ public class TagEntity extends Command {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTableException err) {
       exitWithError(ErrorMessages.UNKNOWN_TABLE);
+    } catch (TagAlreadyAssociatedException err) {
+      exitWithError("Tags are already associated with " + name.getName());
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", tagsToAdd);
+    String all = tagsToAdd.length == 0 ? "nothing" : String.join(",", tagsToAdd);
 
     System.out.println(entity + " now tagged with " + all);
+  }
+
+  @Override
+  public Command validate() {
+    if (name == null || !name.hasName()) exitWithError(ErrorMessages.MISSING_NAME);
+    return super.validate();
   }
 }
