@@ -36,6 +36,7 @@ public class ColumnCommandHandler extends CommandHandler {
   private final String catalog;
   private final String schema;
   private final String table;
+  private final boolean quiet;
   private String column;
 
   /**
@@ -52,6 +53,7 @@ public class ColumnCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = gravitinoCommandLine.getUrl();
     this.name = new FullName(line);
@@ -146,6 +148,7 @@ public class ColumnCommandHandler extends CommandHandler {
         .newAddColumn(
             url,
             ignore,
+            quiet,
             metalake,
             catalog,
             schema,
@@ -164,7 +167,7 @@ public class ColumnCommandHandler extends CommandHandler {
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
     gravitinoCommandLine
-        .newDeleteColumn(url, ignore, metalake, catalog, schema, table, column)
+        .newDeleteColumn(url, ignore, quiet, metalake, catalog, schema, table, column)
         .validate()
         .handle();
   }
@@ -174,28 +177,32 @@ public class ColumnCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment)
+          .newUpdateColumnComment(
+              url, ignore, quiet, metalake, catalog, schema, table, column, comment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateColumnName(url, ignore, metalake, catalog, schema, table, column, newName)
+          .newUpdateColumnName(
+              url, ignore, quiet, metalake, catalog, schema, table, column, newName)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.DATATYPE) && !line.hasOption(GravitinoOptions.DEFAULT)) {
       String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
       gravitinoCommandLine
-          .newUpdateColumnDatatype(url, ignore, metalake, catalog, schema, table, column, datatype)
+          .newUpdateColumnDatatype(
+              url, ignore, quiet, metalake, catalog, schema, table, column, datatype)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.POSITION)) {
       String position = line.getOptionValue(GravitinoOptions.POSITION);
       gravitinoCommandLine
-          .newUpdateColumnPosition(url, ignore, metalake, catalog, schema, table, column, position)
+          .newUpdateColumnPosition(
+              url, ignore, quiet, metalake, catalog, schema, table, column, position)
           .validate()
           .handle();
     }
@@ -203,7 +210,7 @@ public class ColumnCommandHandler extends CommandHandler {
       boolean nullable = line.getOptionValue(GravitinoOptions.NULL).equals("true");
       gravitinoCommandLine
           .newUpdateColumnNullability(
-              url, ignore, metalake, catalog, schema, table, column, nullable)
+              url, ignore, quiet, metalake, catalog, schema, table, column, nullable)
           .validate()
           .handle();
     }
@@ -211,7 +218,7 @@ public class ColumnCommandHandler extends CommandHandler {
       boolean autoIncrement = line.getOptionValue(GravitinoOptions.AUTO).equals("true");
       gravitinoCommandLine
           .newUpdateColumnAutoIncrement(
-              url, ignore, metalake, catalog, schema, table, column, autoIncrement)
+              url, ignore, quiet, metalake, catalog, schema, table, column, autoIncrement)
           .validate()
           .handle();
     }
@@ -220,7 +227,7 @@ public class ColumnCommandHandler extends CommandHandler {
       String dataType = line.getOptionValue(GravitinoOptions.DATATYPE);
       gravitinoCommandLine
           .newUpdateColumnDefault(
-              url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType)
+              url, ignore, quiet, metalake, catalog, schema, table, column, defaultValue, dataType)
           .validate()
           .handle();
     }

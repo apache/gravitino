@@ -36,13 +36,19 @@ public class CatalogEnable extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param enableMetalake Whether to enable it's metalake
    */
   public CatalogEnable(
-      String url, boolean ignoreVersions, String metalake, String catalog, boolean enableMetalake) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String catalog,
+      boolean enableMetalake) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.catalog = catalog;
     this.enableMetalake = enableMetalake;
@@ -69,6 +75,7 @@ public class CatalogEnable extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(metalake + "." + catalog + " has been enabled.");
   }
 }

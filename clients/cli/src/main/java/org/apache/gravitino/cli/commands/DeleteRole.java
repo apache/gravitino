@@ -39,13 +39,19 @@ public class DeleteRole extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param roles The name of the role.
    */
   public DeleteRole(
-      String url, boolean ignoreVersions, boolean force, String metalake, String[] roles) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      boolean force,
+      String metalake,
+      String[] roles) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.force = force;
     this.roles = roles;
@@ -74,9 +80,10 @@ public class DeleteRole extends Command {
     }
 
     if (failedRoles.isEmpty()) {
+      if (quiet) return;
       System.out.println(COMMA_JOINER.join(successRoles) + " deleted.");
     } else {
-      System.err.println(
+      exitWithError(
           COMMA_JOINER.join(successRoles)
               + " deleted, "
               + "but "

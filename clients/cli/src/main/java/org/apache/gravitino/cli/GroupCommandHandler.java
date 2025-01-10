@@ -31,6 +31,7 @@ public class GroupCommandHandler extends CommandHandler {
   private final String url;
   private final FullName name;
   private final String metalake;
+  private final boolean quiet;
   private String group;
 
   /**
@@ -47,6 +48,7 @@ public class GroupCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -119,13 +121,16 @@ public class GroupCommandHandler extends CommandHandler {
 
   /** Handles the "CREATE" command. */
   private void handleCreateCommand() {
-    gravitinoCommandLine.newCreateGroup(url, ignore, metalake, group).validate().handle();
+    gravitinoCommandLine.newCreateGroup(url, ignore, quiet, metalake, group).validate().handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine.newDeleteGroup(url, ignore, force, metalake, group).validate().handle();
+    gravitinoCommandLine
+        .newDeleteGroup(url, ignore, quiet, force, metalake, group)
+        .validate()
+        .handle();
   }
 
   /** Handles the "REVOKE" command. */
@@ -133,7 +138,7 @@ public class GroupCommandHandler extends CommandHandler {
     String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
     for (String role : revokeRoles) {
       gravitinoCommandLine
-          .newRemoveRoleFromGroup(url, ignore, metalake, group, role)
+          .newRemoveRoleFromGroup(url, ignore, quiet, metalake, group, role)
           .validate()
           .handle();
     }
@@ -145,7 +150,7 @@ public class GroupCommandHandler extends CommandHandler {
     String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
     for (String role : grantRoles) {
       gravitinoCommandLine
-          .newAddRoleToGroup(url, ignore, metalake, group, role)
+          .newAddRoleToGroup(url, ignore, quiet, metalake, group, role)
           .validate()
           .handle();
     }

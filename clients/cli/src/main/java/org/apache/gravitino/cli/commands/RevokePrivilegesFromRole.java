@@ -45,6 +45,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    * @param entity The name of the entity.
@@ -53,11 +54,12 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
   public RevokePrivilegesFromRole(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       String metalake,
       String role,
       FullName entity,
       String[] privileges) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.entity = entity;
     this.role = role;
@@ -100,6 +102,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
       return;
     }
 
+    if (quiet) return;
     String all = String.join(",", privileges);
     System.out.println(role + " revoked " + all + " on " + entity.getName());
   }

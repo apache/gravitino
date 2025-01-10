@@ -46,6 +46,7 @@ public class LinkModel extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of schema.
@@ -58,6 +59,7 @@ public class LinkModel extends Command {
   public LinkModel(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       String metalake,
       String catalog,
       String schema,
@@ -66,7 +68,7 @@ public class LinkModel extends Command {
       String[] alias,
       String comment,
       Map<String, String> properties) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -100,6 +102,7 @@ public class LinkModel extends Command {
       exitWithError(err.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(
         "Linked model " + model + " to " + uri + " with aliases " + Arrays.toString(alias));
   }

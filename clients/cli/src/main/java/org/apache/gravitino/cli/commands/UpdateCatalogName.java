@@ -37,13 +37,19 @@ public class UpdateCatalogName extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param name The new catalog name.
    */
   public UpdateCatalogName(
-      String url, boolean ignoreVersions, String metalake, String catalog, String name) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String catalog,
+      String name) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.catalog = catalog;
     this.name = name;
@@ -64,6 +70,7 @@ public class UpdateCatalogName extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(catalog + " name changed.");
   }
 }

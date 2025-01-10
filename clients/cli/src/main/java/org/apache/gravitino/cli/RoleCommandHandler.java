@@ -33,6 +33,7 @@ public class RoleCommandHandler extends CommandHandler {
   private String metalake;
   private String[] roles;
   private String[] privileges;
+  private boolean quiet;
 
   public RoleCommandHandler(
       GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
@@ -41,6 +42,7 @@ public class RoleCommandHandler extends CommandHandler {
     this.command = command;
     this.ignore = ignore;
     this.url = getUrl(line);
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
   }
 
   /** Handles the command execution logic based on the provided command. */
@@ -117,13 +119,13 @@ public class RoleCommandHandler extends CommandHandler {
   }
 
   private void handleCreateCommand() {
-    gravitinoCommandLine.newCreateRole(url, ignore, metalake, roles).validate().handle();
+    gravitinoCommandLine.newCreateRole(url, ignore, quiet, metalake, roles).validate().handle();
   }
 
   private void handleDeleteCommand() {
     boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteRole(url, ignore, forceDelete, metalake, roles)
+        .newDeleteRole(url, ignore, quiet, forceDelete, metalake, roles)
         .validate()
         .handle();
   }
@@ -139,7 +141,7 @@ public class RoleCommandHandler extends CommandHandler {
   private void handleRevokeCommand() {
     gravitinoCommandLine
         .newRevokePrivilegesFromRole(
-            url, ignore, metalake, getOneRole(), new FullName(line), privileges)
+            url, ignore, quiet, metalake, getOneRole(), new FullName(line), privileges)
         .validate()
         .handle();
   }

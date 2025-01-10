@@ -35,12 +35,13 @@ public class RemoveMetalakeProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    */
   public RemoveMetalakeProperty(
-      String url, boolean ignoreVersions, String metalake, String property) {
-    super(url, ignoreVersions);
+      String url, boolean ignoreVersions, boolean quiet, String metalake, String property) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.property = property;
   }
@@ -58,6 +59,7 @@ public class RemoveMetalakeProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(property + " property removed.");
   }
 

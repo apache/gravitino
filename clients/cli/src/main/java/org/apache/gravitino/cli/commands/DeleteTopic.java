@@ -41,6 +41,7 @@ public class DeleteTopic extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
@@ -50,12 +51,13 @@ public class DeleteTopic extends Command {
   public DeleteTopic(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       boolean force,
       String metalake,
       String catalog,
       String schema,
       String topic) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
     this.catalog = catalog;
@@ -86,6 +88,7 @@ public class DeleteTopic extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     if (deleted) {
       System.out.println(topic + " deleted.");
     } else {

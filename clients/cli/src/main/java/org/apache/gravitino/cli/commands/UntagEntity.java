@@ -43,13 +43,19 @@ public class UntagEntity extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param tags The names of the tags.
    */
   public UntagEntity(
-      String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      FullName name,
+      String[] tags) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.name = name;
     this.tags = tags;
@@ -100,6 +106,7 @@ public class UntagEntity extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     String all = String.join(",", removeTags);
 
     if (all.equals("")) {

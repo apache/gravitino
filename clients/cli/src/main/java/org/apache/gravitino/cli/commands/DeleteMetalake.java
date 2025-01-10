@@ -34,11 +34,13 @@ public class DeleteMetalake extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    */
-  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
-    super(url, ignoreVersions);
+  public DeleteMetalake(
+      String url, boolean ignoreVersions, boolean quiet, boolean force, String metalake) {
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
   }
@@ -63,6 +65,7 @@ public class DeleteMetalake extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     if (deleted) {
       System.out.println(metalake + " deleted.");
     } else {

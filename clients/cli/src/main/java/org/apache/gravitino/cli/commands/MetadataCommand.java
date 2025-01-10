@@ -34,7 +34,11 @@ public class MetadataCommand extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    */
   public MetadataCommand(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
+    this(url, ignoreVersions, false);
+  }
+
+  public MetadataCommand(String url, boolean ignoreVersions, boolean quiet) {
+    super(url, ignoreVersions, quiet);
   }
 
   /**

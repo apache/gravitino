@@ -34,6 +34,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private final FullName name;
   private final String metalake;
   private final String catalog;
+  private final boolean quiet;
   private String schema;
 
   /**
@@ -50,6 +51,7 @@ public class SchemaCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -142,7 +144,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine
-        .newCreateSchema(url, ignore, metalake, catalog, schema, comment)
+        .newCreateSchema(url, ignore, quiet, metalake, catalog, schema, comment)
         .validate()
         .handle();
   }
@@ -151,7 +153,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteSchema(url, ignore, force, metalake, catalog, schema)
+        .newDeleteSchema(url, ignore, quiet, force, metalake, catalog, schema)
         .validate()
         .handle();
   }
@@ -161,7 +163,7 @@ public class SchemaCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetSchemaProperty(url, ignore, metalake, catalog, schema, property, value)
+        .newSetSchemaProperty(url, ignore, quiet, metalake, catalog, schema, property, value)
         .validate()
         .handle();
   }
@@ -170,7 +172,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveSchemaProperty(url, ignore, metalake, catalog, schema, property)
+        .newRemoveSchemaProperty(url, ignore, quiet, metalake, catalog, schema, property)
         .validate()
         .handle();
   }

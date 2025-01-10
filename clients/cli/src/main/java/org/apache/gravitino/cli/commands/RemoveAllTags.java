@@ -44,13 +44,19 @@ public class RemoveAllTags extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param force Force operation.
    */
   public RemoveAllTags(
-      String url, boolean ignoreVersions, String metalake, FullName name, boolean force) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      FullName name,
+      boolean force) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.name = name;
     this.force = force;
@@ -111,6 +117,7 @@ public class RemoveAllTags extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     if (tags.length > 0) {
       System.out.println(
           entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");

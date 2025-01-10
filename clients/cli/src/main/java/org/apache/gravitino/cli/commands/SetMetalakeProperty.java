@@ -36,13 +36,19 @@ public class SetMetalakeProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    * @param value The value of the property.
    */
   public SetMetalakeProperty(
-      String url, boolean ignoreVersions, String metalake, String property, String value) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String property,
+      String value) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.property = property;
     this.value = value;
@@ -61,6 +67,7 @@ public class SetMetalakeProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(metalake + " property set.");
   }
 

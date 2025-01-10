@@ -307,6 +307,7 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
 
     GravitinoCommandLine commandLine =
         spy(
@@ -316,6 +317,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newCreateModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
@@ -338,6 +340,7 @@ public class TestModelCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -346,6 +349,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newCreateModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
@@ -369,6 +373,7 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.PROPERTIES))
         .thenReturn(new String[] {"key1=val1", "key2" + "=val2"});
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -378,6 +383,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newCreateModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
@@ -406,6 +412,7 @@ public class TestModelCommands {
         .thenReturn(new String[] {"key1=val1", "key2" + "=val2"});
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -415,6 +422,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newCreateModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
@@ -438,6 +446,7 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
 
     GravitinoCommandLine commandLine =
         spy(
@@ -446,13 +455,15 @@ public class TestModelCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteModel(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "model");
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"));
+
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -468,6 +479,7 @@ public class TestModelCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.URI)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.URI)).thenReturn("file:///tmp/file");
     when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -477,6 +489,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newLinkModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
@@ -503,6 +516,7 @@ public class TestModelCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS))
         .thenReturn(new String[] {"aliasA", "aliasB"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -512,6 +526,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newLinkModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
@@ -538,6 +553,7 @@ public class TestModelCommands {
         spy(
             new LinkModel(
                 GravitinoCommandLine.DEFAULT_URL,
+                false,
                 false,
                 "metalake_demo",
                 "catalog",
@@ -571,6 +587,7 @@ public class TestModelCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.PROPERTIES))
         .thenReturn(new String[] {"key1=val1", "key2" + "=val2"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -580,6 +597,7 @@ public class TestModelCommands {
         .when(commandLine)
         .newLinkModel(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("catalog"),
