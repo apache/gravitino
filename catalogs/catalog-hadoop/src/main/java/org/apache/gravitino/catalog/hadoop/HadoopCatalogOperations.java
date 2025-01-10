@@ -764,7 +764,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(
-                    config, HadoopCatalogPropertiesMetadata.GET_FILESYSTEM_TIMEOUT_SECONDS);
+                    config, HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
     try {
       AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
       Awaitility.await()
@@ -778,8 +778,14 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     } catch (ConditionTimeoutException e) {
       throw new IOException(
           String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s seconds",
-              path, scheme, provider, config, timeoutSeconds),
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s seconds, please check the configuration or increase the "
+                  + "file system connection timeout time by setting catalog property: %s",
+              path,
+              scheme,
+              provider,
+              config,
+              timeoutSeconds,
+              HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
     }
   }

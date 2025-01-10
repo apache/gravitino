@@ -53,8 +53,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
 
-  static final String GET_FILESYSTEM_TIMEOUT_SECONDS = "get-filesystem-timeout-seconds";
-  static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 10;
+  static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS =
+      "filesystem-connection-timeout-seconds";
+  static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
   public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
   public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
@@ -86,9 +87,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   BUILTIN_LOCAL_FS_PROVIDER, // please see LocalFileSystemProvider#name()
                   false /* hidden */))
           .put(
-              GET_FILESYSTEM_TIMEOUT_SECONDS,
+              FILESYSTEM_CONNECTION_TIMEOUT_SECONDS,
               PropertyEntry.integerOptionalPropertyEntry(
-                  GET_FILESYSTEM_TIMEOUT_SECONDS,
+                  FILESYSTEM_CONNECTION_TIMEOUT_SECONDS,
                   "Timeout to wait for to create the Hadoop file system client instance.",
                   false /* immutable */,
                   DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS,
