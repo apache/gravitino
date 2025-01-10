@@ -26,6 +26,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +51,9 @@ public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
 
   static final NameIdentifier ROOT = NameIdentifier.of("/");
+
+
+  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
   @VisibleForTesting TreeLockNode treeLockRootNode;
   final AtomicLong totalNodeCount = new AtomicLong(1);
@@ -136,7 +140,8 @@ public class LockManager {
               // If the thread is holding the lock for more than 30 seconds, we will log it.
               if (System.currentTimeMillis() - ts > 30000) {
                 LOG.warn(
-                    "Dead lock detected for thread with identifier {} on node {}, threads that holding the node: {} ",
+                    "Thread with identifier {} holds the lock node {} for more than 30s since {}, please "
+                        + "check if some dead lock or thread hang like io-connection hangs",
                     threadIdentifier,
                     node,
                     node.getHoldingThreadTimestamp());
