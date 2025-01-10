@@ -36,10 +36,6 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.mybatis)
-  implementation(libs.protobuf.java.util) {
-    exclude("com.google.guava", "guava")
-      .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
-  }
 
   annotationProcessor(libs.lombok)
 
