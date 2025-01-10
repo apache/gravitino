@@ -20,10 +20,15 @@ package org.apache.gravitino.oss.fs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -31,7 +36,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem;
 import org.apache.hadoop.fs.aliyun.oss.Constants;
 
-public class OSSFileSystemProvider implements FileSystemProvider {
+public class OSSFileSystemProvider implements FileSystemProvider, SupportsCredentialVending {
 
   private static final String OSS_FILESYSTEM_IMPL = "fs.oss.impl";
 
@@ -61,7 +66,20 @@ public class OSSFileSystemProvider implements FileSystemProvider {
     }
 
     hadoopConfMap.forEach(configuration::set);
+
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  @Override
+  public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
+    Credential credential = OSSUtils.getSuitableCredential(credentials);
+    Map<String, String> result = Maps.newHashMap();
+    if (credential instanceof OSSSecretKeyCredential || credential instanceof OSSTokenCredential) {
+      result.put(
+          Constants.CREDENTIALS_PROVIDER_KEY, OSSCredentialsProvider.class.getCanonicalName());
+    }
+
+    return result;
   }
 
   @Override

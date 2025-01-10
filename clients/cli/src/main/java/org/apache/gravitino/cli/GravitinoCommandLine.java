@@ -133,98 +133,25 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.TABLE)) {
       new TableCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.SCHEMA)) {
-      handleSchemaCommand();
+      new SchemaCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.CATALOG)) {
       new CatalogCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       new MetalakeCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.TOPIC)) {
-      handleTopicCommand();
+      new TopicCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {
       handleFilesetCommand();
     } else if (entity.equals(CommandEntities.USER)) {
       handleUserCommand();
     } else if (entity.equals(CommandEntities.GROUP)) {
-      handleGroupCommand();
+      new GroupCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.TAG)) {
       handleTagCommand();
     } else if (entity.equals(CommandEntities.ROLE)) {
-      handleRoleCommand();
+      new RoleCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
       new ModelCommandHandler(this, line, command, ignore).handle();
-    }
-  }
-
-  /**
-   * Handles the command execution for Schemas based on command type and the command line options.
-   */
-  private void handleSchemaCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-
-    Command.setAuthenticationMode(auth, userName);
-
-    List<String> missingEntities = Lists.newArrayList();
-    if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-
-    // Handle the CommandActions.LIST action separately as it doesn't use `schema`
-    if (CommandActions.LIST.equals(command)) {
-      checkEntities(missingEntities);
-      newListSchema(url, ignore, metalake, catalog).validate().handle();
-      return;
-    }
-
-    String schema = name.getSchemaName();
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newSchemaAudit(url, ignore, metalake, catalog, schema).validate().handle();
-        } else {
-          newSchemaDetails(url, ignore, metalake, catalog, schema).validate().handle();
-        }
-        break;
-
-      case CommandActions.CREATE:
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newCreateSchema(url, ignore, metalake, catalog, schema, comment).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteSchema(url, ignore, force, metalake, catalog, schema).validate().handle();
-        break;
-
-      case CommandActions.SET:
-        String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetSchemaProperty(url, ignore, metalake, catalog, schema, property, value)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.REMOVE:
-        property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveSchemaProperty(url, ignore, metalake, catalog, schema, property)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.PROPERTIES:
-        newListSchemaProperties(url, ignore, metalake, catalog, schema).validate().handle();
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        Main.exit(-1);
-        break;
     }
   }
 
@@ -284,67 +211,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  /** Handles the command execution for Group based on command type and the command line options. */
-  protected void handleGroupCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String group = line.getOptionValue(GravitinoOptions.GROUP);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    if (group == null && !CommandActions.LIST.equals(command)) {
-      System.err.println(ErrorMessages.MISSING_GROUP);
-      Main.exit(-1);
-    }
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newGroupAudit(url, ignore, metalake, group).validate().handle();
-        } else {
-          newGroupDetails(url, ignore, metalake, group).validate().handle();
-        }
-        break;
-
-      case CommandActions.LIST:
-        newListGroups(url, ignore, metalake).validate().handle();
-        break;
-
-      case CommandActions.CREATE:
-        newCreateGroup(url, ignore, metalake, group).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteGroup(url, ignore, force, metalake, group).validate().handle();
-        break;
-
-      case CommandActions.REVOKE:
-        String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
-        for (String role : revokeRoles) {
-          newRemoveRoleFromGroup(url, ignore, metalake, group, role).validate().handle();
-        }
-        System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
-        break;
-
-      case CommandActions.GRANT:
-        String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
-        for (String role : grantRoles) {
-          newAddRoleToGroup(url, ignore, metalake, group, role).validate().handle();
-        }
-        System.out.printf("Grant roles %s to group %s%n", COMMA_JOINER.join(grantRoles), group);
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
         Main.exit(-1);
         break;
     }
@@ -448,77 +314,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       Main.exit(-1);
     }
     return tags[0];
-  }
-
-  /** Handles the command execution for Roles based on command type and the command line options. */
-  protected void handleRoleCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String[] privileges = line.getOptionValues(GravitinoOptions.PRIVILEGE);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    String[] roles = line.getOptionValues(GravitinoOptions.ROLE);
-    if (roles == null && !CommandActions.LIST.equals(command)) {
-      System.err.println(ErrorMessages.MISSING_ROLE);
-      Main.exit(-1);
-    }
-
-    if (roles != null) {
-      roles = Arrays.stream(roles).distinct().toArray(String[]::new);
-    }
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newRoleAudit(url, ignore, metalake, getOneRole(roles)).validate().handle();
-        } else {
-          newRoleDetails(url, ignore, metalake, getOneRole(roles)).validate().handle();
-        }
-        break;
-
-      case CommandActions.LIST:
-        newListRoles(url, ignore, metalake).validate().handle();
-        break;
-
-      case CommandActions.CREATE:
-        newCreateRole(url, ignore, metalake, roles).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteRole(url, ignore, forceDelete, metalake, roles).validate().handle();
-        break;
-
-      case CommandActions.GRANT:
-        newGrantPrivilegesToRole(url, ignore, metalake, getOneRole(roles), name, privileges)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.REVOKE:
-        newRevokePrivilegesFromRole(url, ignore, metalake, getOneRole(roles), name, privileges)
-            .validate()
-            .handle();
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  private String getOneRole(String[] roles) {
-    if (roles == null || roles.length != 1) {
-      System.err.println(ErrorMessages.MULTIPLE_ROLE_COMMAND_ERROR);
-      Main.exit(-1);
-    }
-
-    return roles[0];
   }
 
   /**
@@ -706,95 +501,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           }
           break;
         }
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
-        break;
-    }
-  }
-
-  /**
-   * Handles the command execution for topics based on command type and the command line options.
-   */
-  private void handleTopicCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-    String schema = name.getSchemaName();
-
-    Command.setAuthenticationMode(auth, userName);
-
-    List<String> missingEntities = Lists.newArrayList();
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
-
-    if (CommandActions.LIST.equals(command)) {
-      checkEntities(missingEntities);
-      newListTopics(url, ignore, metalake, catalog, schema).validate().handle();
-      return;
-    }
-
-    String topic = name.getTopicName();
-    if (topic == null) missingEntities.add(CommandEntities.TOPIC);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        newTopicDetails(url, ignore, metalake, catalog, schema, topic).validate().handle();
-        break;
-
-      case CommandActions.CREATE:
-        {
-          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.DELETE:
-        {
-          boolean force = line.hasOption(GravitinoOptions.FORCE);
-          newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic).validate().handle();
-          break;
-        }
-
-      case CommandActions.UPDATE:
-        {
-          if (line.hasOption(GravitinoOptions.COMMENT)) {
-            String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-            newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment)
-                .validate()
-                .handle();
-          }
-          break;
-        }
-
-      case CommandActions.SET:
-        {
-          String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-          String value = line.getOptionValue(GravitinoOptions.VALUE);
-          newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.REMOVE:
-        {
-          String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-          newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.PROPERTIES:
-        newListTopicProperties(url, ignore, metalake, catalog, schema, topic).validate().handle();
-        break;
 
       default:
         System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
