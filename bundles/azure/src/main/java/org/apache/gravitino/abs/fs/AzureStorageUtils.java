@@ -20,24 +20,32 @@
 package org.apache.gravitino.abs.fs;
 
 import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 
 public class AzureStorageUtils {
 
   /**
-   * Get the ADLS credential from the credential array. If the dynamic credential is not found,
-   * return null.
+   * Get the ADLS credential from the credential array. Use the account and secret if dynamic token
+   * is not found, null if both are not found.
    *
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
-  static Credential getAzureStorageTokenCredential(Credential[] credentials) {
+  static Credential getSuitableCredential(Credential[] credentials) {
     // Use dynamic credential if found.
     for (Credential credential : credentials) {
       if (credential instanceof ADLSTokenCredential) {
         return credential;
       }
     }
+
+    for (Credential credential : credentials) {
+      if (credential instanceof AzureAccountKeyCredential) {
+        return credential;
+      }
+    }
+
     return null;
   }
 }
