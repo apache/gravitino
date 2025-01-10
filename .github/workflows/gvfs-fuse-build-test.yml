@@ -77,7 +77,8 @@ jobs:
 
       - name: Integration test
         run: |
-          ./gradlew bundles:aws-bundle:build -x :clients:client-python:build compileDistribution -x test -x web -PjdkVersion=${{ matrix.java-version }}
+          ./gradle build -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
           cd clients/filesystem-fuse
           make test-s3
           make test-fuse
