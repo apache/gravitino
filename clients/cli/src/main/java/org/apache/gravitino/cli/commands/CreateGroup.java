@@ -33,11 +33,13 @@ public class CreateGroup extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    */
-  public CreateGroup(String url, boolean ignoreVersions, String metalake, String group) {
-    super(url, ignoreVersions);
+  public CreateGroup(
+      String url, boolean ignoreVersions, boolean quiet, String metalake, String group) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.group = group;
   }
@@ -56,6 +58,7 @@ public class CreateGroup extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(group + " created");
   }
 }

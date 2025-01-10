@@ -38,6 +38,7 @@ public class SetTagProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param property The name of the property.
@@ -46,11 +47,12 @@ public class SetTagProperty extends Command {
   public SetTagProperty(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       String metalake,
       String tag,
       String property,
       String value) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.tag = tag;
     this.property = property;
@@ -72,6 +74,7 @@ public class SetTagProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(tag + " property set.");
   }
 

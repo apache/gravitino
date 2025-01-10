@@ -38,12 +38,18 @@ public class DeleteCatalog extends Command {
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param force Force operation.
+   * @param quiet whether to suppress output.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
   public DeleteCatalog(
-      String url, boolean ignoreVersions, boolean force, String metalake, String catalog) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      boolean force,
+      String metalake,
+      String catalog) {
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
     this.catalog = catalog;
@@ -71,6 +77,7 @@ public class DeleteCatalog extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     if (deleted) {
       System.out.println(catalog + " deleted.");
     } else {

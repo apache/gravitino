@@ -37,13 +37,19 @@ public class CreateTag extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param tags The names of the tags.
    * @param comment The comment of the tag.
    */
   public CreateTag(
-      String url, boolean ignoreVersions, String metalake, String[] tags, String comment) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String[] tags,
+      String comment) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.tags = tags;
     this.comment = comment;
@@ -94,6 +100,8 @@ public class CreateTag extends Command {
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
+
+    if (quiet) return;
     if (!created.isEmpty()) {
       System.out.println("Tags " + String.join(",", created) + " created");
     }

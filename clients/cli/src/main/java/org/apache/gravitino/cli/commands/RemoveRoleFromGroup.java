@@ -38,12 +38,18 @@ public class RemoveRoleFromGroup extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet If true don't print any output.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    * @param role The name of the role.
    */
   public RemoveRoleFromGroup(
-      String url, boolean ignoreVersions, String metalake, String group, String role) {
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String group,
+      String role) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.group = group;
@@ -68,6 +74,7 @@ public class RemoveRoleFromGroup extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(role + " removed from " + group);
   }
 }

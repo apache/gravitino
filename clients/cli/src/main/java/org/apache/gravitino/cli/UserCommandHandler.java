@@ -31,6 +31,7 @@ public class UserCommandHandler extends CommandHandler {
   private final String url;
   private final FullName name;
   private final String metalake;
+  private final boolean quiet;
   private String user;
 
   /**
@@ -47,6 +48,7 @@ public class UserCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -134,7 +136,7 @@ public class UserCommandHandler extends CommandHandler {
   /** Handles the "CREATE" command. */
   private void handleCreateCommand() {
     this.gravitinoCommandLine
-        .newCreateUser(this.url, this.ignore, this.metalake, user)
+        .newCreateUser(this.url, this.ignore, quiet, this.metalake, user)
         .validate()
         .handle();
   }
@@ -143,7 +145,7 @@ public class UserCommandHandler extends CommandHandler {
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     this.gravitinoCommandLine
-        .newDeleteUser(this.url, this.ignore, force, this.metalake, user)
+        .newDeleteUser(this.url, this.ignore, quiet, force, this.metalake, user)
         .validate()
         .handle();
   }
@@ -153,7 +155,7 @@ public class UserCommandHandler extends CommandHandler {
     String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
     for (String role : revokeRoles) {
       this.gravitinoCommandLine
-          .newRemoveRoleFromUser(this.url, this.ignore, this.metalake, user, role)
+          .newRemoveRoleFromUser(this.url, this.ignore, quiet, this.metalake, user, role)
           .validate()
           .handle();
     }
@@ -165,7 +167,7 @@ public class UserCommandHandler extends CommandHandler {
     String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
     for (String role : grantRoles) {
       this.gravitinoCommandLine
-          .newAddRoleToUser(this.url, this.ignore, this.metalake, user, role)
+          .newAddRoleToUser(this.url, this.ignore, quiet, this.metalake, user, role)
           .validate()
           .handle();
     }

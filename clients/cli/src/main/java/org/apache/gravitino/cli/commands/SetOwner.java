@@ -41,6 +41,7 @@ public class SetOwner extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param entity The name of the entity.
    * @param entityType The type entity.
@@ -50,12 +51,13 @@ public class SetOwner extends Command {
   public SetOwner(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       String metalake,
       String entity,
       String entityType,
       String owner,
       boolean isGroup) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.entity = entity;
     this.owner = owner;
@@ -97,6 +99,7 @@ public class SetOwner extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println("Set owner to " + owner);
   }
 }

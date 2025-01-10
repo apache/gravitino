@@ -35,6 +35,7 @@ public class OwnerCommandHandler extends CommandHandler {
   private final String owner;
   private final String group;
   private final String entity;
+  private final boolean quiet;
 
   /**
    * Constructs a {@link OwnerCommandHandler} instance.
@@ -55,6 +56,7 @@ public class OwnerCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.owner = line.getOptionValue(GravitinoOptions.USER);
@@ -112,12 +114,12 @@ public class OwnerCommandHandler extends CommandHandler {
   private void handleSetCommand() {
     if (owner != null && group == null) {
       gravitinoCommandLine
-          .newSetOwner(url, ignore, metalake, entityName, entity, owner, false)
+          .newSetOwner(url, ignore, quiet, metalake, entityName, entity, owner, false)
           .validate()
           .handle();
     } else if (owner == null && group != null) {
       gravitinoCommandLine
-          .newSetOwner(url, ignore, metalake, entityName, entity, group, true)
+          .newSetOwner(url, ignore, quiet, metalake, entityName, entity, group, true)
           .validate()
           .handle();
     } else {

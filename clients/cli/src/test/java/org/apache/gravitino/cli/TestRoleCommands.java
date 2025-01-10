@@ -150,6 +150,7 @@ class TestRoleCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE)).thenReturn(new String[] {"admin"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -157,7 +158,11 @@ class TestRoleCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateRole(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", new String[] {"admin"});
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq(new String[] {"admin"}));
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -171,6 +176,7 @@ class TestRoleCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE))
         .thenReturn(new String[] {"admin", "engineer", "scientist"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -180,6 +186,7 @@ class TestRoleCommands {
         .when(commandLine)
         .newCreateRole(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq(new String[] {"admin", "engineer", "scientist"}));
@@ -195,6 +202,7 @@ class TestRoleCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE)).thenReturn(new String[] {"admin"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -202,11 +210,12 @@ class TestRoleCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteRole(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            false,
-            "metalake_demo",
-            new String[] {"admin"});
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq(new String[] {"admin"}));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -221,6 +230,7 @@ class TestRoleCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE))
         .thenReturn(new String[] {"admin", "engineer", "scientist"});
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -230,6 +240,7 @@ class TestRoleCommands {
         .when(commandLine)
         .newDeleteRole(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq(false),
             eq("metalake_demo"),
@@ -247,6 +258,7 @@ class TestRoleCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE)).thenReturn(new String[] {"admin"});
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -254,7 +266,12 @@ class TestRoleCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteRole(
-            GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", new String[] {"admin"});
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(true),
+            eq("metalake_demo"),
+            eq(new String[] {"admin"}));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -315,6 +332,7 @@ class TestRoleCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE)).thenReturn(new String[] {"admin"});
     when(mockCommandLine.hasOption(GravitinoOptions.PRIVILEGE)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.PRIVILEGE)).thenReturn(privileges);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -323,6 +341,7 @@ class TestRoleCommands {
         .when(commandLine)
         .newRevokePrivilegesFromRole(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("admin"),
@@ -339,7 +358,13 @@ class TestRoleCommands {
     RevokePrivilegesFromRole spyGrantRole =
         spy(
             new RevokePrivilegesFromRole(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "admin", null, null));
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                false,
+                "metalake_demo",
+                "admin",
+                null,
+                null));
     assertThrows(RuntimeException.class, spyGrantRole::validate);
     verify(spyGrantRole, never()).handle();
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -352,6 +377,7 @@ class TestRoleCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -360,7 +386,12 @@ class TestRoleCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newDeleteRole(
-            eq(GravitinoCommandLine.DEFAULT_URL), eq(false), eq(false), eq("metalake_demo"), any());
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            any());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.MISSING_ROLE);
   }

@@ -35,6 +35,7 @@ public class TopicCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private final String schema;
+  private final boolean quiet;
   private String topic;
 
   /**
@@ -51,6 +52,7 @@ public class TopicCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -137,7 +139,7 @@ public class TopicCommandHandler extends CommandHandler {
   private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine
-        .newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment)
+        .newCreateTopic(url, ignore, quiet, metalake, catalog, schema, topic, comment)
         .validate()
         .handle();
   }
@@ -146,7 +148,7 @@ public class TopicCommandHandler extends CommandHandler {
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic)
+        .newDeleteTopic(url, ignore, quiet, force, metalake, catalog, schema, topic)
         .validate()
         .handle();
   }
@@ -156,7 +158,7 @@ public class TopicCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment)
+          .newUpdateTopicComment(url, ignore, quiet, metalake, catalog, schema, topic, comment)
           .validate()
           .handle();
     }
@@ -167,7 +169,7 @@ public class TopicCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value)
+        .newSetTopicProperty(url, ignore, quiet, metalake, catalog, schema, topic, property, value)
         .validate()
         .handle();
   }
@@ -176,7 +178,7 @@ public class TopicCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property)
+        .newRemoveTopicProperty(url, ignore, quiet, metalake, catalog, schema, topic, property)
         .validate()
         .handle();
   }

@@ -36,13 +36,19 @@ public class DeleteUser extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
   public DeleteUser(
-      String url, boolean ignoreVersions, boolean force, String metalake, String user) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      boolean force,
+      String metalake,
+      String user) {
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
     this.user = user;
@@ -68,6 +74,7 @@ public class DeleteUser extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     if (deleted) {
       System.out.println(user + " deleted.");
     } else {

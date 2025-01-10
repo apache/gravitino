@@ -42,6 +42,7 @@ public class DeleteModel extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
@@ -51,12 +52,13 @@ public class DeleteModel extends Command {
   public DeleteModel(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       boolean force,
       String metalake,
       String catalog,
       String schema,
       String model) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
     this.catalog = catalog;
@@ -87,6 +89,7 @@ public class DeleteModel extends Command {
       exitWithError(err.getMessage());
     }
 
+    if (quiet) return;
     if (deleted) {
       System.out.println(model + " deleted.");
     } else {

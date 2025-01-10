@@ -146,6 +146,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -153,11 +154,12 @@ class TestTagCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateTags(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            new String[] {"tagA"},
-            "comment");
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            argThat(argument -> argument.length == 1 && argument[0].equals("tagA")),
+            eq("comment"));
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -169,7 +171,7 @@ class TestTagCommands {
     CreateTag spyCreate =
         spy(
             new CreateTag(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, "comment"));
+                GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", null, "comment"));
 
     assertThrows(RuntimeException.class, spyCreate::validate);
     verify(spyCreate, never()).handle();
@@ -187,6 +189,7 @@ class TestTagCommands {
         .thenReturn(new String[] {"tagA", "tagB"});
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -195,6 +198,7 @@ class TestTagCommands {
         .when(commandLine)
         .newCreateTags(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             argThat(
@@ -215,6 +219,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -222,7 +227,12 @@ class TestTagCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateTags(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", new String[] {"tagA"}, null);
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            argThat(argument -> argument.length == 1 && argument[0].equals("tagA")),
+            eq(null));
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -235,6 +245,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -242,7 +253,12 @@ class TestTagCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTag(
-            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", new String[] {"tagA"});
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            argThat(argument -> argument.length == 1 && argument[0].equals("tagA")));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -256,6 +272,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
         .thenReturn(new String[] {"tagA", "tagB"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -263,11 +280,16 @@ class TestTagCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTag(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            false,
-            "metalake_demo",
-            new String[] {"tagA", "tagB"});
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            argThat(
+                argument ->
+                    argument.length == 2
+                        && argument[0].equals("tagA")
+                        && argument[1].equals("tagB")));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -281,6 +303,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -288,7 +311,12 @@ class TestTagCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTag(
-            GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", new String[] {"tagA"});
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq(true),
+            eq("metalake_demo"),
+            argThat(argument -> argument.length == 1 && argument[0].equals("tagA")));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -305,6 +333,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
     when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -312,7 +341,13 @@ class TestTagCommands {
     doReturn(mockSetProperty)
         .when(commandLine)
         .newSetTagProperty(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", "property", "value");
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            argThat(argument -> argument.equals("tagA")),
+            eq("property"),
+            eq("value"));
     doReturn(mockSetProperty).when(mockSetProperty).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperty).handle();
@@ -324,7 +359,13 @@ class TestTagCommands {
     SetTagProperty spySetProperty =
         spy(
             new SetTagProperty(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", null, null));
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                false,
+                "metalake_demo",
+                "tagA",
+                null,
+                null));
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -337,7 +378,13 @@ class TestTagCommands {
     SetTagProperty spySetProperty =
         spy(
             new SetTagProperty(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", null, "value"));
+                GravitinoCommandLine.DEFAULT_URL,
+                false,
+                false,
+                "metalake_demo",
+                "tagA",
+                null,
+                "value"));
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -351,6 +398,7 @@ class TestTagCommands {
         spy(
             new SetTagProperty(
                 GravitinoCommandLine.DEFAULT_URL,
+                false,
                 false,
                 "metalake_demo",
                 "tagA",
@@ -374,6 +422,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
     when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -382,6 +431,7 @@ class TestTagCommands {
     verify(commandLine, never())
         .newSetTagProperty(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -400,6 +450,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -407,7 +458,12 @@ class TestTagCommands {
     doReturn(mockRemoveProperty)
         .when(commandLine)
         .newRemoveTagProperty(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", "property");
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq("tagA"),
+            eq("property"));
     doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
@@ -423,6 +479,7 @@ class TestTagCommands {
         .thenReturn(new String[] {"tagA", "tagB"});
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("property");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -432,6 +489,7 @@ class TestTagCommands {
     verify(commandLine, never())
         .newRemoveTagProperty(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -468,6 +526,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.table");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -476,6 +535,7 @@ class TestTagCommands {
         .when(commandLine)
         .newRemoveAllTags(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(FullName.class),
@@ -494,6 +554,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("new comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -501,7 +562,12 @@ class TestTagCommands {
     doReturn(mockUpdateComment)
         .when(commandLine)
         .newUpdateTagComment(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", "new comment");
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq("tagA"),
+            eq("new comment"));
     doReturn(mockUpdateComment).when(mockUpdateComment).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
@@ -517,6 +583,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
         .thenReturn(new String[] {"tagA", "tagB"});
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("new comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -526,6 +593,7 @@ class TestTagCommands {
     verify(commandLine, never())
         .newUpdateTagComment(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -543,13 +611,20 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
     when(mockCommandLine.hasOption(GravitinoOptions.RENAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.RENAME)).thenReturn("tagB");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.TAG, CommandActions.UPDATE));
     doReturn(mockUpdateName)
         .when(commandLine)
-        .newUpdateTagName(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "tagA", "tagB");
+        .newUpdateTagName(
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq("tagA"),
+            eq("tagB"));
     doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
@@ -565,6 +640,7 @@ class TestTagCommands {
         .thenReturn(new String[] {"tagA", "tagB"});
     when(mockCommandLine.hasOption(GravitinoOptions.RENAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.RENAME)).thenReturn("tagC");
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -574,6 +650,7 @@ class TestTagCommands {
     verify(commandLine, never())
         .newUpdateTagName(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -611,6 +688,7 @@ class TestTagCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.table");
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG)).thenReturn(new String[] {"tagA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -619,6 +697,7 @@ class TestTagCommands {
         .when(commandLine)
         .newTagEntity(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -642,6 +721,7 @@ class TestTagCommands {
             new TagEntity(
                 GravitinoCommandLine.DEFAULT_URL,
                 false,
+                false,
                 "metalake_demo",
                 null,
                 new String[] {"tagA"}));
@@ -662,6 +742,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.TAG)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.TAG))
         .thenReturn(new String[] {"tagA", "tagB"});
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -670,6 +751,7 @@ class TestTagCommands {
         .when(commandLine)
         .newTagEntity(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -700,6 +782,7 @@ class TestTagCommands {
         .thenReturn(new String[] {"tagA", "tagB"});
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(false);
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn(null);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -708,6 +791,7 @@ class TestTagCommands {
         .when(commandLine)
         .newUntagEntity(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -731,6 +815,7 @@ class TestTagCommands {
             new UntagEntity(
                 GravitinoCommandLine.DEFAULT_URL,
                 false,
+                false,
                 "metalake_demo",
                 null,
                 new String[] {"tagA"}));
@@ -753,6 +838,7 @@ class TestTagCommands {
         .thenReturn(new String[] {"tagA", "tagB"});
     when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(false);
     when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn(null);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -761,6 +847,7 @@ class TestTagCommands {
         .when(commandLine)
         .newUntagEntity(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             any(),
@@ -783,7 +870,7 @@ class TestTagCommands {
   void testDeleteTagCommandWithoutTagOption() {
     Main.useExit = false;
     DeleteTag spyDeleteTag =
-        spy(new DeleteTag(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake", null));
+        spy(new DeleteTag(GravitinoCommandLine.DEFAULT_URL, false, false, false, "metalake", null));
 
     assertThrows(RuntimeException.class, spyDeleteTag::validate);
     verify(spyDeleteTag, never()).handle();
@@ -801,6 +888,7 @@ class TestTagCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.table");
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -810,6 +898,7 @@ class TestTagCommands {
         .when(commandLine)
         .newRemoveAllTags(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             argThat(
@@ -830,7 +919,7 @@ class TestTagCommands {
     RemoveAllTags spyRemoveAllTags =
         spy(
             new RemoveAllTags(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, false));
+                GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", null, false));
 
     assertThrows(RuntimeException.class, spyRemoveAllTags::validate);
     verify(spyRemoveAllTags, never()).handle();

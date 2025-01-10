@@ -37,13 +37,19 @@ public class UpdateMetalakeName extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param name The new metalake name.
    */
   public UpdateMetalakeName(
-      String url, boolean ignoreVersions, boolean force, String metalake, String name) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      boolean force,
+      String metalake,
+      String name) {
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
     this.name = name;
@@ -67,6 +73,7 @@ public class UpdateMetalakeName extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(metalake + " name changed.");
   }
 }

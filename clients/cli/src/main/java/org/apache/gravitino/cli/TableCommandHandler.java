@@ -35,6 +35,7 @@ public class TableCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private final String schema;
+  private final boolean quiet;
   private String table;
 
   /**
@@ -51,6 +52,7 @@ public class TableCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -165,7 +167,7 @@ public class TableCommandHandler extends CommandHandler {
     String columnFile = line.getOptionValue(GravitinoOptions.COLUMNFILE);
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine
-        .newCreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment)
+        .newCreateTable(url, ignore, quiet, metalake, catalog, schema, table, columnFile, comment)
         .validate()
         .handle();
   }
@@ -174,7 +176,7 @@ public class TableCommandHandler extends CommandHandler {
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteTable(url, ignore, force, metalake, catalog, schema, table)
+        .newDeleteTable(url, ignore, quiet, force, metalake, catalog, schema, table)
         .validate()
         .handle();
   }
@@ -184,7 +186,7 @@ public class TableCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetTableProperty(url, ignore, metalake, catalog, schema, table, property, value)
+        .newSetTableProperty(url, ignore, quiet, metalake, catalog, schema, table, property, value)
         .validate()
         .handle();
   }
@@ -193,7 +195,7 @@ public class TableCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property)
+        .newRemoveTableProperty(url, ignore, quiet, metalake, catalog, schema, table, property)
         .validate()
         .handle();
   }
@@ -215,14 +217,14 @@ public class TableCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateTableComment(url, ignore, metalake, catalog, schema, table, comment)
+          .newUpdateTableComment(url, ignore, quiet, metalake, catalog, schema, table, comment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateTableName(url, ignore, metalake, catalog, schema, table, newName)
+          .newUpdateTableName(url, ignore, quiet, metalake, catalog, schema, table, newName)
           .validate()
           .handle();
     }

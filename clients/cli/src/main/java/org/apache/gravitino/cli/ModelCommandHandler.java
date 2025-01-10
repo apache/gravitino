@@ -36,6 +36,7 @@ public class ModelCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private final String schema;
+  private final boolean quiet;
   private String model;
 
   /**
@@ -52,6 +53,7 @@ public class ModelCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -137,7 +139,7 @@ public class ModelCommandHandler extends CommandHandler {
     Map<String, String> createPropertyMap = new Properties().parse(createProperties);
     gravitinoCommandLine
         .newCreateModel(
-            url, ignore, metalake, catalog, schema, model, createComment, createPropertyMap)
+            url, ignore, quiet, metalake, catalog, schema, model, createComment, createPropertyMap)
         .validate()
         .handle();
   }
@@ -146,7 +148,7 @@ public class ModelCommandHandler extends CommandHandler {
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteModel(url, ignore, force, metalake, catalog, schema, model)
+        .newDeleteModel(url, ignore, quiet, force, metalake, catalog, schema, model)
         .validate()
         .handle();
   }
@@ -162,6 +164,7 @@ public class ModelCommandHandler extends CommandHandler {
         .newLinkModel(
             url,
             ignore,
+            quiet,
             metalake,
             catalog,
             schema,

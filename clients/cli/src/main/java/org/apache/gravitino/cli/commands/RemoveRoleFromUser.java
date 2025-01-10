@@ -38,13 +38,19 @@ public class RemoveRoleFromUser extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    * @param role The name of the role.
    */
   public RemoveRoleFromUser(
-      String url, boolean ignoreVersions, String metalake, String user, String role) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String user,
+      String role) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.user = user;
     this.role = role;
@@ -68,6 +74,7 @@ public class RemoveRoleFromUser extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(role + " removed from " + user);
   }
 }

@@ -39,13 +39,19 @@ public class DeleteTag extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param tags The names of the tags.
    */
   public DeleteTag(
-      String url, boolean ignoreVersions, boolean force, String metalake, String[] tags) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      boolean force,
+      String metalake,
+      String[] tags) {
+    super(url, ignoreVersions, quiet);
     this.force = force;
     this.metalake = metalake;
     this.tags = tags;
@@ -86,6 +92,8 @@ public class DeleteTag extends Command {
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
+
+    if (quiet) return;
     if (!deleted.isEmpty()) {
       System.out.println("Tags " + String.join(",", deleted) + " deleted.");
     }
@@ -110,6 +118,7 @@ public class DeleteTag extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     if (deleted) {
       System.out.println("Tag " + tags[0] + " deleted.");
     } else {

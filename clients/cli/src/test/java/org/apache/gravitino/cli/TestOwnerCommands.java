@@ -75,6 +75,7 @@ class TestOwnerCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("admin");
     when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.OWNER)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -82,13 +83,14 @@ class TestOwnerCommands {
     doReturn(mockSetOwner)
         .when(commandLine)
         .newSetOwner(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "postgres",
-            "catalog",
-            "admin",
-            false);
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq("postgres"),
+            eq(CommandEntities.CATALOG),
+            eq("admin"),
+            eq(false));
     doReturn(mockSetOwner).when(mockSetOwner).validate();
     commandLine.handleCommandLine();
     verify(mockSetOwner).handle();
@@ -105,6 +107,7 @@ class TestOwnerCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.GROUP)).thenReturn("ITdept");
     when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.OWNER)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -112,13 +115,14 @@ class TestOwnerCommands {
     doReturn(mockSetOwner)
         .when(commandLine)
         .newSetOwner(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "postgres",
-            "catalog",
-            "ITdept",
-            true);
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            eq(false),
+            eq("metalake_demo"),
+            eq("postgres"),
+            eq(CommandEntities.CATALOG),
+            eq("ITdept"),
+            eq(true));
     doReturn(mockSetOwner).when(mockSetOwner).validate();
     commandLine.handleCommandLine();
     verify(mockSetOwner).handle();
@@ -180,6 +184,7 @@ class TestOwnerCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(false);
     when(mockCommandLine.hasOption(GravitinoOptions.OWNER)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.QUIET)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -189,6 +194,7 @@ class TestOwnerCommands {
     verify(commandLine, never())
         .newSetOwner(
             eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
             eq(false),
             eq("metalake_demo"),
             eq("postgres"),

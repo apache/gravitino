@@ -37,13 +37,19 @@ public class UpdateTagComment extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param comment New metalake comment.
    */
   public UpdateTagComment(
-      String url, boolean ignoreVersions, String metalake, String tag, String comment) {
-    super(url, ignoreVersions);
+      String url,
+      boolean ignoreVersions,
+      boolean quiet,
+      String metalake,
+      String tag,
+      String comment) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.tag = tag;
     this.comment = comment;
@@ -64,6 +70,7 @@ public class UpdateTagComment extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(tag + " comment changed.");
   }
 }

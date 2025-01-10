@@ -32,10 +32,11 @@ public class MetalakeDisable extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    */
-  public MetalakeDisable(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public MetalakeDisable(String url, boolean ignoreVersions, boolean quiet, String metalake) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
   }
 
@@ -51,6 +52,7 @@ public class MetalakeDisable extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(metalake + " has been disabled.");
   }
 }

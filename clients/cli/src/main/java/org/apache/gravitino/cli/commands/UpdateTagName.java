@@ -37,13 +37,14 @@ public class UpdateTagName extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the tag.
    * @param tag The name of the catalog.
    * @param name The new tag name.
    */
   public UpdateTagName(
-      String url, boolean ignoreVersions, String metalake, String tag, String name) {
-    super(url, ignoreVersions);
+      String url, boolean ignoreVersions, boolean quiet, String metalake, String tag, String name) {
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.tag = tag;
     this.name = name;
@@ -64,6 +65,7 @@ public class UpdateTagName extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(tag + " name changed.");
   }
 }

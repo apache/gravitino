@@ -39,6 +39,7 @@ public class CatalogCommandHandler extends CommandHandler {
   private final String metalake;
   private String catalog;
   private final String outputFormat;
+  private final boolean quiet;
 
   /**
    * Constructs a {@link CatalogCommandHandler} instance.
@@ -54,6 +55,7 @@ public class CatalogCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.ignore = ignore;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl(line);
     this.name = new FullName(line);
@@ -143,7 +145,7 @@ public class CatalogCommandHandler extends CommandHandler {
 
     Map<String, String> propertyMap = new Properties().parse(properties);
     gravitinoCommandLine
-        .newCreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap)
+        .newCreateCatalog(url, ignore, quiet, metalake, catalog, provider, comment, propertyMap)
         .validate()
         .handle();
   }
@@ -152,7 +154,7 @@ public class CatalogCommandHandler extends CommandHandler {
   private void handleDeleteCommand() {
     boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteCatalog(url, ignore, force, metalake, catalog)
+        .newDeleteCatalog(url, ignore, quiet, force, metalake, catalog)
         .validate()
         .handle();
   }
@@ -162,7 +164,7 @@ public class CatalogCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetCatalogProperty(url, ignore, metalake, catalog, property, value)
+        .newSetCatalogProperty(url, ignore, quiet, metalake, catalog, property, value)
         .validate()
         .handle();
   }
@@ -171,7 +173,7 @@ public class CatalogCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveCatalogProperty(url, ignore, metalake, catalog, property)
+        .newRemoveCatalogProperty(url, ignore, quiet, metalake, catalog, property)
         .validate()
         .handle();
   }
@@ -193,25 +195,28 @@ public class CatalogCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.ENABLE)) {
       boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
       gravitinoCommandLine
-          .newCatalogEnable(url, ignore, metalake, catalog, enableMetalake)
+          .newCatalogEnable(url, ignore, quiet, metalake, catalog, enableMetalake)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.DISABLE)) {
-      gravitinoCommandLine.newCatalogDisable(url, ignore, metalake, catalog).validate().handle();
+      gravitinoCommandLine
+          .newCatalogDisable(url, ignore, quiet, metalake, catalog)
+          .validate()
+          .handle();
     }
 
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment)
+          .newUpdateCatalogComment(url, ignore, quiet, metalake, catalog, updateComment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateCatalogName(url, ignore, metalake, catalog, newName)
+          .newUpdateCatalogName(url, ignore, quiet, metalake, catalog, newName)
           .validate()
           .handle();
     }

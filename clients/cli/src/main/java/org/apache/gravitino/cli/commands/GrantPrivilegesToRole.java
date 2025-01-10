@@ -100,6 +100,7 @@ public class GrantPrivilegesToRole extends MetadataCommand {
       return;
     }
 
+    if (quiet) return;
     String all = String.join(",", privileges);
     System.out.println(role + " granted " + all + " on " + entity.getName());
   }

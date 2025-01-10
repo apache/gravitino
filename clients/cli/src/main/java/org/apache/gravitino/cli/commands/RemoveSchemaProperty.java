@@ -39,6 +39,7 @@ public class RemoveSchemaProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param quiet whether to display output.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -47,11 +48,12 @@ public class RemoveSchemaProperty extends Command {
   public RemoveSchemaProperty(
       String url,
       boolean ignoreVersions,
+      boolean quiet,
       String metalake,
       String catalog,
       String schema,
       String property) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, quiet);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -75,6 +77,7 @@ public class RemoveSchemaProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (quiet) return;
     System.out.println(property + " property removed.");
   }
 
