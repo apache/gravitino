@@ -179,7 +179,7 @@ To use Gravitino locally on macOS or Linux, follow these similar steps:
 3. Start Gravitino using the gravitino.sh script in the binary release package or Docker image:
 
     ```shell
-    <path-to-gravitino>/bin/gravitino.sh start
+    ${GRAVITINO_HOME}/bin/gravitino.sh start
     ```
 
 ## Installing Apache Hive on AWS or Google Cloud Platform
