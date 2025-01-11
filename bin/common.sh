@@ -46,8 +46,7 @@ if [[ -z "${GRAVITINO_VERSION}" ]]; then
   echo -e "No variable GRAVITINO_VERSION was found, you may need to:\n" \
   "1. Ensure that a compiled version of Gravitino is available at" \
   "\${GRAVITINO_HOME}/distribution/package. If not, you must compile it first.\n" \
-  "2. Execute gravitino.sh in the \${GRAVITINO_HOME}/distribution/package/bin directory" \
-  "and avoid running scripts from other directories."
+  "2. Execute gravitino.sh in the \${GRAVITINO_HOME}/distribution/package/bin directory."
   exit 1
 fi
 
