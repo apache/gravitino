@@ -43,7 +43,11 @@ if [[ -f "${GRAVITINO_CONF_DIR}/gravitino-env.sh" ]]; then
 fi
 
 if [[ -z "${GRAVITINO_VERSION}" ]]; then
-  echo -e "No GRAVITINO_VERSION was found, you may need to:\n1. Run the gravitino.sh script on the compiled Gravitino.\n2. Run the gravitino.sh script in the release package."
+  echo -e "No variable GRAVITINO_VERSION was found, you may need to:\n" \
+  "1. Ensure that a compiled version of Gravitino is available at" \
+  "<path-to-gravitino>/distribution/package. If not, you must compile it first.\n" \
+  "2. Execute gravitino.sh from <path-to-gravitino>/distribution/package/bin" \
+  "and avoid running scripts from other directories."
   exit 1
 fi
 

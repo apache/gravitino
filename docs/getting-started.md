@@ -181,12 +181,6 @@ To use Gravitino locally on macOS or Linux, follow these similar steps:
     ```shell
     <path-to-gravitino>/bin/gravitino.sh start
     ```
-4. Start Gravitino using the gravitino.sh script in the distribution package:
- 
-   ```shell
-   ./gradlew compileDistribution -x test
-   <path-to-gravitino>/distribution/package/bin/gravitino.sh start
-   ```
 
 ## Installing Apache Hive on AWS or Google Cloud Platform
 
