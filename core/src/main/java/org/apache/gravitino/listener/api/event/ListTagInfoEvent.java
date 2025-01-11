@@ -56,6 +56,6 @@ public final class ListTagInfoEvent extends TagEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LISTINFO_TAG;
+    return OperationType.LIST_TAGS_INFO;
   }
 }
