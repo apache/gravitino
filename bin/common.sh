@@ -44,8 +44,8 @@ fi
 
 if [[ -z "${GRAVITINO_VERSION}" ]]; then
   echo -e "GRAVITINO_VERSION is not set, you may need to:\n" \
-  "1. Ensure that a compiled version of Gravitino is available at" \
-  "\${GRAVITINO_HOME}/distribution/package. You may need to compile it first," \
+  "1. Ensure that a compiled version of Gravitino is available at " \
+  "\${GRAVITINO_HOME}/distribution/package. You may need to compile it first, " \
   "if you are installing the software from source code.\n" \
   "2. Execute gravitino.sh in the \${GRAVITINO_HOME}/distribution/package/bin directory."
   exit 1
