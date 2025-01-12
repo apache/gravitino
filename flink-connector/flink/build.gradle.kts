@@ -78,7 +78,6 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":core"))
   testImplementation(project(":common"))
-  testImplementation(project(":catalogs:catalog-lakehouse-paimon"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
