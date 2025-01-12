@@ -28,7 +28,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -141,7 +140,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.TOPIC)) {
       new TopicCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {
-      handleFilesetCommand();
+      new FilesetCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.USER)) {
       new UserCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
