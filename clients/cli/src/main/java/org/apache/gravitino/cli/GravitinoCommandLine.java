@@ -143,7 +143,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.FILESET)) {
       handleFilesetCommand();
     } else if (entity.equals(CommandEntities.USER)) {
-      handleUserCommand();
+      new UserCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
       new GroupCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.TAG)) {
@@ -231,67 +231,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
           newUpdateMetalakeName(url, ignore, force, metalake, newName).validate().handle();
         }
 
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  /** Handles the command execution for Users based on command type and the command line options. */
-  protected void handleUserCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String user = line.getOptionValue(GravitinoOptions.USER);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    if (user == null && !CommandActions.LIST.equals(command)) {
-      System.err.println(ErrorMessages.MISSING_USER);
-      Main.exit(-1);
-    }
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newUserAudit(url, ignore, metalake, user).validate().handle();
-        } else {
-          newUserDetails(url, ignore, metalake, user).validate().handle();
-        }
-        break;
-
-      case CommandActions.LIST:
-        newListUsers(url, ignore, metalake).validate().handle();
-        break;
-
-      case CommandActions.CREATE:
-        newCreateUser(url, ignore, metalake, user).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteUser(url, ignore, force, metalake, user).validate().handle();
-        break;
-
-      case CommandActions.REVOKE:
-        String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
-        for (String role : revokeRoles) {
-          newRemoveRoleFromUser(url, ignore, metalake, user, role).validate().handle();
-        }
-        System.out.printf("Remove roles %s from user %s%n", COMMA_JOINER.join(revokeRoles), user);
-        break;
-
-      case CommandActions.GRANT:
-        String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
-        for (String role : grantRoles) {
-          newAddRoleToUser(url, ignore, metalake, user, role).validate().handle();
-        }
-        System.out.printf("Grant roles %s to user %s%n", COMMA_JOINER.join(grantRoles), user);
         break;
 
       default:
