@@ -70,6 +70,10 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
     Map<String, String> paimonCatalogProperties =
         PaimonPropertiesUtils.toPaimonCatalogProperties(all);
     paimonCatalogProperties.put(
+        PaimonConstants.METASTORE,
+        paimonCatalogProperties.getOrDefault(
+            PaimonConstants.CATALOG_BACKEND, FileSystemCatalogFactory.IDENTIFIER));
+    paimonCatalogProperties.put(
         CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoPaimonCatalogFactoryOptions.IDENTIFIER);
     return paimonCatalogProperties;
   }

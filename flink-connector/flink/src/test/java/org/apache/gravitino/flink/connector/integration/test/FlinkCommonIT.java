@@ -72,12 +72,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
-  protected boolean supportSchemaOperationWithoutCommentAndOption() {
-    return true;
-  }
-
   @Test
-  @EnabledIf("supportSchemaOperationWithoutCommentAndOption")
   public void testCreateSchema() {
     doWithCatalog(
         currentCatalog(),
@@ -95,7 +90,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportSchemaOperationWithoutCommentAndOption")
   public void testGetSchemaWithoutCommentAndOption() {
     doWithCatalog(
         currentCatalog(),
@@ -152,7 +146,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportSchemaOperationWithoutCommentAndOption")
   public void testListSchema() {
     doWithCatalog(
         currentCatalog(),

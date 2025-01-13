@@ -37,7 +37,7 @@ public class PaimonPropertiesUtils {
   static {
     Map<String, String> gravitinoConfigToPaimon = new HashMap<>();
     Map<String, String> paimonCatalogConfigToGravitino = new HashMap<>();
-    gravitinoConfigToPaimon.put(PaimonConstants.CATALOG_BACKEND, PaimonConstants.METASTORE);
+    gravitinoConfigToPaimon.put(PaimonConstants.CATALOG_BACKEND, PaimonConstants.CATALOG_BACKEND);
     gravitinoConfigToPaimon.put(
         PaimonConstants.GRAVITINO_JDBC_DRIVER, PaimonConstants.GRAVITINO_JDBC_DRIVER);
     gravitinoConfigToPaimon.put(
