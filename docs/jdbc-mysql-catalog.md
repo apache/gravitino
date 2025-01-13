@@ -187,7 +187,7 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 | `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |
 
 :::note
-Some engine types may not be supported by MySQL by default and required additional configuration. For instance, `FEDERATED` are not supported by 
+Some engine types may not be supported by MySQL by default and require additional configuration. For instance, `FEDERATED` are not supported by 
 default and need to be enabled by setting `federated` to `1` in the MySQL configuration file, the same applies to `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`.
 Please refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html) for more information.
 :::
