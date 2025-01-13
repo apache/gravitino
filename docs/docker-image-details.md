@@ -19,6 +19,7 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Changelog
 
+
 - apache/gravitino:0.8.0-incubating
   - Based on Gravitino 0.8.0-incubating, you can know more information from 0.8.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.8.0-incubating).
 
