@@ -521,7 +521,7 @@ public class AuthorizationUtils {
                           nameIdentifier -> {
                             Fileset fileset = filesetCatalog.loadFileset(nameIdentifier);
                             String filesetLocation = fileset.storageLocation();
-                            if (filesetLocation != null && !filesetLocation.isEmpty())
+                            if (!StringUtils.isNotBlank(filesetLocation))
                               locations.add(filesetLocation);
                           });
                 }
@@ -545,7 +545,7 @@ public class AuthorizationUtils {
               Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
               if (table.properties().containsKey(HiveConstants.LOCATION)) {
                 String tableLocation = table.properties().get(HiveConstants.LOCATION);
-                if (tableLocation != null && tableLocation.isEmpty()) {
+                if (StringUtils.isNotBlank(tableLocation)) {
                   locations.add(tableLocation);
                 } else {
                   LOG.warn("Table %s location is not found", ident);
