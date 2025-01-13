@@ -131,6 +131,7 @@ public class IcebergTable extends BaseTable {
             ArrayUtils.isNotEmpty(partitioning) || ArrayUtils.isNotEmpty(sortOrders),
             "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty.");
         return DistributionMode.RANGE.modeName();
+        // Gravitino NONE distribution means the client side doesn't specify distribution.
       case NONE:
         return DistributionMode.NONE.modeName();
       default:
@@ -152,21 +153,6 @@ public class IcebergTable extends BaseTable {
     Schema schema = table.schema();
     Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
-    Distribution distribution = Distributions.NONE;
-    String distributionName = properties.get(IcebergTablePropertiesMetadata.DISTRIBUTION_MODE);
-    if (null != distributionName) {
-      switch (DistributionMode.fromName(distributionName)) {
-        case HASH:
-          distribution = Distributions.HASH;
-          break;
-        case RANGE:
-          distribution = Distributions.RANGE;
-          break;
-        default:
-          // do nothing
-          break;
-      }
-    }
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
     return IcebergTable.builder()
@@ -178,7 +164,7 @@ public class IcebergTable extends BaseTable {
         .withAuditInfo(AuditInfo.EMPTY)
         .withPartitioning(partitionSpec)
         .withSortOrders(sortOrder)
-        .withDistribution(distribution)
+        .withDistribution(getDistribution(properties))
         .build();
   }
 
@@ -235,5 +221,24 @@ public class IcebergTable extends BaseTable {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  private static Distribution getDistribution(Map<String, String> properties) {
+    Distribution distribution = Distributions.NONE;
+    String distributionName = properties.get(IcebergTablePropertiesMetadata.DISTRIBUTION_MODE);
+    if (null != distributionName) {
+      switch (DistributionMode.fromName(distributionName)) {
+        case HASH:
+          distribution = Distributions.HASH;
+          break;
+        case RANGE:
+          distribution = Distributions.RANGE;
+          break;
+        default:
+          // do nothing
+          break;
+      }
+    }
+    return distribution;
   }
 }
