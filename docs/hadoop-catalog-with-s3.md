@@ -512,10 +512,10 @@ GVFS Java client:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri", "http://localhost:8090");
+conf.set("fs.gravitino.client.metalake", "test_metalake");
 // No need to set s3-access-key-id and s3-secret-access-key
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);

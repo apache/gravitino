@@ -19,6 +19,7 @@ To set up a Hadoop catalog with OSS, follow these steps:
 ```bash
 $ bin/gravitino-server.sh start
 ```
+
 Once the server is up and running, you can proceed to configure the Hadoop catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with OSS
@@ -507,10 +508,10 @@ GVFS Java client:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri", "http://localhost:8090");
+conf.set("fs.gravitino.client.metalake", "test_metalake");
 // No need to set oss-access-key-id and oss-secret-access-key
 Path filesetPath = new Path("gvfs://fileset/oss_test_catalog/test_schema/test_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);

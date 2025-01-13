@@ -426,10 +426,10 @@ For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-vers
 
 In order to access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item | Description                            | Default value | Required | Since version    |
-|--------------------|----------------------------------------|---------------|----------|------------------|
-| `abs_account_name` | The account name of Azure Blob Storage | (none)        | Yes      | 0.8.0-incubating |
-| `abs_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      | 0.8.0-incubating |
+| Configuration item           | Description                            | Default value | Required | Since version    |
+|------------------------------|----------------------------------------|---------------|----------|------------------|
+| `azure_storage_account_name` | The account name of Azure Blob Storage | (none)        | Yes      | 0.8.0-incubating |
+| `azure_storage_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      | 0.8.0-incubating |
 
 :::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
@@ -493,10 +493,10 @@ GVFS Java client:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri", "http://localhost:8090");
+conf.set("fs.gravitino.client.metalake", "test_metalake");
 // No need to set azure-storage-account-name and azure-storage-account-name
 Path filesetPath = new Path("gvfs://fileset/adls_test_catalog/test_schema/test_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
