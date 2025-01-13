@@ -106,6 +106,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
 
+    validateIndexes(indexes, columns);
     appendIndexesSql(indexes, sqlBuilder);
 
     sqlBuilder.append("\n)");
@@ -641,5 +642,34 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   private static String quote(String name) {
     return BACK_QUOTE + name + BACK_QUOTE;
+  }
+
+  /**
+   * Verify the columns in the index.
+   *
+   * @param columns jdbc column
+   * @param indexes table indexes
+   */
+  private static void validateIndexes(Index[] indexes, JdbcColumn[] columns) {
+    Map<String, JdbcColumn> columnMap =
+        Arrays.stream(columns).collect(Collectors.toMap(JdbcColumn::name, c -> c));
+    for (Index index : indexes) {
+      if (index.type() == Index.IndexType.UNIQUE_KEY) {
+        // the column in the unique index must be not null
+        for (String[] colNames : index.fieldNames()) {
+          JdbcColumn column = columnMap.get(colNames[0]);
+          Preconditions.checkArgument(
+              column != null,
+              "Column %s in the unique index %s does not exist in the table",
+              colNames[0],
+              index.name());
+          Preconditions.checkArgument(
+              !column.nullable(),
+              "Column %s in the unique index %s must be a not null column",
+              colNames[0],
+              index.name());
+        }
+      }
+    }
   }
 }
