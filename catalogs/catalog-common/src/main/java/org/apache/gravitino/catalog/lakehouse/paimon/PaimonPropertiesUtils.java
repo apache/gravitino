@@ -32,25 +32,41 @@ public class PaimonPropertiesUtils {
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
   // change it to `catalogType` automatically and pass it to Paimon.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON;
+  public static final Map<String, String> PAIMON_CATALOG_CONFIG_TO_GRAVITINO;
 
   static {
-    Map<String, String> map = new HashMap();
-    map.put(PaimonConstants.CATALOG_BACKEND, PaimonConstants.CATALOG_BACKEND);
-    map.put(PaimonConstants.GRAVITINO_JDBC_DRIVER, PaimonConstants.GRAVITINO_JDBC_DRIVER);
-    map.put(PaimonConstants.GRAVITINO_JDBC_USER, PaimonConstants.PAIMON_JDBC_USER);
-    map.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, PaimonConstants.PAIMON_JDBC_PASSWORD);
-    map.put(PaimonConstants.URI, PaimonConstants.URI);
-    map.put(PaimonConstants.WAREHOUSE, PaimonConstants.WAREHOUSE);
-    map.put(PaimonConstants.CATALOG_BACKEND_NAME, PaimonConstants.CATALOG_BACKEND_NAME);
+    Map<String, String> gravitinoConfigToPaimon = new HashMap<>();
+    Map<String, String> paimonCatalogConfigToGravitino = new HashMap<>();
+    gravitinoConfigToPaimon.put(PaimonConstants.CATALOG_BACKEND, PaimonConstants.CATALOG_BACKEND);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_JDBC_DRIVER, PaimonConstants.GRAVITINO_JDBC_DRIVER);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_JDBC_USER, PaimonConstants.PAIMON_JDBC_USER);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_JDBC_PASSWORD, PaimonConstants.PAIMON_JDBC_PASSWORD);
+    gravitinoConfigToPaimon.put(PaimonConstants.URI, PaimonConstants.URI);
+    gravitinoConfigToPaimon.put(PaimonConstants.WAREHOUSE, PaimonConstants.WAREHOUSE);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.CATALOG_BACKEND_NAME, PaimonConstants.CATALOG_BACKEND_NAME);
     // S3
-    map.put(S3Properties.GRAVITINO_S3_ENDPOINT, PaimonConstants.S3_ENDPOINT);
-    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, PaimonConstants.S3_ACCESS_KEY);
-    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, PaimonConstants.S3_SECRET_KEY);
+    gravitinoConfigToPaimon.put(S3Properties.GRAVITINO_S3_ENDPOINT, PaimonConstants.S3_ENDPOINT);
+    gravitinoConfigToPaimon.put(
+        S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, PaimonConstants.S3_ACCESS_KEY);
+    gravitinoConfigToPaimon.put(
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, PaimonConstants.S3_SECRET_KEY);
     // OSS
-    map.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonConstants.OSS_ENDPOINT);
-    map.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonConstants.OSS_ACCESS_KEY);
-    map.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonConstants.OSS_SECRET_KEY);
-    GRAVITINO_CONFIG_TO_PAIMON = Collections.unmodifiableMap(map);
+    gravitinoConfigToPaimon.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonConstants.OSS_ENDPOINT);
+    gravitinoConfigToPaimon.put(
+        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonConstants.OSS_ACCESS_KEY);
+    gravitinoConfigToPaimon.put(
+        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonConstants.OSS_SECRET_KEY);
+    GRAVITINO_CONFIG_TO_PAIMON = Collections.unmodifiableMap(gravitinoConfigToPaimon);
+    gravitinoConfigToPaimon.forEach(
+        (key, value) -> {
+          paimonCatalogConfigToGravitino.put(value, key);
+        });
+    PAIMON_CATALOG_CONFIG_TO_GRAVITINO =
+        Collections.unmodifiableMap(paimonCatalogConfigToGravitino);
   }
 
   /**

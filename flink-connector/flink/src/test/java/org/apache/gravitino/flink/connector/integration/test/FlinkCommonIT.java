@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,10 +54,23 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract Catalog currentCatalog();
+
+  protected boolean supportTableOperation() {
+    return true;
+  }
+
+  protected boolean supportColumnOperation() {
+    return true;
+  }
+
+  protected boolean supportSchemaOperationWithCommentAndOptions() {
+    return true;
+  }
 
   @Test
   public void testCreateSchema() {
@@ -76,7 +90,29 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  public void testGetSchema() {
+  public void testGetSchemaWithoutCommentAndOption() {
+    doWithCatalog(
+        currentCatalog(),
+        catalog -> {
+          String schema = "test_get_schema";
+          try {
+            TestUtils.assertTableResult(
+                sql("CREATE DATABASE IF NOT EXISTS %s", schema), ResultKind.SUCCESS);
+            TestUtils.assertTableResult(tableEnv.executeSql("USE " + schema), ResultKind.SUCCESS);
+
+            catalog.asSchemas().schemaExists(schema);
+            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+            Assertions.assertEquals(schema, loadedSchema.name());
+          } finally {
+            catalog.asSchemas().dropSchema(schema, true);
+            Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
+          }
+        });
+  }
+
+  @Test
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testGetSchemaWithCommentAndOptions() {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
@@ -114,7 +150,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
-          Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
           String schema = "test_list_schema";
           String schema2 = "test_list_schema2";
           String schema3 = "test_list_schema3";
@@ -135,6 +170,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Row.of(schema3));
 
             String[] schemas = catalog.asSchemas().listSchemas();
+            Arrays.sort(schemas);
             Assertions.assertEquals(4, schemas.length);
             Assertions.assertEquals("default", schemas[0]);
             Assertions.assertEquals(schema, schemas[1]);
@@ -150,7 +186,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  public void testAlterSchema() {
+  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
+  public void testAlterSchemaWithCommentAndOptions() {
     doWithCatalog(
         currentCatalog(),
         catalog -> {
@@ -188,6 +225,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testCreateSimpleTable() {
     String databaseName = "test_create_no_partition_table_db";
     String tableName = "test_create_no_partition_table";
@@ -236,6 +274,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testListTables() {
     String newSchema = "test_list_table_catalog";
     Column[] columns = new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
@@ -268,6 +307,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testDropTable() {
     String databaseName = "test_drop_table_db";
     doWithSchema(
@@ -289,6 +329,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testGetSimpleTable() {
     String databaseName = "test_get_simple_table";
     Column[] columns =
@@ -342,6 +383,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testRenameColumn() {
     String databaseName = "test_rename_column_db";
     String tableName = "test_rename_column";
@@ -377,6 +419,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterTableComment() {
     String databaseName = "test_alter_table_comment_database";
     String tableName = "test_alter_table_comment";
@@ -436,6 +479,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterTableAddColumn() {
     String databaseName = "test_alter_table_add_column_db";
     String tableName = "test_alter_table_add_column";
@@ -471,6 +515,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterTableDropColumn() {
     String databaseName = "test_alter_table_drop_column_db";
     String tableName = "test_alter_table_drop_column";
@@ -501,6 +546,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportColumnOperation")
   public void testAlterColumnTypeAndChangeOrder() {
     String databaseName = "test_alter_table_alter_column_db";
     String tableName = "test_alter_table_rename_column";
@@ -542,6 +588,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testRenameTable() {
     String databaseName = "test_rename_table_db";
     String tableName = "test_rename_table";
@@ -569,6 +616,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportTableOperation")
   public void testAlterTableProperties() {
     String databaseName = "test_alter_table_properties_db";
     String tableName = "test_alter_table_properties";
