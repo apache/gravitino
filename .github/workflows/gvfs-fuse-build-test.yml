@@ -81,7 +81,7 @@ jobs:
           ./gradlew compileDistribution -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
           cd clients/filesystem-fuse
           make test-s3
-          make test-fuse
+          make test-fuse-it
 
       - name: Free up disk space
         run: |

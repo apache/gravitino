@@ -62,7 +62,7 @@ doc-test:
 unit-test: doc-test
 	cargo test --no-fail-fast --lib --all-features --workspace
 
-test-fuse:
+test-fuse-it:
 	@bash ./tests/bin/run_fuse_testers.sh test
 
 test-s3:

@@ -347,6 +347,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             let mut file = opened_file.lock().await;
             file.close().await
         } else {
+            // If the file has been deleted, it does not cause a leak even if it has not been closed.
             Ok(())
         }
     }
