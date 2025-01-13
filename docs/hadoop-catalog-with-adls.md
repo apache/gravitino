@@ -417,8 +417,8 @@ For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-vers
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/adls_catalog/adls_schema/adls_fileset
-hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/adls_fileset
+./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/adls_catalog/adls_schema/adls_fileset
+./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/adls_fileset
 ```
 
 ### Using the GVFS Python client to access a fileset

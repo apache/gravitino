@@ -400,8 +400,8 @@ For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
-hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
+./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
+./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 ```
 
 ### Using the GVFS Python client to access a fileset

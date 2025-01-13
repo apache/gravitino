@@ -435,8 +435,8 @@ For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versio
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/s3_catalog/s3_schema/s3_fileset
-hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
+./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/s3_catalog/s3_schema/s3_fileset
+./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
 ```
 
 ### Using the GVFS Python client to access a fileset

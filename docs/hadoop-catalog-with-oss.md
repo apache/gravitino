@@ -429,8 +429,8 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 3. Run the following command to access the fileset:
 
 ```shell
-hadoop dfs -ls gvfs://fileset/oss_catalog/oss_schema/oss_fileset
-hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/oss_fileset
+./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/oss_catalog/oss_schema/oss_fileset
+./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/oss_fileset
 ```
 
 ### Using the GVFS Python client to access a fileset
