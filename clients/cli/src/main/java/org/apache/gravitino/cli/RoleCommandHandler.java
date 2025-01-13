@@ -36,13 +36,17 @@ public class RoleCommandHandler extends CommandHandler {
   private boolean quiet;
 
   public RoleCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      boolean ignore,
+      boolean quiet) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
     this.ignore = ignore;
     this.url = getUrl(line);
-    this.quiet = line.hasOption(GravitinoOptions.QUIET);
+    this.quiet = quiet;
   }
 
   /** Handles the command execution logic based on the provided command. */

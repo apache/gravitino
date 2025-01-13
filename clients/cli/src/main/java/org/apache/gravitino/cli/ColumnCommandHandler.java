@@ -46,14 +46,19 @@ public class ColumnCommandHandler extends CommandHandler {
    * @param line The command line arguments.
    * @param command The command to execute.
    * @param ignore Ignore server version mismatch.
+   * @param quiet suppress output.
    */
   public ColumnCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      boolean ignore,
+      boolean quiet) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
     this.ignore = ignore;
-    this.quiet = line.hasOption(GravitinoOptions.QUIET);
+    this.quiet = quiet;
 
     this.url = gravitinoCommandLine.getUrl();
     this.name = new FullName(line);

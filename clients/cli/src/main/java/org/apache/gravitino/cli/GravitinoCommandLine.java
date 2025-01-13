@@ -120,34 +120,35 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
+    boolean quiet = line.hasOption(GravitinoOptions.QUIET);
     if (CommandActions.HELP.equals(command)) {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
-      new OwnerCommandHandler(this, line, command, ignore, entity).handle();
+      new OwnerCommandHandler(this, line, command, ignore, quiet, entity).handle();
     } else if (entity.equals(CommandEntities.COLUMN)) {
-      new ColumnCommandHandler(this, line, command, ignore).handle();
+      new ColumnCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.TABLE)) {
-      new TableCommandHandler(this, line, command, ignore).handle();
+      new TableCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.SCHEMA)) {
-      new SchemaCommandHandler(this, line, command, ignore).handle();
+      new SchemaCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.CATALOG)) {
-      new CatalogCommandHandler(this, line, command, ignore).handle();
+      new CatalogCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       new MetalakeCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.TOPIC)) {
-      new TopicCommandHandler(this, line, command, ignore).handle();
+      new TopicCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {
       new FilesetCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.USER)) {
-      new UserCommandHandler(this, line, command, ignore).handle();
+      new UserCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
-      new GroupCommandHandler(this, line, command, ignore).handle();
+      new GroupCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.TAG)) {
       new TagCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.ROLE)) {
-      new RoleCommandHandler(this, line, command, ignore).handle();
+      new RoleCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
-      new ModelCommandHandler(this, line, command, ignore).handle();
+      new ModelCommandHandler(this, line, command, ignore, quiet).handle();
     }
   }
 

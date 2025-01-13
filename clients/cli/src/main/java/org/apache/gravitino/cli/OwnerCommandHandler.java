@@ -44,6 +44,7 @@ public class OwnerCommandHandler extends CommandHandler {
    * @param line The command line arguments.
    * @param command The command to execute.
    * @param ignore Ignore server version mismatch.
+   * @param quiet Suppress output.
    * @param entity The entity to execute the command on.
    */
   public OwnerCommandHandler(
@@ -51,12 +52,13 @@ public class OwnerCommandHandler extends CommandHandler {
       CommandLine line,
       String command,
       boolean ignore,
+      boolean quiet,
       String entity) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
     this.ignore = ignore;
-    this.quiet = line.hasOption(GravitinoOptions.QUIET);
+    this.quiet = quiet;
 
     this.url = getUrl(line);
     this.owner = line.getOptionValue(GravitinoOptions.USER);
