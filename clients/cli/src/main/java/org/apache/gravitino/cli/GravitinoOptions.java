@@ -92,7 +92,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
     options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
     options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
-    options.addOption(createSimpleOption(null, QUIET, "disable command output"));
+    options.addOption(createSimpleOption("q", QUIET, "disable command output"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));
