@@ -83,14 +83,14 @@ class TestOwnerCommands {
     doReturn(mockSetOwner)
         .when(commandLine)
         .newSetOwner(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("postgres"),
-            eq(CommandEntities.CATALOG),
-            eq("admin"),
-            eq(false));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "postgres",
+            "catalog",
+            "admin",
+            false);
     doReturn(mockSetOwner).when(mockSetOwner).validate();
     commandLine.handleCommandLine();
     verify(mockSetOwner).handle();
@@ -115,14 +115,14 @@ class TestOwnerCommands {
     doReturn(mockSetOwner)
         .when(commandLine)
         .newSetOwner(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("postgres"),
-            eq(CommandEntities.CATALOG),
-            eq("ITdept"),
-            eq(true));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "postgres",
+            CommandEntities.CATALOG,
+            "ITdept",
+            true);
     doReturn(mockSetOwner).when(mockSetOwner).validate();
     commandLine.handleCommandLine();
     verify(mockSetOwner).handle();

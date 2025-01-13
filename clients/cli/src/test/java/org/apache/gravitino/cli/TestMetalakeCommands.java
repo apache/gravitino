@@ -22,8 +22,6 @@ package org.apache.gravitino.cli;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -148,11 +146,7 @@ class TestMetalakeCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateMetalake(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("comment"));
+            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "comment");
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -170,12 +164,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.CREATE));
     doReturn(mockCreate)
         .when(commandLine)
-        .newCreateMetalake(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            isNull());
+        .newCreateMetalake(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", null);
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -193,12 +182,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.DELETE));
     doReturn(mockDelete)
         .when(commandLine)
-        .newDeleteMetalake(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"));
+        .newDeleteMetalake(GravitinoCommandLine.DEFAULT_URL, false, false, false, "metalake_demo");
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -217,12 +201,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.DELETE));
     doReturn(mockDelete)
         .when(commandLine)
-        .newDeleteMetalake(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(true),
-            eq("metalake_demo"));
+        .newDeleteMetalake(GravitinoCommandLine.DEFAULT_URL, false, false, true, "metalake_demo");
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -245,12 +224,7 @@ class TestMetalakeCommands {
     doReturn(mockSetProperty)
         .when(commandLine)
         .newSetMetalakeProperty(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("property"),
-            eq("value"));
+            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "property", "value");
     doReturn(mockSetProperty).when(mockSetProperty).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperty).handle();
@@ -315,11 +289,7 @@ class TestMetalakeCommands {
     doReturn(mockRemoveProperty)
         .when(commandLine)
         .newRemoveMetalakeProperty(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("property"));
+            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "property");
     doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
@@ -370,11 +340,7 @@ class TestMetalakeCommands {
     doReturn(mockUpdateComment)
         .when(commandLine)
         .newUpdateMetalakeComment(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("new comment"));
+            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "new comment");
     doReturn(mockUpdateComment).when(mockUpdateComment).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
@@ -395,12 +361,7 @@ class TestMetalakeCommands {
     doReturn(mockUpdateName)
         .when(commandLine)
         .newUpdateMetalakeName(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("new_name"));
+            GravitinoCommandLine.DEFAULT_URL, false, false, false, "metalake_demo", "new_name");
     doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
@@ -422,12 +383,7 @@ class TestMetalakeCommands {
     doReturn(mockUpdateName)
         .when(commandLine)
         .newUpdateMetalakeName(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(true),
-            eq("metalake_demo"),
-            eq("new_name"));
+            GravitinoCommandLine.DEFAULT_URL, false, false, true, "metalake_demo", "new_name");
     doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
@@ -446,12 +402,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
     doReturn(mockEnable)
         .when(commandLine)
-        .newMetalakeEnable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(false));
+        .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", false);
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -471,12 +422,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
     doReturn(mockEnable)
         .when(commandLine)
-        .newMetalakeEnable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(true));
+        .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", true);
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -496,8 +442,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
     doReturn(mockDisable)
         .when(commandLine)
-        .newMetalakeDisable(
-            eq(GravitinoCommandLine.DEFAULT_URL), eq(false), eq(false), eq("metalake_demo"));
+        .newMetalakeDisable(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo");
     doReturn(mockDisable).when(mockDisable).validate();
     commandLine.handleCommandLine();
     verify(mockDisable).handle();
@@ -520,19 +465,9 @@ class TestMetalakeCommands {
 
     Assert.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newMetalakeEnable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(false));
+        .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", false);
     verify(commandLine, never())
-        .newMetalakeEnable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(false));
+        .newMetalakeEnable(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", true);
     assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
   }
 }
