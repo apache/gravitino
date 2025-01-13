@@ -190,8 +190,7 @@ public class CatalogConnectorMetadata {
       // TODO yuhui need improve get the error message. From IllegalArgumentException.
       // At present, the IllegalArgumentException cannot get the error information clearly from the
       // Gravitino server.
-      String message =
-          e.getMessage().lines().toList().get(0) + e.getMessage().lines().toList().get(1);
+      String message = GravitinoErrorCode.toSimpleErrorMessage(e);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, message, e);
     }
   }

@@ -42,9 +42,9 @@ import org.slf4j.LoggerFactory;
 class TrinoQueryRunner {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryRunner.class);
 
-  private QueryRunner queryRunner;
-  private Terminal terminal;
-  private URI uri;
+  private final QueryRunner queryRunner;
+  private final Terminal terminal;
+  private final URI uri;
 
   TrinoQueryRunner(String trinoUri) throws Exception {
     this.uri = new URI(trinoUri);
@@ -92,10 +92,11 @@ class TrinoQueryRunner {
   String runQueryOnce(String query) {
     Query queryResult = queryRunner.startQuery(query);
     StringOutputStream outputStream = new StringOutputStream();
+    StringOutputStream errorStream = new StringOutputStream();
     queryResult.renderOutput(
         this.terminal,
         new PrintStream(outputStream),
-        new PrintStream(outputStream),
+        new PrintStream(errorStream),
         CSV,
         Optional.of(""),
         false);
@@ -109,17 +110,19 @@ class TrinoQueryRunner {
       session = builder.build();
       queryRunner.setSession(session);
     }
-    return outputStream.toString();
+
+    // Avoid the IDE capturing the error message as failure
+    String err_message = errorStream.toString().replace("\nCaused by:", "\n-Caused by:");
+    String out_message = outputStream.toString();
+    return err_message + out_message;
   }
 
-  boolean stop() {
+  void stop() {
     try {
       queryRunner.close();
       terminal.close();
-      return true;
     } catch (Exception e) {
       LOG.error("Failed to stop query runner", e);
-      return false;
     }
   }
 }
