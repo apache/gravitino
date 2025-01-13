@@ -41,7 +41,6 @@ val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion
 dependencies {
   implementation(project(":core"))
   implementation(project(":catalogs:catalog-common"))
-
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
@@ -174,7 +173,6 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
-    dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
   }
 }
 

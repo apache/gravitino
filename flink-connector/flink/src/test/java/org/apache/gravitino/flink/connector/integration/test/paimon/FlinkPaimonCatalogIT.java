@@ -28,10 +28,11 @@ import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-// @Tag("gravitino-docker-test")
+@Tag("gravitino-docker-test")
 public class FlinkPaimonCatalogIT extends FlinkCommonIT {
 
   @TempDir private static Path warehouseDir;
