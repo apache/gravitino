@@ -64,7 +64,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withName("col_1")
             .withType(VARCHAR)
             .withComment("test_comment")
-            .withNullable(true)
+            .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
@@ -573,7 +573,7 @@ public class TestMysqlTableOperations extends TestMysql {
         JdbcColumn.builder()
             .withName("col_4")
             .withType(Types.DateType.get())
-            .withNullable(true)
+            .withNullable(false)
             .withComment("date")
             .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
