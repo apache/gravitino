@@ -22,7 +22,6 @@ Changelog
 - apache/gravitino:0.8.0-incubating
   - Based on Gravitino 0.8.0-incubating, you can know more information from 0.8.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.8.0-incubating).
 
-
 - apache/gravitino:0.7.0-incubating
   - Based on Gravitino 0.7.0-incubating, you can know more information from 0.7.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.7.0-incubating).
   - Place bundle jars (gravitino-aws-bundle.jar, gravitino-gcp-bundle.jar, gravitino-aliyun-bundle.jar) in the `${GRAVITINO_HOME}/catalogs/hadoop/libs` folder to support the cloud storage catalog without manually adding the jars to the classpath.
@@ -113,10 +112,8 @@ Changelog
 - apache/gravitino-playground:trino-435-gravitino-0.8.0-incubating
   - Use Gravitino release 0.8.0-incubating Dockerfile to build the image.
 
-
 - apache/gravitino-playground:trino-435-gravitino-0.7.0-incubating
   - Use Gravitino release 0.7.0-incubating Dockerfile to build the image.
-
 
 - apache/gravitino-playground:trino-435-gravitino-0.6.1-incubating
   - Use Gravitino release 0.6.1-incubating Dockerfile to build the image.
