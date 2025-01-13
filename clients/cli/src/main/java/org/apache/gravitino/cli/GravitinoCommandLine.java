@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -356,7 +355,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       Main.exit(-1);
     }
   }
-  
 
   /**
    * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
