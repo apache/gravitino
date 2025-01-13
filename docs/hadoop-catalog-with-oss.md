@@ -211,11 +211,11 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("test_schema", "example_fileset"),
-  "This is an example fileset",
-  Fileset.Type.MANAGED,
-  "oss://bucket/root/schema/example_fileset",
-  propertiesMap,
+    NameIdentifier.of("test_schema", "example_fileset"),
+    "This is an example fileset",
+    Fileset.Type.MANAGED,
+    "oss://bucket/root/schema/example_fileset",
+    propertiesMap,
 );
 ```
 
@@ -339,17 +339,17 @@ fileset_name = "your_oss_fileset"
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/aliyun-sdk-oss-2.8.3.jar,/path/to/hadoop-aliyun-3.2.0.jar,/path/to/jdom-1.1.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
-  .appName("oss_fileset_test")
-  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "${_URL}")
-  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-  .config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
-  .config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
-  .config("spark.hadoop.oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
-  .config("spark.driver.memory", "2g")
-  .config("spark.driver.port", "2048")
-  .getOrCreate()
+    .appName("oss_fileset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "${_URL}")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+    .config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
+    .config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
+    .config("spark.hadoop.oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
 columns = ["Name", "Age"]
@@ -528,7 +528,7 @@ spark = SparkSession.builder
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-  # No need to set oss-access-key-id and oss-secret-access-key
+    # No need to set oss-access-key-id and oss-secret-access-key
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
     .getOrCreate()

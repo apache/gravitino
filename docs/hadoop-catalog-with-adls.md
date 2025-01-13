@@ -205,11 +205,11 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("test_schema", "example_fileset"),
-  "This is an example fileset",
-  Fileset.Type.MANAGED,
-  "abfss://container@account-name.dfs.core.windows.net/path/example_fileset",
-  propertiesMap,
+    NameIdentifier.of("test_schema", "example_fileset"),
+    "This is an example fileset",
+    Fileset.Type.MANAGED,
+    "abfss://container@account-name.dfs.core.windows.net/path/example_fileset",
+    propertiesMap,
 );
 ```
 
@@ -508,15 +508,15 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-  .appName("adls_fielset_test")
-  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-  # No need to set azure-storage-account-name and azure-storage-account-name
-  .config("spark.driver.memory", "2g")
-  .config("spark.driver.port", "2048")
-  .getOrCreate()
+    .appName("adls_fielset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+    # No need to set azure-storage-account-name and azure-storage-account-name
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 ```
 
 Python client and Hadoop command are similar to the above examples.
