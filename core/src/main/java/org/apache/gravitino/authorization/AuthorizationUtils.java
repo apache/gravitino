@@ -25,10 +25,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -39,8 +41,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.hadoop.Constants;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -51,10 +55,12 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -465,30 +471,72 @@ public class AuthorizationUtils {
           }
           break;
         case SCHEMA:
-          {
-            Catalog catalogObj =
-                GravitinoEnv.getInstance()
-                    .catalogDispatcher()
-                    .loadCatalog(
-                        NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
-            LOG.info("Catalog provider is %s", catalogObj.provider());
-            if (catalogObj.provider().equals("hive")) {
-              Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
-              if (schema.properties().containsKey(HiveConstants.LOCATION)) {
+          Catalog catalogObj =
+              GravitinoEnv.getInstance()
+                  .catalogDispatcher()
+                  .loadCatalog(
+                      NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
+          Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
+
+          switch (catalogObj.type()) {
+            case RELATIONAL:
+              LOG.info("Catalog provider is {}", catalogObj.provider());
+              if ("hive".equals(catalogObj.provider())
+                  && schema.properties().containsKey(HiveConstants.LOCATION)) {
                 String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
-                if (schemaLocation != null && schemaLocation.isEmpty()) {
+                if (StringUtils.isNotBlank(schemaLocation)) {
                   locations.add(schemaLocation);
                 } else {
-                  LOG.warn("Schema %s location is not found", ident);
+                  LOG.warn("Schema {} location is not found", ident);
                 }
               }
-            }
-            // TODO: [#6133] Supports get Fileset schema location in the AuthorizationUtils
+              break;
+
+            case FILESET:
+              if (catalogObj instanceof HasPropertyMetadata) {
+                HasPropertyMetadata catalogObjWithProperties = (HasPropertyMetadata) catalogObj;
+                Map<String, String> properties = schema.properties();
+                String schemaLocation =
+                    (String)
+                        catalogObjWithProperties
+                            .schemaPropertiesMetadata()
+                            .getOrDefault(properties, Constants.LOCATION);
+                if (StringUtils.isNotBlank(schemaLocation)) {
+                  locations.add(normalizeFilesetLocation(schemaLocation));
+                }
+              } else {
+                FilesetCatalog filesetCatalog = catalogObj.asFilesetCatalog();
+                String catalogObjLocation = catalogObj.properties().get(Constants.LOCATION);
+                Namespace namespace = NamespaceUtil.toFileset(ident);
+                NameIdentifier[] nameIdentifiers = filesetCatalog.listFilesets(namespace);
+                if (nameIdentifiers.length == 0) {
+                  LOG.warn(
+                      "{} is empty, use catalog location {} as schema location.",
+                      ident.toString(),
+                      catalogObjLocation);
+                  locations.add(catalogObjLocation);
+                } else {
+                  Arrays.stream(nameIdentifiers)
+                      .forEach(
+                          nameIdentifier -> {
+                            Fileset fileset = filesetCatalog.loadFileset(nameIdentifier);
+                            String filesetLocation = fileset.storageLocation();
+                            if (filesetLocation != null && !filesetLocation.isEmpty())
+                              locations.add(filesetLocation);
+                          });
+                }
+              }
+              break;
+
+            default:
+              LOG.warn("Unsupported catalog type {}", catalogObj.type());
+              break;
           }
           break;
+
         case TABLE:
           {
-            Catalog catalogObj =
+            catalogObj =
                 GravitinoEnv.getInstance()
                     .catalogDispatcher()
                     .loadCatalog(
@@ -530,5 +578,18 @@ public class AuthorizationUtils {
   private static NameIdentifier getObjectNameIdentifier(
       String metalake, MetadataObject metadataObject) {
     return NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
+  }
+
+  /**
+   * Normalize the fileset location to end with a slash.
+   *
+   * @param location the hadoop schema location
+   * @return if the location ends with a slash, return the location; otherwise, return the location
+   *     with a slash at the end.
+   */
+  public static String normalizeFilesetLocation(String location) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(location), "Location is blank");
+    location = location.endsWith(Constants.SLASH) ? location : location + Constants.SLASH;
+    return location;
   }
 }
