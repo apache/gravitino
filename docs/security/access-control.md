@@ -817,7 +817,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-Group group = client.grantRolesToGroup(Lists.newList("role1"), "group1");
+Group group = client.revokeRolesFromGroup(Lists.newList("role1"), "group1");
 ```
 
 </TabItem>
