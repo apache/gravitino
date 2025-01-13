@@ -66,7 +66,9 @@ Changelog
 
 
 - apache/gravitino-iceberg-rest:0.8.0-incubating
-  - Based on Gravitino 0.8.0-incubating, you can know more information from 0.8.0-incubating release notes.
+  - Supports OSS and ADLS storage.
+  - Supports event listener.
+  - Supports audit log.
 
 - apache/gravitino-iceberg-rest:0.7.0-incubating
   - Using JDBC catalog backend.
