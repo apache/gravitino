@@ -19,6 +19,7 @@ To set up a Hadoop catalog with ADLS, follow these steps:
 ```bash
 $ bin/gravitino-server.sh start
 ```
+
 Once the server is up and running, you can proceed to configure the Hadoop catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
 ## Configurations for creating a Hadoop catalog with ADLS
@@ -78,7 +79,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-adlsProperties = ImmutableMap.<String, String>builder()
+Map<String, String> adlsProperties = ImmutableMap.<String, String>builder()
     .put("location", "abfss://container@account-name.dfs.core.windows.net/path")
     .put("azure-storage-account-name", "azure storage account name")
     .put("azure-storage-account-key", "azure storage account key")
@@ -278,13 +279,13 @@ If your wants to custom your hadoop version or there is already a hadoop version
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-azure</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -294,13 +295,13 @@ Or use the bundle jar with Hadoop environment:
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-azure-bundle</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -312,7 +313,7 @@ Before running the following code, you need to install required packages:
 
 ```bash
 pip install pyspark==3.1.3
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
 
@@ -331,17 +332,17 @@ fileset_name = "your_adls_fileset"
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.2.0.jar,/path/to/azure-storage-7.0.0.jar,/path/to/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
-.appName("adls_fileset_test")
-.config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-.config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-.config("spark.hadoop.fs.gravitino.client.metalake", "test")
-.config("spark.hadoop.azure-storage-account-name", "azure_account_name")
-.config("spark.hadoop.azure-storage-account-key", "azure_account_name")
-.config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
-.config("spark.driver.memory", "2g")
-.config("spark.driver.port", "2048")
-.getOrCreate()
+    .appName("adls_fileset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+    .config("spark.hadoop.azure-storage-account-name", "azure_account_name")
+    .config("spark.hadoop.azure-storage-account-key", "azure_account_name")
+    .config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
 columns = ["Name", "Age"]
@@ -349,9 +350,9 @@ spark_df = spark.createDataFrame(data, schema=columns)
 gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
 
 spark_df.coalesce(1).write
-.mode("overwrite")
-.option("header", "true")
-.csv(gvfs_path)
+    .mode("overwrite")
+    .option("header", "true")
+    .csv(gvfs_path)
 ```
 
 If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
@@ -430,14 +431,14 @@ In order to access fileset with Azure Blob storage (ADLS) using the GVFS Python 
 | `abs_account_name` | The account name of Azure Blob Storage | (none)        | Yes      | 0.8.0-incubating |
 | `abs_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      | 0.8.0-incubating |
 
-:::
+:::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
 :::
 
 Please install the `gravitino` package before running the following code:
 
 ```bash
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
 ```python
@@ -476,7 +477,7 @@ ds.head()
 
 For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential
+## Fileset with credential vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
 

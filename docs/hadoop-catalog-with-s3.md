@@ -82,7 +82,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-s3Properties = ImmutableMap.<String, String>builder()
+Map<String, String> s3Properties = ImmutableMap.<String, String>builder()
     .put("location", "s3a://bucket/root")
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
@@ -149,7 +149,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-// Assuming you have just created a Hive catalog named `hive_catalog`
 Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
@@ -211,15 +210,15 @@ Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
-        .put("k1", "v1")
-        .build();
+      .put("k1", "v1")
+      .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("test_schema", "example_fileset"),
-  "This is an example fileset",
-  Fileset.Type.MANAGED,
-  "s3a://bucket/root/schema/example_fileset",
-  propertiesMap,
+    NameIdentifier.of("test_schema", "example_fileset"),
+    "This is an example fileset",
+    Fileset.Type.MANAGED,
+    "s3a://bucket/root/schema/example_fileset",
+    propertiesMap,
 );
 ```
 
@@ -252,10 +251,10 @@ To access fileset with S3 using the GVFS Java client, based on the [basic GVFS c
 | `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
 | `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
 
-:::
+:::note
 - `s3-endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
 - If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
-  :::
+:::
 
 ```java
 Configuration conf = new Configuration();
@@ -292,13 +291,13 @@ Similar to Spark configurations, you need to add S3 (bundle) jars to the classpa
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-aws</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -308,13 +307,13 @@ Or use the bundle jar with Hadoop environment:
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-aws-bundle</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -326,7 +325,7 @@ Before running the following code, you need to install required packages:
 
 ```bash
 pip install pyspark==3.1.3
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
 
@@ -345,17 +344,17 @@ fileset_name = "your_s3_fileset"
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.2.0.jar,/path/to/aws-java-sdk-bundle-1.11.375.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
-  .appName("s3_fielset_test")
-  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-  .config("spark.hadoop.s3-access-key-id", os.environ["S3_ACCESS_KEY_ID"])
-  .config("spark.hadoop.s3-secret-access-key", os.environ["S3_SECRET_ACCESS_KEY"])
-  .config("spark.hadoop.s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
-  .config("spark.driver.memory", "2g")
-  .config("spark.driver.port", "2048")
-  .getOrCreate()
+    .appName("s3_fielset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+    .config("spark.hadoop.s3-access-key-id", os.environ["S3_ACCESS_KEY_ID"])
+    .config("spark.hadoop.s3-secret-access-key", os.environ["S3_SECRET_ACCESS_KEY"])
+    .config("spark.hadoop.s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
 columns = ["Name", "Age"]
@@ -363,9 +362,9 @@ spark_df = spark.createDataFrame(data, schema=columns)
 gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
 
 spark_df.coalesce(1).write
-.mode("overwrite")
-.option("header", "true")
-.csv(gvfs_path)
+    .mode("overwrite")
+    .option("header", "true")
+    .csv(gvfs_path)
 ```
 
 If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
@@ -449,7 +448,7 @@ In order to access fileset with S3 using the GVFS Python client, apart from [bas
 | `s3_access_key_id`         | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
 | `s3_secret_access_key`     | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
 
-:::
+:::note
 - `s3_endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
 - If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
 :::
@@ -457,7 +456,7 @@ In order to access fileset with S3 using the GVFS Python client, apart from [bas
 Please install the `gravitino` package before running the following code:
 
 ```bash
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
 ```python
@@ -497,7 +496,7 @@ ds.head()
 
 For more use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential
+## Fileset with credential vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
 
@@ -528,15 +527,15 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-  .appName("s3_fielset_test")
-  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-  # No need to set s3-access-key-id and s3-secret-access-key
-  .config("spark.driver.memory", "2g")
-  .config("spark.driver.port", "2048")
-  .getOrCreate()
+    .appName("s3_fielset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+    # No need to set s3-access-key-id and s3-secret-access-key
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 ```
 
 Python client and Hadoop command are similar to the above examples.

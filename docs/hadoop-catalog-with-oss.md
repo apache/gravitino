@@ -80,7 +80,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-ossProperties = ImmutableMap.<String, String>builder()
+Map<String, String> ossProperties = ImmutableMap.<String, String>builder()
     .put("location", "oss://bucket/root")
     .put("oss-access-key-id", "access_key")
     .put("oss-secret-access-key", "secret_key")
@@ -266,7 +266,7 @@ fs.mkdirs(filesetPath);
 ...
 ```
 
-Similar to Spark configurations, you need to add OSS bundle jars to the classpath according to your environment.
+Similar to Spark configurations, you need to add OSS (bundle) jars to the classpath according to your environment.
 If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
 
 ```xml
@@ -285,13 +285,13 @@ If your wants to custom your hadoop version or there is already a hadoop version
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-aliyun</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -301,13 +301,13 @@ Or use the bundle jar with Hadoop environment:
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-aliyun-bundle</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -319,7 +319,7 @@ Before running the following code, you need to install required packages:
 
 ```bash
 pip install pyspark==3.1.3
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
 
@@ -338,17 +338,17 @@ fileset_name = "your_oss_fileset"
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/aliyun-sdk-oss-2.8.3.jar,/path/to/hadoop-aliyun-3.2.0.jar,/path/to/jdom-1.1.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
-.appName("oss_fielset_test")
-.config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-.config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "${_URL}")
-.config("spark.hadoop.fs.gravitino.client.metalake", "test")
-.config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
-.config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
-.config("spark.hadoop.oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
-.config("spark.driver.memory", "2g")
-.config("spark.driver.port", "2048")
-.getOrCreate()
+  .appName("oss_fileset_test")
+  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+  .config("spark.hadoop.fs.gravitino.server.uri", "${_URL}")
+  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+  .config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
+  .config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
+  .config("spark.hadoop.oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+  .config("spark.driver.memory", "2g")
+  .config("spark.driver.port", "2048")
+  .getOrCreate()
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
 columns = ["Name", "Age"]
@@ -356,9 +356,9 @@ spark_df = spark.createDataFrame(data, schema=columns)
 gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
 
 spark_df.coalesce(1).write
-.mode("overwrite")
-.option("header", "true")
-.csv(gvfs_path)
+    .mode("overwrite")
+    .option("header", "true")
+    .csv(gvfs_path)
 ```
 
 If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
@@ -450,7 +450,7 @@ If the catalog has enabled [credential vending](security/credential-vending.md),
 Please install the `gravitino` package before running the following code:
 
 ```bash
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
 ```python
@@ -491,7 +491,7 @@ ds.head()
 ```
 For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential
+## Fileset with credential vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
@@ -522,15 +522,15 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-  .appName("oss_fileset_test")
-  .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-  .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-  .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-  .config("spark.hadoop.fs.gravitino.client.metalake", "test")
+    .appName("oss_fileset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
   # No need to set oss-access-key-id and oss-secret-access-key
-  .config("spark.driver.memory", "2g")
-  .config("spark.driver.port", "2048")
-  .getOrCreate()
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 ```
 
 Python client and Hadoop command are similar to the above examples.

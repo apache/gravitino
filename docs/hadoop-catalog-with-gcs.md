@@ -75,13 +75,13 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-gcsProperties = ImmutableMap.<String, String>builder()
+Map<String, String> gcsProperties = ImmutableMap.<String, String>builder()
     .put("location", "gs://bucket/root")
     .put("gcs-service-account-file", "path_of_gcs_service_account_file")
     .put("filesystem-providers", "gcs")
     .build();
 
-Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
+Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog", 
     Type.FILESET,
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a GCS fileset catalog",
@@ -235,7 +235,7 @@ To access fileset with GCS using the GVFS Java client, based on the [basic GVFS 
 |----------------------------|--------------------------------------------|---------------|----------|------------------|
 | `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes      | 0.7.0-incubating |
 
-:::
+:::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
 :::
 
@@ -269,13 +269,13 @@ If your wants to custom your hadoop version or there is already a hadoop version
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-gcp</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -285,13 +285,13 @@ Or use the bundle jar with Hadoop environment:
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>gravitino-gcp-bundle</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
     <artifactId>filesystem-hadoop3-runtime</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
 
@@ -303,7 +303,7 @@ Before running the following code, you need to install required packages:
 
 ```bash
 pip install pyspark==3.1.3
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
 
@@ -322,15 +322,15 @@ fileset_name = "your_gcs_fileset"
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
-.appName("gcs_fielset_test")
-.config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
-.config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-.config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-.config("spark.hadoop.fs.gravitino.client.metalake", "test_metalake")
-.config("spark.hadoop.gcs-service-account-file", "/path/to/gcs-service-account-file.json")
-.config("spark.driver.memory", "2g")
-.config("spark.driver.port", "2048")
-.getOrCreate()
+    .appName("gcs_fielset_test")
+    .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
+    .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "test_metalake")
+    .config("spark.hadoop.gcs-service-account-file", "/path/to/gcs-service-account-file.json")
+    .config("spark.driver.memory", "2g")
+    .config("spark.driver.port", "2048")
+    .getOrCreate()
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
 columns = ["Name", "Age"]
@@ -338,9 +338,9 @@ spark_df = spark.createDataFrame(data, schema=columns)
 gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
 
 spark_df.coalesce(1).write
-.mode("overwrite")
-.option("header", "true")
-.csv(gvfs_path)
+    .mode("overwrite")
+    .option("header", "true")
+    .csv(gvfs_path)
 ```
 
 If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
@@ -419,7 +419,7 @@ If the catalog has enabled [credential vending](security/credential-vending.md),
 Please install the `gravitino` package before running the following code:
 
 ```bash
-pip install gravitino==0.8.0-incubating
+pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
 ```python
@@ -455,7 +455,7 @@ ds.head()
 
 For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential
+## Fileset with credential vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
 
