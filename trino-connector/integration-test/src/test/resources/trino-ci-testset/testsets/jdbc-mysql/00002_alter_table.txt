@@ -104,6 +104,8 @@ WITH (
    engine = 'InnoDB'
 )"
 
+<QUERY_FAILED> "newComment" field is required and cannot be empty
+
 DROP TABLE
 
 DROP SCHEMA
