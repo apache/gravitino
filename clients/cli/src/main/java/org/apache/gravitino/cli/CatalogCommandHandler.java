@@ -48,14 +48,19 @@ public class CatalogCommandHandler extends CommandHandler {
    * @param line The command line arguments.
    * @param command The command to execute.
    * @param ignore Ignore server version mismatch.
+   * @param quiet Suppress output.
    */
   public CatalogCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      boolean ignore,
+      boolean quiet) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
     this.ignore = ignore;
-    this.quiet = line.hasOption(GravitinoOptions.QUIET);
+    this.quiet = quiet;
 
     this.url = getUrl(line);
     this.name = new FullName(line);
