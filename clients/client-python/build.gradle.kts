@@ -285,9 +285,6 @@ tasks {
       generatePypiProjectHomePage()
       delete("dist")
       copy {
-        from("${project.rootDir}/licenses") { into("licenses") }
-        from("${project.rootDir}/LICENSE.bin") { into("./") }
-        from("${project.rootDir}/NOTICE.bin") { into("./") }
         from("${project.rootDir}/DISCLAIMER_WIP.txt") { into("./") }
         into("${project.rootDir}/clients/client-python")
         rename { fileName ->
@@ -301,9 +298,6 @@ tasks {
 
     doLast {
       delete("README.md")
-      delete("licenses")
-      delete("LICENSE")
-      delete("NOTICE")
       delete("DISCLAIMER_WIP.txt")
     }
   }
