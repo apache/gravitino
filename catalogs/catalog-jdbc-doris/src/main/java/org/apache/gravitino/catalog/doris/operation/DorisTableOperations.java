@@ -567,10 +567,6 @@ public class DorisTableOperations extends JdbcTableOperations {
       alterSql.add("MODIFY COMMENT \"" + newComment + "\"");
     }
 
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
-    }
-
     if (CollectionUtils.isEmpty(alterSql)) {
       return "";
     }
@@ -602,11 +598,14 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
-    return setProperties.stream()
-        .map(
-            setProperty ->
-                String.format("\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
-        .collect(Collectors.joining(",\n"));
+    String properties =
+        setProperties.stream()
+            .map(
+                setProperty ->
+                    String.format(
+                        "\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
+            .collect(Collectors.joining(",\n"));
+    return "set (" + properties + ")";
   }
 
   private String updateColumnCommentFieldDefinition(
