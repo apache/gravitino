@@ -17,7 +17,7 @@ To create a Hadoop catalog with S3, follow these steps:
 3. Start the Gravitino server using the following command:
 
 ```bash
-$ bin/gravitino-server.sh start
+$ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
 Once the server is up and running, you can proceed to configure the Hadoop catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
@@ -253,16 +253,15 @@ To access fileset with S3 using the GVFS Java client, based on the [basic GVFS c
 
 :::note
 - `s3-endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
-- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
 :::
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
-
+conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri", "http://localhost:8090");
+conf.set("fs.gravitino.client.metalake", "test_metalake");
 conf.set("s3-endpoint", "http://localhost:8090");
 conf.set("s3-access-key-id", "minio");
 conf.set("s3-secret-access-key", "minio123");
@@ -301,7 +300,8 @@ Similar to Spark configurations, you need to add S3 (bundle) jars to the classpa
   </dependency>
 ```
 
-Or use the bundle jar with Hadoop environment:
+Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
+
 
 ```xml
   <dependency>
@@ -506,7 +506,7 @@ Apart from configuration method in [create-s3-hadoop-catalog](#configurations-fo
 
 ### How to access S3 fileset with credential
 
-If the catalog has been configured with credential, you can access S3 fileset without providing authentication information via GVFS. Let's see how to access S3 fileset with credential:
+If the catalog has been configured with credential, you can access S3 fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access S3 fileset with credential:
 
 GVFS Java client:
 

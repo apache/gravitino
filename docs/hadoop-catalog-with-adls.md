@@ -17,7 +17,7 @@ To set up a Hadoop catalog with ADLS, follow these steps:
 3. Start the Gravitino server by running the following command:
 
 ```bash
-$ bin/gravitino-server.sh start
+$ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
 Once the server is up and running, you can proceed to configure the Hadoop catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
@@ -242,15 +242,15 @@ To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client, base
 | `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes      | 0.8.0-incubating |
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
 :::
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-conf.set("fs.gravitino.server.uri","http://localhost:8090");
-conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri", "http://localhost:8090");
+conf.set("fs.gravitino.client.metalake", "test_metalake");
 conf.set("azure-storage-account-name", "account_name_of_adls");
 conf.set("azure-storage-account-key", "account_key_of_adls");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
@@ -259,7 +259,7 @@ fs.mkdirs(filesetPath);
 ...
 ```
 
-Similar to Spark configurations, you need to add ADLS bundle jars to the classpath according to your environment.
+Similar to Spark configurations, you need to add ADLS (bundle) jars to the classpath according to your environment.
 
 If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
 
@@ -289,7 +289,7 @@ If your wants to custom your hadoop version or there is already a hadoop version
   </dependency>
 ```
 
-Or use the bundle jar with Hadoop environment:
+Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ```xml
   <dependency>
@@ -487,7 +487,7 @@ Apart from configuration method in [create-adls-hadoop-catalog](#configuration-f
 
 ### How to access ADLS fileset with credential
 
-If the catalog has been configured with credential, you can access ADLS fileset without providing authentication information via GVFS. Let's see how to access ADLS fileset with credential:
+If the catalog has been configured with credential, you can access ADLS fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access ADLS fileset with credential:
 
 GVFS Java client:
 
