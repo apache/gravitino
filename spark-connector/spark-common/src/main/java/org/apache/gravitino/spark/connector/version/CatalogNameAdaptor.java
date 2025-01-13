@@ -51,6 +51,9 @@ public class CatalogNameAdaptor {
   }
 
   private static String getCatalogName(String provider, int majorVersion, int minorVersion) {
+    if (provider.startsWith("jdbc")) {
+      return "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalog";
+    }
     String key =
         String.format("%s-%d.%d", provider.toLowerCase(Locale.ROOT), majorVersion, minorVersion);
     return catalogNames.get(key);
