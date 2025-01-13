@@ -158,11 +158,11 @@ class TestRoleCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateRole(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(new String[] {"admin"}));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            new String[] {"admin"});
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -210,12 +210,12 @@ class TestRoleCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteRole(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(new String[] {"admin"}));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            false,
+            "metalake_demo",
+            new String[] {"admin"});
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -266,12 +266,12 @@ class TestRoleCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteRole(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(true),
-            eq("metalake_demo"),
-            eq(new String[] {"admin"}));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            true,
+            "metalake_demo",
+            new String[] {"admin"});
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -386,12 +386,7 @@ class TestRoleCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newDeleteRole(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            any());
+            GravitinoCommandLine.DEFAULT_URL, false, false, false, "metalake_demo", null);
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.MISSING_ROLE);
   }

@@ -21,7 +21,6 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -244,14 +243,14 @@ class TestTableCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("users"));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users");
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -273,14 +272,14 @@ class TestTableCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(true),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("users"));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            true,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users");
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -327,15 +326,15 @@ class TestTableCommands {
     doReturn(mockSetProperties)
         .when(commandLine)
         .newSetTableProperty(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("user"),
-            eq("property"),
-            eq("value"));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "user",
+            "property",
+            "value");
     doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
@@ -425,14 +424,14 @@ class TestTableCommands {
     doReturn(mockSetProperties)
         .when(commandLine)
         .newRemoveTableProperty(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("users"),
-            eq("property"));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "property");
     doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
@@ -476,14 +475,14 @@ class TestTableCommands {
     doReturn(mockUpdate)
         .when(commandLine)
         .newUpdateTableComment(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("users"),
-            eq("New comment"));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "New comment");
     doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
@@ -506,14 +505,14 @@ class TestTableCommands {
     doReturn(mockUpdate)
         .when(commandLine)
         .newUpdateTableName(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("users"),
-            eq("people"));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "people");
     doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
@@ -538,16 +537,15 @@ class TestTableCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateTable(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("users"),
-            eq("users.csv"),
-            eq("comment"));
-
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "users",
+            "users.csv",
+            "comment");
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();

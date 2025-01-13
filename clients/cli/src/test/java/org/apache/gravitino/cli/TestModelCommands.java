@@ -316,15 +316,15 @@ public class TestModelCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("model"),
-            isNull(),
-            argThat(Map::isEmpty));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "model",
+            null,
+            Collections.EMPTY_MAP);
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -455,15 +455,14 @@ public class TestModelCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("model"));
-
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            false,
+            "metalake_demo",
+            "catalog",
+            "schema",
+            "model");
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
