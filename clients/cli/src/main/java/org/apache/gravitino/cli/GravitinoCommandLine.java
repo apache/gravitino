@@ -19,13 +19,11 @@
 
 package org.apache.gravitino.cli;
 
-import com.google.common.base.Joiner;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -37,18 +35,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
   private final Options options;
   private final String entity;
   private final String command;
-  private String urlEnv;
-  private boolean urlSet = false;
   private boolean ignore = false;
   private String ignoreEnv;
   private boolean ignoreSet = false;
-  private String authEnv;
-  private boolean authSet = false;
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
   // This joiner is used to join multiple outputs to be displayed, e.g. roles or groups
-  private static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
   /**
    * Gravitino Command line.
@@ -98,14 +91,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     if (line.hasOption(GravitinoOptions.HELP)) {
       displayHelp(options);
     }
-    /* Display Gravitino client version. */
-    else if (line.hasOption(GravitinoOptions.VERSION)) {
-      newClientVersion(getUrl(), ignore).handle();
-    }
-    /* Display Gravitino server version. */
-    else if (line.hasOption(GravitinoOptions.SERVER)) {
-      newServerVersion(getUrl(), ignore).handle();
-    }
+    new SimpleCommandHandler(this, line, ignore).handle();
   }
 
   /**
@@ -165,87 +151,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       System.out.print(helpMessage.toString());
     } catch (IOException e) {
       System.err.println(ErrorMessages.HELP_FAILED + e.getMessage());
-      Main.exit(-1);
-    }
-  }
-
-  /**
-   * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
-   * variable or the Gravitio config file.
-   *
-   * @return The Gravitinno URL, or null if not found.
-   */
-  public String getUrl() {
-    GravitinoConfig config = new GravitinoConfig(null);
-
-    // If specified on the command line use that
-    if (line.hasOption(GravitinoOptions.URL)) {
-      return line.getOptionValue(GravitinoOptions.URL);
-    }
-
-    // Cache the Gravitino URL environment variable
-    if (urlEnv == null && !urlSet) {
-      urlEnv = System.getenv("GRAVITINO_URL");
-      urlSet = true;
-    }
-
-    // If set return the Gravitino URL environment variable
-    if (urlEnv != null) {
-      return urlEnv;
-    }
-
-    // Check if the Gravitino URL is specified in the configuration file
-    if (config.fileExists()) {
-      config.read();
-      String configURL = config.getGravitinoURL();
-      if (configURL != null) {
-        return configURL;
-      }
-    }
-
-    // Return the default localhost URL
-    return DEFAULT_URL;
-  }
-
-  /**
-   * Retrieves the Gravitinno authentication from the command line options or the GRAVITINO_AUTH
-   * environment variable or the Gravitio config file.
-   *
-   * @return The Gravitinno authentication, or null if not found.
-   */
-  public String getAuth() {
-    // If specified on the command line use that
-    if (line.hasOption(GravitinoOptions.SIMPLE)) {
-      return GravitinoOptions.SIMPLE;
-    }
-
-    // Cache the Gravitino authentication type environment variable
-    if (authEnv == null && !authSet) {
-      authEnv = System.getenv("GRAVITINO_AUTH");
-      authSet = true;
-    }
-
-    // If set return the Gravitino authentication type environment variable
-    if (authEnv != null) {
-      return authEnv;
-    }
-
-    // Check if the authentication type is specified in the configuration file
-    GravitinoConfig config = new GravitinoConfig(null);
-    if (config.fileExists()) {
-      config.read();
-      String configAuthType = config.getGravitinoAuthType();
-      if (configAuthType != null) {
-        return configAuthType;
-      }
-    }
-
-    return null;
-  }
-
-  private void checkEntities(List<String> entities) {
-    if (!entities.isEmpty()) {
-      System.err.println(ErrorMessages.MISSING_ENTITIES + COMMA_JOINER.join(entities));
       Main.exit(-1);
     }
   }
