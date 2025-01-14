@@ -71,7 +71,7 @@ jobs:
         run: |
           dev/ci/check_commands.sh
 
-      - name: Build and test Gvfs-fuse
+      - name: Build Gvfs-fuse
         run: |
            ./gradlew :clients:filesystem-fuse:build -PenableFuse=true
 
