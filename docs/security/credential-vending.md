@@ -132,12 +132,23 @@ Gravitino supports custom credentials, you can implement the `org.apache.graviti
 
 Besides setting credentials related configuration, please download Gravitino cloud bundle jar and place it in the classpath of Iceberg REST server or Hadoop catalog.
 
-Gravitino cloud bundle jar:
+For Hadoop catalog, please use Gravitino cloud bundle jar with Hadoop and cloud packages:
 
-- [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)
-- [Gravitino Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle)
-- [Gravitino GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
-- [Gravitino Azure bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
+- [Gravitino AWS bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)
+- [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle)
+- [Gravitino GCP bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
+- [Gravitino Azure bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
+
+For Iceberg REST catalog server, please use Gravitino cloud bundle jar without Hadoop and cloud packages:
+
+- [Gravitino AWS bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws)
+- [Gravitino Aliyun bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun)
+- [Gravitino GCP bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp)
+- [Gravitino Azure bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure)
+
+:::note
+For OSS, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, you could provide the OSS jar by yourself or use [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), please refer to [OSS configuration](../iceberg-rest-service.md#oss-configuration) for more details.
+:::
 
 The classpath of the server:
 

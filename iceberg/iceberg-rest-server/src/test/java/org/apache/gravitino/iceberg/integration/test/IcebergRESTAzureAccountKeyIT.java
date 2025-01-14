@@ -113,6 +113,6 @@ public class IcebergRESTAzureAccountKeyIT extends IcebergRESTJdbcCatalogIT {
   private void copyAzureBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("azure-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("azure", targetDir);
   }
 }

@@ -111,6 +111,8 @@ public class IcebergRESTOSSSecretIT extends IcebergRESTJdbcCatalogIT {
   private void copyAliyunOSSJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    // Iceberg doesn't provide Iceberg Aliyun bundle jar, so use Gravitino aliyun bundle to provide
+    // OSS packages.
     BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
   }
 }

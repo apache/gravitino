@@ -20,18 +20,23 @@ package org.apache.gravitino.gcs.fs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-public class GCSFileSystemProvider implements FileSystemProvider {
+public class GCSFileSystemProvider implements FileSystemProvider, SupportsCredentialVending {
   private static final String GCS_SERVICE_ACCOUNT_JSON_FILE =
       "fs.gs.auth.service.account.json.keyfile";
+  private static final String GCS_TOKEN_PROVIDER_IMPL = "fs.gs.auth.access.token.provider.impl";
 
   @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
@@ -43,7 +48,19 @@ public class GCSFileSystemProvider implements FileSystemProvider {
     Configuration configuration = new Configuration();
     FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY)
         .forEach(configuration::set);
+
     return FileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  @Override
+  public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
+    Credential credential = GCSUtils.getGCSTokenCredential(credentials);
+    Map<String, String> result = Maps.newHashMap();
+    if (credential instanceof GCSTokenCredential) {
+      result.put(GCS_TOKEN_PROVIDER_IMPL, GCSCredentialsProvider.class.getName());
+    }
+
+    return result;
   }
 
   @Override

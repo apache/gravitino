@@ -1318,7 +1318,7 @@ export const deleteModel = createAsyncThunk(
   'appMetalakes/deleteModel',
   async ({ metalake, catalog, type, schema, model }, { dispatch }) => {
     dispatch(setTableLoading(true))
-    const [err, res] = await to(deleteModleApi({ metalake, catalog, schema, model }))
+    const [err, res] = await to(deleteModelApi({ metalake, catalog, schema, model }))
     dispatch(setTableLoading(false))
 
     if (err || !res) {

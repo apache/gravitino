@@ -88,7 +88,7 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
   private void copyGCSBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("gcp-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
   }
 
   private void downloadIcebergBundleJar() throws IOException {

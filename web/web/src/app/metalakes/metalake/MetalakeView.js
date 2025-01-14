@@ -112,26 +112,39 @@ const MetalakeView = () => {
           dispatch(getSchemaDetails({ metalake, catalog, schema }))
         }
 
-        if (paramsSize === 5 && catalog && schema) {
+        if (paramsSize === 5 && catalog && type && schema && (table || fileset || topic || model)) {
           if (!store.catalogs.length) {
             await dispatch(fetchCatalogs({ metalake }))
             await dispatch(fetchSchemas({ metalake, catalog, type }))
           }
-          if (table) {
-            dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-          }
-          if (fileset) {
-            dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
-          }
-          if (topic) {
-            dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
-          }
-          if (model) {
-            dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
-            dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
+          switch (type) {
+            case 'relational':
+              await dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+              await dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+              break
+            case 'fileset':
+              await dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
+              await dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+              break
+            case 'messaging':
+              await dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema }))
+              await dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+              break
+            case 'model':
+              await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema }))
+              await dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
+              await dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
+              break
+            default:
+              break
           }
         }
         if (paramsSize === 6 && version) {
+          if (!store.catalogs.length) {
+            await dispatch(fetchCatalogs({ metalake }))
+            await dispatch(fetchSchemas({ metalake, catalog, type }))
+            await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema }))
+          }
           dispatch(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
         }
       }

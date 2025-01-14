@@ -74,6 +74,7 @@ public class ADLSTokenCredential implements Credential {
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
         .put(GRAVITINO_ADLS_SAS_TOKEN, sasToken)
+        .put(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, accountName)
         .build();
   }
 

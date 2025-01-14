@@ -1037,6 +1037,27 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(2, table.index().length);
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());
+
+    Column notNullCol = Column.of("col_6", Types.LongType.get(), "id", true, false, null);
+    Exception exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdent,
+                    new Column[] {notNullCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_6"}}),
+                    }));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Column col_6 in the unique index null must be a not null column"));
   }
 
   @Test

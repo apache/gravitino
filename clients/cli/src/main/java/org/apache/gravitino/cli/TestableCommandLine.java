@@ -315,8 +315,8 @@ public class TestableCommandLine {
   }
 
   protected ListTables newListTables(
-      String url, boolean ignore, String metalake, String catalog, String table) {
-    return new ListTables(url, ignore, metalake, catalog, table);
+      String url, boolean ignore, String metalake, String catalog, String schema) {
+    return new ListTables(url, ignore, metalake, catalog, schema);
   }
 
   protected DeleteTable newDeleteTable(
