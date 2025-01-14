@@ -142,8 +142,7 @@ public class LockManager {
                     threadIdentifier,
                     node,
                     // SimpleDateFormat is not thread-safe, so we should create a new instance for
-                    // each
-                    // time
+                    // each time
                     new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
                         .format(node.getHoldingThreadTimestamp()));
               }
