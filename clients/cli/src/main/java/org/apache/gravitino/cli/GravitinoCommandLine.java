@@ -29,7 +29,6 @@ import java.util.List;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.Command;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine extends TestableCommandLine {
