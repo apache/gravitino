@@ -45,9 +45,9 @@ public class SimpleCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     if (line.hasOption(GravitinoOptions.VERSION)) {
-      gravitinoCommandLine.newClientVersion(getUrl(line), ignore);
+      gravitinoCommandLine.newClientVersion(getUrl(line), ignore).validate().handle();
     } else if (line.hasOption(GravitinoOptions.SERVER)) {
-      gravitinoCommandLine.newServerVersion(getUrl(line), ignore);
+      gravitinoCommandLine.newServerVersion(getUrl(line), ignore).validate().handle();
     }
   }
 }
