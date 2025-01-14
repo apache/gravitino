@@ -32,14 +32,13 @@ public class FilesetCommandHandler extends CommandHandler {
   private final CommandLine line;
   private final String command;
   private final boolean ignore;
+  private final boolean quiet;
   private final String url;
   private final FullName name;
   private final String metalake;
   private final String catalog;
   private final String schema;
-  private final boolean quiet;
   private String fileset;
-  private final boolean quiet;
 
   /**
    * Constructs a {@link FilesetCommandHandler} instance.

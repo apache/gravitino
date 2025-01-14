@@ -34,12 +34,12 @@ public class CatalogCommandHandler extends CommandHandler {
   private final CommandLine line;
   private final String command;
   private final boolean ignore;
+  private final boolean quiet;
   private final String url;
   private final FullName name;
   private final String metalake;
   private String catalog;
   private final String outputFormat;
-  private final boolean quiet;
 
   /**
    * Constructs a {@link CatalogCommandHandler} instance.

@@ -45,7 +45,6 @@ public class TagCommandHandler extends CommandHandler {
     this.quiet = quiet;
     this.url = getUrl(line);
     this.tags = line.getOptionValues(GravitinoOptions.TAG);
-    this.quiet = quiet;
 
     if (tags != null) {
       tags = Arrays.stream(tags).distinct().toArray(String[]::new);

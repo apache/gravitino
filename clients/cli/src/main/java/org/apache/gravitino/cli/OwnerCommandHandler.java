@@ -28,6 +28,7 @@ public class OwnerCommandHandler extends CommandHandler {
   private final CommandLine line;
   private final String command;
   private final boolean ignore;
+  private final boolean quiet;
   private final String url;
   private final FullName name;
   private final String metalake;
@@ -35,7 +36,6 @@ public class OwnerCommandHandler extends CommandHandler {
   private final String owner;
   private final String group;
   private final String entity;
-  private final boolean quiet;
 
   /**
    * Constructs a {@link OwnerCommandHandler} instance.
