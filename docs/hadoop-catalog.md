@@ -23,10 +23,11 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 
 Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
 
-| Property Name          | Description                                        | Default Value | Required | Since Version    |
-|------------------------|----------------------------------------------------|---------------|----------|------------------|
-| `location`             | The storage location managed by Hadoop catalog.    | (none)        | No       | 0.5.0            |
-| `credential-providers` | The credential provider types, separated by comma. | (none)        | No       | 0.8.0-incubating |
+| Property Name                  | Description                                                                                         | Default Value | Required | Since Version    |
+|--------------------------------|-----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `location`                     | The storage location managed by Hadoop catalog.                                                     | (none)        | No       | 0.5.0            |
+| `filesystem-conn-timeout-secs` | The timeout of getting the file system using Hadoop FileSystem client instance. Time unit: seconds. | 6             | No       | 0.8.0-incubating |
+| `credential-providers`         | The credential provider types, separated by comma.                                                  | (none)        | No       | 0.8.0-incubating |
 
 Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
