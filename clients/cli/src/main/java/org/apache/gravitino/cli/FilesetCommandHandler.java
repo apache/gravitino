@@ -37,6 +37,7 @@ public class FilesetCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private final String schema;
+  private final boolean quiet;
   private String fileset;
   private final boolean quiet;
 

@@ -56,6 +56,7 @@ public class MetalakeCommandHandler extends CommandHandler {
     this.ignore = ignore;
     this.quiet = quiet;
     this.url = getUrl(line);
+    this.quiet = quiet;
   }
 
   /** Handles the command execution logic based on the provided command. */
