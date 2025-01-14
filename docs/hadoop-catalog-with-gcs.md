@@ -466,7 +466,7 @@ Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-f
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_catalog",
+  "name": "gcs-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a GCS fileset catalog",
   "provider": "hadoop",

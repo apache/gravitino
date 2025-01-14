@@ -502,7 +502,7 @@ Apart from configuration method in [create-oss-hadoop-catalog](#configuration-fo
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_catalog",
+  "name": "oss-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a OSS fileset catalog",
   "provider": "hadoop",

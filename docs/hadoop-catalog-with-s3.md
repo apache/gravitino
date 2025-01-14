@@ -505,7 +505,7 @@ Apart from configuration method in [create-s3-hadoop-catalog](#configurations-fo
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_catalog",
+  "name": "s3-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a S3 fileset catalog",
   "provider": "hadoop",

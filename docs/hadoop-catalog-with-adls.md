@@ -487,7 +487,7 @@ Apart from configuration method in [create-adls-hadoop-catalog](#configuration-f
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "example_catalog",
+  "name": "adls-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a ADLS fileset catalog",
   "provider": "hadoop",
