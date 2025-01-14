@@ -126,6 +126,7 @@ public class MetadataObjects {
       case TABLE:
       case FILESET:
       case TOPIC:
+      case MODEL:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:
