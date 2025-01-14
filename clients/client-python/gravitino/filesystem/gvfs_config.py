@@ -42,8 +42,8 @@ class GVFSConfig:
     GVFS_FILESYSTEM_OSS_SECRET_KEY = "oss_secret_access_key"
     GVFS_FILESYSTEM_OSS_ENDPOINT = "oss_endpoint"
 
-    GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME = "abs_account_name"
-    GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY = "abs_account_key"
+    GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME = "azure_storage_account_name"
+    GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY = "azure_storage_account_key"
 
     # This configuration marks the expired time of the credential. For instance, if the credential
     # fetched from Gravitino server has expired time of 3600 seconds, and the credential_expired_time_ration is 0.5
