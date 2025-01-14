@@ -461,7 +461,23 @@ Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. I
 
 ### How to create a GCS Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-for-a-gcs-hadoop-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset.
+Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-for-a-gcs-hadoop-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_catalog",
+  "type": "FILESET",
+  "comment": "This is a GCS fileset catalog",
+  "provider": "hadoop",
+  "properties": {
+    "location": "gs://bucket/root",
+    "gcs-service-account-file": "path_of_gcs_service_account_file",
+    "filesystem-providers": "gcs",
+    "credential-providers": "gcs-token"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
 
 ### How to access GCS fileset with credential
 

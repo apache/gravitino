@@ -500,7 +500,27 @@ Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If
 
 ### How to create a S3 Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-s3-hadoop-catalog](#configurations-for-s3-hadoop-catalog), properties needed by [s3-credential](./security/credential-vending.md#s3-credentials) should also be set to enable credential vending for S3 fileset.
+Apart from configuration method in [create-s3-hadoop-catalog](#configurations-for-s3-hadoop-catalog), properties needed by [s3-credential](./security/credential-vending.md#s3-credentials) should also be set to enable credential vending for S3 fileset. Take `s3-token` credential provider for example:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_catalog",
+  "type": "FILESET",
+  "comment": "This is a S3 fileset catalog",
+  "provider": "hadoop",
+  "properties": {
+    "location": "s3a://bucket/root",
+    "s3-access-key-id": "access_key",
+    "s3-secret-access-key": "secret_key",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+    "filesystem-providers": "s3",
+    "credential-providers": "s3-token",
+    "s3-region":"ap-northeast-1",
+    "s3-role-arn":"The ARN of the role to access the S3 data",
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
 
 ### How to access S3 fileset with credential
 

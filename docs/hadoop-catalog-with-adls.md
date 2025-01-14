@@ -482,7 +482,27 @@ Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. 
 
 ### How to create an ADLS Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-adls-hadoop-catalog](#configuration-for-a-adls-hadoop-catalog), properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should also be set to enable credential vending for ADLS fileset.
+Apart from configuration method in [create-adls-hadoop-catalog](#configuration-for-a-adls-hadoop-catalog), properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_catalog",
+  "type": "FILESET",
+  "comment": "This is a ADLS fileset catalog",
+  "provider": "hadoop",
+  "properties": {
+    "location": "abfss://container@account-name.dfs.core.windows.net/path",
+    "azure-storage-account-name": "The account name of the Azure Blob Storage",
+    "azure-storage-account-key": "The account key of the Azure Blob Storage",
+    "filesystem-providers": "abs",
+    "credential-providers": "adls-token",
+    "azure-tenant-id":"The Azure tenant id",
+    "azure-client-id":"The Azure client id",
+    "azure-client-secret":"The Azure client secret key"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
 
 ### How to access ADLS fileset with credential
 

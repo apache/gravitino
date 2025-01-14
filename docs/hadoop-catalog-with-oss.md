@@ -497,7 +497,27 @@ Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. I
 
 ### How to create a OSS Hadoop catalog with credential enabled
 
-Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset.
+Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_catalog",
+  "type": "FILESET",
+  "comment": "This is a OSS fileset catalog",
+  "provider": "hadoop",
+  "properties": {
+    "location": "oss://bucket/root",
+    "oss-access-key-id": "access_key",
+    "oss-secret-access-key": "secret_key",
+    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "filesystem-providers": "oss",
+    "credential-providers": "oss-token",
+    "oss-region":"oss-cn-hangzhou",
+    "oss-role-arn":"The ARN of the role to access the OSS data"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
 
 ### How to access OSS fileset with credential
 
