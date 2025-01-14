@@ -294,7 +294,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
               Row.of(2, "B"));
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -367,7 +367,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -474,7 +474,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
           }
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Override
@@ -493,7 +493,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
   }
 
   @Override
-  protected boolean dropCascade() {
+  protected boolean supportDropCascade() {
     return false;
   }
 

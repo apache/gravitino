@@ -61,6 +61,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     all.put(
         CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoIcebergCatalogFactoryOptions.IDENTIFIER);
     // Map "catalog-backend" to "catalog-type".
+    // TODO If catalog backend is CUSTOM, we need special compatibility logic.
     GRAVITINO_CONFIG_TO_FLINK_ICEBERG.forEach(
         (key, value) -> {
           if (all.containsKey(key)) {

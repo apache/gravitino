@@ -78,7 +78,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract String getProvider();
 
-  protected abstract boolean dropCascade();
+  protected abstract boolean supportDropCascade();
 
   @Test
   public void testCreateSchema() {
@@ -91,14 +91,14 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             TestUtils.assertTableResult(tableResult, ResultKind.SUCCESS);
             catalog.asSchemas().schemaExists(schema);
           } finally {
-            catalog.asSchemas().dropSchema(schema, dropCascade());
+            catalog.asSchemas().dropSchema(schema, supportDropCascade());
             Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
           }
         });
   }
 
   @Test
-  @EnabledIf("testGetSchemaWithoutCommentAndOption")
+  @EnabledIf("supportGetSchemaWithoutCommentAndOption")
   public void testGetSchemaWithoutCommentAndOption() {
     doWithCatalog(
         currentCatalog(),
@@ -147,7 +147,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.assertEquals(
                 location, loadedSchema.properties().get(HiveConstants.LOCATION));
           } finally {
-            catalog.asSchemas().dropSchema(schema, dropCascade());
+            catalog.asSchemas().dropSchema(schema, supportDropCascade());
             Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
           }
         });
@@ -185,9 +185,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.assertEquals(schema2, schemas[2]);
             Assertions.assertEquals(schema3, schemas[3]);
           } finally {
-            catalog.asSchemas().dropSchema(schema, dropCascade());
-            catalog.asSchemas().dropSchema(schema2, dropCascade());
-            catalog.asSchemas().dropSchema(schema3, dropCascade());
+            catalog.asSchemas().dropSchema(schema, supportDropCascade());
+            catalog.asSchemas().dropSchema(schema2, supportDropCascade());
+            catalog.asSchemas().dropSchema(schema3, supportDropCascade());
             Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
           }
         });
@@ -225,7 +225,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
             Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
           } finally {
-            catalog.asSchemas().dropSchema(schema, dropCascade());
+            catalog.asSchemas().dropSchema(schema, supportDropCascade());
           }
         });
   }
@@ -277,7 +277,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               Row.of("B", 2.0));
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -311,7 +311,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               Row.of("test_table2"));
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -332,7 +332,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Assertions.assertFalse(catalog.asTableCatalog().tableExists(identifier));
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -387,7 +387,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           }
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -424,7 +424,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           assertColumns(expected, actual);
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -486,7 +486,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           }
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -523,7 +523,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           assertColumns(expected, actual);
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -555,7 +555,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           assertColumns(expected, actual);
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -598,7 +598,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           assertColumns(expected, actual);
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -627,7 +627,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               catalog.asTableCatalog().tableExists(NameIdentifier.of(databaseName, newTableName)));
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 
   @Test
@@ -671,6 +671,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Assertions.assertNull(properties.get("key2"));
         },
         true,
-        dropCascade());
+        supportDropCascade());
   }
 }

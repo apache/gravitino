@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
@@ -584,32 +583,13 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Override
-  protected org.apache.gravitino.Catalog currentCatalog() {
-    return hiveCatalog;
+  protected Map<String, String> getCreateSchemaProps(String schemaName) {
+    return ImmutableMap.of("location", warehouse + "/" + schemaName);
   }
 
-  protected void doWithSchema(
-      org.apache.gravitino.Catalog catalog,
-      String schemaName,
-      Consumer<org.apache.gravitino.Catalog> action,
-      boolean dropSchema) {
-      Preconditions.checkNotNull(catalog);
-      Preconditions.checkNotNull(schemaName);
-      try {
-          tableEnv.useCatalog(catalog.name());
-          if (!catalog.asSchemas().schemaExists(schemaName)) {
-              catalog
-                      .asSchemas()
-                      .createSchema(
-                              schemaName, null, ImmutableMap.of("location", warehouse + "/" + schemaName));
-          }
-          tableEnv.useDatabase(schemaName);
-          action.accept(catalog);
-      } finally {
-          if (dropSchema) {
-              catalog.asSchemas().dropSchema(schemaName, true);
-          }
-      }
+  @Override
+  protected org.apache.gravitino.Catalog currentCatalog() {
+    return hiveCatalog;
   }
 
   @Override
@@ -618,7 +598,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Override
-  protected boolean dropCascade() {
+  protected boolean supportDropCascade() {
     return true;
   }
 }

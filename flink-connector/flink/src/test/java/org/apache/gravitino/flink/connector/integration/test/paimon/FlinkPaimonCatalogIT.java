@@ -53,7 +53,7 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
   }
 
   @Override
-  protected boolean dropCascade() {
+  protected boolean supportDropCascade() {
     return true;
   }
 
@@ -107,5 +107,10 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(warehouse, properties.get("warehouse"));
+  }
+
+  @Override
+  protected Map<String, String> getCreateSchemaProps(String schemaName) {
+    return null;
   }
 }

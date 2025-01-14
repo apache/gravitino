@@ -25,22 +25,25 @@ import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.flink.FlinkCatalogFactory;
 
-public interface IcebergPropertiesConstants {
-  @VisibleForTesting String GRAVITINO_ICEBERG_CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
+public class IcebergPropertiesConstants {
+  @VisibleForTesting
+  public static String GRAVITINO_ICEBERG_CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
 
-  String ICEBERG_CATALOG_TYPE = FlinkCatalogFactory.ICEBERG_CATALOG_TYPE;
+  public static final String ICEBERG_CATALOG_TYPE = FlinkCatalogFactory.ICEBERG_CATALOG_TYPE;
 
-  String GRAVITINO_ICEBERG_CATALOG_WAREHOUSE = IcebergConstants.WAREHOUSE;
+  public static final String GRAVITINO_ICEBERG_CATALOG_WAREHOUSE = IcebergConstants.WAREHOUSE;
 
-  String ICEBERG_CATALOG_WAREHOUSE = CatalogProperties.WAREHOUSE_LOCATION;
+  public static final String ICEBERG_CATALOG_WAREHOUSE = CatalogProperties.WAREHOUSE_LOCATION;
 
-  String GRAVITINO_ICEBERG_CATALOG_URI = IcebergConstants.URI;
+  public static final String GRAVITINO_ICEBERG_CATALOG_URI = IcebergConstants.URI;
 
-  String ICEBERG_CATALOG_URI = CatalogProperties.URI;
+  public static final String ICEBERG_CATALOG_URI = CatalogProperties.URI;
 
-  @VisibleForTesting String ICEBERG_CATALOG_BACKEND_HIVE = CatalogUtil.ICEBERG_CATALOG_TYPE_HIVE;
+  @VisibleForTesting
+  public static String ICEBERG_CATALOG_BACKEND_HIVE = CatalogUtil.ICEBERG_CATALOG_TYPE_HIVE;
 
-  String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";
+  public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";
 
-  @VisibleForTesting String ICEBERG_CATALOG_BACKEND_REST = CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
+  @VisibleForTesting
+  public static final String ICEBERG_CATALOG_BACKEND_REST = CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 }
