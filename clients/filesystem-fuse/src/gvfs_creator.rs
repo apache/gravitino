@@ -87,7 +87,7 @@ pub async fn create_gvfs_filesystem(
         .get_fileset(&catalog_name, &schema_name, &fileset_name)
         .await?;
 
-    let inner_fs = create_fs_with_fileset(&catalog, &fileset, config, fs_context)?;
+    let inner_fs = create_fs_with_fileset(&catalog, &fileset, config, fs_context).await?;
 
     let target_path = extract_root_path(fileset.storage_location.as_str())?;
     let fs =
@@ -95,7 +95,7 @@ pub async fn create_gvfs_filesystem(
     Ok(CreateFileSystemResult::Gvfs(fs))
 }
 
-fn create_fs_with_fileset(
+pub(crate) async fn create_fs_with_fileset(
     catalog: &Catalog,
     fileset: &Fileset,
     config: &AppConfig,
@@ -104,9 +104,9 @@ fn create_fs_with_fileset(
     let schema = extract_filesystem_scheme(&fileset.storage_location)?;
 
     match schema {
-        FileSystemSchema::S3 => Ok(Box::new(S3FileSystem::new(
-            catalog, fileset, config, fs_context,
-        )?)),
+        FileSystemSchema::S3 => Ok(Box::new(
+            S3FileSystem::new(catalog, fileset, config, fs_context).await?,
+        )),
     }
 }
 
