@@ -495,7 +495,7 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
-### How to create a OSS Hadoop catalog with credential enabled
+### How to create an OSS Hadoop catalog with credential vending
 
 Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
 
@@ -519,7 +519,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to access OSS fileset with credential
+### How to access OSS fileset with credential vending
 
 If the catalog has been configured with credential, you can access OSS fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access OSS fileset with credential:
 
