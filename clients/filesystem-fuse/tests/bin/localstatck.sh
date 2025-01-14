@@ -1,3 +1,4 @@
+#!/bin/bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,30 +16,31 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# fuse settings
-[fuse]
-file_mask= 0o600
-dir_mask= 0o700
-fs_type = "gvfs"
+start_localstack() {
+if [ "$DISABLE_LOCALSTACK" -eq 1 ]; then
+  return
+fi
 
-[fuse.properties]
-key1 = "value1"
-key2 = "value2"
+  echo "Starting localstack..."
+  docker run -d -p 4566:4566 -p 4571:4571 --name localstack localstack/localstack
+  echo "Localstack started"
 
-# filesystem settings
-[filesystem]
-block_size = 8192
+  docker exec localstack sh -c "\
+    aws configure set aws_access_key_id $S3_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $S3_SECRET_ACCESS && \
+    aws configure set region $S3_REGION && \
+    aws configure set output json"
 
-# Gravitino settings
-[gravitino]
-uri = "http://localhost:8090"
-metalake = "test"
+  docker exec localstack awslocal s3 mb s3://$S3_BUCKET
+}
 
-# extend settings
-[extend_config]
-s3-access_key_id = "XXX_access_key"
-s3-secret_access_key = "XXX_secret_key"
-s3-region = "XXX_region"
-s3-bucket = "XXX_bucket"
-s3-endpoint = "XXX_endpoint"
+stop_localstack() {
+if [ "$DISABLE_LOCALSTACK" -eq 1 ]; then
+  return
+fi
 
+  echo "Stopping localstack..."
+  docker stop localstack 2>/dev/null || true
+  docker rm localstack 2>/dev/null || true
+  echo "Localstack stopped"
+}

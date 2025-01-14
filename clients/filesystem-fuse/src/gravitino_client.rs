@@ -199,9 +199,33 @@ impl GravitinoClient {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use mockito::mock;
+
+    pub(crate) fn create_test_catalog(
+        name: &str,
+        provider: &str,
+        properties: HashMap<String, String>,
+    ) -> Catalog {
+        Catalog {
+            name: name.to_string(),
+            catalog_type: "fileset".to_string(),
+            provider: provider.to_string(),
+            comment: "".to_string(),
+            properties: properties,
+        }
+    }
+
+    pub(crate) fn create_test_fileset(name: &str, storage_location: &str) -> Fileset {
+        Fileset {
+            name: name.to_string(),
+            fileset_type: "managed".to_string(),
+            comment: "".to_string(),
+            storage_location: storage_location.to_string(),
+            properties: HashMap::default(),
+        }
+    }
 
     #[tokio::test]
     async fn test_get_fileset_success() {
