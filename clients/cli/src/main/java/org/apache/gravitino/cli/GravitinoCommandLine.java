@@ -90,8 +90,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     /* Display command usage. */
     if (line.hasOption(GravitinoOptions.HELP)) {
       displayHelp(options);
+    } else {
+      new SimpleCommandHandler(this, line, ignore).handle();
     }
-    new SimpleCommandHandler(this, line, ignore).handle();
   }
 
   /**
