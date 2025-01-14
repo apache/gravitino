@@ -517,7 +517,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "filesystem-providers": "s3",
     "credential-providers": "s3-token",
     "s3-region":"ap-northeast-1",
-    "s3-role-arn":"The ARN of the role to access the S3 data",
+    "s3-role-arn":"The ARN of the role to access the S3 data"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
