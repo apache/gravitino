@@ -24,7 +24,7 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /** Represents an event triggered upon the successful linking of a model version. */
 public class LinkModelVersionEvent extends ModelEvent {
-  private ModelInfo linkModelVersionInfo;
+  private ModelInfo modelInfo;
 
   /**
    * Constructs an instance of {@code LinkModelVersionEvent}, capturing essential details about the
@@ -32,12 +32,11 @@ public class LinkModelVersionEvent extends ModelEvent {
    *
    * @param user The username of the individual who initiated the model version linking.
    * @param identifier The unique identifier of the model that was linked.
-   * @param linkModelVersionInfo The final state of the model after linking.
+   * @param modelInfo The final state of the model after linking.
    */
-  public LinkModelVersionEvent(
-      String user, NameIdentifier identifier, ModelInfo linkModelVersionInfo) {
+  public LinkModelVersionEvent(String user, NameIdentifier identifier, ModelInfo modelInfo) {
     super(user, identifier);
-    this.linkModelVersionInfo = linkModelVersionInfo;
+    this.modelInfo = modelInfo;
   }
 
   /**
@@ -48,7 +47,7 @@ public class LinkModelVersionEvent extends ModelEvent {
    *     version.
    */
   public ModelInfo linkModelVersionInfo() {
-    return linkModelVersionInfo;
+    return modelInfo;
   }
 
   /**

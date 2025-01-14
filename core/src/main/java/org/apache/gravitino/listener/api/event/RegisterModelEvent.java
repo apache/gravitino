@@ -35,8 +35,7 @@ public class RegisterModelEvent extends ModelEvent {
    *     details such as the metalake, catalog, schema, and Model name.
    * @param registeredTopicInfo The final state of the model post-creation.
    */
-  protected RegisterModelEvent(
-      String user, NameIdentifier identifier, ModelInfo registeredTopicInfo) {
+  public RegisterModelEvent(String user, NameIdentifier identifier, ModelInfo registeredTopicInfo) {
     super(user, identifier);
     this.registeredTopicInfo = registeredTopicInfo;
   }
