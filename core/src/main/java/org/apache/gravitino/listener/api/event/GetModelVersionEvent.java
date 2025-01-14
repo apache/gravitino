@@ -24,19 +24,18 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /** Represents an event triggered upon the successful getting the version of a model. */
 public class GetModelVersionEvent extends ModelEvent {
-  public final ModelInfo getModelVersionInfo;
+  public final ModelInfo modelInfo;
 
   /**
    * Constructs an instance of {@code GetModelVersionEvent}.
    *
    * @param user The username of the individual who initiated the get model version event.
    * @param identifier The unique identifier of the model that was getting the version.
-   * @param getModelVersionInfo The state of the model after the version was loaded.
+   * @param modelInfo The state of the model after the version was loaded.
    */
-  public GetModelVersionEvent(
-      String user, NameIdentifier identifier, ModelInfo getModelVersionInfo) {
+  public GetModelVersionEvent(String user, NameIdentifier identifier, ModelInfo modelInfo) {
     super(user, identifier);
-    this.getModelVersionInfo = getModelVersionInfo;
+    this.modelInfo = modelInfo;
   }
 
   /**
@@ -46,7 +45,7 @@ public class GetModelVersionEvent extends ModelEvent {
    * @return A {@link ModelInfo} instance encapsulating the details of the model version.
    */
   public ModelInfo getModelVersionInfo() {
-    return getModelVersionInfo;
+    return modelInfo;
   }
 
   /**

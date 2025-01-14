@@ -27,19 +27,18 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
  */
 public class ListModelVersionsEvent extends ModelEvent {
 
-  private final ModelInfo listModelVersionInfo;
+  private final ModelInfo modelInfo;
 
   /**
    * Constructs an instance of {@code ListModelVersionsEvent}.
    *
    * @param user The username of the individual who initiated the model version listing.
    * @param identifier The unique identifier of the model that it's version was listed.
-   * @param listModelVersionInfo The model information containing the list of model versions.
+   * @param modelInfo The model information containing the list of model versions.
    */
-  public ListModelVersionsEvent(
-      String user, NameIdentifier identifier, ModelInfo listModelVersionInfo) {
+  public ListModelVersionsEvent(String user, NameIdentifier identifier, ModelInfo modelInfo) {
     super(user, identifier);
-    this.listModelVersionInfo = listModelVersionInfo;
+    this.modelInfo = modelInfo;
   }
 
   /**
@@ -48,7 +47,7 @@ public class ListModelVersionsEvent extends ModelEvent {
    * @return A {@link ModelInfo} instance containing the list of model versions.
    */
   public ModelInfo listModelVersionInfo() {
-    return listModelVersionInfo;
+    return modelInfo;
   }
 
   /**

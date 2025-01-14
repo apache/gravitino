@@ -20,11 +20,9 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /** Event representing the successful drop of a model. */
 public class DropModelEvent extends ModelEvent {
-  private final ModelInfo dropModelInfo;
   private final boolean isExists;
 
   /**
@@ -33,24 +31,12 @@ public class DropModelEvent extends ModelEvent {
    *
    * @param user The username of the individual who initiated the model drop operation.
    * @param identifier The unique identifier of the model that was dropped.
-   * @param dropModelInfo The state of the model post-drop operation.
    * @param isExists A boolean flag indicating whether the model existed at the time of the drop
    *     operation.
    */
-  public DropModelEvent(
-      String user, NameIdentifier identifier, ModelInfo dropModelInfo, boolean isExists) {
+  public DropModelEvent(String user, NameIdentifier identifier, boolean isExists) {
     super(user, identifier);
-    this.dropModelInfo = dropModelInfo;
     this.isExists = isExists;
-  }
-
-  /**
-   * Retrieves the state of the model post-drop operation.
-   *
-   * @return The state of the model post-drop operation.
-   */
-  public ModelInfo DropModelInfo() {
-    return dropModelInfo;
   }
 
   /**
@@ -71,5 +57,15 @@ public class DropModelEvent extends ModelEvent {
   @Override
   public OperationType operationType() {
     return OperationType.DROP_MODEL;
+  }
+
+  /**
+   * The status of the operation.
+   *
+   * @return The operation status.
+   */
+  @Override
+  public OperationStatus operationStatus() {
+    return isExists() ? OperationStatus.SUCCESS : OperationStatus.UNPROCESSED;
   }
 }

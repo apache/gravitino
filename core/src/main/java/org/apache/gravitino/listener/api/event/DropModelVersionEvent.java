@@ -20,7 +20,6 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /**
  * Represents an event that is generated after a model version is successfully dropped from the
@@ -28,7 +27,6 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
  */
 public class DropModelVersionEvent extends ModelEvent {
 
-  private final ModelInfo dropModelVersionInfo;
   private final boolean isExists;
 
   /**
@@ -40,20 +38,9 @@ public class DropModelVersionEvent extends ModelEvent {
    * @param isExists A boolean flag indicating whether the model version existed at the time of the
    *     drop operation.
    */
-  public DropModelVersionEvent(
-      String user, NameIdentifier identifier, ModelInfo dropModelVersionInfo, boolean isExists) {
+  public DropModelVersionEvent(String user, NameIdentifier identifier, boolean isExists) {
     super(user, identifier);
-    this.dropModelVersionInfo = dropModelVersionInfo;
     this.isExists = isExists;
-  }
-
-  /**
-   * Retrieves the state of the model after the drop version operation.
-   *
-   * @return The state of the model after the drop version operation.
-   */
-  public ModelInfo DropModelVersionInfo() {
-    return dropModelVersionInfo;
   }
 
   /**
@@ -74,5 +61,10 @@ public class DropModelVersionEvent extends ModelEvent {
   @Override
   public OperationType operationType() {
     return OperationType.DROP_MODEL_VERSION;
+  }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return isExists() ? OperationStatus.SUCCESS : OperationStatus.UNPROCESSED;
   }
 }

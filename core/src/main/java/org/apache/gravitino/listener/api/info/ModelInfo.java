@@ -25,7 +25,6 @@ import lombok.Getter;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.model.Model;
-import org.apache.gravitino.model.ModelVersion;
 
 /**
  * ModelInfo exposes model information for event listener, it's supposed to be read only. Most of
@@ -38,7 +37,7 @@ public class ModelInfo {
   @Getter private final Map<String, String> properties;
   @Nullable private final Audit audit;
   @Getter private final int lastVersion;
-  private final ModelVersion[] versions;
+  private final ModelVersionInfo[] versions;
 
   /**
    * Constructs model information based on a given model.
@@ -55,7 +54,7 @@ public class ModelInfo {
    * @param model the model to expose information for.
    * @param modelVersions the versions of the model.
    */
-  public ModelInfo(Model model, ModelVersion[] modelVersions) {
+  public ModelInfo(Model model, ModelVersionInfo[] modelVersions) {
     this.name = model.name();
     this.properties = model.properties();
     this.comment = model.comment();
@@ -90,7 +89,7 @@ public class ModelInfo {
    * @return the versions of the model or null if not set.
    */
   @Nullable
-  public ModelVersion[] getModelVersion() {
+  public ModelVersionInfo[] modelVersions() {
     return versions;
   }
 }
