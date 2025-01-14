@@ -105,11 +105,10 @@ gcs_properties = {
 }
 
 gcs_properties = gravitino_client.create_catalog(name="test_catalog",
-                                             type=Catalog.Type.FILESET,
-                                             provider="hadoop",
-                                             comment="This is a GCS fileset catalog",
-                                             properties=gcs_properties)
-
+                                                 type=Catalog.Type.FILESET,
+                                                 provider="hadoop",
+                                                 comment="This is a GCS fileset catalog",
+                                                 properties=gcs_properties)
 ```
 
 </TabItem>
@@ -311,8 +310,6 @@ pip install apache-gravitino==${GRAVITINO_VERSION}
 Then you can run the following code:
 
 ```python
-import logging
-from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
 from pyspark.sql import SparkSession
 import os
 

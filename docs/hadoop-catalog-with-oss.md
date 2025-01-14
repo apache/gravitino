@@ -114,11 +114,10 @@ oss_properties = {
 }
 
 oss_catalog = gravitino_client.create_catalog(name="test_catalog",
-                                             type=Catalog.Type.FILESET,
-                                             provider="hadoop",
-                                             comment="This is a OSS fileset catalog",
-                                             properties=oss_properties)
-
+                                              type=Catalog.Type.FILESET,
+                                              provider="hadoop",
+                                              comment="This is a OSS fileset catalog",
+                                              properties=oss_properties)
 ```
 
 </TabItem>
@@ -327,8 +326,6 @@ pip install apache-gravitino==${GRAVITINO_VERSION}
 Then you can run the following code:
 
 ```python
-import logging
-from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
 from pyspark.sql import SparkSession
 import os
 
@@ -440,11 +437,11 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 
 In order to access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item         | Description                       | Default value | Required | Since version    |
-|----------------------------|-----------------------------------|---------------|----------|------------------|
-| `oss_endpoint`             | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
-| `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
-| `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| Configuration item      | Description                       | Default value | Required | Since version    |
+|-------------------------|-----------------------------------|---------------|----------|------------------|
+| `oss_endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
+| `oss_access_key_id`     | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| `oss_secret_access_key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
 
 :::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.

@@ -110,11 +110,10 @@ adls_properties = {
 }
 
 adls_properties = gravitino_client.create_catalog(name="example_catalog",
-                                             type=Catalog.Type.FILESET,
-                                             provider="hadoop",
-                                             comment="This is a ADLS fileset catalog",
-                                             properties=adls_properties)
-
+                                                  type=Catalog.Type.FILESET,
+                                                  provider="hadoop",
+                                                  comment="This is a ADLS fileset catalog",
+                                                  properties=adls_properties)
 ```
 
 </TabItem>
@@ -320,8 +319,6 @@ pip install apache-gravitino==${GRAVITINO_VERSION}
 Then you can run the following code:
 
 ```python
-import logging
-from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
 from pyspark.sql import SparkSession
 import os
 

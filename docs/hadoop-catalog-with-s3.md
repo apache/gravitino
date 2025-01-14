@@ -118,7 +118,6 @@ s3_catalog = gravitino_client.create_catalog(name="test_catalog",
                                              provider="hadoop",
                                              comment="This is a S3 fileset catalog",
                                              properties=s3_properties)
-
 ```
 
 </TabItem>
@@ -331,8 +330,6 @@ pip install apache-gravitino==${GRAVITINO_VERSION}
 Then you can run the following code:
 
 ```python
-import logging
-from gravitino import NameIdentifier, GravitinoClient, Catalog, Fileset, GravitinoAdminClient
 from pyspark.sql import SparkSession
 import os
 
@@ -443,11 +440,11 @@ For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versio
 
 In order to access fileset with S3 using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item         | Description                   | Default value | Required | Since version    |
-|----------------------------|-------------------------------|---------------|----------|------------------|
-| `s3_endpoint`              | The endpoint of the AWS S3.   | (none)        | No       | 0.7.0-incubating |
-| `s3_access_key_id`         | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
-| `s3_secret_access_key`     | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+| Configuration item     | Description                   | Default value | Required | Since version    |
+|------------------------|-------------------------------|---------------|----------|------------------|
+| `s3_endpoint`          | The endpoint of the AWS S3.   | (none)        | No       | 0.7.0-incubating |
+| `s3_access_key_id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+| `s3_secret_access_key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
 
 :::note
 - `s3_endpoint` is an optional configuration for AWS S3, however, it is required for other S3-compatible storage services like MinIO.
