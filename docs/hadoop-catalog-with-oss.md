@@ -495,11 +495,31 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
-### How to create a OSS Hadoop catalog with credential enabled
+### How to create an OSS Hadoop catalog with credential vending
 
-Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset.
+Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
 
-### How to access OSS fileset with credential
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "oss-catalog-with-token",
+  "type": "FILESET",
+  "comment": "This is a OSS fileset catalog",
+  "provider": "hadoop",
+  "properties": {
+    "location": "oss://bucket/root",
+    "oss-access-key-id": "access_key",
+    "oss-secret-access-key": "secret_key",
+    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "filesystem-providers": "oss",
+    "credential-providers": "oss-token",
+    "oss-region":"oss-cn-hangzhou",
+    "oss-role-arn":"The ARN of the role to access the OSS data"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
+
+### How to access OSS fileset with credential vending
 
 If the catalog has been configured with credential, you can access OSS fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access OSS fileset with credential:
 
