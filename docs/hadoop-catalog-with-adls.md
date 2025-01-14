@@ -6,7 +6,7 @@ keyword: Hadoop catalog ADLS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document describes how to configure a Hadoop catalog with ADLS (Azure Blob Storage).
+This document describes how to configure a Hadoop catalog with ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)).
 
 ## Prerequisites
 
