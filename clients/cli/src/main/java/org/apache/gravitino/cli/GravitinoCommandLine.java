@@ -25,12 +25,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.Command;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine extends TestableCommandLine {
@@ -146,115 +144,12 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.GROUP)) {
       new GroupCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.TAG)) {
-      handleTagCommand();
+      new TagCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.ROLE)) {
       new RoleCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
       new ModelCommandHandler(this, line, command, ignore, quiet).handle();
     }
-  }
-
-  /** Handles the command execution for Tags based on command type and the command line options. */
-  protected void handleTagCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    boolean quiet = line.hasOption(GravitinoOptions.QUIET);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    String[] tags = line.getOptionValues(GravitinoOptions.TAG);
-
-    if (tags != null) {
-      tags = Arrays.stream(tags).distinct().toArray(String[]::new);
-    }
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        newTagDetails(url, ignore, metalake, getOneTag(tags)).validate().handle();
-        break;
-
-      case CommandActions.LIST:
-        if (!name.hasCatalogName()) {
-          newListTags(url, ignore, metalake).validate().handle();
-        } else {
-          newListEntityTags(url, ignore, metalake, name).validate().handle();
-        }
-        break;
-
-      case CommandActions.CREATE:
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newCreateTags(url, ignore, quiet, metalake, tags, comment).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteTag(url, ignore, quiet, forceDelete, metalake, tags).validate().handle();
-        break;
-
-      case CommandActions.SET:
-        String propertySet = line.getOptionValue(GravitinoOptions.PROPERTY);
-        String valueSet = line.getOptionValue(GravitinoOptions.VALUE);
-        if (propertySet == null && valueSet == null) {
-          newTagEntity(url, ignore, quiet, metalake, name, tags).validate().handle();
-        } else {
-          newSetTagProperty(url, ignore, quiet, metalake, getOneTag(tags), propertySet, valueSet)
-              .validate()
-              .handle();
-        }
-        break;
-
-      case CommandActions.REMOVE:
-        boolean isTag = line.hasOption(GravitinoOptions.TAG);
-        if (!isTag) {
-          boolean forceRemove = line.hasOption(GravitinoOptions.FORCE);
-          newRemoveAllTags(url, ignore, quiet, metalake, name, forceRemove).validate().handle();
-        } else {
-          String propertyRemove = line.getOptionValue(GravitinoOptions.PROPERTY);
-          if (propertyRemove != null) {
-            newRemoveTagProperty(url, ignore, quiet, metalake, getOneTag(tags), propertyRemove)
-                .validate()
-                .handle();
-          } else {
-            newUntagEntity(url, ignore, quiet, metalake, name, tags).validate().handle();
-          }
-        }
-        break;
-
-      case CommandActions.PROPERTIES:
-        newListTagProperties(url, ignore, metalake, getOneTag(tags)).validate().handle();
-        break;
-
-      case CommandActions.UPDATE:
-        if (line.hasOption(GravitinoOptions.COMMENT)) {
-          String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newUpdateTagComment(url, ignore, quiet, metalake, getOneTag(tags), updateComment)
-              .validate()
-              .handle();
-        }
-        if (line.hasOption(GravitinoOptions.RENAME)) {
-          String newName = line.getOptionValue(GravitinoOptions.RENAME);
-          newUpdateTagName(url, ignore, quiet, metalake, getOneTag(tags), newName)
-              .validate()
-              .handle();
-        }
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
-        Main.exit(-1);
-        break;
-    }
-  }
-
-  private String getOneTag(String[] tags) {
-    if (tags == null || tags.length > 1) {
-      System.err.println(ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
-      Main.exit(-1);
-    }
-    return tags[0];
   }
 
   private void handleHelpCommand() {
