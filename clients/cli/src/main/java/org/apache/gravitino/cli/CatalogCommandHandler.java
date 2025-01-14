@@ -186,14 +186,11 @@ public class CatalogCommandHandler extends CommandHandler {
 
   /** Handles the "UPDATE" command. */
   private void handleUpdateCommand() {
-    if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-      System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
-      Main.exit(-1);
-    }
     if (line.hasOption(GravitinoOptions.ENABLE)) {
       boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
+      boolean disable = line.hasOption(GravitinoOptions.DISABLE);
       gravitinoCommandLine
-          .newCatalogEnable(url, ignore, metalake, catalog, enableMetalake)
+          .newCatalogEnable(url, ignore, metalake, catalog, disable, enableMetalake)
           .validate()
           .handle();
     }

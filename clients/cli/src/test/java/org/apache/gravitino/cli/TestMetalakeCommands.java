@@ -432,12 +432,23 @@ class TestMetalakeCommands {
   @SuppressWarnings("DefaultCharset")
   void testMetalakeWithDisableAndEnableOptions() {
     Main.useExit = false;
-    MetalakeEnable mockMetalakeEnable =
-        spy(
-            new MetalakeEnable(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", true, false));
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.DISABLE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
 
-    assertThrows(RuntimeException.class, mockMetalakeEnable::validate);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
+
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            commandLine
+                .newMetalakeEnable(
+                    GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", true, false)
+                .validate());
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(ErrorMessages.INVALID_ENABLE_DISABLE, errOutput);
   }

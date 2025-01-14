@@ -513,12 +513,30 @@ class TestCatalogCommands {
   @SuppressWarnings("DefaultCharset")
   void testCatalogWithDisableAndEnableOptions() {
     Main.useExit = false;
-    CatalogEnable mockCatalogEnable =
-        spy(
-            new CatalogEnable(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", true, false));
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog");
+    when(mockCommandLine.hasOption(GravitinoOptions.DISABLE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
 
-    assertThrows(RuntimeException.class, mockCatalogEnable::validate);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
+
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            commandLine
+                .newCatalogEnable(
+                    GravitinoCommandLine.DEFAULT_URL,
+                    false,
+                    "metalake_demo",
+                    "catalog",
+                    true,
+                    false)
+                .validate());
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(ErrorMessages.INVALID_ENABLE_DISABLE, errOutput);
   }
