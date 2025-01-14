@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +27,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -138,11 +136,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.CATALOG)) {
       new CatalogCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
-      handleMetalakeCommand();
+      new MetalakeCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.TOPIC)) {
       new TopicCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {
-      handleFilesetCommand();
+      new FilesetCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.USER)) {
       new UserCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
@@ -153,92 +151,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       new RoleCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
       new ModelCommandHandler(this, line, command, ignore, quiet).handle();
-    }
-  }
-
-  /**
-   * Handles the command execution for Metalakes based on command type and the command line options.
-   */
-  private void handleMetalakeCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
-    boolean quiet = line.hasOption(GravitinoOptions.QUIET);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    if (CommandActions.LIST.equals(command)) {
-      newListMetalakes(url, ignore, outputFormat).validate().handle();
-      return;
-    }
-
-    String metalake = name.getMetalakeName();
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        if (line.hasOption(GravitinoOptions.AUDIT)) {
-          newMetalakeAudit(url, ignore, metalake).validate().handle();
-        } else {
-          newMetalakeDetails(url, ignore, outputFormat, metalake).validate().handle();
-        }
-        break;
-
-      case CommandActions.CREATE:
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newCreateMetalake(url, ignore, quiet, metalake, comment).validate().handle();
-        break;
-
-      case CommandActions.DELETE:
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newDeleteMetalake(url, ignore, quiet, force, metalake).validate().handle();
-        break;
-
-      case CommandActions.SET:
-        String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        String value = line.getOptionValue(GravitinoOptions.VALUE);
-        newSetMetalakeProperty(url, ignore, quiet, metalake, property, value).validate().handle();
-        break;
-
-      case CommandActions.REMOVE:
-        property = line.getOptionValue(GravitinoOptions.PROPERTY);
-        newRemoveMetalakeProperty(url, ignore, quiet, metalake, property).validate().handle();
-        break;
-
-      case CommandActions.PROPERTIES:
-        newListMetalakeProperties(url, ignore, metalake).validate().handle();
-        break;
-
-      case CommandActions.UPDATE:
-        if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-          System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
-          Main.exit(-1);
-        }
-        if (line.hasOption(GravitinoOptions.ENABLE)) {
-          boolean enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
-          newMetalakeEnable(url, ignore, quiet, metalake, enableAllCatalogs).validate().handle();
-        }
-        if (line.hasOption(GravitinoOptions.DISABLE)) {
-          newMetalakeDisable(url, ignore, quiet, metalake).validate().handle();
-        }
-
-        if (line.hasOption(GravitinoOptions.COMMENT)) {
-          comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          newUpdateMetalakeComment(url, ignore, quiet, metalake, comment).validate().handle();
-        }
-        if (line.hasOption(GravitinoOptions.RENAME)) {
-          String newName = line.getOptionValue(GravitinoOptions.RENAME);
-          force = line.hasOption(GravitinoOptions.FORCE);
-          newUpdateMetalakeName(url, ignore, quiet, force, metalake, newName).validate().handle();
-        }
-
-        break;
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        Main.exit(-1);
-        break;
     }
   }
 
@@ -360,111 +272,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } catch (IOException e) {
       System.err.println(ErrorMessages.HELP_FAILED + e.getMessage());
       Main.exit(-1);
-    }
-  }
-
-  /**
-   * Handles the command execution for filesets based on command type and the command line options.
-   */
-  private void handleFilesetCommand() {
-    String url = getUrl();
-    String auth = getAuth();
-    String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    FullName name = new FullName(line);
-    String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
-    String schema = name.getSchemaName();
-    boolean quiet = line.hasOption(GravitinoOptions.QUIET);
-
-    Command.setAuthenticationMode(auth, userName);
-
-    List<String> missingEntities = Lists.newArrayList();
-    if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
-    if (schema == null) missingEntities.add(CommandEntities.SCHEMA);
-
-    // Handle CommandActions.LIST action separately as it doesn't require the `fileset`
-    if (CommandActions.LIST.equals(command)) {
-      checkEntities(missingEntities);
-      newListFilesets(url, ignore, metalake, catalog, schema).validate().handle();
-      return;
-    }
-
-    String fileset = name.getFilesetName();
-    if (fileset == null) missingEntities.add(CommandEntities.FILESET);
-    checkEntities(missingEntities);
-
-    switch (command) {
-      case CommandActions.DETAILS:
-        newFilesetDetails(url, ignore, metalake, catalog, schema, fileset).validate().handle();
-        break;
-
-      case CommandActions.CREATE:
-        {
-          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-          String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
-          Map<String, String> propertyMap = new Properties().parse(properties);
-          newCreateFileset(
-                  url, ignore, quiet, metalake, catalog, schema, fileset, comment, propertyMap)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.DELETE:
-        {
-          boolean force = line.hasOption(GravitinoOptions.FORCE);
-          newDeleteFileset(url, ignore, quiet, force, metalake, catalog, schema, fileset)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.SET:
-        {
-          String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-          String value = line.getOptionValue(GravitinoOptions.VALUE);
-          newSetFilesetProperty(
-                  url, ignore, quiet, metalake, catalog, schema, fileset, property, value)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.REMOVE:
-        {
-          String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-          newRemoveFilesetProperty(url, ignore, quiet, metalake, catalog, schema, fileset, property)
-              .validate()
-              .handle();
-          break;
-        }
-
-      case CommandActions.PROPERTIES:
-        newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset)
-            .validate()
-            .handle();
-        break;
-
-      case CommandActions.UPDATE:
-        {
-          if (line.hasOption(GravitinoOptions.COMMENT)) {
-            String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-            newUpdateFilesetComment(url, ignore, quiet, metalake, catalog, schema, fileset, comment)
-                .validate()
-                .handle();
-          }
-          if (line.hasOption(GravitinoOptions.RENAME)) {
-            String newName = line.getOptionValue(GravitinoOptions.RENAME);
-            newUpdateFilesetName(url, ignore, quiet, metalake, catalog, schema, fileset, newName)
-                .validate()
-                .handle();
-          }
-          break;
-        }
-
-      default:
-        System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
-        break;
     }
   }
 
