@@ -27,18 +27,24 @@ public class TagCommandHandler extends CommandHandler {
   private final CommandLine line;
   private final String command;
   private final boolean ignore;
+  private final boolean quiet;
   private final String url;
   private String[] tags;
   private String metalake;
 
   public TagCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      boolean ignore,
+      boolean quiet) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
     this.ignore = ignore;
     this.url = getUrl(line);
     this.tags = line.getOptionValues(GravitinoOptions.TAG);
+    this.quiet = quiet;
 
     if (tags != null) {
       tags = Arrays.stream(tags).distinct().toArray(String[]::new);
@@ -121,13 +127,19 @@ public class TagCommandHandler extends CommandHandler {
   /** Handles the "CREATE" command. */
   private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-    gravitinoCommandLine.newCreateTags(url, ignore, metalake, tags, comment).validate().handle();
+    gravitinoCommandLine
+        .newCreateTags(url, ignore, quiet, metalake, tags, comment)
+        .validate()
+        .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
     boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine.newDeleteTag(url, ignore, forceDelete, metalake, tags).validate().handle();
+    gravitinoCommandLine
+        .newDeleteTag(url, ignore, quiet, forceDelete, metalake, tags)
+        .validate()
+        .handle();
   }
 
   /** Handles the "SET" command. */
@@ -136,12 +148,12 @@ public class TagCommandHandler extends CommandHandler {
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     if (property == null && value == null) {
       gravitinoCommandLine
-          .newTagEntity(url, ignore, metalake, new FullName(line), tags)
+          .newTagEntity(url, ignore, quiet, metalake, new FullName(line), tags)
           .validate()
           .handle();
     } else {
       gravitinoCommandLine
-          .newSetTagProperty(url, ignore, metalake, getOneTag(tags), property, value)
+          .newSetTagProperty(url, ignore, quiet, metalake, getOneTag(tags), property, value)
           .validate()
           .handle();
     }
@@ -154,18 +166,21 @@ public class TagCommandHandler extends CommandHandler {
     if (!isTag) {
       boolean forceRemove = line.hasOption(GravitinoOptions.FORCE);
       gravitinoCommandLine
-          .newRemoveAllTags(url, ignore, metalake, name, forceRemove)
+          .newRemoveAllTags(url, ignore, quiet, metalake, name, forceRemove)
           .validate()
           .handle();
     } else {
       String propertyRemove = line.getOptionValue(GravitinoOptions.PROPERTY);
       if (propertyRemove != null) {
         gravitinoCommandLine
-            .newRemoveTagProperty(url, ignore, metalake, getOneTag(tags), propertyRemove)
+            .newRemoveTagProperty(url, ignore, quiet, metalake, getOneTag(tags), propertyRemove)
             .validate()
             .handle();
       } else {
-        gravitinoCommandLine.newUntagEntity(url, ignore, metalake, name, tags).validate().handle();
+        gravitinoCommandLine
+            .newUntagEntity(url, ignore, quiet, metalake, name, tags)
+            .validate()
+            .handle();
       }
     }
   }
@@ -184,14 +199,14 @@ public class TagCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateTagComment(url, ignore, metalake, getOneTag(tags), updateComment)
+          .newUpdateTagComment(url, ignore, quiet, metalake, getOneTag(tags), updateComment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateTagName(url, ignore, metalake, getOneTag(tags), newName)
+          .newUpdateTagName(url, ignore, quiet, metalake, getOneTag(tags), newName)
           .validate()
           .handle();
     }

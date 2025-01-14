@@ -134,17 +134,17 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.CATALOG)) {
       new CatalogCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
-      new MetalakeCommandHandler(this, line, command, ignore).handle();
+      new MetalakeCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.TOPIC)) {
       new TopicCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {
-      new FilesetCommandHandler(this, line, command, ignore).handle();
+      new FilesetCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.USER)) {
       new UserCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
       new GroupCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.TAG)) {
-      new TagCommandHandler(this, line, command, ignore).handle();
+      new TagCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.ROLE)) {
       new RoleCommandHandler(this, line, command, ignore, quiet).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
