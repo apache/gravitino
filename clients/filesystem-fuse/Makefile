@@ -62,6 +62,9 @@ doc-test:
 unit-test: doc-test
 	cargo test --no-fail-fast --lib --all-features --workspace
 
+test-it:
+	cargo test --test fuse_test
+
 test-fuse-it:
 	@bash ./tests/bin/run_fuse_testers.sh test
 

@@ -120,7 +120,11 @@ impl PathFileSystem for OpenDalFileSystem {
                 .map_err(opendal_error_to_errno)?;
             file.reader = Some(Box::new(FileReaderImpl { reader }));
         }
-        if flags.is_write() || flags.is_create() || flags.is_append() || flags.is_truncate() {
+        if !flags.is_create() && flags.is_append() {
+            return Err(Errno::from(libc::EBADF));
+        }
+
+        if flags.is_write() || flags.is_truncate() {
             let writer = self
                 .op
                 .writer_with(&file_name)

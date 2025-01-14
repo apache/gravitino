@@ -297,7 +297,7 @@ pub trait FileWriter: Sync + Send {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use libc::{O_APPEND, O_CREAT, O_RDONLY};
+    use libc::{O_CREAT, O_RDONLY, O_RDWR};
     use std::collections::HashMap;
     use std::path::Component;
 
@@ -548,7 +548,7 @@ pub(crate) mod tests {
         async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) -> FileHandle {
             let file = self
                 .fs
-                .create_file(root_file_id, name, (O_CREAT | O_APPEND) as u32)
+                .create_file(root_file_id, name, (O_CREAT | O_RDWR) as u32)
                 .await;
             assert!(file.is_ok());
             let file = file.unwrap();
