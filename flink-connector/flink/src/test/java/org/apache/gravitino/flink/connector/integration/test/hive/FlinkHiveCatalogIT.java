@@ -586,4 +586,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   protected org.apache.gravitino.Catalog currentCatalog() {
     return hiveCatalog;
   }
+
+  @Override
+  protected Map<String, String> schemaOptions(String schemaName) {
+    return ImmutableMap.of("location", warehouse + "/" + schemaName);
+  }
 }

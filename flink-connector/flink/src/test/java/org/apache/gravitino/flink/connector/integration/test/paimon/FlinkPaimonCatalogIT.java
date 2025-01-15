@@ -43,16 +43,6 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
   private static org.apache.gravitino.Catalog catalog;
 
   @Override
-  protected boolean supportColumnOperation() {
-    return false;
-  }
-
-  @Override
-  protected boolean supportTableOperation() {
-    return false;
-  }
-
-  @Override
   protected boolean supportSchemaOperationWithCommentAndOptions() {
     return false;
   }

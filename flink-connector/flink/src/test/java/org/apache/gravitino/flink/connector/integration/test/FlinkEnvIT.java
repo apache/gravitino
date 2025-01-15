@@ -19,11 +19,11 @@
 package org.apache.gravitino.flink.connector.integration.test;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -159,17 +159,18 @@ public abstract class FlinkEnvIT extends BaseIT {
     return tableEnv.executeSql(String.format(sql, args));
   }
 
-  protected static void doWithSchema(
+  protected Map<String, String> schemaOptions(String schemaName) {
+    return null;
+  }
+
+  protected void doWithSchema(
       Catalog catalog, String schemaName, Consumer<Catalog> action, boolean dropSchema) {
     Preconditions.checkNotNull(catalog);
     Preconditions.checkNotNull(schemaName);
     try {
       tableEnv.useCatalog(catalog.name());
       if (!catalog.asSchemas().schemaExists(schemaName)) {
-        catalog
-            .asSchemas()
-            .createSchema(
-                schemaName, null, ImmutableMap.of("location", warehouse + "/" + schemaName));
+        catalog.asSchemas().createSchema(schemaName, null, schemaOptions(schemaName));
       }
       tableEnv.useDatabase(schemaName);
       action.accept(catalog);
