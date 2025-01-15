@@ -179,10 +179,10 @@ class TestRoleCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateRole(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq(new String[] {"admin", "engineer", "scientist"}));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            new String[] {"admin", "engineer", "scientist"});
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -229,11 +229,11 @@ class TestRoleCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteRole(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq(false),
-            eq("metalake_demo"),
-            eq(new String[] {"admin", "engineer", "scientist"}));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            false,
+            "metalake_demo",
+            new String[] {"admin", "engineer", "scientist"});
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
