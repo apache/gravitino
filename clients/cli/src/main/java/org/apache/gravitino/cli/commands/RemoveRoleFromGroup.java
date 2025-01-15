@@ -50,7 +50,7 @@ public class RemoveRoleFromGroup extends Command {
     this.role = role;
   }
 
-  /** Removes a from a group. */
+  /** Remove a role from a group. */
   @Override
   public void handle() {
     try {
