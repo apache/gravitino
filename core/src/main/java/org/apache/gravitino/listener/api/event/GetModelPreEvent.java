@@ -20,8 +20,10 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered before getting a model. */
+@DeveloperApi
 public class GetModelPreEvent extends ModelPreEvent {
   /**
    * Create a new {@link GetModelPreEvent} instance.
