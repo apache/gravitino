@@ -43,6 +43,7 @@ public class CreateTablePreEvent extends TablePreEvent {
     return createTableRequest;
   }
 
+  @Override
   public OperationType operationType() {
     return OperationType.CREATE_TABLE;
   }
