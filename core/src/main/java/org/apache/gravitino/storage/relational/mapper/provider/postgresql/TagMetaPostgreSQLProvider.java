@@ -77,6 +77,7 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " deleted_at = #{tagMeta.deletedAt}";
   }
 
+  @Override
   public String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
     return "UPDATE "
