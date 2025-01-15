@@ -156,7 +156,7 @@ public class UserCommandHandler extends CommandHandler {
           .newRemoveAllRoles(url, ignore, metalake, user, CommandEntities.USER)
           .validate()
           .handle();
-      System.out.printf("Remove all roles from user %s%n", user);
+      System.out.printf("Removed all roles from user %s%n", user);
     } else {
       String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : revokeRoles) {
@@ -165,7 +165,7 @@ public class UserCommandHandler extends CommandHandler {
             .validate()
             .handle();
       }
-      System.out.printf("Remove roles %s from user %s%n", COMMA_JOINER.join(revokeRoles), user);
+      System.out.printf("Removed roles %s from user %s%n", COMMA_JOINER.join(revokeRoles), user);
     }
   }
 
