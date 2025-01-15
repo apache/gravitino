@@ -51,6 +51,6 @@ public class ListProperties extends Command {
       all.append(property.getKey() + "," + property.getValue() + System.lineSeparator());
     }
 
-    System.out.print(all.toString());
+    System.out.print(all);
   }
 }

@@ -62,6 +62,6 @@ public class UserDetails extends Command {
 
     String all = roles.isEmpty() ? "The user has no roles." : String.join(",", roles);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }
