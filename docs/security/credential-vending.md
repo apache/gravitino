@@ -161,7 +161,7 @@ The classpath of the server:
 
 Suppose the Iceberg table data is stored in S3, follow the steps below:
 
-1. Download the [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), and place it to the classpath of Iceberg REST server.
+1. Download the [Gravitino AWS bundle jar without hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws), and place it to the classpath of Iceberg REST server.
 
 2. Add s3 token credential configurations.
 
