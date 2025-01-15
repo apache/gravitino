@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -61,6 +62,16 @@ public class ModelInfo {
     this.audit = model.auditInfo();
     this.lastVersion = model.latestVersion();
     this.versions = modelVersions;
+  }
+
+  public ModelInfo(
+      String name, Map<String, String> properties, String comment, ModelVersionInfo[] versions) {
+    this.name = name;
+    this.properties = properties == null ? Collections.emptyMap() : properties;
+    this.comment = comment == null ? "" : comment;
+    this.audit = null;
+    this.lastVersion = 0;
+    this.versions = versions;
   }
 
   /**

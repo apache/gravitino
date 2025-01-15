@@ -79,18 +79,34 @@ public class TestModelEvent {
 
   @Test
   void testRegisterModelEvent() {
-    dispatcher.registerModel(existingIdentA, "comment", ImmutableMap.of("color", "#FFFFFF"));
+    dispatcher.registerModel(existingIdentA, "commentA", ImmutableMap.of("color", "#FFFFFF"));
+    // validate event
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(RegisterModelEvent.class, event.getClass());
     Assertions.assertEquals(OperationType.REGISTER_MODEL, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
+    // validate model info
     RegisterModelEvent registerModelEvent = (RegisterModelEvent) event;
     ModelInfo modelInfo = registerModelEvent.registeredModelInfo();
     Assertions.assertEquals("modelA", modelInfo.getName());
     Assertions.assertEquals("commentA", modelInfo.getComment());
     Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfo.getProperties());
     Assertions.assertNull(modelInfo.modelVersions());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(RegisterModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.REGISTER_MODEL, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    // validate model info
+    RegisterModelPreEvent registerModelPreEvent = (RegisterModelPreEvent) preEvent;
+    ModelInfo modelInfoPreEvent = registerModelPreEvent.registeredModelInfo();
+    Assertions.assertEquals("modelA", modelInfoPreEvent.getName());
+    Assertions.assertEquals("commentA", modelInfoPreEvent.getComment());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.getProperties());
+    Assertions.assertNull(modelInfoPreEvent.modelVersions());
   }
 
   @Test
@@ -109,10 +125,22 @@ public class TestModelEvent {
     Assertions.assertEquals("commentA", modelInfo.getComment());
     Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfo.getProperties());
     Assertions.assertNull(modelInfo.modelVersions());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelPreEvent getModelPreEvent = (GetModelPreEvent) preEvent;
+    Assertions.assertEquals(OperationType.GET_MODEL, getModelPreEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, getModelPreEvent.operationStatus());
+    Assertions.assertEquals(existingIdentA, getModelPreEvent.identifier());
   }
 
   @Test
   void testDeleteExistsModelEvent() {
+    // validate event
     boolean isExists = dispatcher.deleteModel(existingIdentA);
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(DeleteModelEvent.class, event.getClass());
@@ -120,15 +148,29 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
     Assertions.assertTrue(isExists);
 
+    // validate model info
     DeleteModelEvent deleteModelEvent = (DeleteModelEvent) event;
     Assertions.assertEquals(existingIdentA, deleteModelEvent.identifier());
     Assertions.assertEquals(DeleteModelEvent.class, deleteModelEvent.getClass());
     Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, deleteModelEvent.operationStatus());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(DeleteModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    DeleteModelPreEvent deleteModelPreEvent = (DeleteModelPreEvent) preEvent;
+    Assertions.assertEquals(DeleteModelPreEvent.class, deleteModelPreEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelPreEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelPreEvent.operationStatus());
+    Assertions.assertEquals(existingIdentA, deleteModelPreEvent.identifier());
   }
 
   @Test
   void testDeleteNotExistsModelEvent() {
+    // validate event
     boolean isExists = dispatcher.deleteModel(notExistingIdent);
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(DeleteModelEvent.class, event.getClass());
@@ -136,14 +178,27 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationStatus.UNPROCESSED, event.operationStatus());
     Assertions.assertFalse(isExists);
 
+    // validate model info
     DeleteModelEvent deleteModelEvent = (DeleteModelEvent) event;
     Assertions.assertEquals(DeleteModelEvent.class, deleteModelEvent.getClass());
     Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelEvent.operationStatus());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(DeleteModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    DeleteModelPreEvent deleteModelPreEvent = (DeleteModelPreEvent) preEvent;
+    Assertions.assertEquals(DeleteModelPreEvent.class, deleteModelPreEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelPreEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelPreEvent.operationStatus());
   }
 
   @Test
   void testListModelEvent() {
+    // validate event
     NameIdentifier[] nameIdentifiers = dispatcher.listModels(namespace);
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(ListModelEvent.class, event.getClass());
@@ -152,10 +207,18 @@ public class TestModelEvent {
 
     ListModelEvent listModelEvent = (ListModelEvent) event;
     Assertions.assertEquals(namespace, listModelEvent.namespace());
-
     Assertions.assertEquals(2, nameIdentifiers.length);
     Assertions.assertEquals(existingIdentA, nameIdentifiers[0]);
     Assertions.assertEquals(existingIdentB, nameIdentifiers[1]);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(ListModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    ListModelPreEvent listModelPreEvent = (ListModelPreEvent) preEvent;
+    Assertions.assertEquals(namespace, listModelPreEvent.namespace());
   }
 
   @Test
@@ -185,6 +248,27 @@ public class TestModelEvent {
     Assertions.assertEquals("versionInfoA", modelVersionInfos[0].getComment());
     Assertions.assertEquals("uriA", modelVersionInfos[0].getUri());
     Assertions.assertEquals("aliasProduction", modelVersionInfos[0].getAliases()[0]);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(LinkModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LINK_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    // validate model info
+    LinkModelVersionPreEvent linkModelVersionPreEvent = (LinkModelVersionPreEvent) preEvent;
+    ModelInfo modelInfoPreEvent = linkModelVersionPreEvent.linkedModelInfo();
+    Assertions.assertEquals("modelA", modelInfoPreEvent.getName());
+    Assertions.assertEquals("commentA", modelInfoPreEvent.getComment());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.getProperties());
+
+    // validate model version info
+    ModelVersionInfo[] modelVersionInfosPreEvent = modelInfoPreEvent.modelVersions();
+    Assertions.assertNotNull(modelVersionInfosPreEvent);
+    Assertions.assertEquals(1, modelVersionInfosPreEvent.length);
+    Assertions.assertEquals("versionInfoA", modelVersionInfosPreEvent[0].getComment());
+    Assertions.assertEquals("uriA", modelVersionInfosPreEvent[0].getUri());
+    Assertions.assertEquals("aliasProduction", modelVersionInfosPreEvent[0].getAliases()[0]);
   }
 
   @Test
@@ -209,6 +293,12 @@ public class TestModelEvent {
     Assertions.assertEquals("model version versionInfoA", modelVersionInfos[0].getComment());
     Assertions.assertEquals("uriA", modelVersionInfos[0].getUri());
     Assertions.assertEquals("aliasProduction", modelVersionInfos[0].getAliases()[0]);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -233,6 +323,12 @@ public class TestModelEvent {
     Assertions.assertEquals("model version versionInfoB", modelVersionInfos[0].getComment());
     Assertions.assertEquals("uriB", modelVersionInfos[0].getUri());
     Assertions.assertEquals("aliasTest", modelVersionInfos[0].getAliases()[0]);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -251,6 +347,12 @@ public class TestModelEvent {
     Assertions.assertEquals(
         OperationType.DELETE_MODEL_VERSION, deleteModelVersionEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, deleteModelVersionEvent.operationStatus());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(DeleteModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -269,6 +371,12 @@ public class TestModelEvent {
     Assertions.assertEquals(
         OperationType.DELETE_MODEL_VERSION, deleteModelVersionEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, deleteModelVersionEvent.operationStatus());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(DeleteModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -286,6 +394,12 @@ public class TestModelEvent {
     Assertions.assertEquals(
         OperationType.DELETE_MODEL_VERSION, deleteModelVersionEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelVersionEvent.operationStatus());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(DeleteModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -306,6 +420,20 @@ public class TestModelEvent {
     Assertions.assertEquals("commentA", modelInfo.getComment());
     Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfo.getProperties());
     Assertions.assertNull(modelInfo.modelVersions());
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(ListModelVersionsPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    // validate model info
+    ListModelVersionsPreEvent listModelVersionsPreEvent = (ListModelVersionsPreEvent) preEvent;
+    ModelInfo modelInfoPreEvent = listModelVersionsPreEvent.listModelVersionInfo();
+    Assertions.assertEquals("modelA", modelInfoPreEvent.getName());
+    Assertions.assertEquals("commentA", modelInfoPreEvent.getComment());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.getProperties());
+    Assertions.assertNull(modelInfoPreEvent.modelVersions());
   }
 
   private ModelDispatcher mockExceptionModelDispatcher() {
@@ -319,9 +447,9 @@ public class TestModelEvent {
   private ModelDispatcher mockTagDispatcher() {
     ModelDispatcher dispatcher = mock(ModelDispatcher.class);
 
-    when(dispatcher.registerModel(existingIdentA, "comment", ImmutableMap.of("color", "#FFFFFF")))
+    when(dispatcher.registerModel(existingIdentA, "commentA", ImmutableMap.of("color", "#FFFFFF")))
         .thenReturn(modelA);
-    when(dispatcher.registerModel(existingIdentB, "comment", ImmutableMap.of("color", "#FFFFFF")))
+    when(dispatcher.registerModel(existingIdentB, "commentB", ImmutableMap.of("color", "#FFFFFF")))
         .thenReturn(modelB);
 
     when(dispatcher.getModel(existingIdentA)).thenReturn(modelA);
