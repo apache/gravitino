@@ -55,6 +55,6 @@ public class ListRoles extends Command {
 
     String all = roles.length == 0 ? "No roles exist." : String.join(",", roles);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }

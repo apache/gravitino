@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
+
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -33,7 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 public class UntagEntity extends Command {
-  public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
+  
   protected final String metalake;
   protected final FullName name;
   protected final String[] tags;
