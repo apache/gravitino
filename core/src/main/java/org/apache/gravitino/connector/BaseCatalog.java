@@ -37,6 +37,8 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.HEAD;
+
 /**
  * The abstract base class for Catalog implementations.
  *
@@ -208,7 +210,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           try (BaseAuthorization<?> authorization =
               BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
             authorizationPlugin =
-                authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
+                classLoader.withClassLoader(
+                    cl ->
+                        authorization.newPlugin(
+                            entity.namespace().level(0), provider(), this.conf));
+
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
             throw new RuntimeException(e);
