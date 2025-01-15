@@ -32,6 +32,7 @@ import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLProvider {
+  @Override
   public String batchSoftDeleteSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
     return "<script>"

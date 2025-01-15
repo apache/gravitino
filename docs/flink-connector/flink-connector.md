@@ -34,16 +34,16 @@ This capability allows users to perform federation queries, accessing data from 
 
 Set the flink configuration in flink-conf.yaml.
 ```yaml
-table.catalog-store.kind=gravitino
-table.catalog-store.gravitino.gravitino.metalake=test
-table.catalog-store.gravitino.gravitino.uri=http://localhost:8080
+table.catalog-store.kind: gravitino
+table.catalog-store.gravitino.gravitino.metalake: test
+table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
 ```
 Or you can set the flink configuration in the `TableEnvironment`.
 ```java
 final Configuration configuration = new Configuration();
 configuration.setString("table.catalog-store.kind", "gravitino");
 configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "test");
-configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8080");
+configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
 EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
 TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
 ```
