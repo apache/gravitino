@@ -26,7 +26,7 @@ use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
 use log::error;
-use opendal::{EntryMode, ErrorKind, Metadata, Operator};
+use opendal::{Buffer, EntryMode, ErrorKind, Metadata, Operator};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -37,6 +37,8 @@ pub(crate) struct OpenDalFileSystem {
 impl OpenDalFileSystem {}
 
 impl OpenDalFileSystem {
+    const WRITE_BUFFER_SIZE: usize = 5 * 1024 * 1024;
+
     pub(crate) fn new(op: Operator, _config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
         Self { op: op }
     }
@@ -121,17 +123,29 @@ impl PathFileSystem for OpenDalFileSystem {
             file.reader = Some(Box::new(FileReaderImpl { reader }));
         }
         if !flags.is_create() && flags.is_append() {
+            error!("The file system does not support open a exists file with the append mode ");
             return Err(Errno::from(libc::EBADF));
         }
 
-        if flags.is_write() || flags.is_truncate() {
+        if flags.is_truncate() {
+            self.op
+                .write(&file_name, Buffer::new())
+                .await
+                .map_err(opendal_error_to_errno)?;
+        }
+
+        if flags.is_write() || flags.is_append() || flags.is_truncate() {
             let writer = self
                 .op
                 .writer_with(&file_name)
                 .await
                 .map_err(opendal_error_to_errno)?;
-            file.writer = Some(Box::new(FileWriterImpl { writer }));
+            file.writer = Some(Box::new(FileWriterImpl {
+                writer,
+                buffer: Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE),
+            }));
         }
+
         Ok(file)
     }
 
@@ -146,14 +160,10 @@ impl PathFileSystem for OpenDalFileSystem {
     async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
         let file_name = path.to_string_lossy().to_string();
 
-        let mut writer = self
-            .op
-            .writer_with(&file_name)
+        self.op
+            .write(&file_name, Buffer::new())
             .await
             .map_err(opendal_error_to_errno)?;
-
-        writer.close().await.map_err(opendal_error_to_errno)?;
-
         let file = self.open_file(path, flags).await?;
         Ok(file)
     }
@@ -214,19 +224,34 @@ impl FileReader for FileReaderImpl {
 
 struct FileWriterImpl {
     writer: opendal::Writer,
+    buffer: Vec<u8>,
 }
 
 #[async_trait]
 impl FileWriter for FileWriterImpl {
     async fn write(&mut self, _offset: u64, data: &[u8]) -> Result<u32> {
-        self.writer
-            .write(data.to_vec())
-            .await
-            .map_err(opendal_error_to_errno)?;
+        if self.buffer.len() > OpenDalFileSystem::WRITE_BUFFER_SIZE {
+            let mut new_buffer: Vec<u8> = Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE);
+            new_buffer.append(&mut self.buffer);
+
+            self.writer
+                .write(new_buffer)
+                .await
+                .map_err(opendal_error_to_errno)?;
+        }
+        self.buffer.extend(data);
         Ok(data.len() as u32)
     }
 
     async fn close(&mut self) -> Result<()> {
+        if !self.buffer.is_empty() {
+            let mut new_buffer: Vec<u8> = vec![];
+            new_buffer.append(&mut self.buffer);
+            self.writer
+                .write(new_buffer)
+                .await
+                .map_err(opendal_error_to_errno)?;
+        }
         self.writer.close().await.map_err(opendal_error_to_errno)?;
         Ok(())
     }
@@ -268,6 +293,7 @@ mod test {
     use crate::s3_filesystem::tests::s3_test_config;
     use crate::test_enable_with;
     use crate::RUN_TEST_WITH_S3;
+    use bytes::Buf;
     use opendal::layers::LoggingLayer;
     use opendal::{services, Builder, Operator};
 
@@ -330,5 +356,57 @@ mod test {
                 println!("Delete failed: {:?}", e);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn s3_ut_test_s3_write() {
+        test_enable_with!(RUN_TEST_WITH_S3);
+        let config = s3_test_config();
+
+        let op = create_opendal(&config);
+        let path = "/s1/fileset1/gvfs_test/test_dir/test_file";
+        let mut writer = op.writer_with(path).await.unwrap();
+
+        let mut buffer: Vec<u8> = vec![];
+        for i in 0..10 * 1024 {
+            let data = vec![i as u8; 1024];
+            buffer.extend(&data);
+
+            if buffer.len() > 5 * 1024 * 1024 {
+                writer.write(buffer).await.unwrap();
+                buffer = vec![];
+            };
+        }
+
+        if !buffer.is_empty() {
+            writer.write(buffer).await.unwrap();
+        }
+        writer.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn s3_ut_test_s3_read() {
+        test_enable_with!(RUN_TEST_WITH_S3);
+        let config = s3_test_config();
+
+        let op = create_opendal(&config);
+        let path = "/s1/fileset1/test_dir/test_big_file";
+        let reader = op.reader(path).await.unwrap();
+
+        let mut buffer = Vec::new();
+
+        let mut start = 0;
+        let mut end = 1024;
+        loop {
+            let buf = reader.read(start..end).await.unwrap();
+            if buf.is_empty() {
+                break;
+            }
+            buffer.extend_from_slice(buf.chunk());
+            start = end;
+            end += 1024;
+        }
+
+        println!("Read {} bytes.", buffer.len());
     }
 }
