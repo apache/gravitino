@@ -47,7 +47,7 @@ Refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for mo
 
 This section will show you how to use the Hadoop catalog with GCS in Gravitino, including detailed examples.
 
-### Create a Hadoop catalog with GCS
+### Step1: Create a Hadoop catalog with GCS
 
 First, you need to create a Hadoop catalog with GCS. The following example shows how to create a Hadoop catalog with GCS:
 
