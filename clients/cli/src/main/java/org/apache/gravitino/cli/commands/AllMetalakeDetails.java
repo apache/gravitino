@@ -55,6 +55,6 @@ public class AllMetalakeDetails extends Command {
 
     String all = Joiner.on(System.lineSeparator()).join(metalakeDetails);
 
-    System.out.print(all.toString());
+    System.out.print(all);
   }
 }

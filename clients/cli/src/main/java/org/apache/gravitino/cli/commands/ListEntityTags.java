@@ -93,6 +93,6 @@ public class ListEntityTags extends Command {
 
     String all = String.join(",", tags);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }
