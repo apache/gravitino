@@ -28,8 +28,8 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.listener.api.event.DropModelEvent;
-import org.apache.gravitino.listener.api.event.DropModelVersionEvent;
+import org.apache.gravitino.listener.api.event.DeleteModelEvent;
+import org.apache.gravitino.listener.api.event.DeleteModelVersionEvent;
 import org.apache.gravitino.listener.api.event.GetModelEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionEvent;
@@ -163,7 +163,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     try {
       boolean isExists = dispatcher.deleteModel(ident);
       eventBus.dispatchEvent(
-          new DropModelEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
+          new DeleteModelEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
       return isExists;
     } catch (Exception e) {
       // TODO: failureEvent
@@ -292,7 +292,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     try {
       boolean isExists = dispatcher.deleteModelVersion(ident, version);
       eventBus.dispatchEvent(
-          new DropModelVersionEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
+          new DeleteModelVersionEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
       return isExists;
     } catch (Exception e) {
       // TODO: failureEvent
@@ -314,7 +314,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     try {
       boolean isExists = dispatcher.deleteModelVersion(ident, alias);
       eventBus.dispatchEvent(
-          new DropModelVersionEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
+          new DeleteModelVersionEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
       return isExists;
     } catch (Exception e) {
       // TODO: failureEvent

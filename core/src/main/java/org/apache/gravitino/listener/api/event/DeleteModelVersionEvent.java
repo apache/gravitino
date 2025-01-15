@@ -25,12 +25,12 @@ import org.apache.gravitino.NameIdentifier;
  * Represents an event that is generated after a model version is successfully dropped from the
  * model.
  */
-public class DropModelVersionEvent extends ModelEvent {
+public class DeleteModelVersionEvent extends ModelEvent {
 
   private final boolean isExists;
 
   /**
-   * Constructs a new {@code DropModelVersionEvent} instance, encapsulating information about the
+   * Constructs a new {@code DeleteModelVersionEvent} instance, encapsulating information about the
    * outcome of a model version drop operation.
    *
    * @param user The user who initiated the drop model version operation.
@@ -38,7 +38,7 @@ public class DropModelVersionEvent extends ModelEvent {
    * @param isExists A boolean flag indicating whether the model version existed at the time of the
    *     drop operation.
    */
-  public DropModelVersionEvent(String user, NameIdentifier identifier, boolean isExists) {
+  public DeleteModelVersionEvent(String user, NameIdentifier identifier, boolean isExists) {
     super(user, identifier);
     this.isExists = isExists;
   }
@@ -60,7 +60,7 @@ public class DropModelVersionEvent extends ModelEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.DROP_MODEL_VERSION;
+    return OperationType.DELETE_MODEL_VERSION;
   }
 
   @Override

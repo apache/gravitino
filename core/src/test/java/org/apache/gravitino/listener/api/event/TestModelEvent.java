@@ -115,31 +115,31 @@ public class TestModelEvent {
   void testDeleteExistsModelEvent() {
     boolean isExists = dispatcher.deleteModel(existingIdentA);
     Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(DropModelEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL, event.operationType());
+    Assertions.assertEquals(DeleteModelEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
     Assertions.assertTrue(isExists);
 
-    DropModelEvent dropModelEvent = (DropModelEvent) event;
-    Assertions.assertEquals(existingIdentA, dropModelEvent.identifier());
-    Assertions.assertEquals(DropModelEvent.class, dropModelEvent.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL, dropModelEvent.operationType());
-    Assertions.assertEquals(OperationStatus.SUCCESS, dropModelEvent.operationStatus());
+    DeleteModelEvent deleteModelEvent = (DeleteModelEvent) event;
+    Assertions.assertEquals(existingIdentA, deleteModelEvent.identifier());
+    Assertions.assertEquals(DeleteModelEvent.class, deleteModelEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, deleteModelEvent.operationStatus());
   }
 
   @Test
   void testDeleteNotExistsModelEvent() {
     boolean isExists = dispatcher.deleteModel(notExistingIdent);
     Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(DropModelEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL, event.operationType());
+    Assertions.assertEquals(DeleteModelEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, event.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, event.operationStatus());
     Assertions.assertFalse(isExists);
 
-    DropModelEvent dropModelEvent = (DropModelEvent) event;
-    Assertions.assertEquals(DropModelEvent.class, dropModelEvent.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL, dropModelEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, dropModelEvent.operationStatus());
+    DeleteModelEvent deleteModelEvent = (DeleteModelEvent) event;
+    Assertions.assertEquals(DeleteModelEvent.class, deleteModelEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelEvent.operationStatus());
   }
 
   @Test
@@ -239,53 +239,53 @@ public class TestModelEvent {
   void testDeleteModelVersionEventViaVersion() {
     boolean isExists = dispatcher.deleteModelVersion(existingIdentA, 1);
     Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(DropModelVersionEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(DeleteModelVersionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
     Assertions.assertTrue(isExists);
 
     // validate model info
-    DropModelVersionEvent dropModelVersionEvent = (DropModelVersionEvent) event;
-    Assertions.assertEquals(existingIdentA, dropModelVersionEvent.identifier());
-    Assertions.assertEquals(DropModelVersionEvent.class, dropModelVersionEvent.getClass());
+    DeleteModelVersionEvent deleteModelVersionEvent = (DeleteModelVersionEvent) event;
+    Assertions.assertEquals(existingIdentA, deleteModelVersionEvent.identifier());
+    Assertions.assertEquals(DeleteModelVersionEvent.class, deleteModelVersionEvent.getClass());
     Assertions.assertEquals(
-        OperationType.DROP_MODEL_VERSION, dropModelVersionEvent.operationType());
-    Assertions.assertEquals(OperationStatus.SUCCESS, dropModelVersionEvent.operationStatus());
+        OperationType.DELETE_MODEL_VERSION, deleteModelVersionEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, deleteModelVersionEvent.operationStatus());
   }
 
   @Test
   void testDeleteModelVersionEventViaAlias() {
     boolean isExists = dispatcher.deleteModelVersion(existingIdentB, "aliasTest");
     Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(DropModelVersionEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(DeleteModelVersionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
     Assertions.assertTrue(isExists);
 
     // validate model info
-    DropModelVersionEvent dropModelVersionEvent = (DropModelVersionEvent) event;
-    Assertions.assertEquals(existingIdentB, dropModelVersionEvent.identifier());
-    Assertions.assertEquals(DropModelVersionEvent.class, dropModelVersionEvent.getClass());
+    DeleteModelVersionEvent deleteModelVersionEvent = (DeleteModelVersionEvent) event;
+    Assertions.assertEquals(existingIdentB, deleteModelVersionEvent.identifier());
+    Assertions.assertEquals(DeleteModelVersionEvent.class, deleteModelVersionEvent.getClass());
     Assertions.assertEquals(
-        OperationType.DROP_MODEL_VERSION, dropModelVersionEvent.operationType());
-    Assertions.assertEquals(OperationStatus.SUCCESS, dropModelVersionEvent.operationStatus());
+        OperationType.DELETE_MODEL_VERSION, deleteModelVersionEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, deleteModelVersionEvent.operationStatus());
   }
 
   @Test
   void testDeleteModelVersionEventViaVersionNotExists() {
     boolean isExists = dispatcher.deleteModelVersion(existingIdentA, 3);
     Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(DropModelVersionEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.DROP_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(DeleteModelVersionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, event.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, event.operationStatus());
     Assertions.assertFalse(isExists);
 
     // validate model info
-    DropModelVersionEvent dropModelVersionEvent = (DropModelVersionEvent) event;
-    Assertions.assertEquals(DropModelVersionEvent.class, dropModelVersionEvent.getClass());
+    DeleteModelVersionEvent deleteModelVersionEvent = (DeleteModelVersionEvent) event;
+    Assertions.assertEquals(DeleteModelVersionEvent.class, deleteModelVersionEvent.getClass());
     Assertions.assertEquals(
-        OperationType.DROP_MODEL_VERSION, dropModelVersionEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, dropModelVersionEvent.operationStatus());
+        OperationType.DELETE_MODEL_VERSION, deleteModelVersionEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelVersionEvent.operationStatus());
   }
 
   @Test
