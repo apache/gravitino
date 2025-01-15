@@ -123,7 +123,7 @@ oss_catalog = gravitino_client.create_catalog(name="test_catalog",
 </TabItem>
 </Tabs>
 
-Step 2: Create a Schema
+### Step 2: Create a Schema
 
 Once the Hadoop catalog with OSS is created, you can create a schema inside that catalog. Below are examples of how to do this:
 
@@ -174,10 +174,9 @@ catalog.as_schemas().create_schema(name="test_schema",
 </Tabs>
 
 
-### Create a fileset
+### Step3: Create a fileset
 
 Now that the schema is created, you can create a fileset inside it. Here’s how:
-
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
