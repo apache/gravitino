@@ -74,14 +74,15 @@ A credential with static OSS access key id and secret access key.
 
 An OSS token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://www.alibabacloud.com/help/en/oss/developer-reference/use-temporary-access-credentials-provided-by-sts-to-access-oss). To use an OSS token credential, you should create a role and grant it proper privileges.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                   | Default value | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|-------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-token` for s3 token credential.                                          | (none)        | Yes      | 0.8.0-incubating |
-| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                             | (none)        | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                         | (none)        | Yes      | 0.7.0-incubating |
-| `oss-role-arn`                      | `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data.                                   | (none)        | Yes      | 0.8.0-incubating |
-| `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                        | (none)        | No       | 0.8.0-incubating |
-| `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                   | 3600          | No       | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                                                  | Default value | Required | Since Version    |
+|-------------------------------------|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-token` for s3 token credential.                                                                         | (none)        | Yes      | 0.8.0-incubating |
+| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                            | (none)        | Yes      | 0.7.0-incubating |
+| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                        | (none)        | Yes      | 0.7.0-incubating |
+| `oss-role-arn`                      | `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data.                                                                  | (none)        | Yes      | 0.8.0-incubating |
+| `oss-region`                        | `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-providers` is `oss-token`. | (none)        | No       | 0.8.0-incubating |
+| `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                                                       | (none)        | No       | 0.8.0-incubating |
+| `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                                                  | 3600          | No       | 0.8.0-incubating |
 
 ### ADLS credentials
 
