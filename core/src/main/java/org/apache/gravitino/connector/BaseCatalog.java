@@ -205,18 +205,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             LOG.info("Authorization provider is not set!");
             return;
           }
-          try {
-            BaseAuthorization<?> authorization =
-                BaseAuthorization.createAuthorization(classLoader, authorizationProvider);
-
-            // Load the authorization plugin with the class loader of the catalog.
-            // Because the JDBC authorization plugin may load JDBC driver using the class loader.
+          try (BaseAuthorization<?> authorization =
+              BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
             authorizationPlugin =
-                classLoader.withClassLoader(
-                    cl ->
-                        authorization.newPlugin(
-                            entity.namespace().level(0), provider(), this.conf));
-
+                authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
             throw new RuntimeException(e);
