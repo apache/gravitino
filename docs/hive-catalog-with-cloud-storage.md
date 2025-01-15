@@ -91,7 +91,6 @@ cp gcs-connector-hadoop3-2.2.22-shaded.jar ${HIVE_HOME}/lib
 
 [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop2-2.2.22-shaded.jar) is the bundle jar that contains Hadoop GCS connector, you need to choose the corresponding gcs connector jar for the version of Hadoop you are using.
 
-
 Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath. It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
 
 ### Restart Hive metastore
