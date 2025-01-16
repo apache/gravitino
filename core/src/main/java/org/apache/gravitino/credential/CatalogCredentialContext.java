@@ -47,7 +47,7 @@ public class CatalogCredentialContext implements CredentialContext {
     if (this == o) {
       return true;
     }
-    if (o == null || !(o instanceof CatalogCredentialContext)) {
+    if (!(o instanceof CatalogCredentialContext)) {
       return false;
     }
     return Objects.equal(userName, ((CatalogCredentialContext) o).userName);
