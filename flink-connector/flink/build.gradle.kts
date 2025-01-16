@@ -30,6 +30,8 @@ var paimonVersion: String = libs.versions.paimon.get()
 val flinkVersion: String = libs.versions.flink.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
+val icebergVersion: String = libs.versions.iceberg.get()
+
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:
 // https://issues.apache.org/jira/browse/FLINK-23986,
@@ -44,6 +46,8 @@ dependencies {
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
+
+  compileOnly("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
@@ -88,7 +92,9 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.metrics.core)
 
+  testImplementation("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
   testImplementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-common:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-api-java:$flinkVersion")
