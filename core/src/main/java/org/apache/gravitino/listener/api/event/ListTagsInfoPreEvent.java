@@ -19,7 +19,9 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
+@DeveloperApi
 public class ListTagsInfoPreEvent extends TagPreEvent {
   public ListTagsInfoPreEvent(String user, String metalake) {
     super(user, NameIdentifier.of(metalake));

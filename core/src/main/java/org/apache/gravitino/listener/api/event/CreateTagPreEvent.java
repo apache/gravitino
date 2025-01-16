@@ -19,19 +19,21 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.annotation.DeveloperApi;
 
+@DeveloperApi
 public class CreateTagPreEvent extends TagPreEvent {
-  private final TagInfo createTagRequest;
+  private final TagInfo tagInfo;
 
-  public CreateTagPreEvent(String user, String metalake, TagInfo createTagRequest) {
-    super(user, NameIdentifier.of(metalake));
-    this.createTagRequest = createTagRequest;
+  public CreateTagPreEvent(String user, String metalake, TagInfo tagInfo) {
+    super(user, NameIdentifierUtil.ofTag(metalake, tagInfo.name()));
+    this.tagInfo = tagInfo;
   }
 
-  public TagInfo getCreateTagRequest() {
-    return createTagRequest;
+  public TagInfo tagInfo() {
+    return tagInfo;
   }
 
   @Override

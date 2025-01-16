@@ -19,13 +19,12 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /** Represents an event triggered before associating tags with a specific metadata object. */
 @DeveloperApi
 public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
-  private final MetadataObject metadataObject;
   private final String[] tagsToAdd;
   private final String[] tagsToRemove;
 
@@ -44,19 +43,9 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
       MetadataObject metadataObject,
       String[] tagsToAdd,
       String[] tagsToRemove) {
-    super(user, NameIdentifier.of(metalake));
-    this.metadataObject = metadataObject;
+    super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
     this.tagsToAdd = tagsToAdd;
     this.tagsToRemove = tagsToRemove;
-  }
-
-  /**
-   * Returns the metadata object associated with this event.
-   *
-   * @return The metadata object instance.
-   */
-  public MetadataObject getMetadataObject() {
-    return metadataObject;
   }
 
   /**

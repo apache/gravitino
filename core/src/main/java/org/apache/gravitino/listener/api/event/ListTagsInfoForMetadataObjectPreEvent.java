@@ -19,8 +19,8 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /**
  * Represents an event triggered before listing detailed tag information for a specific metadata
@@ -28,9 +28,6 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class ListTagsInfoForMetadataObjectPreEvent extends TagPreEvent {
-  // Metadata object to associate with the event
-  private final MetadataObject metadataObject;
-
   /**
    * Constructs the pre-event with user, metalake, and metadata object details.
    *
@@ -40,19 +37,7 @@ public class ListTagsInfoForMetadataObjectPreEvent extends TagPreEvent {
    */
   public ListTagsInfoForMetadataObjectPreEvent(
       String user, String metalake, MetadataObject metadataObject) {
-    super(
-        user,
-        NameIdentifier.of(metalake)); // Pass the user and metalake identifier to the parent class
-    this.metadataObject = metadataObject;
-  }
-
-  /**
-   * Returns the metadata object associated with this event.
-   *
-   * @return The metadata object instance.
-   */
-  public MetadataObject getMetadataObject() {
-    return metadataObject;
+    super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
   }
 
   /**

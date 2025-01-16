@@ -19,7 +19,9 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
+@DeveloperApi
 public class ListTagsPreEvent extends TagPreEvent {
   public ListTagsPreEvent(String user, String metalake) {
     super(user, NameIdentifier.of(metalake));
@@ -27,6 +29,6 @@ public class ListTagsPreEvent extends TagPreEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_TAGS;
+    return OperationType.LIST_TAG;
   }
 }

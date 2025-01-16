@@ -20,13 +20,11 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents a pre-event for listing metadata objects associated with a tag. */
 @DeveloperApi
 public class ListMetadataObjectsForTagPreEvent extends TagPreEvent {
-
-  private final String tagName;
-
   /**
    * Constructs a new ListMetadataObjectsForTagPreEvent instance.
    *
@@ -35,17 +33,7 @@ public class ListMetadataObjectsForTagPreEvent extends TagPreEvent {
    * @param tagName The name of the tag.
    */
   public ListMetadataObjectsForTagPreEvent(String user, String metalake, String tagName) {
-    super(user, NameIdentifier.of(metalake));
-    this.tagName = tagName;
-  }
-
-  /**
-   * Gets the name of the tag for which metadata objects are being listed.
-   *
-   * @return The tag name.
-   */
-  public String getTagName() {
-    return tagName;
+    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
   }
 
   @Override

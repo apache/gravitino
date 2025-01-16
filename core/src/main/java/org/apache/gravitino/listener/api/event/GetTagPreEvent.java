@@ -18,18 +18,13 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
+@DeveloperApi
 public class GetTagPreEvent extends TagPreEvent {
-  private final String tagName;
-
   public GetTagPreEvent(String user, String metalake, String tagName) {
-    super(user, NameIdentifier.of(metalake));
-    this.tagName = tagName;
-  }
-
-  public String getTagName() {
-    return tagName;
+    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
   }
 
   @Override
