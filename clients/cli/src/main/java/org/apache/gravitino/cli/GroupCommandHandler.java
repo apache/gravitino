@@ -130,14 +130,23 @@ public class GroupCommandHandler extends CommandHandler {
 
   /** Handles the "REVOKE" command. */
   private void handleRevokeCommand() {
-    String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
-    for (String role : revokeRoles) {
+    boolean revokeAll = line.hasOption(GravitinoOptions.ALL);
+    if (revokeAll) {
       gravitinoCommandLine
-          .newRemoveRoleFromGroup(url, ignore, metalake, group, role)
+          .newRemoveAllRoles(url, ignore, metalake, group, CommandEntities.GROUP)
           .validate()
           .handle();
+      System.out.printf("Removed all roles from group %s%n", group);
+    } else {
+      String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : revokeRoles) {
+        gravitinoCommandLine
+            .newRemoveRoleFromGroup(url, ignore, metalake, group, role)
+            .validate()
+            .handle();
+      }
+      System.out.printf("Removed roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
     }
-    System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
   }
 
   /** Handles the "GRANT" command. */
