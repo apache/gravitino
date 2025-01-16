@@ -111,10 +111,10 @@ public class TableFormat {
         Pattern.compile(
             "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
     private int[][] elementOutputWidths;
-    private final String horizontalDelimiter = "-";
-    private final String verticalDelimiter = "|";
-    private final String crossDelimiter = "+";
-    private final String indent = " ";
+    private static final String horizontalDelimiter = "-";
+    private static final String verticalDelimiter = "|";
+    private static final String crossDelimiter = "+";
+    private static final String indent = " ";
 
     public void debug() {
       System.out.println();
