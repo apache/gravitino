@@ -1038,9 +1038,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         columns,
         table_comment,
         properties,
-        partitioning,
+        new Transform[0],
         distribution,
-        sortOrders);
+        new SortOrder[0]);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
 
