@@ -19,19 +19,25 @@
 package org.apache.gravitino.flink.connector.integration.test;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
+import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -154,31 +160,56 @@ public abstract class FlinkEnvIT extends BaseIT {
   }
 
   @FormatMethod
-  protected TableResult sql(@FormatString String sql, Object... args) {
+  protected static TableResult sql(@FormatString String sql, Object... args) {
     return tableEnv.executeSql(String.format(sql, args));
   }
 
   protected void doWithSchema(
       Catalog catalog, String schemaName, Consumer<Catalog> action, boolean dropSchema) {
+    doWithSchema(catalog, schemaName, action, dropSchema, true);
+  }
+
+  protected void doWithSchema(
+      Catalog catalog,
+      String schemaName,
+      Consumer<Catalog> action,
+      boolean dropSchema,
+      boolean cascade) {
     Preconditions.checkNotNull(catalog);
     Preconditions.checkNotNull(schemaName);
     try {
       tableEnv.useCatalog(catalog.name());
       if (!catalog.asSchemas().schemaExists(schemaName)) {
-        catalog.asSchemas().createSchema(schemaName, null, null);
+        catalog.asSchemas().createSchema(schemaName, null, getCreateSchemaProps(schemaName));
       }
       tableEnv.useDatabase(schemaName);
       action.accept(catalog);
     } finally {
       if (dropSchema) {
-        catalog.asSchemas().dropSchema(schemaName, true);
+        clearTableInSchema();
+        catalog.asSchemas().dropSchema(schemaName, cascade);
       }
     }
+  }
+
+  protected Map<String, String> getCreateSchemaProps(String schemaName) {
+    return null;
   }
 
   protected static void doWithCatalog(Catalog catalog, Consumer<Catalog> action) {
     Preconditions.checkNotNull(catalog);
     tableEnv.useCatalog(catalog.name());
     action.accept(catalog);
+  }
+
+  /** Iceberg requires deleting the table first, then deleting the schema. */
+  protected static void clearTableInSchema() {
+    TableResult result = sql("SHOW TABLES");
+    List<Row> rows = Lists.newArrayList(result.collect());
+    for (Row row : rows) {
+      String tableName = row.getField(0).toString();
+      TableResult deleteResult = sql("DROP TABLE IF EXISTS %s", tableName);
+      TestUtils.assertTableResult(deleteResult, ResultKind.SUCCESS);
+    }
   }
 }

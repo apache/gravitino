@@ -16,7 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.flink.connector.integration.test.hive;
+
+package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
@@ -25,17 +26,13 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_T
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.api.ValidationException;
-import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -43,13 +40,12 @@ import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.DefaultCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
-import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
-import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
-import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalog;
+import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.rel.Column;
@@ -57,54 +53,41 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
-public class FlinkHiveCatalogIT extends FlinkCommonIT {
-  private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
+public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
 
-  private static org.apache.gravitino.Catalog hiveCatalog;
+  private static final String DEFAULT_ICEBERG_CATALOG = "flink_iceberg_catalog";
+
+  private static org.apache.gravitino.Catalog icebergCatalog;
 
   @BeforeAll
-  void hiveStartUp() {
-    initDefaultHiveCatalog();
-  }
-
-  @AfterAll
-  static void hiveStop() {
+  public void before() {
     Preconditions.checkNotNull(metalake);
-    metalake.dropCatalog(DEFAULT_HIVE_CATALOG, true);
-  }
-
-  protected void initDefaultHiveCatalog() {
-    Preconditions.checkNotNull(metalake);
-    hiveCatalog =
+    icebergCatalog =
         metalake.createCatalog(
-            DEFAULT_HIVE_CATALOG,
+            DEFAULT_ICEBERG_CATALOG,
             org.apache.gravitino.Catalog.Type.RELATIONAL,
             getProvider(),
             null,
-            ImmutableMap.of("metastore.uris", hiveMetastoreUri));
+            getCatalogConfigs());
   }
 
+  protected abstract Map<String, String> getCatalogConfigs();
+
   @Test
-  public void testCreateGravitinoHiveCatalog() {
+  public void testCreateGravitinoIcebergCatalog() {
     tableEnv.useCatalog(DEFAULT_CATALOG);
     int numCatalogs = tableEnv.listCatalogs().length;
 
     // Create a new catalog.
-    String catalogName = "gravitino_hive";
-    Configuration configuration = new Configuration();
+    String catalogName = "gravitino_iceberg_catalog";
+    Configuration configuration = Configuration.fromMap(getCatalogConfigs());
     configuration.set(
-        CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
-    configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, "src/test/resources/flink-tests");
-    configuration.set(GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS, hiveMetastoreUri);
+        CommonCatalogOptions.CATALOG_TYPE, GravitinoIcebergCatalogFactoryOptions.IDENTIFIER);
+
     CatalogDescriptor catalogDescriptor = CatalogDescriptor.of(catalogName, configuration);
     tableEnv.createCatalog(catalogName, catalogDescriptor);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
@@ -112,23 +95,12 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     // Check the catalog properties.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
-    Map<String, String> flinkProperties =
-        gravitinoCatalog.properties().entrySet().stream()
-            .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    Assertions.assertEquals(2, flinkProperties.size());
-    Assertions.assertEquals(
-        "src/test/resources/flink-tests",
-        flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
-    Assertions.assertEquals(
-        GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
-        flinkProperties.get(flinkByPass(CommonCatalogOptions.CATALOG_TYPE.key())));
+    Assertions.assertEquals(hiveMetastoreUri, properties.get(IcebergConstants.URI));
 
     // Get the created catalog.
     Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
     Assertions.assertTrue(catalog.isPresent());
-    Assertions.assertInstanceOf(GravitinoHiveCatalog.class, catalog.get());
+    Assertions.assertInstanceOf(GravitinoIcebergCatalog.class, catalog.get());
 
     // List catalogs.
     String[] catalogs = tableEnv.listCatalogs();
@@ -153,52 +125,46 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     tableEnv.executeSql("drop catalog " + catalogName);
     Assertions.assertFalse(metalake.catalogExists(catalogName));
 
-    Optional<Catalog> droppedCatalog = tableEnv.getCatalog(catalogName);
+    Optional<org.apache.flink.table.catalog.Catalog> droppedCatalog =
+        tableEnv.getCatalog(catalogName);
     Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
   }
 
   @Test
-  public void testCreateGravitinoHiveCatalogUsingSQL() {
+  public void testCreateGravitinoIcebergUsingSQL() {
     tableEnv.useCatalog(DEFAULT_CATALOG);
     int numCatalogs = tableEnv.listCatalogs().length;
 
     // Create a new catalog.
-    String catalogName = "gravitino_hive_sql";
+    String catalogName = "gravitino_iceberg_using_sql";
     tableEnv.executeSql(
         String.format(
             "create catalog %s with ("
-                + "'type'='gravitino-hive', "
-                + "'hive-conf-dir'='src/test/resources/flink-tests',"
-                + "'hive.metastore.uris'='%s',"
-                + "'unknown.key'='unknown.value'"
+                + "'type'='%s', "
+                + "'catalog-backend'='%s',"
+                + "'uri'='%s',"
+                + "'warehouse'='%s'"
                 + ")",
-            catalogName, hiveMetastoreUri));
+            catalogName,
+            GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
+            getCatalogBackend(),
+            hiveMetastoreUri,
+            warehouse));
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
-    Map<String, String> flinkProperties =
-        properties.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    Assertions.assertEquals(3, flinkProperties.size());
+    Assertions.assertEquals(hiveMetastoreUri, properties.get(IcebergConstants.URI));
+
     Assertions.assertEquals(
-        "src/test/resources/flink-tests",
-        flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
-    Assertions.assertEquals(
-        GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
-        flinkProperties.get(flinkByPass(CommonCatalogOptions.CATALOG_TYPE.key())));
-    Assertions.assertEquals(
-        "unknown.value",
-        flinkProperties.get(flinkByPass("unknown.key")),
-        "The unknown.key will not cause failure and will be saved in Gravitino.");
+        GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
+        properties.get(CommonCatalogOptions.CATALOG_TYPE.key()));
 
     // Get the created catalog.
     Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
     Assertions.assertTrue(catalog.isPresent());
-    Assertions.assertInstanceOf(GravitinoHiveCatalog.class, catalog.get());
+    Assertions.assertInstanceOf(GravitinoIcebergCatalog.class, catalog.get());
 
     // List catalogs.
     String[] catalogs = tableEnv.listCatalogs();
@@ -228,30 +194,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     tableEnv.executeSql("drop catalog " + catalogName);
     Assertions.assertFalse(metalake.catalogExists(catalogName));
 
-    Optional<Catalog> droppedCatalog = tableEnv.getCatalog(catalogName);
+    Optional<org.apache.flink.table.catalog.Catalog> droppedCatalog =
+        tableEnv.getCatalog(catalogName);
     Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
-  }
-
-  @Test
-  public void testCreateGravitinoHiveCatalogRequireOptions() {
-    tableEnv.useCatalog(DEFAULT_CATALOG);
-
-    // Failed to create the catalog for missing the required options.
-    String catalogName = "gravitino_hive_sql2";
-    Assertions.assertThrows(
-        ValidationException.class,
-        () -> {
-          tableEnv.executeSql(
-              String.format(
-                  "create catalog %s with ("
-                      + "'type'='gravitino-hive', "
-                      + "'hive-conf-dir'='src/test/resources/flink-tests'"
-                      + ")",
-                  catalogName));
-        },
-        "The hive.metastore.uris is required.");
-
-    Assertions.assertFalse(metalake.catalogExists(catalogName));
   }
 
   @Test
@@ -260,20 +205,14 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     int numCatalogs = tableEnv.listCatalogs().length;
 
     // create a new catalog.
-    String catalogName = "hive_catalog_in_gravitino";
+    String catalogName = "iceberg_catalog_in_gravitino";
     org.apache.gravitino.Catalog gravitinoCatalog =
         metalake.createCatalog(
             catalogName,
             org.apache.gravitino.Catalog.Type.RELATIONAL,
-            "hive",
+            getProvider(),
             null,
-            ImmutableMap.of(
-                "flink.bypass.hive-conf-dir",
-                "src/test/resources/flink-tests",
-                "flink.bypass.hive.test",
-                "hive.config",
-                "metastore.uris",
-                hiveMetastoreUri));
+            getCatalogConfigs());
     Assertions.assertNotNull(gravitinoCatalog);
     Assertions.assertEquals(catalogName, gravitinoCatalog.name());
     Assertions.assertTrue(metalake.catalogExists(catalogName));
@@ -281,15 +220,10 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
         numCatalogs + 1, tableEnv.listCatalogs().length, "Should create a new catalog");
 
     // get the catalog from Gravitino.
-    Optional<Catalog> flinkHiveCatalog = tableEnv.getCatalog(catalogName);
-    Assertions.assertTrue(flinkHiveCatalog.isPresent());
-    Assertions.assertInstanceOf(GravitinoHiveCatalog.class, flinkHiveCatalog.get());
-    GravitinoHiveCatalog gravitinoHiveCatalog = (GravitinoHiveCatalog) flinkHiveCatalog.get();
-    HiveConf hiveConf = gravitinoHiveCatalog.getHiveConf();
-    Assertions.assertTrue(hiveConf.size() > 0, "Should have hive conf");
-    Assertions.assertEquals("hive.config", hiveConf.get("hive.test"));
-    Assertions.assertEquals(
-        hiveMetastoreUri, hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
+    Optional<org.apache.flink.table.catalog.Catalog> flinkIcebergCatalog =
+        tableEnv.getCatalog(catalogName);
+    Assertions.assertTrue(flinkIcebergCatalog.isPresent());
+    Assertions.assertInstanceOf(GravitinoIcebergCatalog.class, flinkIcebergCatalog.get());
 
     // drop the catalog.
     tableEnv.useCatalog(DEFAULT_CATALOG);
@@ -300,123 +234,99 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
-  public void testHivePartitionTable() {
-    String databaseName = "test_create_hive_partition_table_db";
-    String tableName = "test_create_hive_partition_table";
-    String comment = "test comment";
+  public void testIcebergTableWithPartition() {
+    String databaseName = "test_iceberg_table_partition";
+    String tableName = "iceberg_table_with_partition";
     String key = "test key";
     String value = "test value";
 
     doWithSchema(
-        currentCatalog(),
+        icebergCatalog,
         databaseName,
         catalog -> {
           TableResult result =
               sql(
-                  "CREATE TABLE %s "
-                      + "(string_type STRING COMMENT 'string_type', "
-                      + " double_type DOUBLE COMMENT 'double_type')"
-                      + " COMMENT '%s' "
-                      + " PARTITIONED BY (string_type, double_type)"
+                  "CREATE TABLE %s ("
+                      + " id BIGINT COMMENT 'unique id',"
+                      + " data STRING NOT NULL"
+                      + " ) PARTITIONED BY (data)"
                       + " WITH ("
                       + "'%s' = '%s')",
-                  tableName, comment, key, value);
+                  tableName, key, value);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
 
           Table table =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
-          Assertions.assertEquals(comment, table.comment());
           Assertions.assertEquals(value, table.properties().get(key));
           Column[] columns =
               new Column[] {
-                Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
-                Column.of("double_type", Types.DoubleType.get(), "double_type")
+                Column.of("id", Types.LongType.get(), "unique id", true, false, null),
+                Column.of("data", Types.StringType.get(), null, false, false, null)
               };
           assertColumns(columns, table.columns());
-          Transform[] partitions =
-              new Transform[] {
-                Transforms.identity("string_type"), Transforms.identity("double_type")
-              };
+          Transform[] partitions = new Transform[] {Transforms.identity("data")};
           Assertions.assertArrayEquals(partitions, table.partitioning());
 
           // load flink catalog
           try {
-            Catalog flinkCatalog = tableEnv.getCatalog(currentCatalog().name()).get();
+            org.apache.flink.table.catalog.Catalog flinkCatalog =
+                tableEnv.getCatalog(currentCatalog().name()).get();
             CatalogBaseTable flinkTable =
                 flinkCatalog.getTable(ObjectPath.fromString(databaseName + "." + tableName));
             DefaultCatalogTable catalogTable = (DefaultCatalogTable) flinkTable;
             Assertions.assertTrue(catalogTable.isPartitioned());
             Assertions.assertArrayEquals(
-                new String[] {"string_type", "double_type"},
-                catalogTable.getPartitionKeys().toArray());
+                new String[] {"data"}, catalogTable.getPartitionKeys().toArray());
           } catch (Exception e) {
             Assertions.fail("Table should be exist", e);
           }
 
           // write and read.
           TestUtils.assertTableResult(
-              sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName),
+              sql("INSERT INTO %s VALUES (1, 'A'), (2, 'B')", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of(-1L));
           TestUtils.assertTableResult(
-              sql("SELECT * FROM %s ORDER BY double_type", tableName),
+              sql("SELECT * FROM %s ORDER BY data", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
-              Row.of("A", 1.0),
-              Row.of("B", 2.0));
-          try {
-            Assertions.assertTrue(
-                hdfs.exists(
-                    new Path(
-                        table.properties().get("location") + "/string_type=A/double_type=1.0")));
-            Assertions.assertTrue(
-                hdfs.exists(
-                    new Path(
-                        table.properties().get("location") + "/string_type=B/double_type=2.0")));
-          } catch (IOException e) {
-            Assertions.fail("The partition directory should be exist.", e);
-          }
+              Row.of(1, "A"),
+              Row.of(2, "B"));
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
-  public void testCreateHiveTable() {
-    String databaseName = "test_create_hive_table_db";
-    String tableName = "test_create_hive_table";
-    String comment = "test comment";
+  public void testCreateIcebergTable() {
+    String databaseName = "test_create_iceberg_table";
+    String tableName = "iceberg_table";
+    String comment = "test table comment";
     String key = "test key";
     String value = "test value";
 
-    // 1. The NOT NULL constraint for column is only supported since Hive 3.0,
-    // but the current Gravitino Hive catalog only supports Hive 2.x.
-    // 2. Hive doesn't support Time and Timestamp with timezone type.
-    // 3. Flink SQL only support to create Interval Month and Second(3).
     doWithSchema(
-        metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
+        metalake.loadCatalog(DEFAULT_ICEBERG_CATALOG),
         databaseName,
         catalog -> {
           TableResult result =
               sql(
-                  "CREATE TABLE %s "
-                      + "(string_type STRING COMMENT 'string_type', "
+                  "CREATE TABLE %s ("
+                      + " string_type STRING COMMENT 'string_type', "
                       + " double_type DOUBLE COMMENT 'double_type',"
                       + " int_type INT COMMENT 'int_type',"
                       + " varchar_type VARCHAR COMMENT 'varchar_type',"
-                      + " char_type CHAR COMMENT 'char_type',"
                       + " boolean_type BOOLEAN COMMENT 'boolean_type',"
-                      + " byte_type TINYINT COMMENT 'byte_type',"
                       + " binary_type VARBINARY(10) COMMENT 'binary_type',"
                       + " decimal_type DECIMAL(10, 2) COMMENT 'decimal_type',"
                       + " bigint_type BIGINT COMMENT 'bigint_type',"
                       + " float_type FLOAT COMMENT 'float_type',"
                       + " date_type DATE COMMENT 'date_type',"
                       + " timestamp_type TIMESTAMP COMMENT 'timestamp_type',"
-                      + " smallint_type SMALLINT COMMENT 'smallint_type',"
                       + " array_type ARRAY<INT> COMMENT 'array_type',"
                       + " map_type MAP<INT, STRING> COMMENT 'map_type',"
-                      + " struct_type ROW<k1 INT, k2 String>)"
-                      + " COMMENT '%s' WITH ("
+                      + " struct_type ROW<k1 INT, k2 String>"
+                      + " ) COMMENT '%s' WITH ("
                       + "'%s' = '%s')",
                   tableName, comment, key, value);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
@@ -432,9 +342,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                 Column.of("double_type", Types.DoubleType.get(), "double_type"),
                 Column.of("int_type", Types.IntegerType.get(), "int_type"),
                 Column.of("varchar_type", Types.StringType.get(), "varchar_type"),
-                Column.of("char_type", Types.FixedCharType.of(1), "char_type"),
                 Column.of("boolean_type", Types.BooleanType.get(), "boolean_type"),
-                Column.of("byte_type", Types.ByteType.get(), "byte_type"),
                 Column.of("binary_type", Types.BinaryType.get(), "binary_type"),
                 Column.of("decimal_type", Types.DecimalType.of(10, 2), "decimal_type"),
                 Column.of("bigint_type", Types.LongType.get(), "bigint_type"),
@@ -442,7 +350,6 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                 Column.of("date_type", Types.DateType.get(), "date_type"),
                 Column.of(
                     "timestamp_type", Types.TimestampType.withoutTimeZone(), "timestamp_type"),
-                Column.of("smallint_type", Types.ShortType.get(), "smallint_type"),
                 Column.of(
                     "array_type", Types.ListType.of(Types.IntegerType.get(), true), "array_type"),
                 Column.of(
@@ -459,28 +366,25 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
-  public void testGetHiveTable() {
+  public void testGetIcebergTable() {
     Column[] columns =
         new Column[] {
           Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
           Column.of("double_type", Types.DoubleType.get(), "double_type"),
           Column.of("int_type", Types.IntegerType.get(), "int_type"),
           Column.of("varchar_type", Types.StringType.get(), "varchar_type"),
-          Column.of("char_type", Types.FixedCharType.of(1), "char_type"),
           Column.of("boolean_type", Types.BooleanType.get(), "boolean_type"),
-          Column.of("byte_type", Types.ByteType.get(), "byte_type"),
           Column.of("binary_type", Types.BinaryType.get(), "binary_type"),
           Column.of("decimal_type", Types.DecimalType.of(10, 2), "decimal_type"),
           Column.of("bigint_type", Types.LongType.get(), "bigint_type"),
           Column.of("float_type", Types.FloatType.get(), "float_type"),
           Column.of("date_type", Types.DateType.get(), "date_type"),
           Column.of("timestamp_type", Types.TimestampType.withoutTimeZone(), "timestamp_type"),
-          Column.of("smallint_type", Types.ShortType.get(), "smallint_type"),
-          Column.of("fixed_char_type", Types.FixedCharType.of(10), "fixed_char_type"),
           Column.of("array_type", Types.ListType.of(Types.IntegerType.get(), true), "array_type"),
           Column.of(
               "map_type",
@@ -494,9 +398,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               null)
         };
 
-    String databaseName = "test_get_hive_table_db";
+    String databaseName = "test_get_iceberg_table";
     doWithSchema(
-        metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
+        metalake.loadCatalog(DEFAULT_ICEBERG_CATALOG),
         databaseName,
         catalog -> {
           String tableName = "test_desc_table";
@@ -510,7 +414,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   ImmutableMap.of("k1", "v1"));
 
           Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
-              tableEnv.getCatalog(DEFAULT_HIVE_CATALOG);
+              tableEnv.getCatalog(DEFAULT_ICEBERG_CATALOG);
           Assertions.assertTrue(flinkCatalog.isPresent());
           try {
             CatalogBaseTable table =
@@ -530,13 +434,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   org.apache.flink.table.catalog.Column.physical(
                           "varchar_type", DataTypes.VARCHAR(Integer.MAX_VALUE))
                       .withComment("varchar_type"),
-                  org.apache.flink.table.catalog.Column.physical("char_type", DataTypes.CHAR(1))
-                      .withComment("char_type"),
                   org.apache.flink.table.catalog.Column.physical(
                           "boolean_type", DataTypes.BOOLEAN())
                       .withComment("boolean_type"),
-                  org.apache.flink.table.catalog.Column.physical("byte_type", DataTypes.TINYINT())
-                      .withComment("byte_type"),
                   org.apache.flink.table.catalog.Column.physical("binary_type", DataTypes.BYTES())
                       .withComment("binary_type"),
                   org.apache.flink.table.catalog.Column.physical(
@@ -551,12 +451,6 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   org.apache.flink.table.catalog.Column.physical(
                           "timestamp_type", DataTypes.TIMESTAMP())
                       .withComment("timestamp_type"),
-                  org.apache.flink.table.catalog.Column.physical(
-                          "smallint_type", DataTypes.SMALLINT())
-                      .withComment("smallint_type"),
-                  org.apache.flink.table.catalog.Column.physical(
-                          "fixed_char_type", DataTypes.CHAR(10))
-                      .withComment("fixed_char_type"),
                   org.apache.flink.table.catalog.Column.physical(
                           "array_type", DataTypes.ARRAY(DataTypes.INT()))
                       .withComment("array_type"),
@@ -579,26 +473,29 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             Assertions.fail(e);
           }
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Override
-  protected Map<String, String> getCreateSchemaProps(String schemaName) {
-    return ImmutableMap.of("location", warehouse + "/" + schemaName);
-  }
-
-  @Override
-  protected org.apache.gravitino.Catalog currentCatalog() {
-    return hiveCatalog;
+  protected Catalog currentCatalog() {
+    return icebergCatalog;
   }
 
   @Override
   protected String getProvider() {
-    return "hive";
+    return "lakehouse-iceberg";
+  }
+
+  @Override
+  protected boolean supportGetSchemaWithoutCommentAndOption() {
+    return false;
   }
 
   @Override
   protected boolean supportDropCascade() {
-    return true;
+    return false;
   }
+
+  protected abstract String getCatalogBackend();
 }
