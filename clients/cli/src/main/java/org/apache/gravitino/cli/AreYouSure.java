@@ -42,6 +42,10 @@ public class AreYouSure {
           "This command could result in data loss or other issues. Are you sure you want to do this? (Y/N)");
       String answer = scanner.next();
       return answer.equals("Y");
+    } catch (Exception e) {
+      System.err.println("Error while reading user input: " + e.getMessage());
+      Main.exit(-1);
     }
+    return false;
   }
 }
