@@ -19,11 +19,11 @@
 
 package org.apache.gravitino.flink.connector.hive;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.PropertiesConverter;

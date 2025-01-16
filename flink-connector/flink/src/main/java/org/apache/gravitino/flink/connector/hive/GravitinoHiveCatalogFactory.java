@@ -21,9 +21,9 @@ package org.apache.gravitino.flink.connector.hive;
 
 import static org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions.IDENTIFIER;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactory;

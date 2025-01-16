@@ -24,12 +24,12 @@ import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFa
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_URI;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.shaded.guava31.com.google.common.base.Preconditions;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogStoreFactory;

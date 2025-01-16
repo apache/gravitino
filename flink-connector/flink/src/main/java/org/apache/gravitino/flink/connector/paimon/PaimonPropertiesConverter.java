@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
-import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;

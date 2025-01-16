@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.flink.connector.catalog;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.flink.shaded.guava31.com.google.common.base.Preconditions;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
