@@ -32,6 +32,7 @@ if [[ -z "$S3_ACCESS_KEY_ID" || -z "$S3_SECRET_ACCESS" || -z "$S3_REGION" || -z 
 fi
 
 GRAVITINO_HOME=../../../..
+GRAVITINO_HOME=$(cd $GRAVITINO_HOME && pwd)
 GRAVITINO_SERVER_DIR=$GRAVITINO_HOME/distribution/package
 CLIENT_FUSE_DIR=$GRAVITINO_HOME/clients/filesystem-fuse
 GRAVITINO_SERVER_URL=http://localhost:8090
@@ -49,7 +50,7 @@ echo "Start the Gravitino server"
 rm -rf $GRAVITINO_SERVER_DIR/data
 $GRAVITINO_SERVER_DIR/bin/gravitino.sh restart
 
-check_server_ready() {
+check_gravitino_server_ready() {
   local url=$1
   local retries=10  # Number of retries
   local wait_time=1 # Wait time between retries (seconds)
@@ -68,7 +69,7 @@ check_server_ready() {
   exit 1
 }
 
-check_server_ready "$GRAVITINO_SERVER_URL/api/metalakes"
+check_gravitino_server_ready "$GRAVITINO_SERVER_URL/api/metalakes"
 
 # create metalake
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -115,7 +116,7 @@ if [ ! -d "$MOUNT_DIR" ]; then
   mkdir -p $MOUNT_DIR
 fi
 
-FILESET=gvfs://fileset/test/c1/s1/fileset1
+MOUNT_FROM_LOCATION=gvfs://fileset/test/c1/s1/fileset1
 
 CONF_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
 
@@ -131,18 +132,27 @@ awk -v access_key="$S3_ACCESS_KEY_ID" \
     in_extend_config && /s3-bucket/ { $0 = "s3-bucket = \"" bucket "\"" }
     { print }' $CLIENT_FUSE_DIR/tests/conf/gvfs_fuse_s3.toml > "$CONF_FILE"
 
+cleanup() {
+    # Stop the gvfs-fuse process if it's running
+    if [ -n "$FUSE_PID" ] && ps -p $FUSE_PID > /dev/null; then
+        echo "Stopping gvfs-fuse..."
+        kill -INT $FUSE_PID
+    else
+        echo "gvfs-fuse process not found or already stopped."
+    fi
+
+    # Stop the Gravitino server
+    echo "Stopping Gravitino server..."
+    $GRAVITINO_SERVER_DIR/bin/gravitino.sh stop || echo "Failed to stop Gravitino server."
+}
+trap cleanup EXIT
+
 # Start the gvfs-fuse process in the background
-$CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $FILESET $CONF_FILE &
+$CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $MOUNT_FROM_LOCATION $CONF_FILE > $CLIENT_FUSE_DIR/target/debug/fuse.log 2>&1 &
 FUSE_PID=$!
+echo "Gvfs fuse started with PID: $FUSE_PID"
 
 # run the integration test
 cd $CLIENT_FUSE_DIR
-make integration_test
-cd -
-
-# Stop the gvfs-fuse process after the test completes
-echo "Stopping the Gvfs fuse client..."
-kill -INT $FUSE_PID
-
-# Stop the Gravitino server
-$GRAVITINO_SERVER_DIR/bin/gravitino.sh stop
+export RUN_TEST_WITH_BACKGROUND=1
+cargo test --test fuse_test test_fuse_system_with_manual -- --exact
