@@ -42,3 +42,6 @@ gcli role grant --name catalog_postgres --role admin --privilege create_table mo
 
 Revoke a privilege
 gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
+
+Revoke all privileges
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --all
