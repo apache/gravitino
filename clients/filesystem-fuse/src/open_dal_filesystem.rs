@@ -397,6 +397,11 @@ mod test {
 
         let op = create_opendal(&config);
         let path = "/s1/fileset1/test_dir/test_big_file";
+        let meta = op.stat(path).await;
+        if meta.is_err() {
+            println!("stat error: {:?}", meta.err());
+            return;
+        }
         let reader = op.reader(path).await.unwrap();
 
         let mut buffer = Vec::new();

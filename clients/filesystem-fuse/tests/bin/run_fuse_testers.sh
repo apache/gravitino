@@ -58,8 +58,10 @@ elif [ "$1" == "start" ]; then
   start_servers
 
 elif [ "$1" == "restart" ]; then
+  # Stop the servers
   echo "Stopping servers..."
   stop_servers
+
   # Start the servers
   echo "Starting servers..."
   start_servers
