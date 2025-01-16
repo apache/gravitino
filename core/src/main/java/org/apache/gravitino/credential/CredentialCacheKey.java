@@ -43,7 +43,7 @@ public class CredentialCacheKey {
     if (this == o) {
       return true;
     }
-    if (o == null || !(o instanceof CredentialCacheKey)) {
+    if (!(o instanceof CredentialCacheKey)) {
       return false;
     }
     CredentialCacheKey that = (CredentialCacheKey) o;
