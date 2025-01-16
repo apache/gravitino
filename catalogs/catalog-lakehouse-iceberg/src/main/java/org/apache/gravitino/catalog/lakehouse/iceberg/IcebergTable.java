@@ -131,7 +131,6 @@ public class IcebergTable extends BaseTable {
             ArrayUtils.isNotEmpty(partitioning) || ArrayUtils.isNotEmpty(sortOrders),
             "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty.");
         return DistributionMode.RANGE.modeName();
-        // Gravitino NONE distribution means the client side doesn't specify distribution.
       case NONE:
         return DistributionMode.NONE.modeName();
       default:
