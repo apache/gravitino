@@ -150,14 +150,23 @@ public class UserCommandHandler extends CommandHandler {
 
   /** Handles the "REVOKE" command. */
   private void handleRevokeCommand() {
-    String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
-    for (String role : revokeRoles) {
-      this.gravitinoCommandLine
-          .newRemoveRoleFromUser(this.url, this.ignore, this.metalake, user, role)
+    boolean removeAll = line.hasOption(GravitinoOptions.ALL);
+    if (removeAll) {
+      gravitinoCommandLine
+          .newRemoveAllRoles(url, ignore, metalake, user, CommandEntities.USER)
           .validate()
           .handle();
+      System.out.printf("Removed all roles from user %s%n", user);
+    } else {
+      String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : revokeRoles) {
+        this.gravitinoCommandLine
+            .newRemoveRoleFromUser(this.url, this.ignore, this.metalake, user, role)
+            .validate()
+            .handle();
+      }
+      System.out.printf("Removed roles %s from user %s%n", COMMA_JOINER.join(revokeRoles), user);
     }
-    System.out.printf("Remove roles %s from user %s%n", COMMA_JOINER.join(revokeRoles), user);
   }
 
   /** Handles the "GRANT" command. */
