@@ -175,8 +175,8 @@ public class TagManager implements TagDispatcher {
             throw new NoSuchTagException(
                 "Tag with name %s under metalake %s does not exist", name, metalake);
           } catch (EntityAlreadyExistsException e) {
-            throw new RuntimeException(
-                "Tag with name " + name + " under metalake " + metalake + " already exists");
+            throw new TagAlreadyExistsException(
+                "Tag with name %s under metalake %s already exists", getNewName(changes), metalake);
           } catch (IOException ioe) {
             LOG.error("Failed to alter tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
@@ -350,6 +350,15 @@ public class TagManager implements TagDispatcher {
                     throw new RuntimeException(e);
                   }
                 }));
+  }
+
+  private String getNewName(TagChange... changes) {
+    for (TagChange change : changes) {
+      if (change instanceof TagChange.RenameTag) {
+        return ((TagChange.RenameTag) change).getNewName();
+      }
+    }
+    return null;
   }
 
   private TagEntity updateTagEntity(TagEntity tagEntity, TagChange... changes) {

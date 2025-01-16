@@ -343,6 +343,18 @@ public class TestTagManager {
     Assertions.assertEquals("new comment", removedPropTag.comment());
     Map<String, String> expectedProp2 = ImmutableMap.of("k2", "v2");
     Assertions.assertEquals(expectedProp2, removedPropTag.properties());
+
+    // Test rename tag to an already-existing tag
+    tagManager.createTag(METALAKE, "tagA", "existing comment", null);
+    tagManager.createTag(METALAKE, "tagB", "some comment", null);
+
+    TagChange renameToExisting = TagChange.rename("tagB");
+    Exception e =
+        Assertions.assertThrows(
+            TagAlreadyExistsException.class,
+            () -> tagManager.alterTag(METALAKE, "tagA", renameToExisting));
+    Assertions.assertEquals(
+        "Tag with name tagB under metalake " + METALAKE + " already exists", e.getMessage());
   }
 
   @Test
