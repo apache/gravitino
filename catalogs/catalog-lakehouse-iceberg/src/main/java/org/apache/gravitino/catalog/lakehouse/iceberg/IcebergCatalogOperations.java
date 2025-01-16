@@ -514,8 +514,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                           .build())
               .toArray(IcebergColumn[]::new);
 
-      // Gravitino NONE distribution means the client side doesn't specify distribution not the same
-      // as Iceberg none distribution.
+      // Gravitino NONE distribution means the client side doesn't specify distribution, which is
+      // not the same as none distribution in Iceberg.
       if (Distributions.NONE.equals(distribution)) {
         distribution =
             getIcebergDefaultDistribution(sortOrders.length > 0, partitioning.length > 0);
@@ -597,7 +597,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   private static Distribution getIcebergDefaultDistribution(
-      Boolean isSorted, Boolean isPartitioned) {
+      boolean isSorted, boolean isPartitioned) {
     if (isSorted) {
       return Distributions.RANGE;
     } else if (isPartitioned) {
