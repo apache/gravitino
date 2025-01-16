@@ -39,6 +39,7 @@ import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListGroups;
+import org.apache.gravitino.cli.commands.RemoveAllRoles;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -266,6 +267,32 @@ class TestGroupCommands {
 
     verify(mockRemoveFirstRole).handle();
     verify(mockRemoveSecondRole).handle();
+  }
+
+  @Test
+  void testRemoveAllRolesFromGroupCommand() {
+    RemoveAllRoles mock = mock(RemoveAllRoles.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.GROUP)).thenReturn("groupA");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALL)).thenReturn(true);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.GROUP, CommandActions.REVOKE));
+
+    doReturn(mock)
+        .when(commandLine)
+        .newRemoveAllRoles(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "groupA",
+            CommandEntities.GROUP);
+    doReturn(mock).when(mock).validate();
+    commandLine.handleCommandLine();
+    verify(mock).handle();
   }
 
   @Test

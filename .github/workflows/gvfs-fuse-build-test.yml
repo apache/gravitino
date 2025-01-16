@@ -71,9 +71,17 @@ jobs:
         run: |
           dev/ci/check_commands.sh
 
-      - name: Build and test Gravitino
+      - name: Build Gvfs-fuse
         run: |
            ./gradlew :clients:filesystem-fuse:build -PenableFuse=true
+
+      - name: Integration test
+        run: |
+          ./gradlew build -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
+          cd clients/filesystem-fuse
+          make test-s3
+          make test-fuse-it
 
       - name: Free up disk space
         run: |
@@ -85,5 +93,7 @@ jobs:
         with:
           name: Gvfs-fuse integrate-test-reports-${{ matrix.java-version }}
           path: |
-            clients/filesystem-fuse/build/test/log/*.log
+            clients/filesystem-fuse/target/debug/fuse.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
 

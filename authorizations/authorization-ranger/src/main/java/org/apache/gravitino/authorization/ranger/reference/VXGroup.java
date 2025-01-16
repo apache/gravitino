@@ -60,6 +60,7 @@ public class VXGroup extends VXDataObject implements java.io.Serializable {
    *
    * @return formatedStr
    */
+  @Override
   public String toString() {
     String str = "VXGroup={";
     str += super.toString();

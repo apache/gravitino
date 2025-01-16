@@ -19,7 +19,8 @@
 
 use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
-use gvfs_fuse::{gvfs_mount, gvfs_unmount};
+use gvfs_fuse::RUN_TEST_WITH_FUSE;
+use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
 use log::{error, info};
 use std::fs::File;
 use std::path::Path;
@@ -85,7 +86,7 @@ impl Drop for FuseTest {
 }
 
 #[test]
-fn test_fuse_system_with_auto() {
+fn test_fuse_with_memory_fs() {
     tracing_subscriber::fmt().init();
 
     panic::set_hook(Box::new(|info| {
@@ -106,13 +107,20 @@ fn test_fuse_system_with_auto() {
     test_fuse_filesystem(mount_point);
 }
 
-fn test_fuse_system_with_manual() {
-    test_fuse_filesystem("build/gvfs");
+#[test]
+fn fuse_it_test_fuse() {
+    test_enable_with!(RUN_TEST_WITH_FUSE);
+
+    test_fuse_filesystem("target/gvfs/gvfs_test");
 }
 
 fn test_fuse_filesystem(mount_point: &str) {
     info!("Test startup");
     let base_path = Path::new(mount_point);
+
+    if !file_exists(base_path) {
+        fs::create_dir_all(base_path).expect("Failed to create test dir");
+    }
 
     //test create file
     let test_file = base_path.join("test_create");
@@ -124,12 +132,12 @@ fn test_fuse_filesystem(mount_point: &str) {
     fs::write(&test_file, "read test").expect("Failed to write file");
 
     //test read file
-    let content = fs::read_to_string(test_file.clone()).expect("Failed to read file");
+    let content = fs::read_to_string(&test_file).expect("Failed to read file");
     assert_eq!(content, "read test", "File content mismatch");
 
     //test delete file
-    fs::remove_file(test_file.clone()).expect("Failed to delete file");
-    assert!(!file_exists(test_file));
+    fs::remove_file(&test_file).expect("Failed to delete file");
+    assert!(!file_exists(&test_file));
 
     //test create directory
     let test_dir = base_path.join("test_dir");

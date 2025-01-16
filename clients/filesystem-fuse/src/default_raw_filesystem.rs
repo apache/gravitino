@@ -334,13 +334,22 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
         file.flush().await
     }
 
-    async fn close_file(&self, _file_id: u64, fh: u64) -> Result<()> {
+    async fn close_file(&self, file_id: u64, fh: u64) -> Result<()> {
+        let file_entry = self.get_file_entry(file_id).await;
+
         let opened_file = self
             .opened_file_manager
             .remove(fh)
             .ok_or(Errno::from(libc::EBADF))?;
-        let mut file = opened_file.lock().await;
-        file.close().await
+
+        // todo: need to handle racing condition and corner case when the file has been deleted.
+        if file_entry.is_ok() {
+            let mut file = opened_file.lock().await;
+            file.close().await
+        } else {
+            // If the file has been deleted, it does not cause a leak even if it has not been closed.
+            Ok(())
+        }
     }
 
     async fn read(&self, file_id: u64, fh: u64, offset: u64, size: u32) -> Result<Bytes> {

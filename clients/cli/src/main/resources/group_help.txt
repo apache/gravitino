@@ -18,3 +18,9 @@ gcli group details --group new_group --audit
 
 Delete a group
 gcli group delete --group new_group
+
+Revoke a role from a group
+gcli group revoke --group new_group --role admin
+
+Revoke all roles from a group
+gcli group revoke --group new_group --all

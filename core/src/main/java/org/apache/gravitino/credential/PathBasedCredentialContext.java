@@ -67,7 +67,7 @@ public class PathBasedCredentialContext implements CredentialContext {
     if (this == o) {
       return true;
     }
-    if (o == null || !(o instanceof PathBasedCredentialContext)) {
+    if (!(o instanceof PathBasedCredentialContext)) {
       return false;
     }
     PathBasedCredentialContext that = (PathBasedCredentialContext) o;

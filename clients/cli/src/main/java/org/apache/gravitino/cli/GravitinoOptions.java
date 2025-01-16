@@ -111,7 +111,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
-    options.addOption(createSimpleOption(null, ALL, "all operation for --enable"));
+    options.addOption(createSimpleOption(null, ALL, "on all entities"));
 
     // model options
     options.addOption(createArgOption(null, URI, "model version artifact"));

@@ -235,4 +235,40 @@ public class TestFulllName {
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(errOutput, ErrorMessages.MISSING_METALAKE);
   }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromCatalog() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(1, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromSchema() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(2, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromTable() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default.sales"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(3, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromColumn() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default.sales.columns"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(4, fullName.getLevel());
+  }
 }

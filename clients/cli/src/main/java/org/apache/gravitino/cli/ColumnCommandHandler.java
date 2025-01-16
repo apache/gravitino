@@ -60,7 +60,7 @@ public class ColumnCommandHandler extends CommandHandler {
     this.ignore = ignore;
     this.quiet = quiet;
 
-    this.url = gravitinoCommandLine.getUrl();
+    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -72,7 +72,7 @@ public class ColumnCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(gravitinoCommandLine.getAuth(), userName);
+    Command.setAuthenticationMode(getAuth(line), userName);
 
     List<String> missingEntities = Lists.newArrayList();
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
