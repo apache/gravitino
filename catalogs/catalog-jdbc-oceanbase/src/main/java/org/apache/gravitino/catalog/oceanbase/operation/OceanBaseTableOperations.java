@@ -185,6 +185,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     }
   }
 
+  @Override
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {

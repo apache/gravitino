@@ -30,13 +30,17 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
   usage: gcli [metalake|catalog|schema|model|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
   Options
  usage: gcli
- -a,--audit              display audit information
+  -a,--audit             display audit information
+    --alias <arg>        model aliases
+    --all                all operation for --enable
     --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
     --columnfile <arg>   CSV file describing columns
  -d,--distribution       display distribution information
     --datatype <arg>     column data type
     --default <arg>      default column value
+    --disable            disable entities
+    --enable             enable entities
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
@@ -52,6 +56,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -p,--properties <arg>   property name/value pairs
     --partition          display partition information
     --position <arg>     position of column
+    --privilege <arg>    privilege(s)
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -59,6 +64,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
     --sortorder          display sortorder information
  -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
+    --uri <arg>          model version artifact
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
  -x,--index              display index information
@@ -756,6 +762,12 @@ gcli user grant --user new_user --role admin
 gcli user revoke --user new_user --role admin
 ```
 
+#### Remove all roles from a user
+
+```bash
+gcli user revoke --user new_user --all
+```
+
 #### Add a role to a group
 
 ```bash
@@ -766,6 +778,12 @@ gcli group grant --group groupA --role admin
 
 ```bash
 gcli group revoke --group groupA --role admin
+```
+
+#### Remove all roles from a group
+
+```bash
+gcli group revoke --group groupA --all
 ```
 
 ### Grant a privilege
@@ -951,3 +969,5 @@ gcli <normal command> --simple
 ```bash
 gcli <normal command> --simple --login userName
 ```
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=CLI" alt="" />

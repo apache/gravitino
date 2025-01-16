@@ -9,9 +9,9 @@ license: "This software is licensed under the Apache License version 2."
 ## Introduction
 
 Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. Currently, it supports local filesystem and HDFS. For
-object storage like S3, GCS, Azure Blob Storage and OSS, you can put the hadoop object store jar like
-`gravitino-aws-bundle-{gravitino-version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory to enable the support.
+the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports [S3](hadoop-catalog-with-s3.md), [GCS](hadoop-catalog-with-gcs.md), [OSS](hadoop-catalog-with-oss.md) and [Azure Blob Storage](hadoop-catalog-with-adls.md) through Hadoop catalog. 
+
+The rest of this document will use HDFS or local file as an example to illustrate how to use the Hadoop catalog. For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, please refer to the corresponding document for more details.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Hadoop catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
@@ -23,16 +23,19 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 
 Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
 
-| Property Name          | Description                                        | Default Value | Required | Since Version    |
-|------------------------|----------------------------------------------------|---------------|----------|------------------|
-| `location`             | The storage location managed by Hadoop catalog.    | (none)        | No       | 0.5.0            |
-| `credential-providers` | The credential provider types, separated by comma. | (none)        | No       | 0.8.0-incubating |
+| Property Name                  | Description                                                                                                                                                                                                                                                                                                        | Default Value   | Required | Since Version    |
+|--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `location`                     | The storage location managed by Hadoop catalog.                                                                                                                                                                                                                                                                    | (none)          | No       | 0.5.0            |
+| `default-filesystem-provider`  | The default filesystem provider of this Hadoop catalog if users do not specify the scheme in the URI. Candidate values are 'builtin-local', 'builtin-hdfs', 's3', 'gcs', 'abs' and 'oss'. Default value is `builtin-local`. For S3, if we set this value to 's3', we can omit the prefix 's3a://' in the location. | `builtin-local` | No       | 0.7.0-incubating |
+| `filesystem-providers`         | The file system providers to add. Users needs to set this configuration to support cloud storage or custom HCFS. For instance, set it to `s3` or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                     | (none)          | Yes      | 0.7.0-incubating |
+| `credential-providers`         | The credential provider types, separated by comma.                                                                                                                                                                                                                                                                 | (none)          | No       | 0.8.0-incubating |
+| `filesystem-conn-timeout-secs` | The timeout of getting the file system using Hadoop FileSystem client instance. Time unit: seconds.                                                                                                                                                                                                                | 6               | No       | 0.8.0-incubating |
 
 Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
-Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or custom fileset, you need to configure the following extra properties.
+### HDFS fileset 
 
-#### HDFS fileset 
+Apart from the above properties, to access fileset like HDFS fileset, you need to configure the following extra properties.
 
 | Property Name                                      | Description                                                                                    | Default Value | Required                                                    | Since Version |
 |----------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
@@ -43,66 +46,13 @@ Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or cu
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Hadoop catalog.                                  | 60            | No                                                          | 0.5.1         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.     | 60            | No                                                          | 0.5.1         |
 
-#### S3 fileset
+### Hadoop catalog with Cloud Storage
+- For S3, please refer to [Hadoop-catalog-with-s3](./hadoop-catalog-with-s3.md) for more details.
+- For GCS, please refer to [Hadoop-catalog-with-gcs](./hadoop-catalog-with-gcs.md) for more details.
+- For OSS, please refer to [Hadoop-catalog-with-oss](./hadoop-catalog-with-oss.md) for more details.
+- For Azure Blob Storage, please refer to [Hadoop-catalog-with-adls](./hadoop-catalog-with-adls.md) for more details.
 
-| Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                  | Since version    |
-|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                      | (none)          | Yes                       | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location. | `builtin-local` | No                        | 0.7.0-incubating |
-| `s3-endpoint`                 | The endpoint of the AWS S3.                                                                                                                                                                                                  | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
-
-Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
-
-At the same time, you need to place the corresponding bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aws-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
-
-#### GCS fileset
-
-| Configuration item            | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
-|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `gs` if it's a GCS fileset, a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`.                                        | (none)          | Yes                        | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
-| `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a GCS fileset. | 0.7.0-incubating |
-
-Please refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
-
-In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
-
-#### OSS fileset
-
-| Configuration item            | Description                                                                                                                                                                                                                   | Default value   | Required                   | Since version    |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                               | (none)          | Yes                        | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
-| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                               | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                             | (none)          | Yes if it's a OSS fileset. | 0.7.0-incubating |
-
-Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
-
-In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-aliyun-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
-
-
-#### Azure Blob Storage fileset
-
-| Configuration item                | Description                                                                                                                                                                                                                                    | Default value   | Required                                  | Since version    |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------|------------------|
-| `filesystem-providers`            | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                | (none)          | Yes                                       | 0.8.0-incubating |
-| `default-filesystem-provider`     | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location. | `builtin-local` | No                                        | 0.8.0-incubating |
-| `azure-storage-account-name `     | The account name of Azure Blob Storage.                                                                                                                                                                                                        | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                                                         | (none)          | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-
-Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
-
-Similar to the above, you need to place the corresponding bundle jar [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-azure-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
-
-:::note
-- Gravitino contains builtin file system providers for local file system(`builtin-local`) and HDFS(`builtin-hdfs`), that is to say if `filesystem-providers` is not set, Gravitino will still support local file system and HDFS. Apart from that, you can set the `filesystem-providers` to support other file systems like S3, GCS, OSS or custom file system.
-- `default-filesystem-provider` is used to set the default file system provider for the Hadoop catalog. If the user does not specify the scheme in the URI, Gravitino will use the default file system provider to access the fileset. For example, if the default file system provider is set to `builtin-local`, the user can omit the prefix `file:///` in the location. 
-:::
-
-#### How to custom your own HCFS file system fileset?
+### How to custom your own HCFS file system fileset?
 
 Developers and users can custom their own HCFS file system fileset by implementing the `FileSystemProvider` interface in the jar [gravitino-catalog-hadoop](https://repo1.maven.org/maven2/org/apache/gravitino/catalog-hadoop/). The `FileSystemProvider` interface is defined as follows:
 
@@ -180,7 +130,7 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 | `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
 | `credential-providers`                | The credential provider types, separated by comma.                                                     | (none)                   | No       | 0.8.0-incubating |
 
-Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-provider` setting in the following order of precedence:
+Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-providers` setting in the following order of precedence:
 
 1. Fileset properties
 2. Schema properties

@@ -656,11 +656,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return schemaChanges.toArray(new SchemaChange[0]);
   }
 
-  private Catalog catalog() {
+  protected Catalog catalog() {
     return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
   }
 
-  private String catalogName() {
+  protected String catalogName() {
     return getName();
   }
 }

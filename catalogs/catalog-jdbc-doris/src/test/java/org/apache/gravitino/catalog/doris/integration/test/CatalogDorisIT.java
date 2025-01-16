@@ -577,6 +577,16 @@ public class CatalogDorisIT extends BaseIT {
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () -> assertEquals(4, tableCatalog.loadTable(tableIdentifier).columns().length));
+
+    // set property
+    tableCatalog.alterTable(tableIdentifier, TableChange.setProperty("in_memory", "true"));
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertEquals(
+                    "true", tableCatalog.loadTable(tableIdentifier).properties().get("in_memory")));
   }
 
   @Test
