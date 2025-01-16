@@ -34,7 +34,7 @@ public class RemoveRoleFromGroup extends Command {
   protected String role;
 
   /**
-   * Removes a role from a group.
+   * Remove a role from a group.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -50,7 +50,7 @@ public class RemoveRoleFromGroup extends Command {
     this.role = role;
   }
 
-  /** Adds a role to a group. */
+  /** Remove a role from a group. */
   @Override
   public void handle() {
     try {

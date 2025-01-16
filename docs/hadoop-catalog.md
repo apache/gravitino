@@ -130,7 +130,7 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 | `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
 | `credential-providers`                | The credential provider types, separated by comma.                                                     | (none)                   | No       | 0.8.0-incubating |
 
-Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-provider` setting in the following order of precedence:
+Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-providers` setting in the following order of precedence:
 
 1. Fileset properties
 2. Schema properties

@@ -73,6 +73,6 @@ public class ListFilesets extends Command {
 
     String all = filesets.length == 0 ? "No filesets exist." : Joiner.on(",").join(filesets);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }
