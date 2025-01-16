@@ -446,7 +446,7 @@ In order to access fileset with S3 using the GVFS Python client, apart from [bas
 | `s3_secret_access_key` | The secret key of the AWS S3.                                                                                                                | (none)        | Yes      | 0.7.0-incubating |
 
 :::note
-- `s3_endpoint` is an optional configuration for GVFS **Python** client but a required configuration for GVFS **Java** client to access Hadop with AWS S3, and it is required for other S3-compatible storage services like MinIO.
+- `s3_endpoint` is an optional configuration for GVFS **Python** client but a required configuration for GVFS **Java** client to access Hadoop with AWS S3, and it is required for other S3-compatible storage services like MinIO.
 - If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
 :::
 
