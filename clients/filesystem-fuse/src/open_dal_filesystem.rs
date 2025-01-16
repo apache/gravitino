@@ -159,6 +159,12 @@ impl PathFileSystem for OpenDalFileSystem {
 
     async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
         let file_name = path.to_string_lossy().to_string();
+        if flags.is_exclusive() {
+            let meta = self.op.stat(&file_name).await;
+            if meta.is_ok() {
+                return Err(Errno::from(libc::EEXIST));
+            }
+        }
 
         self.op
             .write(&file_name, Buffer::new())

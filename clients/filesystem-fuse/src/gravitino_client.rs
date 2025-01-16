@@ -35,18 +35,6 @@ pub(crate) struct Fileset {
     properties: HashMap<String, String>,
 }
 
-impl Fileset {
-    pub fn new(name: &str, storage_location: &str) -> Fileset {
-        Self {
-            name: name.to_string(),
-            fileset_type: "managed".to_string(),
-            comment: "".to_string(),
-            storage_location: storage_location.to_string(),
-            properties: HashMap::default(),
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 struct FilesetResponse {
     code: u32,
@@ -68,18 +56,6 @@ pub(crate) struct Catalog {
     provider: String,
     comment: String,
     pub(crate) properties: HashMap<String, String>,
-}
-
-impl Catalog {
-    pub fn new(name: &str, properties: HashMap<String, String>) -> Catalog {
-        Self {
-            name: name.to_string(),
-            catalog_type: "fileset".to_string(),
-            provider: "s3".to_string(),
-            comment: "".to_string(),
-            properties: properties,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -223,7 +199,7 @@ impl GravitinoClient {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use mockito::mock;
 
