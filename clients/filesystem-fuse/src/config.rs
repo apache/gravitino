@@ -205,19 +205,19 @@ impl AppConfig {
             .unwrap_or_else(|e| panic!("Failed to set default for {}: {}", entity.name, e))
     }
 
-    pub fn from_file(config_file_path: Option<&str>) -> GvfsResult<AppConfig> {
+    pub fn from_file(config_file_path: Option<String>) -> GvfsResult<AppConfig> {
         let builder = Self::crete_default_config_builder();
 
         let config_path = {
             if config_file_path.is_some() {
                 let path = config_file_path.unwrap();
                 //check config file exists
-                if fs::metadata(path).is_err() {
+                if fs::metadata(&path).is_err() {
                     return Err(
                         ConfigNotFound.to_error("The configuration file not found".to_string())
                     );
                 }
-                info!("Use configuration file: {}", path);
+                info!("Use configuration file: {}", &path);
                 path
             } else {
                 //use default config
@@ -232,11 +232,11 @@ impl AppConfig {
                         CONF_FUSE_CONFIG_PATH.default
                     );
                 }
-                CONF_FUSE_CONFIG_PATH.default
+                CONF_FUSE_CONFIG_PATH.default.to_string()
             }
         };
         let config = builder
-            .add_source(config::File::with_name(config_path).required(true))
+            .add_source(config::File::with_name(&config_path).required(true))
             .build();
         if let Err(e) = config {
             let msg = format!("Failed to build configuration: {}", e);
@@ -302,7 +302,7 @@ mod test {
 
     #[test]
     fn test_config_from_file() {
-        let config = AppConfig::from_file(Some("tests/conf/config_test.toml")).unwrap();
+        let config = AppConfig::from_file(Some("tests/conf/config_test.toml".to_string())).unwrap();
         assert_eq!(config.fuse.file_mask, 0o644);
         assert_eq!(config.fuse.dir_mask, 0o755);
         assert_eq!(config.filesystem.block_size, 8192);

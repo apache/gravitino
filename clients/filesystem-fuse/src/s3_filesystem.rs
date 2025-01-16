@@ -255,7 +255,7 @@ pub(crate) mod tests {
             config_file_name = source_file_name;
         }
 
-        AppConfig::from_file(Some(config_file_name)).unwrap()
+        AppConfig::from_file(Some(config_file_name.to_string())).unwrap()
     }
 
     #[tokio::test]

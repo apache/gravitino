@@ -16,49 +16,170 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-use fuse3::Errno;
+mod command_args;
+
+use crate::command_args::Commands;
+use clap::Parser;
+use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
 use log::{error, info};
+use std::fs::OpenOptions;
+use std::path::Path;
+use std::process::{exit, Command};
+use std::{env, io};
+use tokio::runtime::Runtime;
 use tokio::signal;
+use tokio::signal::unix::{signal, SignalKind};
 
-#[tokio::main]
-async fn main() -> fuse3::Result<()> {
-    tracing_subscriber::fmt().init();
+fn make_daemon() {
+    let log_file_name = "/tmp/gvfs-fuse.log";
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_file_name)
+        .unwrap();
+    let log_err_file = OpenOptions::new().write(true).open(log_file_name).unwrap();
 
-    // todo need inmprove the args parsing
-    let args: Vec<String> = std::env::args().collect();
-    let (mount_point, mount_from, config_path) = match args.len() {
-        4 => (args[1].clone(), args[2].clone(), args[3].clone()),
-        _ => {
-            error!("Usage: {} <mount_point> <mount_from> <config>", args[0]);
-            return Err(Errno::from(libc::EINVAL));
+    let cwd = env::current_dir();
+    if let Err(e) = cwd {
+        error!("Error getting current directory: {}", e);
+        return;
+    }
+    let cwd = cwd.unwrap();
+
+    let daemonize = Daemonize::new()
+        .pid_file("/tmp/gvfs-fuse.pid")
+        .chown_pid_file(true)
+        .working_directory(&cwd)
+        .stdout(log_file)
+        .stderr(log_err_file);
+
+    match daemonize.start() {
+        Ok(_) => info!("Gvfs-fuse Daemon started successfully"),
+        Err(e) => {
+            error!("Gvfs-fuse Daemon failed to start: {:?}", e);
+            exit(-1)
         }
+    }
+}
+
+fn mount_fuse(config: AppConfig, mount_point: String, target: String) -> io::Result<()> {
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async {
+        let handle = tokio::spawn(async move {
+            let result = gvfs_mount(&mount_point, &target, &config).await;
+            if let Err(e) = result {
+                error!("Failed to mount gvfs: {:?}", e);
+                return Err(io::Error::from(io::ErrorKind::InvalidInput));
+            }
+            Ok(())
+        });
+
+        let mut term_signal = signal(SignalKind::terminate())?;
+        tokio::select! {
+            _ = handle => {}
+            _ = signal::ctrl_c() => {
+                    info!("Received Ctrl+C, unmounting gvfs...")
+                }
+            _ = term_signal.recv()=> {
+                    info!("Received SIGTERM, unmounting gvfs...")
+                }
+        }
+
+        let _ = gvfs_unmount().await;
+        Ok(())
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn do_umount(mp: &str, force: bool) -> std::io::Result<()> {
+    let cmd_result = if force {
+        Command::new("umount").arg("-f").arg(mp).output()
+    } else {
+        Command::new("umount").arg(mp).output()
     };
 
-    //todo(read config file from args)
-    let config = AppConfig::from_file(Some(&config_path));
-    if let Err(e) = &config {
-        error!("Failed to load config: {:?}", e);
-        return Err(Errno::from(libc::EINVAL));
-    }
-    let config = config.unwrap();
-    let handle = tokio::spawn(async move {
-        let result = gvfs_mount(&mount_point, &mount_from, &config).await;
-        if let Err(e) = result {
-            error!("Failed to mount gvfs: {:?}", e);
-            return Err(Errno::from(libc::EINVAL));
-        }
-        Ok(())
-    });
+    handle_command_result(cmd_result)
+}
 
-    tokio::select! {
-        _ = handle => {}
-        _ = signal::ctrl_c() => {
-            info!("Received Ctrl+C, unmounting gvfs...");
+#[cfg(target_os = "linux")]
+fn do_umount(mp: &str, force: bool) -> std::io::Result<()> {
+    let cmd_result =
+        if Path::new("/bin/fusermount").exists() || Path::new("/usr/bin/fusermount").exists() {
+            if force {
+                Command::new("fusermount").arg("-uz").arg(mp).output()
+            } else {
+                Command::new("fusermount").arg("-u").arg(mp).output()
+            }
+        } else if force {
+            Command::new("umount").arg("-l").arg(mp).output()
+        } else {
+            Command::new("umount").arg(mp).output()
+        };
+
+    handle_command_result(cmd_result)
+}
+
+fn handle_command_result(cmd_result: io::Result<std::process::Output>) -> io::Result<()> {
+    match cmd_result {
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Err(io::Error::new(io::ErrorKind::Other, stderr.to_string()))
+            } else {
+                Ok(())
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        format!("OS {} is not supported", env::consts::OS),
+    ))
+}
+
+fn main() -> Result<(), i32> {
+    tracing_subscriber::fmt().init();
+    let args = command_args::Arguments::parse();
+    match args.command {
+        Commands::Mount {
+            mount_point,
+            location,
+            config,
+            debug: _,
+            foreground,
+        } => {
+            let app_config = AppConfig::from_file(config);
+            if let Err(e) = &app_config {
+                error!("Failed to load config: {:?}", e);
+                return Err(-1);
+            };
+            let app_config = app_config.unwrap();
+            let result = if foreground {
+                mount_fuse(app_config, mount_point, location)
+            } else {
+                make_daemon();
+                mount_fuse(app_config, mount_point, location)
+            };
+
+            if let Err(e) = result {
+                error!("Failed to mount gvfs: {:?}", e.to_string());
+                return Err(-1);
+            };
+            Ok(())
+        }
+        Commands::Umount { mount_point, force } => {
+            let result = do_umount(&mount_point, force);
+            if let Err(e) = result {
+                error!("Failed to unmount gvfs: {:?}", e.to_string());
+                return Err(-1);
+            };
+            Ok(())
         }
     }
-
-    let _ = gvfs_unmount().await;
-    Ok(())
 }
