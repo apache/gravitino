@@ -1051,8 +1051,8 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         Arrays.asList(columns),
         properties,
         distribution,
-        sortOrders,
-        partitioning,
+        new SortOrder[0],
+        new Transform[0],
         loadTable);
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
