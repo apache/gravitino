@@ -21,12 +21,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-source ./env.sh
+TEST_CONFIG_FILE=$CLIENT_FUSE_DIR/target/conf/gvfs_fuse_s3.toml
 
+source ./env.sh
 source ./localstatck.sh
 
 start_servers() {
   start_localstack
+  generate_test_config
 }
 
 stop_servers() {
