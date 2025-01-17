@@ -798,6 +798,12 @@ gcli role grant --name catalog_postgres --role admin --privilege create_table mo
 gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
+### Revoke all privileges
+
+```bash
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --all
+```
+
 ### Topic commands
 
 #### Display a topic's details

@@ -137,11 +137,19 @@ public class RoleCommandHandler extends CommandHandler {
   }
 
   private void handleRevokeCommand() {
-    gravitinoCommandLine
-        .newRevokePrivilegesFromRole(
-            url, ignore, metalake, getOneRole(), new FullName(line), privileges)
-        .validate()
-        .handle();
+    boolean removeAll = line.hasOption(GravitinoOptions.ALL);
+    if (removeAll) {
+      gravitinoCommandLine
+          .newRevokeAllPrivileges(url, ignore, metalake, getOneRole(), new FullName(line))
+          .validate()
+          .handle();
+    } else {
+      gravitinoCommandLine
+          .newRevokePrivilegesFromRole(
+              url, ignore, metalake, getOneRole(), new FullName(line), privileges)
+          .validate()
+          .handle();
+    }
   }
 
   private String getOneRole() {
