@@ -23,12 +23,12 @@ import java.util.Collections;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
-import org.apache.paimon.flink.FlinkCatalog;
-import org.apache.paimon.flink.FlinkCatalogFactory;
+import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
 /**
  * Factory for creating instances of {@link GravitinoPaimonCatalog}. It will be created by SPI
@@ -38,9 +38,12 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public Catalog createCatalog(Context context) {
-    FlinkCatalog catalog = new FlinkCatalogFactory().createCatalog(context);
+    final FactoryUtil.CatalogFactoryHelper helper =
+        FactoryUtils.createCatalogFactoryHelper(this, context);
+    String defaultDatabase =
+        helper.getOptions().get(GravitinoPaimonCatalogFactoryOptions.DEFAULT_DATABASE);
     return new GravitinoPaimonCatalog(
-        context.getName(), catalog, propertiesConverter(), partitionConverter());
+        context, defaultDatabase, propertiesConverter(), partitionConverter());
   }
 
   @Override
