@@ -66,7 +66,7 @@ SET 'execution.runtime-mode' = 'batch';
 SET 'sql-client.execution.result-mode' = 'tableau';
 -- [INFO] Execute statement succeed.
 
-CREATE TABLE paimon_tabla_a (
+CREATE TABLE paimon_table_a (
     aa BIGINT,
     bb BIGINT
 );
