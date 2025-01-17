@@ -110,8 +110,13 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
   @Override
   public Boolean onRoleCreated(Role role) throws AuthorizationPluginException {
     List<String> sqls = getCreateRoleSQL(role.name());
+    boolean createdNewly = false;
     for (String sql : sqls) {
-      executeUpdateSQL(sql, "already exists");
+      createdNewly = executeUpdateSQL(sql, "already exists");
+    }
+
+    if (!createdNewly) {
+      return true;
     }
 
     if (role.securableObjects() != null) {
@@ -140,7 +145,6 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
   @Override
   public Boolean onRoleUpdated(Role role, RoleChange... changes)
       throws AuthorizationPluginException {
-    onRoleCreated(role);
     for (RoleChange change : changes) {
       if (change instanceof RoleChange.AddSecurableObject) {
         SecurableObject object = ((RoleChange.AddSecurableObject) change).getSecurableObject();
@@ -381,14 +385,15 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
         "JDBC authorization plugin fail to execute SQL, error code: %d", se.getErrorCode());
   }
 
-  public void executeUpdateSQL(String sql, String ignoreErrorMsg) {
+  public boolean executeUpdateSQL(String sql, String ignoreErrorMsg) {
     try (final Connection connection = getConnection()) {
       try (final Statement statement = connection.createStatement()) {
         statement.executeUpdate(sql);
+        return true;
       }
     } catch (SQLException se) {
       if (ignoreErrorMsg != null && se.getMessage().contains(ignoreErrorMsg)) {
-        return;
+        return false;
       }
       LOG.error("JDBC authorization plugin exception: ", se);
       throw toAuthorizationPluginException(se);
