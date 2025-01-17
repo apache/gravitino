@@ -22,7 +22,6 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
   :::
 
 #### Not supported operations:
-- `CREATE DATABASE`
 - `UPDATE`
 - `DELETE`
 - `TRUNCATE`
@@ -32,7 +31,8 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 ```sql
 -- Suppose mysql_a is the mysql catalog name managed by Gravitino
 USE mysql_a;
--- Suppose mydatabase is in your mysql
+
+CREATE DATABASE IF NOT EXISTS mydatabase;
 USE mydatabase;
 
 CREATE TABLE IF NOT EXISTS employee (

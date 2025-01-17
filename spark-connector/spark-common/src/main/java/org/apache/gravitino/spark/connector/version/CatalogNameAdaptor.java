@@ -46,13 +46,22 @@ public class CatalogNameAdaptor {
           "lakehouse-paimon-3.5",
           "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35");
 
+  private static final Map<String, String> jdbcCatalogNames =
+      ImmutableMap.of(
+          "3.3",
+          "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark33",
+          "3.4",
+          "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark34",
+          "3.5",
+          "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35");
+
   private static String sparkVersion() {
     return package$.MODULE$.SPARK_VERSION();
   }
 
   private static String getCatalogName(String provider, int majorVersion, int minorVersion) {
     if (provider.startsWith("jdbc")) {
-      return "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalog";
+      return jdbcCatalogNames.get(String.format("%d.%d", majorVersion, minorVersion));
     }
     String key =
         String.format("%s-%d.%d", provider.toLowerCase(Locale.ROOT), majorVersion, minorVersion);

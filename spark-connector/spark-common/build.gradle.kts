@@ -39,6 +39,9 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:catalog-jdbc-common")) {
+    exclude("org.apache.logging.log4j")
+  }
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
@@ -76,6 +79,9 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(project(":server-common")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":catalogs:catalog-jdbc-mysql")) {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(project(":integration-test-common", "testArtifacts"))
