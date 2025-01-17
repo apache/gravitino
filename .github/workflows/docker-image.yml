@@ -126,7 +126,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           
-          if [[ -n "${tag_name}" ]];then
+          if [[ -n "${tag_name}" ]]; then
             full_tag_name="${tag_name}-${{ github.event.inputs.version }}"
           else
             full_tag_name="${{ github.event.inputs.version }}"
@@ -136,6 +136,6 @@ jobs:
             echo "Publish tag ${full_tag_name}, and update latest too."
             ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${full_tag_name} --latest
           else
-            echo "Publish tag ${full_tag_name}, doesn't update latest."
+            echo "Publish tag ${full_tag_name}."
             ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${full_tag_name}
           fi
