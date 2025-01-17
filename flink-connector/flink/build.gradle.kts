@@ -41,8 +41,12 @@ val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
 dependencies {
-  implementation(project(":core"))
-  implementation(project(":catalogs:catalog-common"))
+  implementation(project(":core")) {
+    exclude("org.apache.logging.log4j")
+  }
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("org.apache.logging.log4j")
+  }
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
