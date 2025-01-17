@@ -126,10 +126,16 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           
-          if [[ "${publish_latest}" == "true" ]]; then
-            echo "Publish latest tag"
-            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.version }} --latest
+          if [[ -n "${tag_name}" ]];then
+            full_tag_name="${tag_name}-${{ github.event.inputs.version }}"
           else
-            echo "Doesn't publish latest tag"
-            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag "${tag_name}-${{ github.event.inputs.version }}"
+            full_tag_name="${{ github.event.inputs.version }}"
+          fi
+          
+          if [[ "${publish_latest}" == "true" ]]; then
+            echo "Publish tag ${full_tag_name}, and update latest too."
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${full_tag_name} --latest
+          else
+            echo "Publish tag ${full_tag_name}, doesn't update latest."
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${full_tag_name}
           fi
