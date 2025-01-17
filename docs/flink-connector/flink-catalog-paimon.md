@@ -6,6 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the Paimon catalog managed by the Gravitino server.
+
 ## Capabilities
 
 ### Supported Paimon Table Types
@@ -32,7 +33,7 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 * Paimon 0.8
 
-Higher version like 0.9 or above may also supported but have not been tested fully.
+Higher version like 0.9 or above may also support but have not been tested fully.
 
 ## Getting Started
 
@@ -40,19 +41,18 @@ Higher version like 0.9 or above may also supported but have not been tested ful
 
 Place the following JAR files in the lib directory of your Flink installation:
 
-* paimon-flink-1.18-0.8.2.jar
-
-* gravitino-flink-connector-runtime-\${flinkMajorVersion}_$scalaVersion.jar
+- `paimon-flink-1.18-{paimon-version}.jar`
+- `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`
 
 ### SQL Example
 
 ```sql
 
 -- Suppose paimon_catalog is the Paimon catalog name managed by Gravitino
-use catalog paimon_catalog;
+USE CATALOG paimon_catalog;
 -- Execute statement succeed.
 
-show databases;
+SHOW DATABASES;
 -- +---------------------+
 -- |       database name |
 -- +---------------------+
@@ -71,7 +71,7 @@ CREATE TABLE paimon_tabla_a (
     bb BIGINT
 );
 
-show tables;
+SHOW TABLES;
 -- +----------------+
 -- |     table name |
 -- +----------------+
@@ -79,15 +79,15 @@ show tables;
 -- +----------------+
 
 
-select * from paimon_table_a;
+SELECT * FROM paimon_table_a;
 -- Empty set
 
-insert into paimon_table_a(aa,bb) values(1,2);
+INSERT INTO paimon_table_a(aa,bb) VALUES(1,2);
 -- [INFO] Submitting SQL update statement to the cluster...
 -- [INFO] SQL update statement has been successfully submitted to the cluster:
 -- Job ID: 74c0c678124f7b452daf08c399d0fee2
 
-select * from paimon_table_a;
+SELECT * FROM paimon_table_a;
 -- +----+----+
 -- | aa | bb |
 -- +----+----+
@@ -100,9 +100,9 @@ select * from paimon_table_a;
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink Paimon connector configuration.
 
-| Gravitino catalog property name | Flink Paimon connector configuration   | Description                                                                                                                                                                                                 | Since Version    |
-|---------------------------------|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `metastore`                            | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`.                                                                                                                      | 0.8.0-incubating |
-| `warehouse`                     | `warehouse`                            | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | 0.8.0-incubating |
+| Gravitino catalog property name | Flink Paimon connector configuration | Description                                                                                                                                                                                                | Since Version    |
+|---------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| `catalog-backend`               | `metastore`                          | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`.                                                                                                                                        | 0.8.0-incubating |
+| `warehouse`                     | `warehouse`                          | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS | 0.8.0-incubating |
 
 Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink Paimon connector. For example, using `flink.bypass.clients` to pass the `clients` to the Flink Paimon connector.
