@@ -33,7 +33,7 @@ on:
         required: true
         type: string
       publish-latest-tag:
-        description: 'Whether to publish the image to the Docker latest tag. This operation is only applicable to official releases and should not be used for Release Candidate (RC).'
+        description: 'Whether to update the latest tag. This operation is only applicable to official releases and should not be used for Release Candidate (RC).'
         required: false
         type: boolean
         default: false
