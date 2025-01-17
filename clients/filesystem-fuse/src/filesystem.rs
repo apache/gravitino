@@ -461,7 +461,11 @@ pub(crate) mod tests {
 
             // Test create file
             let file_handle = self
-                .test_create_file(parent_file_id, "file1.txt".as_ref(), (O_CREAT | O_WRONLY) as u32)
+                .test_create_file(
+                    parent_file_id,
+                    "file1.txt".as_ref(),
+                    (O_CREAT | O_WRONLY) as u32,
+                )
                 .await;
 
             // Test write file
@@ -545,11 +549,13 @@ pub(crate) mod tests {
             self.files.insert(file_stat.file_id, file_stat);
         }
 
-        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr, flags: u32) -> FileHandle {
-            let file = self
-                .fs
-                .create_file(root_file_id, name, flags)
-                .await;
+        async fn test_create_file(
+            &mut self,
+            root_file_id: u64,
+            name: &OsStr,
+            flags: u32,
+        ) -> FileHandle {
+            let file = self.fs.create_file(root_file_id, name, flags).await;
             assert!(file.is_ok());
             let file = file.unwrap();
             assert!(file.handle_id > 0);
