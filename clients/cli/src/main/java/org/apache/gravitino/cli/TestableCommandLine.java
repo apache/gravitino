@@ -141,6 +141,7 @@ import org.apache.gravitino.cli.commands.UpdateTagName;
 import org.apache.gravitino.cli.commands.UpdateTopicComment;
 import org.apache.gravitino.cli.commands.UserAudit;
 import org.apache.gravitino.cli.commands.UserDetails;
+import org.apache.gravitino.cli.outputs.OutputProperty;
 
 /*
  * Methods used for testing
@@ -162,12 +163,12 @@ public class TestableCommandLine {
   }
 
   protected MetalakeDetails newMetalakeDetails(
-      String url, boolean ignore, String outputFormat, String metalake) {
-    return new MetalakeDetails(url, ignore, outputFormat, metalake);
+      String url, boolean ignore, OutputProperty property, String metalake) {
+    return new MetalakeDetails(url, ignore, property, metalake);
   }
 
-  protected ListMetalakes newListMetalakes(String url, boolean ignore, String outputFormat) {
-    return new ListMetalakes(url, ignore, outputFormat);
+  protected ListMetalakes newListMetalakes(String url, boolean ignore, OutputProperty property) {
+    return new ListMetalakes(url, ignore, property);
   }
 
   protected CreateMetalake newCreateMetalake(
@@ -211,13 +212,13 @@ public class TestableCommandLine {
   }
 
   protected CatalogDetails newCatalogDetails(
-      String url, boolean ignore, String outputFormat, String metalake, String catalog) {
-    return new CatalogDetails(url, ignore, outputFormat, metalake, catalog);
+      String url, boolean ignore, OutputProperty property, String metalake, String catalog) {
+    return new CatalogDetails(url, ignore, property, metalake, catalog);
   }
 
   protected ListCatalogs newListCatalogs(
-      String url, boolean ignore, String outputFormat, String metalake) {
-    return new ListCatalogs(url, ignore, outputFormat, metalake);
+      String url, boolean ignore, OutputProperty property, String metalake) {
+    return new ListCatalogs(url, ignore, property, metalake);
   }
 
   protected CreateCatalog newCreateCatalog(

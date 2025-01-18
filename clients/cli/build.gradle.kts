@@ -28,6 +28,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
+  implementation(libs.commons.lang3)
   implementation(project(":api"))
   implementation(project(":clients:client-java"))
   implementation(project(":common"))

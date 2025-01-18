@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
+import org.apache.gravitino.cli.outputs.OutputProperty;
 
 /**
  * Handles the command execution for Metalakes based on command type and the command line options.
@@ -113,7 +114,10 @@ public class MetalakeCommandHandler extends CommandHandler {
   /** Handles the "LIST" command. */
   private void handleListCommand() {
     String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
-    gravitinoCommandLine.newListMetalakes(url, ignore, outputFormat).validate().handle();
+    // TODO: move this to GravitinoCommandLine class
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setOutputFormat(outputFormat);
+    gravitinoCommandLine.newListMetalakes(url, ignore, property).validate().handle();
   }
 
   /** Handles the "DETAILS" command. */
@@ -121,11 +125,11 @@ public class MetalakeCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine.newMetalakeAudit(url, ignore, metalake).validate().handle();
     } else {
+      // TODO: move this to GravitinoCommandLine class
       String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
-      gravitinoCommandLine
-          .newMetalakeDetails(url, ignore, outputFormat, metalake)
-          .validate()
-          .handle();
+      OutputProperty property = OutputProperty.defaultOutputProperty();
+      property.setOutputFormat(outputFormat);
+      gravitinoCommandLine.newMetalakeDetails(url, ignore, property, metalake).validate().handle();
     }
   }
 

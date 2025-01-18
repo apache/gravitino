@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.cli.integration.test;
 
+import static org.apache.gravitino.cli.outputs.OutputProperty.OUTPUT_FORMAT_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
@@ -25,7 +26,6 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.cli.Main;
-import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -94,7 +94,7 @@ public class TableFormatOutputIT extends BaseIT {
       "metalake",
       "list",
       commandArg(GravitinoOptions.OUTPUT),
-      Command.OUTPUT_FORMAT_TABLE,
+      OUTPUT_FORMAT_TABLE,
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -105,16 +105,17 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+-------------+\n"
-            + "| metalake    |\n"
-            + "+-------------+\n"
-            + "| my_metalake |\n"
-            + "+-------------+",
+        "+---+-------------+\n"
+            + "|   |  METALAKE   |\n"
+            + "+---+-------------+\n"
+            + "| 1 | my_metalake |\n"
+            + "+---+-------------+",
         output);
   }
 
   @Test
   public void testMetalakeDetailsCommand() {
+    Main.useExit = false;
     // Create a byte array output stream to capture the output of the command
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintStream originalOut = System.out;
@@ -126,7 +127,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.METALAKE),
       "my_metalake",
       commandArg(GravitinoOptions.OUTPUT),
-      Command.OUTPUT_FORMAT_TABLE,
+      OUTPUT_FORMAT_TABLE,
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -137,11 +138,11 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+-------------+-------------+\n"
-            + "| metalake    | comment     |\n"
-            + "+-------------+-------------+\n"
-            + "| my_metalake | my metalake |\n"
-            + "+-------------+-------------+",
+        "+---+-------------+-------------+\n"
+            + "|   |  METALAKE   |   COMMENT   |\n"
+            + "+---+-------------+-------------+\n"
+            + "| 1 | my_metalake | my metalake |\n"
+            + "+---+-------------+-------------+",
         output);
   }
 
@@ -158,7 +159,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.METALAKE),
       "my_metalake",
       commandArg(GravitinoOptions.OUTPUT),
-      Command.OUTPUT_FORMAT_TABLE,
+      OUTPUT_FORMAT_TABLE,
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -169,12 +170,12 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+-----------+\n"
-            + "| catalog   |\n"
-            + "+-----------+\n"
-            + "| postgres  |\n"
-            + "| postgres2 |\n"
-            + "+-----------+",
+        "+---+-----------+\n"
+            + "|   | METALAKE  |\n"
+            + "+---+-----------+\n"
+            + "| 1 | postgres  |\n"
+            + "| 2 | postgres2 |\n"
+            + "+---+-----------+",
         output);
   }
 
@@ -204,11 +205,11 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+----------+------------+-----------------+---------+\n"
-            + "| catalog  | type       | provider        | comment |\n"
-            + "+----------+------------+-----------------+---------+\n"
-            + "| postgres | RELATIONAL | jdbc-postgresql | null    |\n"
-            + "+----------+------------+-----------------+---------+",
+        "+---+----------+------------+-----------------+---------+\n"
+            + "|   | CATALOG  |    TYPE    |    PROVIDER     | COMMENT |\n"
+            + "+---+----------+------------+-----------------+---------+\n"
+            + "| 1 | postgres | RELATIONAL | jdbc-postgresql | null    |\n"
+            + "+---+----------+------------+-----------------+---------+",
         output);
   }
 
@@ -236,11 +237,11 @@ public class TableFormatOutputIT extends BaseIT {
     // Get the output and verify it
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
-        "+-----------+------------+-----------------+-------------------+\n"
-            + "| catalog   | type       | provider        | comment           |\n"
-            + "+-----------+------------+-----------------+-------------------+\n"
-            + "| postgres2 | RELATIONAL | jdbc-postgresql | catalog, 用于测试 |\n"
-            + "+-----------+------------+-----------------+-------------------+",
+        "+---+-----------+------------+-----------------+-------------------+\n"
+            + "|   |  CATALOG  |    TYPE    |    PROVIDER     |      COMMENT      |\n"
+            + "+---+-----------+------------+-----------------+-------------------+\n"
+            + "| 1 | postgres2 | RELATIONAL | jdbc-postgresql | catalog, 用于测试 |\n"
+            + "+---+-----------+------------+-----------------+-------------------+",
         output);
   }
 

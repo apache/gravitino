@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
+import org.apache.gravitino.cli.outputs.OutputProperty;
 
 /**
  * Handles the command execution for Catalogs based on command type and the command line options.
@@ -128,8 +129,11 @@ public class CatalogCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine.newCatalogAudit(url, ignore, metalake, catalog).validate().handle();
     } else {
+      // TODO: move this to GravitinoCommandLine class
+      OutputProperty property = OutputProperty.defaultOutputProperty();
+      property.setOutputFormat(outputFormat);
       gravitinoCommandLine
-          .newCatalogDetails(url, ignore, outputFormat, metalake, catalog)
+          .newCatalogDetails(url, ignore, property, metalake, catalog)
           .validate()
           .handle();
     }
@@ -219,6 +223,9 @@ public class CatalogCommandHandler extends CommandHandler {
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListCatalogs(url, ignore, outputFormat, metalake).validate().handle();
+    // TODO: move this to GravitinoCommandLine class
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setOutputFormat(outputFormat);
+    gravitinoCommandLine.newListCatalogs(url, ignore, property, metalake).validate().handle();
   }
 }

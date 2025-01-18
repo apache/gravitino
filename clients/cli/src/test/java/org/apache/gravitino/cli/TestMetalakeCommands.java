@@ -22,6 +22,8 @@ package org.apache.gravitino.cli;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -89,7 +91,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListMetalakes(GravitinoCommandLine.DEFAULT_URL, false, null);
+        .newListMetalakes(eq(GravitinoCommandLine.DEFAULT_URL), eq(false), any());
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -107,7 +109,8 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.DETAILS));
     doReturn(mockDetails)
         .when(commandLine)
-        .newMetalakeDetails(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
+        .newMetalakeDetails(
+            eq(GravitinoCommandLine.DEFAULT_URL), eq(false), any(), eq("metalake_demo"));
     doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();

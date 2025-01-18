@@ -19,15 +19,20 @@
 
 package org.apache.gravitino.cli.commands;
 
+import static org.apache.gravitino.cli.outputs.OutputProperty.OUTPUT_FORMAT_PLAIN;
+import static org.apache.gravitino.cli.outputs.OutputProperty.OUTPUT_FORMAT_TABLE;
 import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
 import com.google.common.base.Joiner;
 import java.io.File;
+import java.io.OutputStream;
+
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
 import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.cli.OAuthData;
+import org.apache.gravitino.cli.outputs.OutputProperty;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -39,8 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /* The base for all commands. */
 public abstract class Command {
-  public static final String OUTPUT_FORMAT_TABLE = "table";
-  public static final String OUTPUT_FORMAT_PLAIN = "plain";
+
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
   protected static String authentication = null;
@@ -51,7 +55,7 @@ public abstract class Command {
   private static final String KERBEROS_AUTH = "kerberos";
   private final String url;
   private final boolean ignoreVersions;
-  private final String outputFormat;
+  private final OutputProperty outputProperty;
 
   /**
    * Command constructor.
@@ -60,9 +64,7 @@ public abstract class Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    */
   public Command(String url, boolean ignoreVersions) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.outputFormat = OUTPUT_FORMAT_PLAIN;
+    this(url, ignoreVersions, OutputProperty.defaultOutputProperty());
   }
 
   /**
@@ -70,12 +72,13 @@ public abstract class Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param outputFormat output format used in some commands
+   * @param outputProperty The output property to use for the command.
    */
-  public Command(String url, boolean ignoreVersions, String outputFormat) {
+  public Command(String url, boolean ignoreVersions, OutputProperty outputProperty) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
-    this.outputFormat = outputFormat;
+    this.outputProperty =
+        outputProperty == null ? OutputProperty.defaultOutputProperty() : outputProperty;
   }
 
   /**
@@ -212,15 +215,28 @@ public abstract class Command {
    * @param <T> The type of entity.
    */
   protected <T> void output(T entity) {
-    if (outputFormat == null) {
-      PlainFormat.output(entity);
-      return;
+    if (OUTPUT_FORMAT_PLAIN.equals(outputProperty.getOutputFormat())) {
+      PlainFormat.output(entity, outputProperty);
+    } else if (OUTPUT_FORMAT_TABLE.equals(outputProperty.getOutputFormat())) {
+      TableFormat.output(entity, outputProperty);
+    } else {
+      throw new IllegalArgumentException("Unsupported output format");
     }
+  }
 
-    if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
-      TableFormat.output(entity);
-    } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
-      PlainFormat.output(entity);
+  protected void outputInfo(String message) {
+    output(message, System.out);
+  }
+
+  protected void outputError(String message) {
+    output(message, System.err);
+  }
+
+  protected void output(String message, OutputStream os) {
+    if (OUTPUT_FORMAT_PLAIN.equals(outputProperty.getOutputFormat())) {
+      PlainFormat.output(message, os);
+    } else if (OUTPUT_FORMAT_TABLE.equals(outputProperty.getOutputFormat())) {
+      TableFormat.output(message, os);
     } else {
       throw new IllegalArgumentException("Unsupported output format");
     }

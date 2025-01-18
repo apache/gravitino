@@ -24,13 +24,17 @@ import org.apache.commons.cli.Options;
 
 /* Gravitino Command line options */
 public class GravitinoOptions {
+  public static final String ALIAS = "alias";
+  public static final String ALL = "all";
   public static final String AUDIT = "audit";
   public static final String AUTO = "auto";
   public static final String COLUMNFILE = "columnfile";
   public static final String COMMENT = "comment";
   public static final String DATATYPE = "datatype";
   public static final String DEFAULT = "default";
+  public static final String DISABLE = "disable";
   public static final String DISTRIBUTION = "distribution";
+  public static final String ENABLE = "enable";
   public static final String FILESET = "fileset";
   public static final String FORCE = "force";
   public static final String GROUP = "group";
@@ -49,6 +53,7 @@ public class GravitinoOptions {
   public static final String PROPERTIES = "properties";
   public static final String PROPERTY = "property";
   public static final String PROVIDER = "provider";
+  public static final String QUIET = "quiet";
   public static final String RENAME = "rename";
   public static final String ROLE = "role";
   public static final String SERVER = "server";
@@ -59,10 +64,6 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String VALUE = "value";
   public static final String VERSION = "version";
-  public static final String ALL = "all";
-  public static final String ENABLE = "enable";
-  public static final String DISABLE = "disable";
-  public static final String ALIAS = "alias";
   public static final String URI = "uri";
 
   /**
@@ -91,6 +92,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
     options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
     options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
+    options.addOption(createSimpleOption("q", QUIET, "disable command output"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));

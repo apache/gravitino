@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.outputs.OutputProperty;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,14 +36,17 @@ public class CatalogDetails extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param outputFormat The output format.
+   * @param property The output format.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
   public CatalogDetails(
-      String url, boolean ignoreVersions, String outputFormat, String metalake, String catalog) {
-
-    super(url, ignoreVersions, outputFormat);
+      String url,
+      boolean ignoreVersions,
+      OutputProperty property,
+      String metalake,
+      String catalog) {
+    super(url, ignoreVersions, property);
     this.metalake = metalake;
     this.catalog = catalog;
   }

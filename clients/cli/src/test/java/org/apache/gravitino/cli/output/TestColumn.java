@@ -17,36 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.cli.commands;
+package org.apache.gravitino.cli.output;
 
-import org.apache.gravitino.Metalake;
+import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.OutputProperty;
-import org.apache.gravitino.client.GravitinoAdminClient;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-/** Lists all metalakes. */
-public class ListMetalakes extends Command {
+public class TestColumn {
 
-  /**
-   * List all metalakes.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param property The output format.
-   */
-  public ListMetalakes(String url, boolean ignoreVersions, OutputProperty property) {
-    super(url, ignoreVersions, property);
-  }
-
-  /** Lists all metalakes. */
-  @Override
-  public void handle() {
-    Metalake[] metalakes;
-    try {
-      GravitinoAdminClient client = buildAdminClient();
-      metalakes = client.listMetalakes();
-      output(metalakes);
-    } catch (Exception exp) {
-      exitWithError(exp.getMessage());
-    }
+  @Test
+  void testCreateColumn() {
+    Column column = new Column("METALAKE", "Footer", OutputProperty.defaultOutputProperty());
+    column.addCell("cell1").addCell("cell2").addCell("cell3");
+    Assertions.assertEquals(8, column.getMaxWidth());
   }
 }

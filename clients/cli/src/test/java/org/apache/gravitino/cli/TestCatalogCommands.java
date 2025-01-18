@@ -22,6 +22,8 @@ package org.apache.gravitino.cli;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,7 +41,6 @@ import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.CatalogDisable;
 import org.apache.gravitino.cli.commands.CatalogEnable;
-import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
@@ -48,6 +49,7 @@ import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
+import org.apache.gravitino.cli.outputs.OutputProperty;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,7 +93,8 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
+        .newListCatalogs(
+            eq(GravitinoCommandLine.DEFAULT_URL), eq(false), any(), eq("metalake_demo"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -112,7 +115,11 @@ class TestCatalogCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newCatalogDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo", "catalog");
+            eq(GravitinoCommandLine.DEFAULT_URL),
+            eq(false),
+            any(),
+            eq("metalake_demo"),
+            eq("catalog"));
     doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
@@ -431,7 +438,7 @@ class TestCatalogCommands {
         .newCatalogDetails(
             GravitinoCommandLine.DEFAULT_URL,
             false,
-            Command.OUTPUT_FORMAT_TABLE,
+            OutputProperty.defaultOutputProperty(),
             "metalake_demo",
             "catalog");
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
