@@ -25,7 +25,7 @@ import org.apache.gravitino.tag.Tag;
 
 /** Represents an event that is triggered upon the successful listing of tags. */
 @DeveloperApi
-public final class ListTagInfoEvent extends TagEvent {
+public final class ListTagsInfoEvent extends TagEvent {
   private final Tag[] tags;
 
   /**
@@ -35,7 +35,7 @@ public final class ListTagInfoEvent extends TagEvent {
    * @param metalake The namespace from which tags were listed.
    * @param tags An array of {@link Tag} objects representing the tags.
    */
-  public ListTagInfoEvent(String user, String metalake, Tag[] tags) {
+  public ListTagsInfoEvent(String user, String metalake, Tag[] tags) {
     super(user, NameIdentifier.of(metalake));
     this.tags = tags;
   }

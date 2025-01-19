@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful listing of tags. */
 @DeveloperApi
-public final class ListTagEvent extends TagEvent {
+public final class ListTagsEvent extends TagEvent {
   private final String metalake;
 
   /**
@@ -33,7 +33,7 @@ public final class ListTagEvent extends TagEvent {
    * @param user The username of the individual who initiated the tag listing.
    * @param metalake The namespace from which tags were listed.
    */
-  public ListTagEvent(String user, String metalake) {
+  public ListTagsEvent(String user, String metalake) {
     super(user, NameIdentifier.of(metalake));
     this.metalake = metalake;
   }
