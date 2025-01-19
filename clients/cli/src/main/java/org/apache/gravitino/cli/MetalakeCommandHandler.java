@@ -113,22 +113,18 @@ public class MetalakeCommandHandler extends CommandHandler {
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
     // TODO: move this to GravitinoCommandLine class
-    OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setOutputFormat(outputFormat);
+    OutputProperty property = OutputProperty.fromLine(line);
     gravitinoCommandLine.newListMetalakes(url, ignore, property).validate().handle();
   }
 
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
+    OutputProperty property = OutputProperty.fromLine(line);
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine.newMetalakeAudit(url, ignore, metalake).validate().handle();
     } else {
       // TODO: move this to GravitinoCommandLine class
-      String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
-      OutputProperty property = OutputProperty.defaultOutputProperty();
-      property.setOutputFormat(outputFormat);
       gravitinoCommandLine.newMetalakeDetails(url, ignore, property, metalake).validate().handle();
     }
   }

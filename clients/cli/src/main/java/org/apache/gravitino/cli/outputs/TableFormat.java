@@ -667,7 +667,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         output("No metalakes exist.", System.err);
         return null;
       } else {
-        Column columnA = new Column("METALAKE", null, property);
+        Column columnA = new Column("CATALOG", null, property);
         Arrays.stream(catalogs).forEach(metalake -> columnA.addCell(metalake.name()));
 
         return getTableFormat(columnA);

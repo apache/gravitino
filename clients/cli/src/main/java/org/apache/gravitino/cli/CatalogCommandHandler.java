@@ -39,7 +39,6 @@ public class CatalogCommandHandler extends CommandHandler {
   private final FullName name;
   private final String metalake;
   private String catalog;
-  private final String outputFormat;
 
   /**
    * Constructs a {@link CatalogCommandHandler} instance.
@@ -59,7 +58,6 @@ public class CatalogCommandHandler extends CommandHandler {
     this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
-    this.outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
   }
 
   /** Handles the command execution logic based on the provided command. */
@@ -130,8 +128,7 @@ public class CatalogCommandHandler extends CommandHandler {
       gravitinoCommandLine.newCatalogAudit(url, ignore, metalake, catalog).validate().handle();
     } else {
       // TODO: move this to GravitinoCommandLine class
-      OutputProperty property = OutputProperty.defaultOutputProperty();
-      property.setOutputFormat(outputFormat);
+      OutputProperty property = OutputProperty.fromLine(line);
       gravitinoCommandLine
           .newCatalogDetails(url, ignore, property, metalake, catalog)
           .validate()
@@ -224,8 +221,7 @@ public class CatalogCommandHandler extends CommandHandler {
   /** Handles the "LIST" command. */
   private void handleListCommand() {
     // TODO: move this to GravitinoCommandLine class
-    OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setOutputFormat(outputFormat);
+    OutputProperty property = OutputProperty.fromLine(line);
     gravitinoCommandLine.newListCatalogs(url, ignore, property, metalake).validate().handle();
   }
 }

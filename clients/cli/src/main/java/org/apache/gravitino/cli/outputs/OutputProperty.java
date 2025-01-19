@@ -110,10 +110,14 @@ public class OutputProperty {
    */
   public static OutputProperty fromLine(CommandLine line) {
     OutputProperty outputProperty = defaultOutputProperty();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
+    if (outputFormat != null) {
+      outputProperty.setOutputFormat(outputFormat);
+    }
+
     if (line.hasOption(GravitinoOptions.QUIET)) {
       outputProperty.setQuiet(true);
     }
-
     // TODO: implement other options.
     return outputProperty;
   }

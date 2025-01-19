@@ -515,7 +515,7 @@ public class TestTableFormat {
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+---------------+\n"
-            + "|   METALAKE    |\n"
+            + "|    CATALOG    |\n"
             + "+---------------+\n"
             + "| demo_catalog1 |\n"
             + "| demo_catalog2 |\n"
