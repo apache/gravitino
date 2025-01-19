@@ -61,7 +61,7 @@ import org.apache.gravitino.cli.utils.LineUtil;
 public abstract class TableFormat<T> extends BaseOutputFormat<T> {
 
   public static final int PADDING = 1;
-  private final Style style;
+  private final BorderStyle borderStyle;
   private final boolean rowNumbersEnabled;
   protected final OutputProperty property;
 
@@ -99,7 +99,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
   public TableFormat(OutputProperty property) {
     super(property.isQuiet(), property.getLimit(), property.isSort());
     this.property = property;
-    this.style = property.getStyle();
+    this.borderStyle = property.getStyle();
     this.rowNumbersEnabled = property.isRowNumbersEnabled();
   }
 
@@ -109,7 +109,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
    * @param columns the columns to print.
    * @return the table formatted output string.
    */
-  public String formatTable(Column... columns) {
+  public String getTableFormat(Column... columns) {
     checkColumns(columns);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -125,7 +125,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
             .filter(StringUtils::isNotBlank)
             .toArray(String[]::new);
 
-    List<Character> borders = style.getCharacters();
+    List<Character> borders = borderStyle.getCharacters();
     checkHeaders(headers, columns);
 
     if (headers.length != columns.length) {
@@ -149,10 +149,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       writeUpperBorder(osw, borders, System.lineSeparator(), columns);
       writeHeader(osw, borders, System.lineSeparator(), columns);
       writeHeaderBorder(osw, borders, System.lineSeparator(), columns);
-      writeData(osw, style, columns, System.lineSeparator());
+      writeData(osw, borderStyle, columns, System.lineSeparator());
 
       if (footers.length > 0) {
-        writeRowSeparator(osw, style, System.lineSeparator(), columns);
+        writeRowSeparator(osw, borderStyle, System.lineSeparator(), columns);
         writeFooter(osw, borders, columns);
       }
 
@@ -266,15 +266,15 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
    * Writes the separator line between data rows.
    *
    * @param writer the writer for output
-   * @param style the table style containing border characters
+   * @param borderStyle the table style containing border characters
    * @param lineSeparator the system-specific line separator
    * @param columns the array of columns defining the table structure
    * @throws IOException if an error occurs while writing to the output
    */
   private static void writeRowSeparator(
-      OutputStreamWriter writer, Style style, String lineSeparator, Column[] columns)
+      OutputStreamWriter writer, BorderStyle borderStyle, String lineSeparator, Column[] columns)
       throws IOException {
-    List<Character> borders = style.getCharacters();
+    List<Character> borders = borderStyle.getCharacters();
     writeHorizontalLine(
         writer,
         borders.get(DATA_ROW_BORDER_LEFT_IDX),
@@ -319,15 +319,15 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
    * </ul>
    *
    * @param writer the writer for output
-   * @param style the table style containing border characters and row boundary settings
+   * @param borderStyle the table style containing border characters and row boundary settings
    * @param columns the array of columns containing the data to write
    * @param lineSeparator the system-specific line separator
    * @throws IOException if an error occurs while writing to the output
    */
   private void writeData(
-      OutputStreamWriter writer, Style style, Column[] columns, String lineSeparator)
+      OutputStreamWriter writer, BorderStyle borderStyle, Column[] columns, String lineSeparator)
       throws IOException {
-    List<Character> borders = style.getCharacters();
+    List<Character> borders = borderStyle.getCharacters();
     int dataSize = columns[0].getCellCount();
     HorizontalAlign[] dataAligns =
         Arrays.stream(columns).map(Column::getDataAlign).toArray(HorizontalAlign[]::new);
@@ -344,8 +344,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
           dataAligns,
           lineSeparator);
 
-      if (i < dataSize - 1 && style.isRowBoundariesEnabled()) {
-        writeRowSeparator(writer, style, lineSeparator, columns);
+      if (i < dataSize - 1 && borderStyle.isRowBoundariesEnabled()) {
+        writeRowSeparator(writer, borderStyle, lineSeparator, columns);
       }
     }
   }
@@ -594,7 +594,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       columnA.addCell(metalake.name());
       columnB.addCell(metalake.comment());
 
-      return formatTable(columnA, columnB);
+      return getTableFormat(columnA, columnB);
     }
   }
 
@@ -618,7 +618,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         Column columnA = new Column("METALAKE", null, property);
         Arrays.stream(metalakes).forEach(metalake -> columnA.addCell(metalake.name()));
 
-        return formatTable(columnA);
+        return getTableFormat(columnA);
       }
     }
   }
@@ -646,7 +646,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       columnC.addCell(catalog.provider());
       columnD.addCell(catalog.comment());
 
-      return formatTable(columnA, columnB, columnC, columnD);
+      return getTableFormat(columnA, columnB, columnC, columnD);
     }
   }
 
@@ -670,7 +670,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         Column columnA = new Column("METALAKE", null, property);
         Arrays.stream(catalogs).forEach(metalake -> columnA.addCell(metalake.name()));
 
-        return formatTable(columnA);
+        return getTableFormat(columnA);
       }
     }
   }
@@ -693,7 +693,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       columnA.addCell(schema.name());
       columnB.addCell(schema.comment());
 
-      return formatTable(columnA, columnB);
+      return getTableFormat(columnA, columnB);
     }
   }
 
@@ -716,7 +716,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         Column column = new Column("SCHEMA", null, property);
         Arrays.stream(schemas).forEach(schema -> column.addCell(schema.name()));
 
-        return formatTable(column);
+        return getTableFormat(column);
       }
     }
   }

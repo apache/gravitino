@@ -43,8 +43,7 @@ import org.testcontainers.shaded.com.google.common.base.Joiner;
 
 public class TestPlainFormat {
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
-  com.google.common.base.Joiner NEWLINE_JOINER =
-      com.google.common.base.Joiner.on(System.lineSeparator()).skipNulls();
+  public static final Joiner NEWLINE_JOINER = Joiner.on(System.lineSeparator()).skipNulls();
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;

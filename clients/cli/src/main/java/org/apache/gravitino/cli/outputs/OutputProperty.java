@@ -37,7 +37,7 @@ public class OutputProperty {
           false,
           false,
           -1,
-          Style.BASIC2,
+          BorderStyle.BASIC2,
           HorizontalAlign.CENTER,
           HorizontalAlign.LEFT,
           HorizontalAlign.CENTER,
@@ -48,7 +48,7 @@ public class OutputProperty {
   private boolean sort;
   private boolean quiet;
   private int limit;
-  private Style style;
+  private BorderStyle borderStyle;
   private HorizontalAlign headerAlign;
   private HorizontalAlign dataAlign;
   private final HorizontalAlign footerAlign;
@@ -62,7 +62,7 @@ public class OutputProperty {
    * @param sort Whether to sort the output.
    * @param quiet Whether to suppress output.
    * @param limit Maximum number of rows (-1 for unlimited).
-   * @param style Border style for tables.
+   * @param borderStyle Border style for tables.
    * @param headerAlign Header text alignment.
    * @param dataAlign Data cell alignment.
    * @param footerAlign Footer text alignment.
@@ -74,7 +74,7 @@ public class OutputProperty {
       boolean sort,
       boolean quiet,
       int limit,
-      Style style,
+      BorderStyle borderStyle,
       HorizontalAlign headerAlign,
       HorizontalAlign dataAlign,
       HorizontalAlign footerAlign,
@@ -84,7 +84,7 @@ public class OutputProperty {
     this.sort = sort;
     this.quiet = quiet;
     this.limit = limit;
-    this.style = style;
+    this.borderStyle = borderStyle;
     this.headerAlign = headerAlign;
     this.dataAlign = dataAlign;
     this.footerAlign = footerAlign;
@@ -130,8 +130,8 @@ public class OutputProperty {
     return limit;
   }
 
-  public Style getStyle() {
-    return style;
+  public BorderStyle getStyle() {
+    return borderStyle;
   }
 
   public HorizontalAlign getHeaderAlign() {
@@ -174,8 +174,8 @@ public class OutputProperty {
     this.limit = limit;
   }
 
-  public void setStyle(Style style) {
-    this.style = style;
+  public void setStyle(BorderStyle borderStyle) {
+    this.borderStyle = borderStyle;
   }
 
   public void setRowNumbersEnabled(boolean rowNumbersEnabled) {
@@ -200,7 +200,7 @@ public class OutputProperty {
         sort,
         quiet,
         limit,
-        style,
+        borderStyle,
         headerAlign,
         dataAlign,
         footerAlign,

@@ -26,7 +26,6 @@ import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.OutputStream;
-
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;

@@ -29,7 +29,7 @@ import java.util.List;
  * Defines different styles for formatting and displaying data. Each style contains a specific set
  * of characters for rendering and configuration for whether to show boundaries between data rows.
  */
-public enum Style {
+public enum BorderStyle {
   FANCY(FANCY_ASCII, false),
   FANCY2(FANCY_ASCII, true),
   BASIC(BASIC_ASCII, true),
@@ -44,13 +44,13 @@ public enum Style {
   private final boolean showRowBoundaries;
 
   /**
-   * Constructs a {@link Style} instance.
+   * Constructs a {@link BorderStyle} instance.
    *
    * @param characters the list of characters to use for the style
    * @param showRowBoundaries {@code true} to show boundaries between data rows, {@code false}
    *     otherwise
    */
-  Style(ImmutableList<Character> characters, boolean showRowBoundaries) {
+  BorderStyle(ImmutableList<Character> characters, boolean showRowBoundaries) {
     this.characters = characters;
     this.showRowBoundaries = showRowBoundaries;
   }

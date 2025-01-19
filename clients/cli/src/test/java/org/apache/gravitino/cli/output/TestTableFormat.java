@@ -19,15 +19,43 @@
 
 package org.apache.gravitino.cli.output;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Metalake;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.outputs.BorderStyle;
 import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.HorizontalAlign;
 import org.apache.gravitino.cli.outputs.OutputProperty;
-import org.apache.gravitino.cli.outputs.Style;
 import org.apache.gravitino.cli.outputs.TableFormat;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestTableFormat {
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+
+  @BeforeEach
+  void setUp() {
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
+  }
+
   @Test
   void testTableOutputWithFooter() {
 
@@ -45,7 +73,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+---+----------+---------+\n"
             + "|   | METALAKE | COMMENT |\n"
@@ -75,7 +103,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+---+----------+---------+\n"
             + "|   | METALAKE | COMMENT |\n"
@@ -105,7 +133,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+----------+---------+\n"
             + "| METALAKE | COMMENT |\n"
@@ -120,7 +148,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithFancyStyle() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.FANCY);
+    property.setStyle(BorderStyle.FANCY);
 
     Column columnA = new Column("METALAKE", null, property);
     Column columnB = new Column("comment", null, property);
@@ -136,7 +164,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "╔═══╤══════════╤═════════╗\n"
             + "║   │ METALAKE │ COMMENT ║\n"
@@ -151,7 +179,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithFancy2Style() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.FANCY2);
+    property.setStyle(BorderStyle.FANCY2);
     property.setRowNumbersEnabled(false);
 
     Column columnA = new Column("METALAKE", null, property);
@@ -168,7 +196,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "╔══════════╤═════════╗\n"
             + "║ METALAKE │ COMMENT ║\n"
@@ -185,7 +213,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithBasic2Style() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.BASIC2);
+    property.setStyle(BorderStyle.BASIC2);
     property.setRowNumbersEnabled(false);
 
     Column columnA = new Column("METALAKE", null, property);
@@ -202,7 +230,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+----------+---------+\n"
             + "| METALAKE | COMMENT |\n"
@@ -217,7 +245,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithLimit() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.BASIC2);
+    property.setStyle(BorderStyle.BASIC2);
     property.setLimit(5);
 
     Column columnA = new Column("METALAKE", null, property);
@@ -234,7 +262,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+---+------------+-----------+\n"
             + "|   |  METALAKE  |  COMMENT  |\n"
@@ -252,7 +280,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithHeaderLeftAlignment() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.BASIC2);
+    property.setStyle(BorderStyle.BASIC2);
     property.setRowNumbersEnabled(false);
     property.setHeaderAlign(HorizontalAlign.LEFT);
 
@@ -270,7 +298,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+----------------+----------------+\n"
             + "| METALAKE       | COMMENT        |\n"
@@ -286,7 +314,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithHeaderRightAlignment() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.BASIC2);
+    property.setStyle(BorderStyle.BASIC2);
     property.setRowNumbersEnabled(false);
     property.setHeaderAlign(HorizontalAlign.RIGHT);
 
@@ -304,7 +332,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+----------------+----------------+\n"
             + "|       METALAKE |        COMMENT |\n"
@@ -320,7 +348,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithDataCenterAlignment() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.BASIC2);
+    property.setStyle(BorderStyle.BASIC2);
     property.setRowNumbersEnabled(false);
     property.setDataAlign(HorizontalAlign.CENTER);
 
@@ -338,7 +366,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+----------------+----------------+\n"
             + "|    METALAKE    |    COMMENT     |\n"
@@ -354,7 +382,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithDataRightAlignment() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.BASIC2);
+    property.setStyle(BorderStyle.BASIC2);
     property.setRowNumbersEnabled(false);
     property.setDataAlign(HorizontalAlign.RIGHT);
 
@@ -372,7 +400,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
     Assertions.assertEquals(
         "+----------------+----------------+\n"
             + "|    METALAKE    |    COMMENT     |\n"
@@ -388,7 +416,7 @@ public class TestTableFormat {
   @Test
   void testTableOutputWithEmptyColumn() {
     OutputProperty property = OutputProperty.defaultOutputProperty();
-    property.setStyle(Style.FANCY);
+    property.setStyle(BorderStyle.FANCY);
     property.setRowNumbersEnabled(false);
 
     Column columnA = new Column("METALAKE", null, property);
@@ -402,7 +430,7 @@ public class TestTableFormat {
           }
         };
 
-    String outputString = tableFormat.formatTable(columnA, columnB).trim();
+    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
 
     Assertions.assertEquals(
         "╔══════════╤═════════╗\n"
@@ -413,28 +441,128 @@ public class TestTableFormat {
   }
 
   @Test
-  void testMetalakeTableOutput() {}
+  void testMetalakeTableOutput() {
+    Metalake mockMetalake = mock(Metalake.class);
+    when(mockMetalake.name()).thenReturn("demo_metalake");
+    when(mockMetalake.comment()).thenReturn("metalake comment");
+
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setRowNumbersEnabled(false);
+    TableFormat.output(mockMetalake, property);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+---------------+------------------+\n"
+            + "|   METALAKE    |     COMMENT      |\n"
+            + "+---------------+------------------+\n"
+            + "| demo_metalake | metalake comment |\n"
+            + "+---------------+------------------+",
+        output);
+  }
 
   @Test
-  void testMetalakesTableOutput() {}
+  void testMetalakesTableOutput() {
+    Metalake mockMetalake1 = mock(Metalake.class);
+    Metalake mockMetalake2 = mock(Metalake.class);
+
+    when(mockMetalake1.name()).thenReturn("demo_metalake1");
+    when(mockMetalake2.name()).thenReturn("demo_metalake2");
+
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setRowNumbersEnabled(false);
+    TableFormat.output(new Metalake[] {mockMetalake1, mockMetalake2}, property);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+----------------+\n"
+            + "|    METALAKE    |\n"
+            + "+----------------+\n"
+            + "| demo_metalake1 |\n"
+            + "| demo_metalake2 |\n"
+            + "+----------------+",
+        output);
+  }
 
   @Test
-  void testCatalogTableOutput() {}
+  void testCatalogTableOutput() {
+    Catalog mockCatalog = mock(Catalog.class);
+    when(mockCatalog.name()).thenReturn("demo_catalog");
+    when(mockCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(mockCatalog.provider()).thenReturn("demo_provider");
+    when(mockCatalog.comment()).thenReturn("catalog comment");
+
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    TableFormat.output(mockCatalog, property);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+---+--------------+------------+---------------+-----------------+\n"
+            + "|   |   CATALOG    |    TYPE    |   PROVIDER    |     COMMENT     |\n"
+            + "+---+--------------+------------+---------------+-----------------+\n"
+            + "| 1 | demo_catalog | RELATIONAL | demo_provider | catalog comment |\n"
+            + "+---+--------------+------------+---------------+-----------------+",
+        output);
+  }
 
   @Test
-  void testCatalogsTableOutput() {}
+  void testCatalogsTableOutput() {
+    Catalog mockCatalog1 = mock(Catalog.class);
+    Catalog mockCatalog2 = mock(Catalog.class);
+
+    when(mockCatalog1.name()).thenReturn("demo_catalog1");
+    when(mockCatalog2.name()).thenReturn("demo_catalog2");
+
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setRowNumbersEnabled(false);
+    TableFormat.output(new Catalog[] {mockCatalog1, mockCatalog2}, property);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+---------------+\n"
+            + "|   METALAKE    |\n"
+            + "+---------------+\n"
+            + "| demo_catalog1 |\n"
+            + "| demo_catalog2 |\n"
+            + "+---------------+",
+        output);
+  }
 
   @Test
-  void testSchemaTableOutput() {}
+  void testSchemaTableOutput() {
+    Schema mmockSchema = mock(Schema.class);
+    when(mmockSchema.name()).thenReturn("demo_schema");
+    when(mmockSchema.comment()).thenReturn("schema comment");
+
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setRowNumbersEnabled(false);
+    TableFormat.output(mmockSchema, property);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-------------+----------------+\n"
+            + "|   SCHEMA    |    COMMENT     |\n"
+            + "+-------------+----------------+\n"
+            + "| demo_schema | schema comment |\n"
+            + "+-------------+----------------+",
+        output);
+  }
 
   @Test
-  void testSchemasTableOutput() {}
+  void testSchemasTableOutput() {
+    Schema mockSchema1 = mock(Schema.class);
+    Schema mockSchema2 = mock(Schema.class);
 
-  @Test
-  void testTableTableOutput() {}
+    when(mockSchema1.name()).thenReturn("demo_schema1");
+    when(mockSchema2.name()).thenReturn("demo_schema2");
 
-  @Test
-  void testTablesTableOutput() {}
+    OutputProperty property = OutputProperty.defaultOutputProperty();
+    property.setRowNumbersEnabled(false);
+    TableFormat.output(new Schema[] {mockSchema1, mockSchema2}, property);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+--------------+\n"
+            + "|    SCHEMA    |\n"
+            + "+--------------+\n"
+            + "| demo_schema1 |\n"
+            + "| demo_schema2 |\n"
+            + "+--------------+",
+        output);
+  }
 
   private void addRepeatedCells(Column column, int count) {
     for (int i = 0; i < count; i++) {
