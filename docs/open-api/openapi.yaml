@@ -22,7 +22,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.8.0-incubating-SNAPSHOT
+  version: 0.9.0-incubating-SNAPSHOT
   description: |
     Defines the specification for the first version of the Gravitino REST API.
 
@@ -67,6 +67,9 @@ paths:
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1roles"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/credentials:
+    $ref: "./credentials.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1credentials"
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags~1%7Btag%7D"
@@ -113,6 +116,20 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
     $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics~1%7Btopic%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D~1versions"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions/{version}:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D~1versions~1%7Bversion%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D~1aliases~1%7Balias%7D"
 
   /metalakes/{metalake}/users:
     $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users"
@@ -430,6 +447,14 @@ components:
       schema:
         type: string
 
+    model:
+      name: model
+      in: path
+      description: The name of the model
+      required: true
+      schema:
+        type: string
+
     tag:
       name: tag
       in: path
@@ -476,6 +501,7 @@ components:
           - "COLUMN"
           - "FILESET"
           - "TOPIC"
+          - "MODEL"
           - "ROLE"
     metadataObjectFullName:
       name: metadataObjectFullName

@@ -15,7 +15,9 @@ filesets to manage non-tabular data like training datasets and other raw data.
 
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
-tabular data in Gravitino in a unified way.
+tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
+HCFS like S3, OSS, GCS, etc, please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
+[hadoop-with-adls](./hadoop-catalog-with-adls.md).
 
 After a fileset is created, users can easily access, manage the files/directories through
 the fileset's identifier, without needing to know the physical path of the managed dataset. Also, with
@@ -53,24 +55,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 
-# create a S3 catalog
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "catalog",
-  "type": "FILESET",
-  "comment": "comment",
-  "provider": "hadoop",
-  "properties": {
-    "location": "s3a://bucket/root",
-    "s3-access-key-id": "access_key",
-    "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3"
-  }
-}' http://localhost:8090/api/metalakes/metalake/catalogs
-
-# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
-# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -93,25 +77,8 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a Hadoop fileset catalog",
     properties);
-
-// create a S3 catalog
-s3Properties = ImmutableMap.<String, String>builder()
-    .put("location", "s3a://bucket/root")
-    .put("s3-access-key-id", "access_key")
-    .put("s3-secret-access-key", "secret_key")
-    .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
-    .put("filesystem-providers", "s3")
-    .build();
-
-Catalog s3Catalog = gravitinoClient.createCatalog("catalog",
-    Type.FILESET,
-    "hadoop", // provider, Gravitino only supports "hadoop" for now.
-    "This is a S3 fileset catalog",
-    s3Properties);
 // ...
 
-// For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
-// The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -124,23 +91,6 @@ catalog = gravitino_client.create_catalog(name="catalog",
                                           provider="hadoop", 
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})
-
-# create a S3 catalog
-s3_properties = {
-    "location": "s3a://bucket/root",
-    "s3-access-key-id": "access_key"
-    "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
-}
-
-s3_catalog = gravitino_client.create_catalog(name="catalog",
-                                             type=Catalog.Type.FILESET,
-                                             provider="hadoop",
-                                             comment="This is a S3 fileset catalog",
-                                             properties=s3_properties)
-
-# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
-# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -371,11 +321,8 @@ The `storageLocation` is the physical location of the fileset. Users can specify
 when creating a fileset, or follow the rules of the catalog/schema location if not specified.
 
 The value of `storageLocation` depends on the configuration settings of the catalog:
-- If this is a S3 fileset catalog, the `storageLocation` should be in the format of `s3a://bucket-name/path/to/fileset`.
-- If this is an OSS fileset catalog, the `storageLocation` should be in the format of `oss://bucket-name/path/to/fileset`.
 - If this is a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
 - If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
-- If this is a GCS fileset catalog, the `storageLocation` should be in the format of `gs://bucket-name/path/to/fileset`.
 
 For a `MANAGED` fileset, the storage location is:
 

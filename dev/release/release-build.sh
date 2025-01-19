@@ -205,6 +205,8 @@ if [[ "$1" == "package" ]]; then
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.bin
   rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.rest
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.rest
+  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.trino
+  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.trino
   rm -f gravitino-$GRAVITINO_VERSION-src/web/LICENSE.bin
   rm -f gravitino-$GRAVITINO_VERSION-src/web/NOTICE.bin
 

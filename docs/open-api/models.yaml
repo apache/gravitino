@@ -1,0 +1,561 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - model
+      summary: List models
+      operationId: listModels
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - model
+      summary: Register model
+      operationId: registerModel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelRegisterRequest"
+            examples:
+              ModelRegisterRequest:
+                $ref: "#/components/examples/ModelRegisterRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelResponse"
+        "409":
+          description: Conflict - The target model already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                ModelAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/ModelAlreadyExistsException"
+        "404":
+          description: Not Found - The schema does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+
+    get:
+      tags:
+        - model
+      summary: Get model
+      operationId: getModel
+      description: Returns the specified model object
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelResponse"
+        "404":
+          description: Not Found - The target fileset does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - model
+      summary: delete model
+      operationId: deleteModel
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+
+    get:
+      tags:
+        - model
+      summary: List model versions
+      operationId: listModelVersions
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionListResponse"
+        "404":
+          description: Not Found - The target model does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - model
+      summary: link model version
+      operationId: linkModelVersion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionLinkRequest"
+            examples:
+              ModelVersionLinkRequest:
+                $ref: "#/components/examples/ModelVersionLinkRequest"
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "404":
+          description: Not Found - The target model does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+        "409":
+          description: Conflict - The model version aliases already exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                ModelVersionAliasesAlreadyExistException:
+                  $ref: "#/components/examples/ModelVersionAliasesAlreadyExistException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions/{version}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+      - $ref: "#/components/parameters/version"
+
+    get:
+      tags:
+        - model
+      summary: Get model version
+      operationId: getModelVersion
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "404":
+          description: Not Found - The target model version does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - model
+      summary: delete model version
+      operationId: deleteModelVersion
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+      - $ref: "#/components/parameters/alias"
+
+    get:
+      tags:
+        - model
+      summary: Get model version by alias
+      operationId: getModelVersionByAlias
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "404":
+          description: Not Found - The target model version does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - model
+      summary: delete model version by alias
+      operationId: deleteModelVersionByAlias
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  parameters:
+    version:
+      name: version
+      in: path
+      required: true
+      description: The version of the model
+      schema:
+        type: integer
+    alias:
+      name: alias
+      in: path
+      required: true
+      description: The alias of the model version
+      schema:
+        type: string
+
+  schemas:
+    Model:
+      type: object
+      required:
+        - name
+        - audit
+        - latestVersion
+      properties:
+        name:
+          type: string
+          description: The name of the model
+        latestVersion:
+          type: integer
+          description: The latest version of the model
+        comment:
+          type: string
+          description: The comment of the fileset
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the fileset
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    ModelVersion:
+      type: object
+      required:
+        - uri
+        - version
+        - audit
+      properties:
+        uri:
+          type: string
+          description: The uri of the model version
+        version:
+          type: integer
+          description: The version of the model
+        aliases:
+          type: array
+          description: The aliases of the model version
+          nullable: true
+          items:
+            type: string
+        comment:
+          type: string
+          description: The comment of the model version
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the model version
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    ModelRegisterRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the model. Can not be empty.
+        comment:
+          type: string
+          description: The comment of the model. Can be empty.
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the model. Can be empty.
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+
+    ModelVersionLinkRequest:
+      type: object
+      required:
+        - uri
+      properties:
+        uri:
+          type: string
+          description: The uri of the model version
+        aliases:
+          type: array
+          description: The aliases of the model version
+          nullable: true
+          items:
+            type: string
+        comment:
+          type: string
+          description: The comment of the model version
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the model version
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+
+  responses:
+    ModelResponse:
+      description: The response of model object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              model:
+                $ref: "#/components/schemas/Model"
+          examples:
+            ModelResponse:
+              $ref: "#/components/examples/ModelResponse"
+    ModelVersionListResponse:
+      description: The response of model version list
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              versions:
+                type: array
+                description: The list of model versions
+                items:
+                  format: int32
+          examples:
+            ModelVersionListResponse:
+              $ref: "#/components/examples/ModelVersionListResponse"
+    ModelVersionResponse:
+      description: The response of model version object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              modelVersion:
+                $ref: "#/components/schemas/ModelVersion"
+          examples:
+            ModelResponse:
+              $ref: "#/components/examples/ModelVersionResponse"
+
+  examples:
+    ModelRegisterRequest:
+      value: {
+        "name": "model1",
+        "comment": "This is a comment",
+        "properties": {
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+
+    ModelVersionLinkRequest:
+      value: {
+        "uri": "hdfs://path/to/model",
+        "aliases": ["alias1", "alias2"],
+        "comment": "This is a comment",
+        "properties": {
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+
+    ModelResponse:
+      value: {
+        "code": 0,
+        "model" : {
+          "name": "model1",
+          "latestVersion": 0,
+          "comment": "This is a comment",
+          "properties": {
+            "key1": "value1",
+            "key2": "value2"
+          },
+          "audit": {
+            "creator": "user1",
+            "createTime": "2021-01-01T00:00:00Z",
+            "lastModifier": "user1",
+            "lastModifiedTime": "2021-01-01T00:00:00Z"
+          }
+        }
+      }
+
+    ModelVersionListResponse:
+      value: {
+        "code": 0,
+        "versions": [0, 1, 2]
+      }
+
+    ModelVersionResponse:
+      value: {
+        "code": 0,
+        "modelVersion" : {
+          "uri": "hdfs://path/to/model",
+          "version": 0,
+          "aliases": ["alias1", "alias2"],
+          "comment": "This is a comment",
+          "properties": {
+            "key1": "value1",
+            "key2": "value2"
+          },
+          "audit": {
+            "creator": "user1",
+            "createTime": "2021-01-01T00:00:00Z",
+            "lastModifier": "user1",
+            "lastModifiedTime": "2021-01-01T00:00:00Z"
+          }
+        }
+      }
+
+    ModelAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "ModelAlreadyExistsException",
+        "message": "Model already exists",
+        "stack": [
+            "org.apache.gravitino.exceptions.ModelAlreadyExistsException: Model already exists"
+        ]
+      }
+
+    NoSuchModelException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchModelException",
+        "message": "Model does not exist",
+        "stack": [
+            "org.apache.gravitino.exceptions.NoSuchModelException: Model does not exist"
+        ]
+      }
+
+    ModelVersionAliasesAlreadyExistException:
+      value: {
+        "code": 1004,
+        "type": "ModelVersionAliasesAlreadyExistException",
+        "message": "Model version aliases already exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException: Model version aliases already exist"
+        ]
+      }
+
+    NoSuchModelVersionException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchModelVersionException",
+        "message": "Model version does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchModelVersionException: Model version does not exist"
+        ]
+      }

@@ -37,7 +37,7 @@ For example, relational metadata models for tabular data, like Hive, MySQL, Post
 File metadata model for all the unstructured data, like HDFS, S3, and others.
 
 Besides the unified metadata models, Gravitino also provides a unified metadata governance layer
-(WIP) to manage the metadata in a unified way, including access control, auditing, discovery and
+to manage the metadata in a unified way, including access control, auditing, discovery and
 others.
 
 ### Direct metadata management
@@ -63,24 +63,28 @@ change the existing SQL dialects.
 In the meantime, other query engine support is on the roadmap, including
 [Apache Spark](https://spark.apache.org/), [Apache Flink](https://flink.apache.org/) and others.
 
-### AI asset management (WIP)
+### AI asset management
 
-The goal of Gravitino is to unify the data management in both data and AI assets. The support of AI
-assets like models, features, and others are under development.
+The goal of Gravitino is to unify the data management in both data and AI assets, including raw files, models, etc.
 
 ## Terminology
 
-### The model of Apache Gravitino
+### The metadata object of Apache Gravitino
 
-![Gravitino Model](assets/metadata-model.png)
-
-* **Metalake**: The top-level container for metadata. Typically, one group has one metalake
-  to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.
+* **Metalake**: The container/tenant for metadata. Typically, one group has one metalake
+  to manage all the metadata in it. Each metalake exposes a three-level namespace (catalog.schema.
   table) to organize the data.
 * **Catalog**: A catalog is a collection of metadata from a specific metadata source.
   Each catalog has a related connector to connect to the specific metadata source.
-* **Schema**: A schema is equivalent to a database, Schemas only exist in the specific catalogs
-  that support relational metadata sources, such as Apache Hive, MySQL, PostgreSQL, and others.
+* **Schema**: Schema is the second level namespace to group a collection of metadata, schema can
+  refer to the database/schema in the relational metadata sources, such as Apache Hive, MySQL,
+  PostgreSQL, and others. Schema can also refer to the logic namespace for the fileset and model
+  catalog.
 * **Table**: The lowest level in the object hierarchy for catalogs that support relational
   metadata sources. You can create Tables in specific schemas in the catalogs.
-* **Model**: The model represents the metadata in the specific catalogs that support model management.
+* **Fileset**: The fileset metadata object refers to a collection of files and directories in
+  the file system. The fileset metadata object is used to manage the logic metadata for the files.
+* **Model**: The model metadata object represents the metadata in the specific catalogs that
+  support model management.
+* **Topic**: The topic metadata object represents the metadata in the specific catalogs that
+  support managing the topic for a message queue system, such as Kafka.

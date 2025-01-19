@@ -19,24 +19,19 @@
 package org.apache.gravitino.connector;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Streams;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.AuthorizationProvider;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
@@ -57,6 +52,7 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata, Closeable {
+
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // This variable is used as a key in properties of catalogs to inject custom operation to
@@ -77,6 +73,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private volatile Capability capability;
 
   private volatile Map<String, String> properties;
+
+  private volatile CatalogCredentialManager catalogCredentialManager;
 
   private static String ENTITY_IS_NOT_SET = "entity is not set";
 
@@ -209,36 +207,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           }
           try {
             BaseAuthorization<?> authorization =
-                classLoader.withClassLoader(
-                    cl -> {
-                      try {
-                        ServiceLoader<AuthorizationProvider> loader =
-                            ServiceLoader.load(AuthorizationProvider.class, cl);
+                BaseAuthorization.createAuthorization(classLoader, authorizationProvider);
 
-                        List<Class<? extends AuthorizationProvider>> providers =
-                            Streams.stream(loader.iterator())
-                                .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
-                                .map(AuthorizationProvider::getClass)
-                                .collect(Collectors.toList());
-                        if (providers.isEmpty()) {
-                          throw new IllegalArgumentException(
-                              "No authorization provider found for: " + authorizationProvider);
-                        } else if (providers.size() > 1) {
-                          throw new IllegalArgumentException(
-                              "Multiple authorization providers found for: "
-                                  + authorizationProvider);
-                        }
-                        return (BaseAuthorization<?>)
-                            Iterables.getOnlyElement(providers)
-                                .getDeclaredConstructor()
-                                .newInstance();
-                      } catch (Exception e) {
-                        LOG.error("Failed to create authorization instance", e);
-                        throw new RuntimeException(e);
-                      }
-                    });
+            // Load the authorization plugin with the class loader of the catalog.
+            // Because the JDBC authorization plugin may load JDBC driver using the class loader.
             authorizationPlugin =
-                authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
+                classLoader.withClassLoader(
+                    cl ->
+                        authorization.newPlugin(
+                            entity.namespace().level(0), provider(), this.conf));
+
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
             throw new RuntimeException(e);
@@ -258,6 +236,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       authorizationPlugin.close();
       authorizationPlugin = null;
     }
+    if (catalogCredentialManager != null) {
+      catalogCredentialManager.close();
+      catalogCredentialManager = null;
+    }
   }
 
   public Capability capability() {
@@ -270,6 +252,17 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return capability;
+  }
+
+  public CatalogCredentialManager catalogCredentialManager() {
+    if (catalogCredentialManager == null) {
+      synchronized (this) {
+        if (catalogCredentialManager == null) {
+          this.catalogCredentialManager = new CatalogCredentialManager(name(), properties());
+        }
+      }
+    }
+    return catalogCredentialManager;
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {

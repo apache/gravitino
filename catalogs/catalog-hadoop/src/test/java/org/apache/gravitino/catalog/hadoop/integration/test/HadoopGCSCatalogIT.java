@@ -19,7 +19,7 @@
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.storage.GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH;
+import static org.apache.gravitino.storage.GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -99,7 +99,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put(GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    map.put(GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
     map.put(FILESYSTEM_PROVIDERS, "gcs");
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
@@ -117,7 +117,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
     String ossLocation = String.format("gs://%s", BUCKET_NAME);
     Map<String, String> catalogProps = Maps.newHashMap();
     catalogProps.put("location", ossLocation);
-    catalogProps.put(GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
+    catalogProps.put(GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
     catalogProps.put(FILESYSTEM_PROVIDERS, "gcs");
 
     Catalog localCatalog =

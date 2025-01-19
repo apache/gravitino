@@ -56,13 +56,17 @@ public class TableFormat {
   static final class MetalakesTableFormat implements OutputFormat<Metalake[]> {
     @Override
     public void output(Metalake[] metalakes) {
-      List<String> headers = Collections.singletonList("metalake");
-      List<List<String>> rows = new ArrayList<>();
-      for (int i = 0; i < metalakes.length; i++) {
-        rows.add(Arrays.asList(metalakes[i].name()));
+      if (metalakes.length == 0) {
+        System.out.println("No metalakes exist.");
+      } else {
+        List<String> headers = Collections.singletonList("metalake");
+        List<List<String>> rows = new ArrayList<>();
+        for (int i = 0; i < metalakes.length; i++) {
+          rows.add(Arrays.asList(metalakes[i].name()));
+        }
+        TableFormatImpl tableFormat = new TableFormatImpl();
+        tableFormat.print(headers, rows);
       }
-      TableFormatImpl tableFormat = new TableFormatImpl();
-      tableFormat.print(headers, rows);
     }
   }
 
@@ -85,13 +89,17 @@ public class TableFormat {
   static final class CatalogsTableFormat implements OutputFormat<Catalog[]> {
     @Override
     public void output(Catalog[] catalogs) {
-      List<String> headers = Collections.singletonList("catalog");
-      List<List<String>> rows = new ArrayList<>();
-      for (int i = 0; i < catalogs.length; i++) {
-        rows.add(Arrays.asList(catalogs[i].name()));
+      if (catalogs.length == 0) {
+        System.out.println("No catalogs exist.");
+      } else {
+        List<String> headers = Collections.singletonList("catalog");
+        List<List<String>> rows = new ArrayList<>();
+        for (int i = 0; i < catalogs.length; i++) {
+          rows.add(Arrays.asList(catalogs[i].name()));
+        }
+        TableFormatImpl tableFormat = new TableFormatImpl();
+        tableFormat.print(headers, rows);
       }
-      TableFormatImpl tableFormat = new TableFormatImpl();
-      tableFormat.print(headers, rows);
     }
   }
 
@@ -103,10 +111,10 @@ public class TableFormat {
         Pattern.compile(
             "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
     private int[][] elementOutputWidths;
-    private final String horizontalDelimiter = "-";
-    private final String verticalDelimiter = "|";
-    private final String crossDelimiter = "+";
-    private final String indent = " ";
+    private static final String horizontalDelimiter = "-";
+    private static final String verticalDelimiter = "|";
+    private static final String crossDelimiter = "+";
+    private static final String indent = " ";
 
     public void debug() {
       System.out.println();

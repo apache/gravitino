@@ -116,6 +116,7 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
     dispatcher.disableMetalake(ident);
   }
 
+  @Override
   public boolean dropMetalake(NameIdentifier ident) {
     // For metalake, we don't clear all the privileges of catalog authorization plugin.
     // we just remove metalake.

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
@@ -85,8 +86,8 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.OSS_TOKEN_CREDENTIAL_PROVIDER);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
+        OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE);
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_REGION, region);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
@@ -125,6 +126,8 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
   private void copyAliyunOSSJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    // Iceberg doesn't provide Iceberg Aliyun bundle jar, so use Gravitino aliyun bundle to provide
+    // OSS packages.
     BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
   }
 }

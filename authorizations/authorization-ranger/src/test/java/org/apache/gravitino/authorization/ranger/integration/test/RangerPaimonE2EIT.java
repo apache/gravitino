@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
-import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -34,7 +33,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationProperties;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -69,18 +68,13 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
     RangerITEnv.init(RangerBaseE2EIT.metalakeName, true);
     RangerITEnv.startHiveRangerContainer();
 
-    RANGER_ADMIN_URL =
-        String.format(
-            "http://%s:%d",
-            containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
-
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveRangerContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
 
-    generateRangerSparkSecurityXML();
+    generateRangerSparkSecurityXML("authorization-ranger");
 
     sparkSession =
         SparkSession.builder()
@@ -116,7 +110,12 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void useCatalog() throws InterruptedException {
+  protected String testUserName() {
+    return System.getenv(HADOOP_USER_NAME);
+  }
+
+  @Override
+  protected void useCatalog() {
     String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
@@ -199,7 +198,7 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
             RangerAuthorizationProperties.RANGER_SERVICE_NAME,
             RangerITEnv.RANGER_HIVE_REPO_NAME,
             RangerAuthorizationProperties.RANGER_ADMIN_URL,
-            RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
             RangerAuthorizationProperties.RANGER_AUTH_TYPE,
             RangerContainer.authType,
             RangerAuthorizationProperties.RANGER_USERNAME,

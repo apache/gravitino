@@ -116,6 +116,15 @@ public class TestGroupOperations extends JerseyTest {
 
     when(manager.addGroup(any(), any())).thenReturn(group);
 
+    // test with IllegalRequest
+    GroupAddRequest illegalReq = new GroupAddRequest("");
+    Response illegalResp =
+        target("/metalakes/metalake1/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
     Response resp =
         target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)

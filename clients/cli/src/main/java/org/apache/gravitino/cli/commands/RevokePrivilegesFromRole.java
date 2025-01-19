@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -69,11 +69,11 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      List<Privilege> privilegesList = new ArrayList<>();
+      Set<Privilege> privilegesSet = new HashSet<>();
 
       for (String privilege : privileges) {
         if (!Privileges.isValid(privilege)) {
-          System.err.println("Unknown privilege " + privilege);
+          System.err.println(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
           return;
         }
         PrivilegeDTO privilegeDTO =
@@ -81,26 +81,28 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
                 .withName(Privileges.toName(privilege))
                 .withCondition(Privilege.Condition.DENY)
                 .build();
-        privilegesList.add(privilegeDTO);
+        privilegesSet.add(privilegeDTO);
       }
 
       MetadataObject metadataObject = constructMetadataObject(entity, client);
-      client.revokePrivilegesFromRole(role, metadataObject, privilegesList);
+      client.revokePrivilegesFromRole(role, metadataObject, privilegesSet);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ROLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (NoSuchMetadataObjectException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     String all = String.join(",", privileges);
     System.out.println(role + " revoked " + all + " on " + entity.getName());
+  }
+
+  @Override
+  public Command validate() {
+    if (privileges == null) exitWithError(ErrorMessages.MISSING_PRIVILEGES);
+    return super.validate();
   }
 }

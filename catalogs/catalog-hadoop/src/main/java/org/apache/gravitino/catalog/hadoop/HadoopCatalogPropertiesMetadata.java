@@ -27,6 +27,7 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -51,6 +52,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    * 'builtin-local'.
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
+
+  static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
+  static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
   public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
   public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
@@ -81,9 +85,18 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   BUILTIN_LOCAL_FS_PROVIDER, // please see LocalFileSystemProvider#name()
                   false /* hidden */))
+          .put(
+              FILESYSTEM_CONNECTION_TIMEOUT_SECONDS,
+              PropertyEntry.integerOptionalPropertyEntry(
+                  FILESYSTEM_CONNECTION_TIMEOUT_SECONDS,
+                  "Timeout to wait for to create the Hadoop file system client instance.",
+                  false /* immutable */,
+                  DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS,
+                  false /* hidden */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
+          .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
           .build();
 
   @Override

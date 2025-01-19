@@ -52,6 +52,8 @@ import {
   deleteTopic,
   deleteSchema,
   deleteTable,
+  deleteModel,
+  deleteVersion,
   setCatalogInUse
 } from '@/lib/store/metalakes'
 
@@ -62,6 +64,7 @@ import { useSearchParams } from 'next/navigation'
 import { getFilesetDetailsApi } from '@/lib/api/filesets'
 import { getTopicDetailsApi } from '@/lib/api/topics'
 import { getTableDetailsApi } from '@/lib/api/tables'
+import { getModelDetailsApi, getVersionDetailsApi } from '@/lib/api/models'
 
 const fonts = Inconsolata({ subsets: ['latin'] })
 
@@ -90,6 +93,7 @@ const TableView = () => {
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
   const schema = searchParams.get('schema') || ''
+  const model = searchParams.get('model') || ''
 
   const isCatalogList = paramsSize == 1 && searchParams.has('metalake')
 
@@ -119,6 +123,7 @@ const TableView = () => {
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
   const [isHideEdit, setIsHideEdit] = useState(true)
+  const [isHideDrop, setIsHideDrop] = useState(true)
 
   useEffect(() => {
     if (store.catalogs.length) {
@@ -127,9 +132,10 @@ const TableView = () => {
       const isHideAction =
         (['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3) ||
         (currentCatalog?.provider === 'lakehouse-hudi' && paramsSize == 4)
-      setIsHideEdit(isHideAction)
+      setIsHideEdit(isHideAction || type === 'model')
+      setIsHideDrop(isHideAction)
     }
-  }, [store.catalogs, store.catalogs.length, paramsSize, catalog])
+  }, [store.catalogs, store.catalogs.length, paramsSize, catalog, type])
 
   const handleClickUrl = path => {
     if (!path) {
@@ -249,7 +255,7 @@ const TableView = () => {
       disableColumnMenu: true,
       type: 'string',
       field: 'name',
-      headerName: 'Name',
+      headerName: model ? 'Version' : 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
 
@@ -325,7 +331,7 @@ const TableView = () => {
             </IconButton>
           )}
 
-          {!isHideEdit && (
+          {!isHideDrop && (
             <IconButton
               title='Delete'
               size='small'
@@ -535,6 +541,26 @@ const TableView = () => {
         setOpenDrawer(true)
         break
       }
+      case 'model': {
+        const [err, res] = await to(getModelDetailsApi({ metalake, catalog, schema, model: row.name }))
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.model)
+        setOpenDrawer(true)
+        break
+      }
+      case 'version': {
+        const [err, res] = await to(getVersionDetailsApi({ metalake, catalog, schema, model, version: row.name }))
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.modelVersion)
+        setOpenDrawer(true)
+        break
+      }
       default:
         return
     }
@@ -642,6 +668,12 @@ const TableView = () => {
         case 'table':
           dispatch(deleteTable({ metalake, catalog, type, schema, table: confirmCacheData.name }))
           break
+        case 'model':
+          dispatch(deleteModel({ metalake, catalog, type, schema, model: confirmCacheData.name }))
+          break
+        case 'version':
+          dispatch(deleteVersion({ metalake, catalog, type, schema, model, version: confirmCacheData.name }))
+          break
         default:
           break
       }
@@ -676,7 +708,18 @@ const TableView = () => {
         searchParams.has('metalake') &&
         searchParams.has('catalog') &&
         searchParams.get('type') === 'relational' &&
-        searchParams.has('schema'))
+        searchParams.has('schema')) ||
+      (paramsSize == 4 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.get('type') === 'model' &&
+        searchParams.has('schema')) ||
+      (paramsSize == 5 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.get('type') === 'model' &&
+        searchParams.has('schema') &&
+        searchParams.has('model'))
     ) {
       return actionsColumns
     } else if (paramsSize == 5 && searchParams.has('table')) {

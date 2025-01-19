@@ -113,6 +113,7 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            request.validate();
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
             TreeLockUtils.doWithTreeLock(

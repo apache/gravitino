@@ -62,10 +62,11 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
+  // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
   testImplementation(project(":bundles:aliyun-bundle"))
-  testImplementation(project(":bundles:aws-bundle"))
-  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:azure-bundle"))
+  testImplementation(project(":bundles:aws"))
+  testImplementation(project(":bundles:gcp", configuration = "shadow"))
+  testImplementation(project(":bundles:azure", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")

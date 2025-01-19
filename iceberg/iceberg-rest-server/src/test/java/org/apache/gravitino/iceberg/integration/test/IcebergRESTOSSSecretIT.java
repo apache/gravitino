@@ -79,7 +79,7 @@ public class IcebergRESTOSSSecretIT extends IcebergRESTJdbcCatalogIT {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
         OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
@@ -111,6 +111,8 @@ public class IcebergRESTOSSSecretIT extends IcebergRESTJdbcCatalogIT {
   private void copyAliyunOSSJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    // Iceberg doesn't provide Iceberg Aliyun bundle jar, so use Gravitino aliyun bundle to provide
+    // OSS packages.
     BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
   }
 }

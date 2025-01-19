@@ -27,8 +27,8 @@ import org.apache.commons.lang3.StringUtils;
 /** ADLS SAS token credential. */
 public class ADLSTokenCredential implements Credential {
 
-  /** ADLS SAS token credential type. */
-  public static final String ADLS_SAS_TOKEN_CREDENTIAL_TYPE = "adls-sas-token";
+  /** ADLS token credential type. */
+  public static final String ADLS_TOKEN_CREDENTIAL_TYPE = "adls-token";
   /** ADLS base domain */
   public static final String ADLS_DOMAIN = "dfs.core.windows.net";
   /** ADLS storage account name */
@@ -62,7 +62,7 @@ public class ADLSTokenCredential implements Credential {
 
   @Override
   public String credentialType() {
-    return ADLS_SAS_TOKEN_CREDENTIAL_TYPE;
+    return ADLS_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override
@@ -74,6 +74,7 @@ public class ADLSTokenCredential implements Credential {
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
         .put(GRAVITINO_ADLS_SAS_TOKEN, sasToken)
+        .put(GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, accountName)
         .build();
   }
 

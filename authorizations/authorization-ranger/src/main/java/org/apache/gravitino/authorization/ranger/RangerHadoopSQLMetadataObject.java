@@ -48,12 +48,12 @@ public class RangerHadoopSQLMetadataObject implements AuthorizationMetadataObjec
 
     public static Type fromMetadataType(MetadataObject.Type metadataType) {
       for (Type type : Type.values()) {
-        if (type.metadataObjectType() == metadataType) {
+        if (type.metadataType == metadataType) {
           return type;
         }
       }
       throw new IllegalArgumentException(
-          "No matching RangerMetadataObject.Type for " + metadataType);
+          "No matching RangerHadoopSQLMetadataObject.Type for " + metadataType);
     }
   }
 

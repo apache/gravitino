@@ -63,4 +63,10 @@ public class SetMetalakeProperty extends Command {
 
     System.out.println(metalake + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return this;
+  }
 }

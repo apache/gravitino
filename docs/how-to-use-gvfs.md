@@ -42,8 +42,7 @@ the path mapping and convert automatically.
 
 ### Prerequisites
 
-+ A Hadoop environment with HDFS running. GVFS has been tested against
-  Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
+ - GVFS has been tested against Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.
   x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
   compatibility issues.
 
@@ -67,46 +66,8 @@ the path mapping and convert automatically.
 | `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                                          | `3600000`     | No                                  | 0.5.0           |
 | `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                                          | `3600000`     | No                                  | 0.5.0           |
 
-Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, you need to configure the following extra properties.
-
-#### S3 fileset
-
-| Configuration item             | Description                                                                                                                                                                            | Default value | Required                 | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------|------------------|
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                            | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-
-At the same time, you need to place the corresponding bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
-
-
-#### GCS fileset
-
-| Configuration item             | Description                                                                                                                                                                              | Default value | Required                  | Since version    |
-|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
-
-In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
-
-
-#### OSS fileset
-
-| Configuration item              | Description                                                                                                                                                                                    | Default value | Required                  | Since version    |
-|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `oss-endpoint`                  | The endpoint of the Aliyun OSS.                                                                                                                                                                | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-| `oss-access-key-id`             | The access key of the Aliyun OSS.                                                                                                                                                              | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-| `oss-secret-access-key`         | The secret key of the Aliyun OSS.                                                                                                                                                              | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
-
-In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
-
-#### Azure Blob Storage fileset
-
-| Configuration item                | Description                                                                                                                                                                                                     | Default value | Required                                  | Since version    |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------|------------------|
-| `azure-storage-account-name`      | The account name of Azure Blob Storage.                                                                                                                                                                         | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `azure-storage-account-key`       | The account key of Azure Blob Storage.                                                                                                                                                                          | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-
-Similar to the above, you need to place the corresponding bundle jar [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/azure-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
+Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, extra properties are needed, please see 
+[S3 GVFS Java client configurations](./hadoop-catalog-with-s3.md#using-the-gvfs-java-client-to-access-the-fileset), [GCS GVFS Java client configurations](./hadoop-catalog-with-gcs.md#using-the-gvfs-java-client-to-access-the-fileset), [OSS GVFS Java client configurations](./hadoop-catalog-with-oss.md#using-the-gvfs-java-client-to-access-the-fileset) and [Azure Blob Storage GVFS Java client configurations](./hadoop-catalog-with-adls.md#using-the-gvfs-java-client-to-access-the-fileset) for more details.
 
 #### Custom fileset 
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
@@ -126,21 +87,10 @@ You can configure these properties in two ways:
     conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
-   
-    // Optional. It's only for S3 catalog. For GCS and OSS catalog, you should set the corresponding properties.
-    conf.set("s3-endpoint", "http://localhost:9000");
-    conf.set("s3-access-key-id", "minio");
-    conf.set("s3-secret-access-key", "minio123"); 
-   
     Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
     FileSystem fs = filesetPath.getFileSystem(conf);
     ```
    
-:::note
-If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jar in the Hadoop environment. 
-For example if you want to access the S3 fileset, you need to place the S3 bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`) or add it to the classpath. 
-:::
-
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
 
     ```xml
@@ -162,20 +112,6 @@ For example if you want to access the S3 fileset, you need to place the S3 bundl
       <property>
         <name>fs.gravitino.client.metalake</name>
         <value>test_metalake</value>
-      </property>
-   
-      <!-- Optional. It's only for S3 catalog. For GCs and OSS catalog, you should set the corresponding properties. -->
-      <property>
-        <name>s3-endpoint</name>
-        <value>http://localhost:9000</value>
-      </property>
-      <property>
-        <name>s3-access-key-id</name>
-        <value>minio</value>
-      </property>
-      <property>
-        <name>s3-secret-access-key</name>
-        <value>minio123</value>
       </property>
     ```
 
@@ -273,7 +209,6 @@ fs.getFileStatus(filesetPath);
 
     rdd.foreach(println)
     ```
-
 
 #### Via Tensorflow
 
@@ -397,9 +332,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 ### Prerequisites
 
-+ A Hadoop environment with HDFS running. Now we only supports Fileset on HDFS.
-  GVFS in Python has been tested against Hadoop 2.7.3. It is recommended to use Hadoop 2.7.3 or later,
-  it should work with Hadoop 3.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
++ A Hadoop environment with HDFS or other Hadoop Compatible File System (HCFS) implementations like S3, GCS, etc. GVFS has been tested against Hadoop 3.3.1. It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
   if you find any compatibility issues.
 + Python version >= 3.8. It has been tested GVFS works well with Python 3.8 and Python 3.9.
   Your Python version should be at least higher than Python 3.8.
@@ -410,73 +343,26 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 
 ### Configuration
 
-| Configuration item         | Description                                                                                                                                              | Default value | Required                          | Since version    |
-|----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------|------------------|
-| `server_uri`               | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                                                  | (none)        | Yes                               | 0.6.0-incubating |
-| `metalake_name`            | The metalake name which the fileset belongs to.                                                                                                          | (none)        | Yes                               | 0.6.0-incubating |
-| `cache_size`               | The cache capacity of the Gravitino Virtual File System.                                                                                                 | `20`          | No                                | 0.6.0-incubating |                                                                                                                      
-| `cache_expired_time`       | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                                | `3600`        | No                                | 0.6.0-incubating |
-| `auth_type`                | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently supports `simple` and `oauth2` auth types.     | `simple`      | No                                | 0.6.0-incubating |
-| `oauth2_server_uri`        | The auth server URI for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
-| `oauth2_credential`        | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
-| `oauth2_path`              | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`. | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
-| `oauth2_scope`             | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                            | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                        | Default value | Required                          | Since version    |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------|------------------|
+| `server_uri`                  | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                                                                                                                                                                                            | (none)        | Yes                               | 0.6.0-incubating |
+| `metalake_name`               | The metalake name which the fileset belongs to.                                                                                                                                                                                                                                                    | (none)        | Yes                               | 0.6.0-incubating |
+| `cache_size`                  | The cache capacity of the Gravitino Virtual File System.                                                                                                                                                                                                                                           | `20`          | No                                | 0.6.0-incubating |                                                                                                                      
+| `cache_expired_time`          | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                                                                                                                                                                          | `3600`        | No                                | 0.6.0-incubating |
+| `auth_type`                   | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently supports `simple` and `oauth2` auth types.                                                                                                                                               | `simple`      | No                                | 0.6.0-incubating |
+| `oauth2_server_uri`           | The auth server URI for the Gravitino client when using `oauth2` auth type.                                                                                                                                                                                                                        | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `oauth2_credential`           | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                                                                                                                                                                        | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `oauth2_path`                 | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`.                                                                                                                                           | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `oauth2_scope`                | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                                                                                                                      | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `credential_expiration_ratio` | The ratio of expiration time for credential from Gravitino. This is used in the cases where Gravitino Hadoop catalogs have enable credential vending. if the expiration time of credential fetched from Gravitino is 1 hour, GVFS client will try to refresh the credential in 1 * 0.9 = 0.5 hour. | 0.5           | No                                | 0.8.0-incubating |
 
+#### Configurations for S3, GCS, OSS and Azure Blob storage fileset
 
-#### Extra configuration for S3, GCS, OSS fileset
-
-The following properties are required if you want to access the S3 fileset via the GVFS python client:
-
-| Configuration item         | Description                  | Default value | Required                 | Since version    |
-|----------------------------|------------------------------|---------------|--------------------------|------------------|
-| `s3_endpoint`              | The endpoint of the AWS S3.  | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3_access_key_id`         | The access key of the AWS S3.| (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-| `s3_secret_access_key`     | The secret key of the AWS S3.| (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
-
-The following properties are required if you want to access the GCS fileset via the GVFS python client:
-
-| Configuration item         | Description                               | Default value | Required                  | Since version    |
-|----------------------------|-------------------------------------------|---------------|---------------------------|------------------|
-| `gcs_service_account_file` | The path of GCS service account JSON file.| (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
-
-The following properties are required if you want to access the OSS fileset via the GVFS python client:
-
-| Configuration item         | Description                       | Default value | Required                   | Since version    |
-|----------------------------|-----------------------------------|---------------|----------------------------|------------------|
-| `oss_endpoint`             | The endpoint of the Aliyun OSS.   | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
-| `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
-
-For Azure Blob Storage fileset, you need to configure the following properties:
-
-| Configuration item | Description                            | Default value | Required                                  | Since version    |
-|--------------------|----------------------------------------|---------------|-------------------------------------------|------------------|
-| `abs_account_name` | The account name of Azure Blob Storage | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-| `abs_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes if it's a Azure Blob Storage fileset. | 0.8.0-incubating |
-
-
-You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
-
-```python
-from gravitino import gvfs
-options = {
-    "cache_size": 20,
-    "cache_expired_time": 3600,
-    "auth_type": "simple"
-    
-    # Optional, the following properties are required if you want to access the S3 fileset via GVFS python client, for GCS and OSS fileset, you should set the corresponding properties.
-    "s3_endpoint": "http://localhost:9000",
-    "s3_access_key_id": "minio",
-    "s3_secret_access_key": "minio123"
-}
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
-```
+Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./hadoop-catalog-with-gcs.md#using-the-gvfs-python-client-to-access-a-fileset), [S3 GVFS Java client configurations](./hadoop-catalog-with-s3.md#using-the-gvfs-python-client-to-access-a-fileset), [OSS GVFS Java client configurations](./hadoop-catalog-with-oss.md#using-the-gvfs-python-client-to-access-a-fileset) and [Azure Blob Storage GVFS Java client configurations](./hadoop-catalog-with-adls.md#using-the-gvfs-python-client-to-access-a-fileset) for more details.
 
 :::note
-
-Gravitino python client does not support customized filesets defined by users due to the limit of `fsspec` library. 
+Gravitino python client does not support [customized file systems](hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library. 
 :::
-
 
 ### Usage examples
 

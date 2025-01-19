@@ -43,11 +43,7 @@ public class ListMetalakes extends Command {
     try {
       GravitinoAdminClient client = buildAdminClient();
       metalakes = client.listMetalakes();
-      if (metalakes.length == 0) {
-        System.out.println("No metalakes exist.");
-      } else {
-        output(metalakes);
-      }
+      output(metalakes);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

@@ -42,6 +42,20 @@ public class FullName {
   }
 
   /**
+   * Retrieves the level of the full name.
+   *
+   * @return The level of the full name, or -1 if line does not contain a {@code --name} option.
+   */
+  public int getLevel() {
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      return names.length;
+    }
+
+    return -1;
+  }
+
+  /**
    * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
    * variable or the Gravitino config file.
    *
@@ -73,10 +87,8 @@ public class FullName {
       }
     }
 
-    // Extract the metalake name from the full name option
-    if (line.hasOption(GravitinoOptions.NAME)) {
-      return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
-    }
+    System.err.println(ErrorMessages.MISSING_METALAKE);
+    Main.exit(-1);
 
     return null;
   }
@@ -97,6 +109,15 @@ public class FullName {
    */
   public String getSchemaName() {
     return getNamePart(1);
+  }
+
+  /**
+   * Retrieves the model name from the second part of the full name option.
+   *
+   * @return The model name, or null if not found.
+   */
+  public String getModelName() {
+    return getNamePart(2);
   }
 
   /**
@@ -146,6 +167,15 @@ public class FullName {
     }
 
     return null;
+  }
+
+  /**
+   * Are there any names that can be retrieved?
+   *
+   * @return True if the name exists, or false if it does not.
+   */
+  public Boolean hasName() {
+    return line.hasOption(GravitinoOptions.NAME);
   }
 
   /**

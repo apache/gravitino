@@ -501,6 +501,9 @@ subprojects {
       exclude("test/**")
     }
   }
+  tasks.named("compileJava").configure {
+    dependsOn("spotlessCheck")
+  }
 }
 
 tasks.rat {
@@ -583,7 +586,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", ":authorizations:copyLibAndConfig", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -673,13 +676,13 @@ tasks {
     doLast {
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
-        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".bin", "")
+          fileName.replace(".trino", "")
         }
       }
     }
@@ -779,7 +782,7 @@ tasks {
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
-        it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" && it.name != "hadoop-common"
+        it.parent?.name != "bundles" && it.name != "hadoop-common"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -799,10 +802,8 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("flink") &&
         !it.name.startsWith("trino-connector") &&
-        it.name != "bundled-catalog" &&
-        it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
-        it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
-        it.name != "hadoop-common" && it.name != "docs"
+        it.name != "hive-metastore-common" &&
+        it.name != "docs" && it.name != "hadoop-common" && it.parent?.name != "bundles"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -826,12 +827,6 @@ tasks {
       ":catalogs:catalog-hadoop:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
       ":catalogs:catalog-model:copyLibAndConfig"
-    )
-  }
-
-  register("copyAuthorizationLibAndConfigs", Copy::class) {
-    dependsOn(
-      ":authorizations:authorization-ranger:copyLibAndConfig"
     )
   }
 

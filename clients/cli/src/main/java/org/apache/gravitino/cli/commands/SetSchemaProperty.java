@@ -81,4 +81,10 @@ public class SetSchemaProperty extends Command {
 
     System.out.println(schema + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return this;
+  }
 }

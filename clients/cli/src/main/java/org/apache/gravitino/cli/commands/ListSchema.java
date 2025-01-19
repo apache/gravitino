@@ -62,6 +62,6 @@ public class ListSchema extends Command {
 
     String all = schemas.length == 0 ? "No schemas exist." : Joiner.on(",").join(schemas);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }

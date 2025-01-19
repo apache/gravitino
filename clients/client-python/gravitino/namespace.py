@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 from typing import List, ClassVar
 from gravitino.exceptions.base import IllegalNamespaceException
 
@@ -34,13 +33,13 @@ class Namespace:
         self._levels = levels
 
     def to_json(self):
-        return json.dumps(self._levels)
+        return self._levels
 
     @classmethod
     def from_json(cls, levels):
         if levels is None or not isinstance(levels, list):
             raise IllegalNamespaceException(
-                f"Cannot parse name identifier from invalid JSON: {levels}"
+                f"Cannot parse namespace from invalid JSON: {levels}"
             )
         return cls(levels)
 

@@ -53,8 +53,8 @@ public class ListUsers extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = String.join(",", users);
+    String all = users.length == 0 ? "No users exist." : String.join(",", users);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }
