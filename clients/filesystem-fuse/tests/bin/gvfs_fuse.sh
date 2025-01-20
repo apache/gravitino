@@ -52,6 +52,7 @@ start_gvfs_fuse() {
   make build
 
   echo "Starting gvfs-fuse-daemon"
+  mkdir -p target/debug/gvfs-dir
   $CLIENT_FUSE_DIR/target/debug/gvfs-fuse mount $MOUNT_DIR $MOUNT_FROM_LOCATION -c $TEST_CONFIG_FILE -f > \
     $CLIENT_FUSE_DIR/target/debug/fuse.log 2>&1 &
   check_gvfs_fuse_ready
