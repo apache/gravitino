@@ -20,6 +20,7 @@
 file_mask= 0o600
 dir_mask= 0o700
 fs_type = "gvfs"
+data_path = "target/debug/gvfs-fuse"
 
 [fuse.properties]
 key1 = "value1"

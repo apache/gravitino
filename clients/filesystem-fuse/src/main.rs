@@ -22,35 +22,43 @@ use crate::command_args::Commands;
 use clap::Parser;
 use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
-use gvfs_fuse::{gvfs_mount, gvfs_unmount};
+use gvfs_fuse::{gvfs_mount, gvfs_unmount, LOG_FILE_NAME, PID_FILE_NAME};
 use log::{error, info};
-use std::fs::OpenOptions;
+use std::fs::{create_dir_all, OpenOptions};
+use std::io;
+use std::path::Path;
 use std::process::{exit, Command};
-use std::{env, io};
 use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 
-fn make_daemon() {
-    let log_file_name = "/tmp/gvfs-fuse.log";
+fn make_daemon(config: &AppConfig) -> io::Result<()> {
+    let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
+    if !data_dir_name.exists() {
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Data directory {} not found", &config.fuse.data_dir),
+        ))?
+    };
+
+    let log_dir_name = data_dir_name.join(&config.fuse.log_dir);
+    if !log_dir_name.exists() {
+        create_dir_all(&log_dir_name)?
+    };
+    let log_file_name = Path::new(&config.fuse.log_dir).join(LOG_FILE_NAME);
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(log_file_name)
+        .open(&log_file_name)
         .unwrap();
-    let log_err_file = OpenOptions::new().write(true).open(log_file_name).unwrap();
+    let log_err_file = OpenOptions::new().append(true).open(log_file_name).unwrap();
 
-    let cwd = env::current_dir();
-    if let Err(e) = cwd {
-        error!("Error getting current directory: {}", e);
-        return;
-    }
-    let cwd = cwd.unwrap();
+    let pid_file_name = data_dir_name.join(PID_FILE_NAME);
 
     let daemonize = Daemonize::new()
-        .pid_file("/tmp/gvfs-fuse.pid")
+        .pid_file(pid_file_name)
         .chown_pid_file(true)
-        .working_directory(&cwd)
+        .working_directory(&data_dir_name)
         .stdout(log_file)
         .stderr(log_err_file);
 
@@ -61,6 +69,7 @@ fn make_daemon() {
             exit(-1)
         }
     }
+    Ok(())
 }
 
 fn mount_fuse(config: AppConfig, mount_point: String, target: String) -> io::Result<()> {
@@ -162,7 +171,11 @@ fn main() -> Result<(), i32> {
             let result = if foreground {
                 mount_fuse(app_config, mount_point, location)
             } else {
-                make_daemon();
+                let result = make_daemon(&app_config);
+                if let Err(e) = result {
+                    error!("Failed to daemonize: {:?}", e);
+                    return Err(-1);
+                };
                 mount_fuse(app_config, mount_point, location)
             };
 
