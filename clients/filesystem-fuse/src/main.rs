@@ -25,7 +25,6 @@ use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount};
 use log::{error, info};
 use std::fs::OpenOptions;
-use std::path::Path;
 use std::process::{exit, Command};
 use std::{env, io};
 use tokio::runtime::Runtime;
@@ -65,7 +64,7 @@ fn make_daemon() {
 }
 
 fn mount_fuse(config: AppConfig, mount_point: String, target: String) -> io::Result<()> {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new()?;
     rt.block_on(async {
         let handle = tokio::spawn(async move {
             let result = gvfs_mount(&mount_point, &target, &config).await;
