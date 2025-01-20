@@ -30,6 +30,7 @@ use opendal::services::S3;
 use opendal::{Builder, Operator};
 use std::collections::HashMap;
 use std::path::Path;
+use fuse3::FileType;
 
 pub(crate) struct S3FileSystem {
     open_dal_fs: OpenDalFileSystem,
@@ -94,8 +95,12 @@ impl PathFileSystem for S3FileSystem {
         Ok(())
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
-        self.open_dal_fs.stat(path).await
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat> {
+        self.open_dal_fs.stat(path, kind).await
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
+        self.open_dal_fs.lookup(path).await
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
