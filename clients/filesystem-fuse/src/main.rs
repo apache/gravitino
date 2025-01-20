@@ -24,15 +24,15 @@ use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, LOG_FILE_NAME, PID_FILE_NAME};
 use log::{error, info};
-use std::fs::{create_dir_all, OpenOptions};
+use std::fs::{create_dir, OpenOptions};
 use std::io;
 use std::path::Path;
-use std::process::{exit, Command};
+use std::process::Command;
 use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 
-fn make_daemon(config: &AppConfig) -> io::Result<()> {
+fn init_work_dirs(config: &AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
     if !data_dir_name.exists() {
         Err(io::Error::new(
@@ -41,11 +41,23 @@ fn make_daemon(config: &AppConfig) -> io::Result<()> {
         ))?
     };
 
+    let mount_point_name = data_dir_name.join(mount_point);
+    if !mount_point_name.exists() {
+        create_dir(&mount_point_name)?
+    };
+
     let log_dir_name = data_dir_name.join(&config.fuse.log_dir);
     if !log_dir_name.exists() {
-        create_dir_all(&log_dir_name)?
+        create_dir(&log_dir_name)?
     };
-    let log_file_name = Path::new(&config.fuse.log_dir).join(LOG_FILE_NAME);
+
+    Ok(())
+}
+
+fn make_daemon(config: &AppConfig) -> io::Result<()> {
+    let data_dir_name = Path::new(&config.fuse.data_dir);
+    let log_dir_name = data_dir_name.join(&config.fuse.log_dir);
+    let log_file_name = log_dir_name.join(LOG_FILE_NAME);
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -58,15 +70,17 @@ fn make_daemon(config: &AppConfig) -> io::Result<()> {
     let daemonize = Daemonize::new()
         .pid_file(pid_file_name)
         .chown_pid_file(true)
-        .working_directory(&data_dir_name)
+        .working_directory(data_dir_name)
         .stdout(log_file)
         .stderr(log_err_file);
 
     match daemonize.start() {
         Ok(_) => info!("Gvfs-fuse Daemon started successfully"),
         Err(e) => {
-            error!("Gvfs-fuse Daemon failed to start: {:?}", e);
-            exit(-1)
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Gvfs-fuse Daemon failed to start: {:?}", e),
+            ))
         }
     }
     Ok(())
@@ -168,6 +182,13 @@ fn main() -> Result<(), i32> {
                 return Err(-1);
             };
             let app_config = app_config.unwrap();
+
+            let result = init_work_dirs(&app_config, &mount_point);
+            if let Err(e) = result {
+                error!("Failed to initialize working directories: {:?}", e);
+                return Err(-1);
+            }
+
             let result = if foreground {
                 mount_fuse(app_config, mount_point, location)
             } else {
