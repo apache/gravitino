@@ -122,8 +122,13 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
 
   @Override
   public String toString() {
-    return "MetadataObject: [fullName=" + fullName() + "],  [path=" + path == null
-        ? "null"
-        : path + "], [type=" + type + "]";
+    String strPath = path == null ? "null" : path;
+    return "MetadataObject: [fullName="
+        + fullName()
+        + "],  [path="
+        + strPath
+        + "], [type="
+        + type
+        + "]";
   }
 }
