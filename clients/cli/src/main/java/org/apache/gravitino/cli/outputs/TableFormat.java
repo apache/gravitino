@@ -162,7 +162,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       throw new RuntimeException(e);
     }
 
-    return baos.toString();
+    return new String(baos.toByteArray(), StandardCharsets.UTF_8);
   }
 
   private void checkColumns(Column... columns) {
