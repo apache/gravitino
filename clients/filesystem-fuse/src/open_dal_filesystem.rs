@@ -123,7 +123,7 @@ impl PathFileSystem for OpenDalFileSystem {
             file.reader = Some(Box::new(FileReaderImpl { reader }));
         }
         if !flags.is_create() && flags.is_append() {
-            error!("The file system does not support open a exists file with the append mode ");
+            error!("The file system does not support open a exists file with the append mode");
             return Err(Errno::from(libc::EBADF));
         }
 
@@ -140,10 +140,7 @@ impl PathFileSystem for OpenDalFileSystem {
                 .writer_with(&file_name)
                 .await
                 .map_err(opendal_error_to_errno)?;
-            file.writer = Some(Box::new(FileWriterImpl {
-                writer,
-                buffer: Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE),
-            }));
+            file.writer = Some(Box::new(FileWriterImpl::new(writer)));
         }
 
         Ok(file)
@@ -233,11 +230,21 @@ struct FileWriterImpl {
     buffer: Vec<u8>,
 }
 
+impl FileWriterImpl {
+    fn new(writer: opendal::Writer) -> Self {
+        Self {
+            writer,
+            buffer: Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE + 4096),
+        }
+    }
+}
+
 #[async_trait]
 impl FileWriter for FileWriterImpl {
     async fn write(&mut self, _offset: u64, data: &[u8]) -> Result<u32> {
         if self.buffer.len() > OpenDalFileSystem::WRITE_BUFFER_SIZE {
-            let mut new_buffer: Vec<u8> = Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE);
+            let mut new_buffer: Vec<u8> =
+                Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE + 4096);
             new_buffer.append(&mut self.buffer);
 
             self.writer
@@ -295,6 +302,7 @@ fn opendal_filemode_to_filetype(mode: EntryMode) -> FileType {
 #[cfg(test)]
 mod test {
     use crate::config::AppConfig;
+    use crate::open_dal_filesystem::OpenDalFileSystem;
     use crate::s3_filesystem::extract_s3_config;
     use crate::s3_filesystem::tests::s3_test_config;
     use crate::test_enable_with;
@@ -374,11 +382,12 @@ mod test {
         let mut writer = op.writer_with(path).await.unwrap();
 
         let mut buffer: Vec<u8> = vec![];
-        for i in 0..10 * 1024 {
-            let data = vec![i as u8; 1024];
+        let num_batch = 10 * 1024;
+        for i in 0..num_batch {
+            let data = vec![i as u8; num_batch];
             buffer.extend(&data);
 
-            if buffer.len() > 5 * 1024 * 1024 {
+            if buffer.len() > OpenDalFileSystem::WRITE_BUFFER_SIZE {
                 writer.write(buffer).await.unwrap();
                 buffer = vec![];
             };
@@ -406,8 +415,9 @@ mod test {
 
         let mut buffer = Vec::new();
 
+        let batch_size = 1024;
         let mut start = 0;
-        let mut end = 1024;
+        let mut end = batch_size;
         loop {
             let buf = reader.read(start..end).await.unwrap();
             if buf.is_empty() {
@@ -415,7 +425,7 @@ mod test {
             }
             buffer.extend_from_slice(buf.chunk());
             start = end;
-            end += 1024;
+            end += batch_size;
         }
 
         println!("Read {} bytes.", buffer.len());

@@ -108,7 +108,7 @@ impl PathFileSystem for MemoryFileSystem {
                 if flags.is_read() {
                     opened_file.reader = Some(Box::new(MemoryFileReader { data: data.clone() }));
                 }
-                if flags.is_write() || flags.is_append() {
+                if flags.is_write() || flags.is_append() || flags.is_truncate() {
                     opened_file.writer = Some(Box::new(MemoryFileWriter { data: data.clone() }));
                 }
 
