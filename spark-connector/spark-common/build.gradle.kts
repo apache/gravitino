@@ -81,9 +81,6 @@ dependencies {
   testImplementation(project(":server-common")) {
     exclude("org.apache.logging.log4j")
   }
-  testImplementation(project(":catalogs:catalog-jdbc-mysql")) {
-    exclude("org.apache.logging.log4j")
-  }
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation(libs.hive2.common) {
