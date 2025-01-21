@@ -109,11 +109,15 @@ public class TableFormat {
   static final class SchemaTableFormat implements OutputFormat<Schema> {
     @Override
     public void output(Schema schema) {
-      List<String> headers = Arrays.asList("schema", "comment");
-      List<List<String>> rows = new ArrayList<>();
-      rows.add(Arrays.asList(schema.name(), schema.comment() + ""));
-      TableFormatImpl tableFormat = new TableFormatImpl();
-      tableFormat.print(headers, rows);
+      if (schema == null) {
+        System.out.println("No schemas exist.");
+      } else {
+        List<String> headers = Arrays.asList("schema", "comment");
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(Arrays.asList(schema.name(), schema.comment() + ""));
+        TableFormatImpl tableFormat = new TableFormatImpl();
+        tableFormat.print(headers, rows);
+      }
     }
   }
 

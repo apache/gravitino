@@ -95,7 +95,11 @@ public class PlainFormat {
   static final class SchemaPlainFormat implements OutputFormat<Schema> {
     @Override
     public void output(Schema schema) {
-      System.out.println(schema.name() + "," + schema.comment());
+      if (schema == null) {
+        System.out.println("No schemas exist.");
+      } else {
+        System.out.println(schema.name() + "," + schema.comment());
+      }
     }
   }
 }
