@@ -21,8 +21,6 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -160,11 +158,11 @@ class TestOwnerCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newOwnerDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq(null),
-            eq(CommandEntities.CATALOG));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            null,
+            CommandEntities.CATALOG);
 
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(ErrorMessages.MISSING_NAME, errOutput);
@@ -188,13 +186,13 @@ class TestOwnerCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newSetOwner(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("postgres"),
-            eq(CommandEntities.CATALOG),
-            isNull(),
-            eq(false));
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "postgres",
+            CommandEntities.CATALOG,
+            null,
+            false);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(ErrorMessages.INVALID_SET_COMMAND, errOutput);
   }
