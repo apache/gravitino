@@ -28,10 +28,13 @@ use fuse3::raw::prelude::{
 };
 use fuse3::raw::reply::{DirectoryEntry, DirectoryEntryPlus};
 use fuse3::raw::Filesystem;
-use fuse3::{Inode, SetAttr, Timestamp};
-use futures_util::stream::BoxStream;
-use std::ffi::OsStr;
+use fuse3::{Errno, FileType, Inode, SetAttr, Timestamp};
+use futures_util::stream::{BoxStream, Stream};
+use futures_util::{stream, StreamExt};
+use std::ffi::{OsStr, OsString};
 use std::fmt::Write;
+use std::pin::Pin;
+use std::sync::Arc;
 use tracing::{debug, error};
 
 /// A macro to log the result of an asynchronous method call in the context of FUSE operations.
@@ -89,7 +92,7 @@ macro_rules! log_result {
         }
     };
 
-    // Format reply with custom format function
+    // Format reply with custom formatting function
     ($method_call:expr, $method_name:expr, $req:ident, $format_reply_fn:ident) => {
             match $method_call.await {
             Ok(reply) => {
@@ -102,7 +105,48 @@ macro_rules! log_result {
             }
         }
     };
+
+    // Format stream with custom formatting function
+    ($method_call:expr, $method_name:expr, $req:ident, stream, $format_reply_fn:expr) => {{
+        match $method_call.await {
+            Ok(reply_dir) => {
+                let mut stream = reply_dir.entries.peekable();
+                let mut debug_output = String::new();
+                while let Some(entry_result) = stream.peek().await {
+                    match entry_result {
+                        Ok(entry) => {
+                            debug_output.push_str(format!("Directory entry: {:?}\n", entry).as_str());
+                        }
+                        Err(e) => {
+                            debug_output.push_str(format!("Error reading directory entry: {:?}\n", e).as_str());
+                        }
+                    }
+                }
+
+                Ok(reply_dir)
+            }
+            Err(e) => {
+                error!(
+                    $req.unique,
+                    ?e,
+                    concat!($method_name, " failed")
+                );
+                Err(e)
+            }
+        }
+    }};
 }
+
+// async fn stream_to_desc_str<S>(mut res: ReplyDirectory<>) -> String {
+//     let mut s = String::new();
+//     while let Some(entry_result) = res.entries.next().await {
+//         match entry_result {
+//             Ok(entry) => s.push_str(format!("Directory entry: {:?}", entry).as_str()),
+//             Err(e) => s.push_str(format!("Error reading directory entry: {:?}", e).as_str()),
+//         }
+//     }
+//     s
+// }
 
 /// Convert `ReplyAttr` to descriptive string.
 ///
@@ -252,11 +296,11 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, parent = ?parent_stat.name, ?name, "lookup started");
+        debug!("req_id" = req.unique, parent = ?parent_stat.name, ?name, ?req, "LOOKUP started");
 
         log_result!(
             self.inner.lookup(req, parent, name),
-            "lookup",
+            "LOOKUP",
             req,
             reply_entry_to_desc_str
         )
@@ -273,11 +317,21 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, "filename" = ?stat.name, ?fh, ?flags, "getattr started");
+        debug!(
+            req.unique,
+            "filename" = ?stat.name,
+            "file_id" = inode,
+            "uid" = req.uid,
+            "gid" = req.gid,
+            "pid" = req.pid,
+            ?fh,
+            flags,
+            "GETATTR started"
+        );
 
         log_result!(
             self.inner.getattr(req, inode, fh, flags),
-            "getattr",
+            "GETATTR",
             req,
             reply_attr_to_desc_str
         )
@@ -474,9 +528,18 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         log_result!(self.inner.opendir(req, inode, flags), "opendir", req, debug)
     }
 
-    type DirEntryStream<'a> = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+    type DirEntryStream<'a>
+    = BoxStream<'a, fuse3::Result<DirectoryEntry>>
     where
         T: 'a;
+
+    // type DirEntryStream = Stream<Item = fuse3::Result<DirectoryEntry>>;
+
+    // type DirEntryStream<'a> = Stream<'a, fuse3::Result<DirectoryEntry>>
+    // where
+    //     T: 'a;
+    //
+    // type DirEntryStream<'a> = Stream<Item = fuse3::Result<DirectoryEntry>> + Send + 'a;
 
     #[allow(clippy::needless_lifetimes)]
     async fn readdir<'a>(
@@ -499,7 +562,73 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "readdir started"
         );
 
-        log_result!(self.inner.readdir(req, parent, fh, offset), "readdir", req)
+        let mut debug_output = String::new();
+
+        match self.inner.readdir(req, parent, fh, offset).await {
+            Ok(mut reply_dir) => {
+                // Ok(reply_dir)
+                // append them to debug_output (a String)
+                // and assign reply_dir.entries with new BoxStream
+
+                let mut stream = &mut reply_dir.entries;
+                // let mut stream = Pin::new(&mut reply_dir.entries.peekable());
+
+                let _ = stream.inspect(|entry_result| match entry_result {
+                    Ok(entry) => {
+                        // debug_output.push_str(format!("Directory entry: {:?}\n", entry).as_str());
+                        debug!("{}", format!("Directory entry: {:?}\n", entry).as_str());
+                    }
+
+                    Err(e) => {
+                        // debug_output
+                        //     .push_str(format!("Error reading directory entry: {:?}\n", e).as_str());
+                        debug!("{}",format!("Error reading directory entry: {:?}\n", e).as_str());
+                    }
+                });
+
+                Ok(reply_dir)
+            }
+            Err(e) => {
+                debug_output
+                    .push_str(format!("Error reading directory entries: {:?}\n", e).as_str());
+                Err(e)
+            }
+        }
+
+        // while let Some(entry_result) = res.entries.collect() {
+        //
+        //
+        // }
+        // while let Some(entry_result) = res.entries.next().await {
+        //     match entry_result {
+        //         Ok(entry) => debug!(?entry, "READDIR result"),
+        //         Err(e) => error!("Error reading directory entry: {:?}", e),
+        //     }
+        // }
+
+        // log_result!(
+        //     self.inner.readdir(req, parent, fh, offset),
+        //     "READDIR",
+        //     req,
+        //     stream,
+        //     // |entry: &DirectoryEntry| { debug!("Hello") }
+        //     |entry: &DirectoryEntry| {
+        //         format!(
+        //             "{{ inode: {}, kind: {}, name: \"{}\", offset: {} }}",
+        //             entry.inode,
+        //             match entry.kind {
+        //                 FileType::Directory => "Directory",
+        //                 FileType::RegularFile => "File",
+        //                 FileType::Symlink => "Symlink",
+        //                 _ => "Other",
+        //             },
+        //             entry.name.to_string_lossy(),
+        //             entry.offset
+        //         )
+        //     }
+        // )
+
+        // log_result!(self.inner.readdir(req, parent, fh, offset), "READDIR", req)
     }
 
     async fn releasedir(
@@ -574,6 +703,17 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             ?lock_owner,
             "readdirplus started"
         );
+
+        let mut res = self
+            .inner
+            .readdirplus(req, parent, fh, offset, lock_owner)
+            .await?;
+        while let Some(entry_result) = res.entries.next().await {
+            match entry_result {
+                Ok(entry) => println!("Directory entry plus: {:?}", entry),
+                Err(e) => eprintln!("Error reading directory entry plus: {:?}", e),
+            }
+        }
 
         log_result!(
             self.inner.readdirplus(req, parent, fh, offset, lock_owner),
