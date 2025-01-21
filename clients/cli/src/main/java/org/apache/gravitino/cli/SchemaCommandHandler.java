@@ -35,6 +35,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private final String metalake;
   private final String catalog;
   private String schema;
+  private final String outputFormat;
 
   /**
    * Constructs a {@link SchemaCommandHandler} instance.
@@ -55,6 +56,7 @@ public class SchemaCommandHandler extends CommandHandler {
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
+    this.outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
   }
 
   @Override
@@ -132,7 +134,7 @@ public class SchemaCommandHandler extends CommandHandler {
           .handle();
     } else {
       gravitinoCommandLine
-          .newSchemaDetails(url, ignore, metalake, catalog, schema)
+          .newSchemaDetails(url, ignore, outputFormat, metalake, catalog, schema)
           .validate()
           .handle();
     }
