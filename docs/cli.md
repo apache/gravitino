@@ -762,6 +762,12 @@ gcli user grant --user new_user --role admin
 gcli user revoke --user new_user --role admin
 ```
 
+#### Remove all roles from a user
+
+```bash
+gcli user revoke --user new_user --all
+```
+
 #### Add a role to a group
 
 ```bash
@@ -774,6 +780,12 @@ gcli group grant --group groupA --role admin
 gcli group revoke --group groupA --role admin
 ```
 
+#### Remove all roles from a group
+
+```bash
+gcli group revoke --group groupA --all
+```
+
 ### Grant a privilege
 
 ```bash
@@ -784,6 +796,12 @@ gcli role grant --name catalog_postgres --role admin --privilege create_table mo
 
 ```bash
 gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
+```
+
+### Revoke all privileges
+
+```bash
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --all
 ```
 
 ### Topic commands

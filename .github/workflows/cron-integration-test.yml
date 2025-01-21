@@ -87,7 +87,7 @@ jobs:
           ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         with:
           name: integrate test reports

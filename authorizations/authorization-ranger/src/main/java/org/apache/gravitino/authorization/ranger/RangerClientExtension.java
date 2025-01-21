@@ -100,12 +100,14 @@ public class RangerClientExtension extends RangerClient {
     }
   }
 
+  @Override
   public RangerPolicy createPolicy(RangerPolicy policy) throws RangerServiceException {
     Preconditions.checkArgument(
         policy.getResources().size() > 0, "Ranger policy resources can not be empty!");
     return super.createPolicy(policy);
   }
 
+  @Override
   public RangerPolicy updatePolicy(long policyId, RangerPolicy policy)
       throws RangerServiceException {
     Preconditions.checkArgument(

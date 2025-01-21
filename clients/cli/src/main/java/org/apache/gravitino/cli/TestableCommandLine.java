@@ -86,6 +86,7 @@ import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RegisterModel;
+import org.apache.gravitino.cli.commands.RemoveAllRoles;
 import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
@@ -96,6 +97,7 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.RevokeAllPrivileges;
 import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
 import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
@@ -455,6 +457,11 @@ public class TestableCommandLine {
   protected RemoveRoleFromGroup newRemoveRoleFromGroup(
       String url, boolean ignore, String metalake, String group, String role) {
     return new RemoveRoleFromGroup(url, ignore, metalake, group, role);
+  }
+
+  protected RemoveAllRoles newRemoveAllRoles(
+      String url, boolean ignore, String metalake, String entity, String entityType) {
+    return new RemoveAllRoles(url, ignore, metalake, entity, entityType);
   }
 
   protected AddRoleToGroup newAddRoleToGroup(
@@ -893,6 +900,11 @@ public class TestableCommandLine {
       FullName entity,
       String[] privileges) {
     return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected RevokeAllPrivileges newRevokeAllPrivileges(
+      String url, boolean ignore, String metalake, String role, FullName entity) {
+    return new RevokeAllPrivileges(url, ignore, metalake, role, entity);
   }
 
   protected MetalakeEnable newMetalakeEnable(
