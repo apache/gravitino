@@ -21,6 +21,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -40,10 +41,6 @@ import org.apache.kerby.kerberos.kerb.type.base.PrincipalName;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
-// Referred from Apache Hadoop KerberosUtil.java
-// Remove part methods
-// hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
-// security/authentication/util/KerberosUtil.java
 public class KerberosServerUtils {
 
   /**
@@ -354,7 +351,7 @@ public class KerberosServerUtils {
 
     String getAsString() {
       try {
-        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), "UTF-8");
+        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8);
       } catch (UnsupportedEncodingException e) {
         throw new IllegalCharsetNameException("UTF-8"); // won't happen.
       }
