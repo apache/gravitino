@@ -31,8 +31,12 @@ public class PathBasedSecurableObject extends PathBasedMetadataObject
   private final List<AuthorizationPrivilege> privileges;
 
   public PathBasedSecurableObject(
-      String path, AuthorizationMetadataObject.Type type, Set<AuthorizationPrivilege> privileges) {
-    super(path, type);
+      String parent,
+      String name,
+      String path,
+      AuthorizationMetadataObject.Type type,
+      Set<AuthorizationPrivilege> privileges) {
+    super(parent, name, path, type);
     this.privileges = ImmutableList.copyOf(privileges);
   }
 

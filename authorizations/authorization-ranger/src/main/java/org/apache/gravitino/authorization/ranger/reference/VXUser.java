@@ -75,6 +75,7 @@ public class VXUser extends VXDataObject implements java.io.Serializable {
    *
    * @return formatedStr
    */
+  @Override
   public String toString() {
     String str = "VXUser={";
     str += super.toString();

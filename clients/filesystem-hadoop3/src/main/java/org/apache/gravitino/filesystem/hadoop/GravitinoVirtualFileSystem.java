@@ -23,35 +23,44 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
-import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -79,7 +88,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private String metalakeName;
   private Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private ScheduledThreadPoolExecutor catalogCleanScheduler;
-  private Cache<String, FileSystem> internalFileSystemCache;
+  // Fileset name identifier and its corresponding FileSystem cache, the name identifier has
+  // four levels, the first level is metalake name.
+  private Cache<NameIdentifier, FileSystem> internalFileSystemCache;
   private ScheduledThreadPoolExecutor internalFileSystemCleanScheduler;
 
   // The pattern is used to match gvfs path. The scheme prefix (gvfs://fileset) is optional.
@@ -90,6 +101,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+
+  private static final Set<String> CATALOG_NECESSARY_PROPERTIES_TO_KEEP =
+      Sets.newHashSet(
+          OSSProperties.GRAVITINO_OSS_ENDPOINT,
+          OSSProperties.GRAVITINO_OSS_REGION,
+          S3Properties.GRAVITINO_S3_ENDPOINT,
+          S3Properties.GRAVITINO_S3_REGION,
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -132,8 +151,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         "'%s' is not set in the configuration",
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
 
-    initializeClient(configuration);
-
+    this.client = GravitinoVirtualFileSystemUtils.createClient(configuration);
     // Register the default local and HDFS FileSystemProvider
     fileSystemProvidersMap.putAll(getFileSystemProviders());
 
@@ -145,7 +163,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @VisibleForTesting
-  Cache<String, FileSystem> internalFileSystemCache() {
+  Cache<NameIdentifier, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
   }
 
@@ -191,116 +209,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private ThreadFactory newDaemonThreadFactory(String name) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(name + "-%d").build();
-  }
-
-  private void initializeClient(Configuration configuration) {
-    // initialize the Gravitino client
-    String serverUri =
-        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(serverUri),
-        "'%s' is not set in the configuration",
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
-
-    String authType =
-        configuration.get(
-            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
-            GravitinoVirtualFileSystemConfiguration.SIMPLE_AUTH_TYPE);
-    if (authType.equalsIgnoreCase(GravitinoVirtualFileSystemConfiguration.SIMPLE_AUTH_TYPE)) {
-      this.client =
-          GravitinoClient.builder(serverUri).withMetalake(metalakeName).withSimpleAuth().build();
-    } else if (authType.equalsIgnoreCase(
-        GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE)) {
-      String authServerUri =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY);
-      checkAuthConfig(
-          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
-          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY,
-          authServerUri);
-
-      String credential =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY);
-      checkAuthConfig(
-          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
-          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY,
-          credential);
-
-      String path =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY);
-      checkAuthConfig(
-          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
-          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY,
-          path);
-
-      String scope =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY);
-      checkAuthConfig(
-          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
-          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY,
-          scope);
-
-      DefaultOAuth2TokenProvider authDataProvider =
-          DefaultOAuth2TokenProvider.builder()
-              .withUri(authServerUri)
-              .withCredential(credential)
-              .withPath(path)
-              .withScope(scope)
-              .build();
-
-      this.client =
-          GravitinoClient.builder(serverUri)
-              .withMetalake(metalakeName)
-              .withOAuth(authDataProvider)
-              .build();
-    } else if (authType.equalsIgnoreCase(
-        GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE)) {
-      String principal =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_PRINCIPAL_KEY);
-      checkAuthConfig(
-          GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE,
-          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_PRINCIPAL_KEY,
-          principal);
-      String keytabFilePath =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration
-                  .FS_GRAVITINO_CLIENT_KERBEROS_KEYTAB_FILE_PATH_KEY);
-      KerberosTokenProvider authDataProvider;
-      if (StringUtils.isNotBlank(keytabFilePath)) {
-        // Using principal and keytab to create auth provider
-        authDataProvider =
-            KerberosTokenProvider.builder()
-                .withClientPrincipal(principal)
-                .withKeyTabFile(new File(keytabFilePath))
-                .build();
-      } else {
-        // Using ticket cache to create auth provider
-        authDataProvider = KerberosTokenProvider.builder().withClientPrincipal(principal).build();
-      }
-      this.client =
-          GravitinoClient.builder(serverUri)
-              .withMetalake(metalakeName)
-              .withKerberosAuth(authDataProvider)
-              .build();
-    } else {
-      throw new IllegalArgumentException(
-          String.format(
-              "Unsupported authentication type: %s for %s.",
-              authType, GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY));
-    }
-  }
-
-  private void checkAuthConfig(String authType, String configKey, String configValue) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(configValue),
-        "%s should not be null if %s is set to %s.",
-        configKey,
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
-        authType);
   }
 
   private String getVirtualLocation(NameIdentifier identifier, boolean withScheme) {
@@ -360,6 +268,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     FilesetCatalog filesetCatalog =
         catalogCache.get(
             catalogIdent, ident -> client.loadCatalog(catalogIdent.name()).asFilesetCatalog());
+    Catalog catalog = (Catalog) filesetCatalog;
     Preconditions.checkArgument(
         filesetCatalog != null, String.format("Loaded fileset catalog: %s is null.", catalogIdent));
 
@@ -383,8 +292,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
     FileSystem fs =
         internalFileSystemCache.get(
-            scheme,
-            str -> {
+            identifier,
+            ident -> {
               try {
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
                 if (provider == null) {
@@ -398,8 +307,19 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 // https://github.com/apache/gravitino/issues/5609
                 resetFileSystemServiceLoader(scheme);
 
-                Map<String, String> maps = getConfigMap(getConf());
-                return provider.getFileSystem(filePath, maps);
+                Map<String, String> necessaryPropertyFromCatalog =
+                    catalog.properties().entrySet().stream()
+                        .filter(
+                            property ->
+                                CATALOG_NECESSARY_PROPERTIES_TO_KEEP.contains(property.getKey()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+                Map<String, String> totalProperty = Maps.newHashMap(necessaryPropertyFromCatalog);
+                totalProperty.putAll(getConfigMap(getConf()));
+
+                totalProperty.putAll(getCredentialProperties(provider, catalog, identifier));
+
+                return provider.getFileSystem(filePath, totalProperty);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
                     "Exception occurs when create new FileSystem for actual uri: %s, msg: %s",
@@ -408,6 +328,41 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             });
 
     return new FilesetContextPair(new Path(actualFileLocation), fs);
+  }
+
+  private Map<String, String> getCredentialProperties(
+      FileSystemProvider fileSystemProvider, Catalog catalog, NameIdentifier filesetIdentifier) {
+    // Do not support credential vending, we do not need to add any credential properties.
+    if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
+      return ImmutableMap.of();
+    }
+
+    ImmutableMap.Builder<String, String> mapBuilder = ImmutableMap.builder();
+    try {
+      Fileset fileset =
+          catalog
+              .asFilesetCatalog()
+              .loadFileset(
+                  NameIdentifier.of(
+                      filesetIdentifier.namespace().level(2), filesetIdentifier.name()));
+      Credential[] credentials = fileset.supportsCredentials().getCredentials();
+      if (credentials.length > 0) {
+        mapBuilder.put(
+            GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
+            DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
+        mapBuilder.put(
+            GravitinoFileSystemCredentialsProvider.GVFS_NAME_IDENTIFIER,
+            filesetIdentifier.toString());
+
+        SupportsCredentialVending supportsCredentialVending =
+            (SupportsCredentialVending) fileSystemProvider;
+        mapBuilder.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    return mapBuilder.build();
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {

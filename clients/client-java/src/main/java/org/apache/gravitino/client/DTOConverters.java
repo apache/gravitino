@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
@@ -124,6 +125,18 @@ class DTOConverters {
             .withAudit((AuditDTO) catalog.auditInfo())
             .withRestClient(client)
             .build();
+      case MODEL:
+        return GenericModelCatalog.builder()
+            .withNamespace(namespace)
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(catalog.properties())
+            .withAudit((AuditDTO) catalog.auditInfo())
+            .withRestClient(client)
+            .build();
+
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
     }
@@ -309,7 +322,7 @@ class DTOConverters {
         .build();
   }
 
-  static List<PrivilegeDTO> toPrivileges(List<Privilege> privileges) {
+  static List<PrivilegeDTO> toPrivileges(Collection<Privilege> privileges) {
     return privileges.stream()
         .map(
             privilege ->

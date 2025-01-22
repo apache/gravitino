@@ -92,4 +92,10 @@ public class SetTopicProperty extends Command {
 
     System.out.println(property + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return super.validate();
+  }
 }

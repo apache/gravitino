@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +36,7 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.TableMetadata;
@@ -58,6 +61,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT);
 
+  @SuppressWarnings("deprecation")
+  private static Map<String, String> deprecatedProperties =
+      ImmutableMap.of(
+          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
+          CredentialConstants.CREDENTIAL_PROVIDERS,
+          "gcs-credential-file-path",
+          GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
+
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
     this.catalogConfigToClients =
@@ -65,7 +76,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             config.getIcebergCatalogProperties(),
             key -> catalogPropertiesToClientKeys.contains(key));
     // To be compatible with old properties
-    Map<String, String> catalogProperties = checkForCompatibility(config.getAllConfig());
+    Map<String, String> catalogProperties =
+        checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
   }
 
@@ -131,27 +143,30 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .build();
   }
 
-  @SuppressWarnings("deprecation")
-  private Map<String, String> checkForCompatibility(Map<String, String> properties) {
-    HashMap<String, String> normalizedProperties = new HashMap<>(properties);
-    String credentialProviderType = properties.get(CredentialConstants.CREDENTIAL_PROVIDER_TYPE);
-    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    if (StringUtils.isNotBlank(credentialProviders)
-        && StringUtils.isNotBlank(credentialProviderType)) {
+  @VisibleForTesting
+  static Map<String, String> checkForCompatibility(
+      Map<String, String> properties, Map<String, String> deprecatedProperties) {
+    Map<String, String> newProperties = new HashMap<>(properties);
+    deprecatedProperties.forEach(
+        (deprecatedProperty, newProperty) -> {
+          replaceDeprecatedProperties(newProperties, deprecatedProperty, newProperty);
+        });
+    return newProperties;
+  }
+
+  private static void replaceDeprecatedProperties(
+      Map<String, String> properties, String deprecatedProperty, String newProperty) {
+    String deprecatedValue = properties.get(deprecatedProperty);
+    String newValue = properties.get(newProperty);
+    if (StringUtils.isNotBlank(deprecatedValue) && StringUtils.isNotBlank(newValue)) {
       throw new IllegalArgumentException(
-          String.format(
-              "Should not set both %s and %s",
-              CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-              CredentialConstants.CREDENTIAL_PROVIDERS));
+          String.format("Should not set both %s and %s", deprecatedProperty, newProperty));
     }
 
-    if (StringUtils.isNotBlank(credentialProviderType)) {
-      LOG.warn(
-          "%s is deprecated, please use %s instead.",
-          CredentialConstants.CREDENTIAL_PROVIDER_TYPE, CredentialConstants.CREDENTIAL_PROVIDERS);
-      normalizedProperties.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialProviderType);
+    if (StringUtils.isNotBlank(deprecatedValue)) {
+      LOG.warn("%s is deprecated, please use %s instead.", deprecatedProperty, newProperty);
+      properties.remove(deprecatedProperty);
+      properties.put(newProperty, deprecatedValue);
     }
-
-    return normalizedProperties;
   }
 }

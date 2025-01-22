@@ -19,6 +19,9 @@ import unittest
 
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
+from gravitino.dto.responses.model_response import ModelResponse
+from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
+from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -74,3 +77,175 @@ class TestResponses(unittest.TestCase):
             "secret-key", credential.credential_info()["s3-secret-access-key"]
         )
         self.assertEqual("token", credential.credential_info()["s3-session-token"])
+
+    def test_model_response(self):
+        json_data = {
+            "code": 0,
+            "model": {
+                "name": "test_model",
+                "comment": "test comment",
+                "properties": {"key1": "value1"},
+                "latestVersion": 0,
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2024-04-05T10:10:35.218Z",
+                },
+            },
+        }
+        json_str = json.dumps(json_data)
+        model_resp: ModelResponse = ModelResponse.from_json(
+            json_str, infer_missing=True
+        )
+        model_resp.validate()
+        self.assertEqual("test_model", model_resp.model().name())
+        self.assertEqual(0, model_resp.model().latest_version())
+        self.assertEqual("test comment", model_resp.model().comment())
+        self.assertEqual({"key1": "value1"}, model_resp.model().properties())
+        self.assertEqual("anonymous", model_resp.model().audit_info().creator())
+        self.assertEqual(
+            "2024-04-05T10:10:35.218Z", model_resp.model().audit_info().create_time()
+        )
+
+        json_data_missing = {
+            "code": 0,
+            "model": {
+                "name": "test_model",
+                "latestVersion": 0,
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2024-04-05T10:10:35.218Z",
+                },
+            },
+        }
+        json_str_missing = json.dumps(json_data_missing)
+        model_resp_missing: ModelResponse = ModelResponse.from_json(
+            json_str_missing, infer_missing=True
+        )
+        model_resp_missing.validate()
+        self.assertEqual("test_model", model_resp_missing.model().name())
+        self.assertEqual(0, model_resp_missing.model().latest_version())
+        self.assertIsNone(model_resp_missing.model().comment())
+        self.assertIsNone(model_resp_missing.model().properties())
+
+    def test_model_version_list_response(self):
+        json_data = {"code": 0, "versions": [0, 1, 2]}
+        json_str = json.dumps(json_data)
+        resp: ModelVersionListResponse = ModelVersionListResponse.from_json(
+            json_str, infer_missing=True
+        )
+        resp.validate()
+        self.assertEqual(3, len(resp.versions()))
+        self.assertEqual([0, 1, 2], resp.versions())
+
+        json_data_missing = {"code": 0, "versions": []}
+        json_str_missing = json.dumps(json_data_missing)
+        resp_missing: ModelVersionListResponse = ModelVersionListResponse.from_json(
+            json_str_missing, infer_missing=True
+        )
+        resp_missing.validate()
+        self.assertEqual(0, len(resp_missing.versions()))
+        self.assertEqual([], resp_missing.versions())
+
+        json_data_missing_1 = {
+            "code": 0,
+        }
+        json_str_missing_1 = json.dumps(json_data_missing_1)
+        resp_missing_1: ModelVersionListResponse = ModelVersionListResponse.from_json(
+            json_str_missing_1, infer_missing=True
+        )
+        self.assertRaises(IllegalArgumentException, resp_missing_1.validate)
+
+    def test_model_version_response(self):
+        json_data = {
+            "code": 0,
+            "modelVersion": {
+                "version": 0,
+                "aliases": ["alias1", "alias2"],
+                "uri": "http://localhost:8080",
+                "comment": "test comment",
+                "properties": {"key1": "value1"},
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2024-04-05T10:10:35.218Z",
+                },
+            },
+        }
+        json_str = json.dumps(json_data)
+        resp: ModelVersionResponse = ModelVersionResponse.from_json(
+            json_str, infer_missing=True
+        )
+        resp.validate()
+        self.assertEqual(0, resp.model_version().version())
+        self.assertEqual(["alias1", "alias2"], resp.model_version().aliases())
+        self.assertEqual("test comment", resp.model_version().comment())
+        self.assertEqual({"key1": "value1"}, resp.model_version().properties())
+        self.assertEqual("anonymous", resp.model_version().audit_info().creator())
+        self.assertEqual(
+            "2024-04-05T10:10:35.218Z", resp.model_version().audit_info().create_time()
+        )
+
+        json_data = {
+            "code": 0,
+            "modelVersion": {
+                "version": 0,
+                "uri": "http://localhost:8080",
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2024-04-05T10:10:35.218Z",
+                },
+            },
+        }
+        json_str = json.dumps(json_data)
+        resp: ModelVersionResponse = ModelVersionResponse.from_json(
+            json_str, infer_missing=True
+        )
+        resp.validate()
+        self.assertEqual(0, resp.model_version().version())
+        self.assertIsNone(resp.model_version().aliases())
+        self.assertIsNone(resp.model_version().comment())
+        self.assertIsNone(resp.model_version().properties())
+
+        json_data = {
+            "code": 0,
+            "modelVersion": {
+                "uri": "http://localhost:8080",
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2024-04-05T10:10:35.218Z",
+                },
+            },
+        }
+        json_str = json.dumps(json_data)
+        resp: ModelVersionResponse = ModelVersionResponse.from_json(
+            json_str, infer_missing=True
+        )
+        self.assertRaises(IllegalArgumentException, resp.validate)
+
+        json_data = {
+            "code": 0,
+            "modelVersion": {
+                "version": 0,
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2024-04-05T10:10:35.218Z",
+                },
+            },
+        }
+        json_str = json.dumps(json_data)
+        resp: ModelVersionResponse = ModelVersionResponse.from_json(
+            json_str, infer_missing=True
+        )
+        self.assertRaises(IllegalArgumentException, resp.validate)
+
+        json_data = {
+            "code": 0,
+            "modelVersion": {
+                "version": 0,
+                "uri": "http://localhost:8080",
+            },
+        }
+        json_str = json.dumps(json_data)
+        resp: ModelVersionResponse = ModelVersionResponse.from_json(
+            json_str, infer_missing=True
+        )
+        self.assertRaises(IllegalArgumentException, resp.validate)

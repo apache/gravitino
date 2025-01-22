@@ -189,7 +189,7 @@ public class TestMain {
 
     Main.main(args);
 
-    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+    assertTrue(errContent.toString().contains(ErrorMessages.MISSING_TAG)); // Expect error
   }
 
   @SuppressWarnings("DefaultCharset")
@@ -198,6 +198,6 @@ public class TestMain {
 
     Main.main(args);
 
-    assertTrue(errContent.toString().contains(ErrorMessages.TAG_EMPTY)); // Expect error
+    assertTrue(errContent.toString().contains(ErrorMessages.MISSING_TAG)); // Expect error
   }
 }

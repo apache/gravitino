@@ -47,6 +47,7 @@ public class TestFulllName {
 
   @BeforeEach
   public void setUp() {
+    Main.useExit = false;
     options = new GravitinoOptions().options();
     System.setOut(new PrintStream(outContent));
     System.setErr(new PrintStream(errContent));
@@ -82,8 +83,7 @@ public class TestFulllName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
-    String metalakeName = fullName.getMetalakeName();
-    assertNull(metalakeName);
+    assertThrows(RuntimeException.class, fullName::getMetalakeName);
   }
 
   @Test
@@ -109,6 +109,21 @@ public class TestFulllName {
 
     String namePart = fullName.getNamePart(3);
     assertNull(namePart);
+  }
+
+  @Test
+  public void hasPartName() throws ParseException {
+    String[] argsWithoutName = {"catalog", "details", "--metalake", "metalake"};
+    CommandLine commandLineWithoutName = new DefaultParser().parse(options, argsWithoutName);
+    FullName fullNameWithoutName = new FullName(commandLineWithoutName);
+    assertFalse(fullNameWithoutName.hasName());
+
+    String[] argsWithName = {
+      "catalog", "details", "--metalake", "metalake", "--name", "Hive_catalog"
+    };
+    CommandLine commandLineWithName = new DefaultParser().parse(options, argsWithName);
+    FullName fullNameWithName = new FullName(commandLineWithName);
+    assertTrue(fullNameWithName.hasName());
   }
 
   @Test
@@ -196,5 +211,64 @@ public class TestFulllName {
     fullName.getColumnName();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.MALFORMED_NAME);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalake() throws ParseException {
+    String[] args = {
+      "table", "list", "-i", "-m", "demo_metalake", "--name", "Hive_catalog.default"
+    };
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    String metalakeName = fullName.getMetalakeName();
+    assertEquals(metalakeName, "demo_metalake");
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalakeWithoutMetalakeOption() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertThrows(RuntimeException.class, fullName::getMetalakeName);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(errOutput, ErrorMessages.MISSING_METALAKE);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromCatalog() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(1, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromSchema() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(2, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromTable() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default.sales"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(3, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromColumn() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default.sales.columns"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(4, fullName.getLevel());
   }
 }

@@ -44,6 +44,7 @@ import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.rest.RESTUtils;
 
 /**
  * Messaging catalog is a catalog implementation that supports messaging-like metadata operations,
@@ -115,7 +116,7 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
     Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     TopicResponse resp =
         restClient.get(
-            formatTopicRequestPath(fullNamespace) + "/" + ident.name(),
+            formatTopicRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             TopicResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.topicErrorHandler());
@@ -187,7 +188,7 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
 
     TopicResponse resp =
         restClient.put(
-            formatTopicRequestPath(fullNamespace) + "/" + ident.name(),
+            formatTopicRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             updatesRequest,
             TopicResponse.class,
             Collections.emptyMap(),
@@ -210,7 +211,7 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
     Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     DropResponse resp =
         restClient.delete(
-            formatTopicRequestPath(fullNamespace) + "/" + ident.name(),
+            formatTopicRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.topicErrorHandler());
@@ -222,7 +223,10 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
   @VisibleForTesting
   static String formatTopicRequestPath(Namespace ns) {
     Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
-    return formatSchemaRequestPath(schemaNs) + "/" + ns.level(2) + "/topics";
+    return formatSchemaRequestPath(schemaNs)
+        + "/"
+        + RESTUtils.encodeString(ns.level(2))
+        + "/topics";
   }
 
   /**

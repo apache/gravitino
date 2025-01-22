@@ -74,4 +74,10 @@ public class SetTagProperty extends Command {
 
     System.out.println(tag + " property set.");
   }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return super.validate();
+  }
 }

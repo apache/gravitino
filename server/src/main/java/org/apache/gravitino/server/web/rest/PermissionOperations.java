@@ -87,12 +87,14 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () ->
-                              Utils.ok(
-                                  new UserResponse(
-                                      DTOConverters.toDTO(
-                                          accessControlManager.grantRolesToUser(
-                                              metalake, request.getRoleNames(), user)))))));
+                          () -> {
+                            request.validate();
+                            return Utils.ok(
+                                new UserResponse(
+                                    DTOConverters.toDTO(
+                                        accessControlManager.grantRolesToUser(
+                                            metalake, request.getRoleNames(), user))));
+                          })));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
@@ -119,12 +121,14 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () ->
-                              Utils.ok(
-                                  new GroupResponse(
-                                      DTOConverters.toDTO(
-                                          accessControlManager.grantRolesToGroup(
-                                              metalake, request.getRoleNames(), group)))))));
+                          () -> {
+                            request.validate();
+                            return Utils.ok(
+                                new GroupResponse(
+                                    DTOConverters.toDTO(
+                                        accessControlManager.grantRolesToGroup(
+                                            metalake, request.getRoleNames(), group))));
+                          })));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), group, e);
@@ -151,12 +155,14 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () ->
-                              Utils.ok(
-                                  new UserResponse(
-                                      DTOConverters.toDTO(
-                                          accessControlManager.revokeRolesFromUser(
-                                              metalake, request.getRoleNames(), user)))))));
+                          () -> {
+                            request.validate();
+                            return Utils.ok(
+                                new UserResponse(
+                                    DTOConverters.toDTO(
+                                        accessControlManager.revokeRolesFromUser(
+                                            metalake, request.getRoleNames(), user))));
+                          })));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), user, e);
@@ -183,12 +189,14 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () ->
-                              Utils.ok(
-                                  new GroupResponse(
-                                      DTOConverters.toDTO(
-                                          accessControlManager.revokeRolesFromGroup(
-                                              metalake, request.getRoleNames(), group)))))));
+                          () -> {
+                            request.validate();
+                            return Utils.ok(
+                                new GroupResponse(
+                                    DTOConverters.toDTO(
+                                        accessControlManager.revokeRolesFromGroup(
+                                            metalake, request.getRoleNames(), group))));
+                          })));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames()), group, e);
@@ -214,6 +222,8 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            privilegeGrantRequest.validate();
+
             for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
@@ -232,7 +242,7 @@ public class PermissionOperations {
                                     object,
                                     privilegeGrantRequest.getPrivileges().stream()
                                         .map(DTOConverters::fromPrivilegeDTO)
-                                        .collect(Collectors.toList()))))));
+                                        .collect(Collectors.toSet()))))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
@@ -259,6 +269,8 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            privilegeRevokeRequest.validate();
+
             for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
@@ -277,7 +289,7 @@ public class PermissionOperations {
                                     object,
                                     privilegeRevokeRequest.getPrivileges().stream()
                                         .map(DTOConverters::fromPrivilegeDTO)
-                                        .collect(Collectors.toList()))))));
+                                        .collect(Collectors.toSet()))))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(

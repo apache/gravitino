@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -293,7 +294,7 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
   Role grantPrivilegeToRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchGroupException, NoSuchRoleException;
 
   /**
@@ -308,6 +309,6 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   Role revokePrivilegesFromRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException;
 }

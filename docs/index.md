@@ -56,11 +56,13 @@ REST API and the Java SDK. You can use either to manage metadata. See
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
   messaging metadata.
+* [Manage model metadata using Gravitino](./manage-model-metadata-using-gravitino.md) to learn how to manage
+  model metadata.
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/0.8.0-incubating-SNAPSHOT/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.8.0-incubating-SNAPSHOT/api/python/index.html).
+Java SDK definition in [Gravitino Java doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/index.html),
+and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/python/index.html).
 
 Gravitino also provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`.
 See [Gravitino web UI](./webui.md) for details.
@@ -87,6 +89,10 @@ Gravitino currently supports the following catalogs:
 **Messaging catalogs:**
 
 * [**Kafka catalog**](./kafka-catalog.md)
+
+**Model catalogs:**
+
+* [**Model catalog**](./model-catalog.md)
 
 ## Apache Gravitino playground
 
@@ -119,6 +125,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 * [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
 * [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
+* [Model catalog](./model-catalog.md): a complete guide to using Gravitino to manage model metadata.
 
 ### Governance
 
@@ -171,8 +178,8 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
-* [Gravitino Java doc](pathname:///docs/0.8.0-incubating-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
-* [Gravitino Python doc](pathname:///docs/0.8.0-incubating-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
+* [Gravitino Java doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Python doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
 
 ### Development guides
 

@@ -25,11 +25,16 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,9 +44,9 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class S3FileSystemProvider implements FileSystemProvider {
+public class S3FileSystemProvider implements FileSystemProvider, SupportsCredentialVending {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(S3FileSystemProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(S3FileSystemProvider.class);
 
   @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
@@ -61,16 +66,27 @@ public class S3FileSystemProvider implements FileSystemProvider {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
-    if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
-      hadoopConfMap.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
-    }
-
     hadoopConfMap.forEach(configuration::set);
+    if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
+      configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+    }
 
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
     checkAndSetCredentialProvider(configuration);
 
     return S3AFileSystem.newInstance(path.toUri(), configuration);
+  }
+
+  @Override
+  public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
+    Credential credential = S3Utils.getSuitableCredential(credentials);
+    Map<String, String> result = Maps.newHashMap();
+    if (credential instanceof S3SecretKeyCredential || credential instanceof S3TokenCredential) {
+      result.put(
+          Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
+    }
+
+    return result;
   }
 
   private void checkAndSetCredentialProvider(Configuration configuration) {
@@ -91,12 +107,12 @@ public class S3FileSystemProvider implements FileSystemProvider {
         if (AWSCredentialsProvider.class.isAssignableFrom(c)) {
           validProviders.add(provider);
         } else {
-          LOGGER.warn(
+          LOG.warn(
               "Credential provider {} is not a subclass of AWSCredentialsProvider, skipping",
               provider);
         }
       } catch (Exception e) {
-        LOGGER.warn(
+        LOG.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
             provider);
         configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);

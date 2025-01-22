@@ -94,6 +94,6 @@ public class ListColumns extends TableCommand {
               + System.lineSeparator());
     }
 
-    System.out.print(all.toString());
+    System.out.print(all);
   }
 }

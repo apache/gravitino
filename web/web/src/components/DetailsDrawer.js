@@ -121,9 +121,27 @@ const DetailsDrawer = props => {
             }}
             data-refer='details-title'
           >
-            {drawerData.name}
+            {drawerData.name || drawerData.version}
           </Typography>
         </Grid>
+
+        {drawerData.uri && (
+          <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              Type
+            </Typography>
+            {renderFieldText({ value: drawerData.uri })}
+          </Grid>
+        )}
+
+        {drawerData.aliases && (
+          <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              Aliases
+            </Typography>
+            {renderFieldText({ value: drawerData.aliases.join(', ') })}
+          </Grid>
+        )}
 
         {drawerData.type && (
           <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
@@ -134,7 +152,7 @@ const DetailsDrawer = props => {
           </Grid>
         )}
 
-        {drawerData.provider && (
+        {drawerData.provider && drawerData?.type !== 'model' && (
           <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
             <Typography variant='body2' sx={{ mb: 2 }}>
               Provider

@@ -37,6 +37,8 @@ show create table gt_mysql.gt_db1.tb01;
 alter table gt_mysql.gt_db1.tb01 add column address varchar(200) not null comment 'address of users';
 show create table gt_mysql.gt_db1.tb01;
 
+COMMENT ON COLUMN gt_mysql.gt_db1.tb01.city IS NULL;
+
 drop table gt_mysql.gt_db1.tb01;
 
 drop schema gt_mysql.gt_db1;

@@ -186,13 +186,13 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
   @VisibleForTesting
   String getPartitionRequestPath() {
     return "api/metalakes/"
-        + namespace.level(0)
+        + RESTUtils.encodeString(namespace.level(0))
         + "/catalogs/"
-        + namespace.level(1)
+        + RESTUtils.encodeString(namespace.level(1))
         + "/schemas/"
-        + namespace.level(2)
+        + RESTUtils.encodeString(namespace.level(2))
         + "/tables/"
-        + name()
+        + RESTUtils.encodeString(name())
         + "/partitions";
   }
 

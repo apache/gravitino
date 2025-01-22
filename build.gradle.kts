@@ -501,6 +501,9 @@ subprojects {
       exclude("test/**")
     }
   }
+  tasks.named("compileJava").configure {
+    dependsOn("spotlessCheck")
+  }
 }
 
 tasks.rat {
@@ -673,13 +676,13 @@ tasks {
     doLast {
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
-        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".bin", "")
+          fileName.replace(".trino", "")
         }
       }
     }

@@ -172,20 +172,10 @@ public class ModelMetaService {
 
   private void fillModelPOBuilderParentEntityId(ModelPO.Builder builder, Namespace ns) {
     NamespaceUtil.checkModel(ns);
-    String metalake = ns.level(0);
-    String catalog = ns.level(1);
-    String schema = ns.level(2);
-
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    builder.withMetalakeId(metalakeId);
-
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalog);
-    builder.withCatalogId(catalogId);
-
-    Long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schema);
-    builder.withSchemaId(schemaId);
+    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(ns);
+    builder.withMetalakeId(parentEntityIds[0]);
+    builder.withCatalogId(parentEntityIds[1]);
+    builder.withSchemaId(parentEntityIds[2]);
   }
 
   ModelPO getModelPOByIdentifier(NameIdentifier ident) {

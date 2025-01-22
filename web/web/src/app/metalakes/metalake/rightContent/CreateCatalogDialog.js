@@ -64,7 +64,7 @@ const defaultValues = {
 
 const schema = yup.object().shape({
   name: yup.string().required().matches(nameRegex, nameRegexDesc),
-  type: yup.mixed().oneOf(['relational', 'fileset', 'messaging']).required(),
+  type: yup.mixed().oneOf(['relational', 'fileset', 'messaging', 'model']).required(),
   provider: yup.string().when('type', (type, schema) => {
     switch (type) {
       case 'relational':
@@ -148,12 +148,7 @@ const CreateCatalogDialog = props => {
   }
 
   const addFields = () => {
-    const duplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
+    const duplicateKeys = innerProps.some(item => item.hasDuplicateKey)
 
     if (duplicateKeys) {
       return
@@ -212,16 +207,9 @@ const CreateCatalogDialog = props => {
   }
 
   const onSubmit = data => {
-    const duplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
+    const hasError = innerProps.some(prop => prop.hasDuplicateKey || prop.invalid)
 
-    const invalidKeys = innerProps.some(i => i.invalid)
-
-    if (duplicateKeys || invalidKeys) {
+    if (hasError) {
       return
     }
 
@@ -371,6 +359,11 @@ const CreateCatalogDialog = props => {
         setValue('provider', 'kafka')
         break
       }
+      case 'model': {
+        setProviderTypes([])
+        setValue('provider', '')
+        break
+      }
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -385,11 +378,10 @@ const CreateCatalogDialog = props => {
       defaultProps = providerTypes[providerItemIndex].defaultProps
 
       resetPropsFields(providerTypes, providerItemIndex)
-
-      if (type === 'create') {
-        setInnerProps(defaultProps)
-        setValue('propItems', providerTypes[providerItemIndex].defaultProps)
-      }
+    }
+    if (type === 'create') {
+      setInnerProps(defaultProps)
+      setValue('propItems', defaultProps)
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -420,12 +412,16 @@ const CreateCatalogDialog = props => {
           providersItems = messagingProviders
           break
         }
+        case 'model': {
+          providersItems = []
+          break
+        }
       }
 
       setProviderTypes(providersItems)
 
       const providerItem = providersItems.find(i => i.value === data.provider)
-      let propsItems = [...providerItem.defaultProps].filter(i => i.required)
+      let propsItems = providerItem ? [...providerItem.defaultProps].filter(i => i.required) : []
 
       propsItems = propsItems.map((it, idx) => {
         let propItem = {
@@ -528,6 +524,7 @@ const CreateCatalogDialog = props => {
                       <MenuItem value={'relational'}>Relational</MenuItem>
                       <MenuItem value={'fileset'}>Fileset</MenuItem>
                       <MenuItem value={'messaging'}>Messaging</MenuItem>
+                      <MenuItem value={'model'}>Model</MenuItem>
                     </Select>
                   )}
                 />
@@ -535,41 +532,43 @@ const CreateCatalogDialog = props => {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel id='select-catalog-provider' error={Boolean(errors.provider)}>
-                  Provider
-                </InputLabel>
-                <Controller
-                  name='provider'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <Select
-                      value={value}
-                      label='Provider'
-                      defaultValue='hive'
-                      onChange={e => handleChangeProvider(onChange, e)}
-                      error={Boolean(errors.provider)}
-                      labelId='select-catalog-provider'
-                      disabled={type === 'update'}
-                      data-refer='catalog-provider-selector'
-                    >
-                      {providerTypes.map(item => {
-                        return (
-                          <MenuItem key={item.label} value={item.value}>
-                            {item.label}
-                          </MenuItem>
-                        )
-                      })}
-                    </Select>
+            {typeSelect !== 'model' && (
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel id='select-catalog-provider' error={Boolean(errors.provider)}>
+                    Provider
+                  </InputLabel>
+                  <Controller
+                    name='provider'
+                    control={control}
+                    rules={{ required: true }}
+                    render={({ field: { value, onChange } }) => (
+                      <Select
+                        value={value}
+                        label='Provider'
+                        defaultValue='hive'
+                        onChange={e => handleChangeProvider(onChange, e)}
+                        error={Boolean(errors.provider)}
+                        labelId='select-catalog-provider'
+                        disabled={type === 'update'}
+                        data-refer='catalog-provider-selector'
+                      >
+                        {providerTypes.map(item => {
+                          return (
+                            <MenuItem key={item.label} value={item.value}>
+                              {item.label}
+                            </MenuItem>
+                          )
+                        })}
+                      </Select>
+                    )}
+                  />
+                  {errors.provider && (
+                    <FormHelperText sx={{ color: 'error.main' }}>{errors.provider.message}</FormHelperText>
                   )}
-                />
-                {errors.provider && (
-                  <FormHelperText sx={{ color: 'error.main' }}>{errors.provider.message}</FormHelperText>
-                )}
-              </FormControl>
-            </Grid>
+                </FormControl>
+              </Grid>
+            )}
 
             <Grid item xs={12}>
               <FormControl fullWidth>

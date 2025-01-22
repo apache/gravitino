@@ -77,7 +77,7 @@ public interface AuthorizationPrivilegesMappingProvider {
    * Translate the Gravitino metadata object to the underlying data source metadata object.
    *
    * @param metadataObject The Gravitino metadata object.
-   * @return The underlying data source metadata object.
+   * @return The underlying data source metadata object list.
    */
-  AuthorizationMetadataObject translateMetadataObject(MetadataObject metadataObject);
+  List<AuthorizationMetadataObject> translateMetadataObject(MetadataObject metadataObject);
 }

@@ -107,37 +107,40 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkUpdateSQLWithReadWritePrivileges() {
+  protected String testUserName() {
+    return System.getenv(HADOOP_USER_NAME);
+  }
+
+  public void checkUpdateSQLWithReadWritePrivileges() {
     sparkSession.sql(SQL_UPDATE_TABLE);
   }
 
   @Override
-  protected void checkUpdateSQLWithReadPrivileges() {
+  public void checkUpdateSQLWithReadPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkUpdateSQLWithWritePrivileges() {
+  public void checkUpdateSQLWithWritePrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithReadWritePrivileges() {
+  public void checkDeleteSQLWithReadWritePrivileges() {
     sparkSession.sql(SQL_DELETE_TABLE);
   }
 
   @Override
-  protected void checkDeleteSQLWithReadPrivileges() {
+  public void checkDeleteSQLWithReadPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithWritePrivileges() {
+  public void checkDeleteSQLWithWritePrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
-  @Override
-  protected void checkWithoutPrivileges() {
+  public void checkWithoutPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
@@ -151,8 +154,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
-  @Override
-  protected void testAlterTable() {
+  public void testAlterTable() {
     sparkSession.sql(SQL_ALTER_TABLE);
     sparkSession.sql(SQL_ALTER_TABLE_BACK);
   }
@@ -183,8 +185,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     LOG.info("Catalog created: {}", catalog);
   }
 
-  @Override
-  protected void useCatalog() throws InterruptedException {
+  public void useCatalog() {
     String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
@@ -198,7 +199,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     waitForUpdatingPolicies();
   }
 
-  protected void checkTableAllPrivilegesExceptForCreating() {
+  public void checkTableAllPrivilegesExceptForCreating() {
     // - a. Succeed to insert data into the table
     sparkSession.sql(SQL_INSERT_TABLE);
 

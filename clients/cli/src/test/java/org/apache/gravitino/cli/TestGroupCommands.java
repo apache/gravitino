@@ -39,6 +39,7 @@ import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListGroups;
+import org.apache.gravitino.cli.commands.RemoveAllRoles;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +84,7 @@ class TestGroupCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListGroups(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo");
+    doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -101,6 +103,7 @@ class TestGroupCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newGroupDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA");
+    doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }
@@ -120,6 +123,7 @@ class TestGroupCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newGroupAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "group");
+    doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
   }
@@ -138,6 +142,7 @@ class TestGroupCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateGroup(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA");
+    doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
   }
@@ -156,6 +161,7 @@ class TestGroupCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteGroup(GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "groupA");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -175,6 +181,7 @@ class TestGroupCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteGroup(GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "groupA");
+    doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
   }
@@ -246,10 +253,38 @@ class TestGroupCommands {
         .newRemoveRoleFromGroup(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA", "role1");
 
+    doReturn(mockRemoveFirstRole).when(mockRemoveFirstRole).validate();
+    doReturn(mockRemoveSecondRole).when(mockRemoveSecondRole).validate();
     commandLine.handleCommandLine();
 
     verify(mockRemoveFirstRole).handle();
     verify(mockRemoveSecondRole).handle();
+  }
+
+  @Test
+  void testRemoveAllRolesFromGroupCommand() {
+    RemoveAllRoles mock = mock(RemoveAllRoles.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.GROUP)).thenReturn("groupA");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALL)).thenReturn(true);
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.GROUP, CommandActions.REVOKE));
+
+    doReturn(mock)
+        .when(commandLine)
+        .newRemoveAllRoles(
+            GravitinoCommandLine.DEFAULT_URL,
+            false,
+            "metalake_demo",
+            "groupA",
+            CommandEntities.GROUP);
+    doReturn(mock).when(mock).validate();
+    commandLine.handleCommandLine();
+    verify(mock).handle();
   }
 
   @Test
@@ -279,6 +314,8 @@ class TestGroupCommands {
         .newAddRoleToGroup(
             GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "groupA", "role1");
 
+    doReturn(mockAddFirstRole).when(mockAddFirstRole).validate();
+    doReturn(mockAddSecondRole).when(mockAddSecondRole).validate();
     commandLine.handleCommandLine();
 
     verify(mockAddSecondRole).handle();

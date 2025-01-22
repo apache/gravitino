@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -89,8 +90,11 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.SCHEMA);
     boolean dropped = dispatcher.dropSchema(ident, cascade);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.SCHEMA);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        ident, Entity.EntityType.SCHEMA, locations);
     return dropped;
   }
 

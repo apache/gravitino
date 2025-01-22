@@ -76,6 +76,7 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 
+  @Override
   public String updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO) {

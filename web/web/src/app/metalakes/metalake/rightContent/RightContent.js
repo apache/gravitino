@@ -29,6 +29,8 @@ import CreateSchemaDialog from './CreateSchemaDialog'
 import CreateFilesetDialog from './CreateFilesetDialog'
 import CreateTopicDialog from './CreateTopicDialog'
 import CreateTableDialog from './CreateTableDialog'
+import RegisterModelDialog from './RegisterModelDialog'
+import LinkVersionDialog from './LinkVersionDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
 import { useAppSelector } from '@/lib/hooks/useStore'
@@ -39,12 +41,16 @@ const RightContent = () => {
   const [openFileset, setOpenFileset] = useState(false)
   const [openTopic, setOpenTopic] = useState(false)
   const [openTable, setOpenTable] = useState(false)
+  const [openModel, setOpenModel] = useState(false)
+  const [openVersion, setOpenVersion] = useState(false)
   const searchParams = useSearchParams()
   const [isShowBtn, setBtnVisible] = useState(true)
   const [isShowSchemaBtn, setSchemaBtnVisible] = useState(false)
   const [isShowFilesetBtn, setFilesetBtnVisible] = useState(false)
   const [isShowTopicBtn, setTopicBtnVisible] = useState(false)
   const [isShowTableBtn, setTableBtnVisible] = useState(false)
+  const [isShowModelBtn, setModelBtnVisible] = useState(false)
+  const [isShowVersionBtn, setVersionBtnVisible] = useState(false)
   const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
@@ -67,6 +73,14 @@ const RightContent = () => {
     setOpenTable(true)
   }
 
+  const handleRegisterModel = () => {
+    setOpenModel(true)
+  }
+
+  const handleLinkVersion = () => {
+    setOpenVersion(true)
+  }
+
   useEffect(() => {
     const paramsSize = [...searchParams.keys()].length
     const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
@@ -87,6 +101,23 @@ const RightContent = () => {
       searchParams.get('type') === 'messaging' &&
       searchParams.has('schema')
     setTopicBtnVisible(isTopicList)
+
+    const isModelList =
+      paramsSize == 4 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'model' &&
+      searchParams.has('schema')
+    setModelBtnVisible(isModelList)
+
+    const isVersionList =
+      paramsSize == 5 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'model' &&
+      searchParams.has('schema') &&
+      searchParams.has('model')
+    setVersionBtnVisible(isVersionList)
 
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
@@ -197,6 +228,34 @@ const RightContent = () => {
               Create Table
             </Button>
             <CreateTableDialog open={openTable} setOpen={setOpenTable} />
+          </Box>
+        )}
+        {isShowModelBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleRegisterModel}
+              sx={{ width: 200 }}
+              data-refer='register-model-btn'
+            >
+              Register Model
+            </Button>
+            <RegisterModelDialog open={openModel} setOpen={setOpenModel} />
+          </Box>
+        )}
+        {isShowVersionBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleLinkVersion}
+              sx={{ width: 200 }}
+              data-refer='link-version-btn'
+            >
+              Link Version
+            </Button>
+            <LinkVersionDialog open={openVersion} setOpen={setOpenVersion} />
           </Box>
         )}
       </Box>

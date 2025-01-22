@@ -41,7 +41,7 @@ public interface SupportsCredentials {
    *     org.apache.gravitino.file.Fileset}, {@link org.apache.gravitino.rel.Table}. There will be
    *     at most one credential for one credential type.
    */
-  Credential[] getCredentials() throws NoSuchCredentialException;
+  Credential[] getCredentials();
 
   /**
    * Retrieves an {@link Credential} object based on the specified credential type.

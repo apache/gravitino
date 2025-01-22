@@ -53,7 +53,7 @@ public class CreateTag extends Command {
   @Override
   public void handle() {
     if (tags == null || tags.length == 0) {
-      System.err.println(ErrorMessages.TAG_EMPTY);
+      System.err.println(ErrorMessages.MISSING_TAG);
     } else {
       boolean hasOnlyOneTag = tags.length == 1;
       if (hasOnlyOneTag) {
@@ -102,5 +102,11 @@ public class CreateTag extends Command {
       remaining.removeAll(created);
       System.out.println("Tags " + String.join(",", remaining) + " not created");
     }
+  }
+
+  @Override
+  public Command validate() {
+    if (tags == null) exitWithError(ErrorMessages.MISSING_TAG);
+    return super.validate();
   }
 }

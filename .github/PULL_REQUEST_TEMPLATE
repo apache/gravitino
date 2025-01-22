@@ -20,7 +20,7 @@
   1. If you propose a new API, clarify the use case for a new API.
   2. If you fix a bug, describe the bug.)
 
-Fix: # (issue)
+Fix: #(issue)
 
 ### Does this PR introduce _any_ user-facing change?
 

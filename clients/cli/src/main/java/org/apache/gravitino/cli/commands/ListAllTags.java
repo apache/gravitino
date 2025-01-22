@@ -55,6 +55,6 @@ public class ListAllTags extends Command {
 
     String all = tags.length == 0 ? "No tags exist." : String.join(",", tags);
 
-    System.out.println(all.toString());
+    System.out.println(all);
   }
 }

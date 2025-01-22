@@ -155,7 +155,7 @@ class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
 
     TableCreateRequest req =
         new TableCreateRequest(
-            RESTUtils.encodeString(ident.name()),
+            ident.name(),
             comment,
             toDTOs(columns),
             properties,
