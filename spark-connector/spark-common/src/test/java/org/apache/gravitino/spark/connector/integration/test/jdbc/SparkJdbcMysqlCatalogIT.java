@@ -26,7 +26,7 @@ import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
-public abstract class SparkJdbcCatalogIT extends SparkCommonIT {
+public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
   @Override
   protected boolean supportsSparkSQLClusteredBy() {
     return false;
@@ -53,7 +53,7 @@ public abstract class SparkJdbcCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportsProperties() {
+  protected boolean supportsSchemaAndTableProperties() {
     return false;
   }
 

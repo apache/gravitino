@@ -23,7 +23,7 @@ import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark33;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class SparkJdbcCatalogIT33 extends SparkJdbcCatalogIT {
+public class SparkJdbcMysqlCatalogIT33 extends SparkJdbcMysqlCatalogIT {
   @Test
   void testCatalogClassName() {
     String catalogClass =

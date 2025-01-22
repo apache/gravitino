@@ -28,6 +28,8 @@ import org.apache.spark.sql.types.DataTypes;
 public class SparkJdbcTypeConverter34 extends SparkTypeConverter34 {
   @Override
   public DataType toSparkType(Type gravitinoType) {
+    // if spark version lower than 3.4.4, using VarCharType will throw an exception: Unsupported
+    // type varchar.
     if (gravitinoType instanceof Types.VarCharType) {
       return DataTypes.StringType;
     } else {

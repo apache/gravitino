@@ -119,7 +119,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsReplaceColumns();
 
-  protected abstract boolean supportsProperties();
+  protected abstract boolean supportsSchemaAndTableProperties();
 
   protected abstract boolean supportsComplexType();
 
@@ -197,7 +197,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportsProperties")
+  @EnabledIf("supportsSchemaAndTableProperties")
   protected void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
     dropDatabaseIfExists(testDatabaseName);
@@ -227,7 +227,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportsProperties")
+  @EnabledIf("supportsSchemaAndTableProperties")
   protected void testAlterSchema() {
     String testDatabaseName = "t_alter";
     dropDatabaseIfExists(testDatabaseName);
@@ -405,7 +405,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportsProperties")
+  @EnabledIf("supportsSchemaAndTableProperties")
   void testAlterTableSetAndRemoveProperty() {
     String tableName = "test_property";
     dropTableIfExists(tableName);
@@ -807,7 +807,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportsProperties")
+  @EnabledIf("supportsSchemaAndTableProperties")
   void testTableOptions() {
     String tableName = "options_table";
     dropTableIfExists(tableName);

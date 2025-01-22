@@ -61,12 +61,10 @@ import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-@Tag("gravitino-docker-test")
 public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
   private static final String ICEBERG_FORMAT_VERSION = "format-version";
@@ -112,7 +110,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportsProperties() {
+  protected boolean supportsSchemaAndTableProperties() {
     return true;
   }
 

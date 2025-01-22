@@ -85,7 +85,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportsProperties() {
+  protected boolean supportsSchemaAndTableProperties() {
     return true;
   }
 

@@ -64,7 +64,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportsProperties() {
+  protected boolean supportsSchemaAndTableProperties() {
     return true;
   }
 

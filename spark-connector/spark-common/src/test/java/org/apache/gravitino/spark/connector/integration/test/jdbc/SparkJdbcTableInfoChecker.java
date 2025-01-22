@@ -31,6 +31,7 @@ public class SparkJdbcTableInfoChecker extends SparkTableInfoChecker {
     return new SparkJdbcTableInfoChecker();
   }
 
+  // Spark jdbc table cannot distinguish between comment=null and comment=""
   @Override
   public SparkTableInfoChecker withColumns(List<SparkTableInfo.SparkColumnInfo> columns) {
     getExpectedTableInfo()

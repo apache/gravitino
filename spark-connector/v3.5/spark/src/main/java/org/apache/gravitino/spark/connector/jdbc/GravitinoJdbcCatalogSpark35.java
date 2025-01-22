@@ -19,4 +19,21 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
-public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalogSpark34 {}
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.SparkTypeConverter34;
+
+public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalog {
+
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter() {
+    return new SparkTypeConverter34();
+  }
+
+  @Override
+  protected SparkTableChangeConverter getSparkTableChangeConverter(
+      SparkTypeConverter sparkTypeConverter) {
+    return new SparkTableChangeConverter34(sparkTypeConverter);
+  }
+}

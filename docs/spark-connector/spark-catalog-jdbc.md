@@ -9,6 +9,8 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 
 ## Capabilities
 
+Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dialects could use Mysql driver and Mysql Dialects as a trackoff way. But for Doris which do not support MySQL Dialects, are not currently supported.
+
 #### Support DML and DDL operations:
 
 - `CREATE TABLE`
@@ -22,6 +24,7 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
   :::
 
 #### Not supported operations:
+
 - `UPDATE`
 - `DELETE`
 - `TRUNCATE`
