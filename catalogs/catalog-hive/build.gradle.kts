@@ -158,6 +158,8 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      // Exclude the following jars to avoid conflict with the jars in authorization-gcp
+      exclude("protobuf-java-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/hive/libs")
   }
