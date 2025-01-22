@@ -107,6 +107,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
+    boolean force = line.hasOption(GravitinoOptions.FORCE);
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
+    CommandContext context = new CommandContext(null, ignore, force, outputFormat);
+
     if (CommandActions.HELP.equals(command)) {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
@@ -120,7 +124,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.CATALOG)) {
       new CatalogCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
-      new MetalakeCommandHandler(this, line, command, ignore).handle();
+      new MetalakeCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.TOPIC)) {
       new TopicCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {

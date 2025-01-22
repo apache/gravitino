@@ -156,52 +156,50 @@ public class TestableCommandLine {
     return new ServerVersion(url, ignore);
   }
 
-  protected MetalakeAudit newMetalakeAudit(String url, boolean ignore, String metalake) {
-    return new MetalakeAudit(url, ignore, metalake);
+  protected MetalakeAudit newMetalakeAudit(CommandContext context, String metalake) {
+    return new MetalakeAudit(context, metalake);
   }
 
-  protected MetalakeDetails newMetalakeDetails(
-      String url, boolean ignore, String outputFormat, String metalake) {
-    return new MetalakeDetails(url, ignore, outputFormat, metalake);
+  protected MetalakeDetails newMetalakeDetails(CommandContext context, String metalake) {
+    return new MetalakeDetails(context, metalake);
   }
 
-  protected ListMetalakes newListMetalakes(String url, boolean ignore, String outputFormat) {
-    return new ListMetalakes(url, ignore, outputFormat);
+  protected ListMetalakes newListMetalakes(CommandContext context) {
+    return new ListMetalakes(context);
   }
 
   protected CreateMetalake newCreateMetalake(
-      String url, boolean ignore, String metalake, String comment) {
-    return new CreateMetalake(url, ignore, metalake, comment);
+      CommandContext context, String metalake, String comment) {
+    return new CreateMetalake(context, metalake, comment);
   }
 
-  protected DeleteMetalake newDeleteMetalake(
-      String url, boolean ignore, boolean force, String metalake) {
-    return new DeleteMetalake(url, ignore, force, metalake);
+  protected DeleteMetalake newDeleteMetalake(CommandContext context, String metalake) {
+    return new DeleteMetalake(context, metalake);
   }
 
   protected SetMetalakeProperty newSetMetalakeProperty(
-      String url, boolean ignore, String metalake, String property, String value) {
-    return new SetMetalakeProperty(url, ignore, metalake, property, value);
+      CommandContext context, String metalake, String property, String value) {
+    return new SetMetalakeProperty(context, metalake, property, value);
   }
 
   protected RemoveMetalakeProperty newRemoveMetalakeProperty(
-      String url, boolean ignore, String metalake, String property) {
-    return new RemoveMetalakeProperty(url, ignore, metalake, property);
+      CommandContext context, String metalake, String property) {
+    return new RemoveMetalakeProperty(context, metalake, property);
   }
 
   protected ListMetalakeProperties newListMetalakeProperties(
-      String url, boolean ignore, String metalake) {
-    return new ListMetalakeProperties(url, ignore, metalake);
+      CommandContext context, String metalake) {
+    return new ListMetalakeProperties(context, metalake);
   }
 
   protected UpdateMetalakeComment newUpdateMetalakeComment(
-      String url, boolean ignore, String metalake, String comment) {
-    return new UpdateMetalakeComment(url, ignore, metalake, comment);
+      CommandContext context, String metalake, String comment) {
+    return new UpdateMetalakeComment(context, metalake, comment);
   }
 
   protected UpdateMetalakeName newUpdateMetalakeName(
-      String url, boolean ignore, boolean force, String metalake, String newName) {
-    return new UpdateMetalakeName(url, ignore, force, metalake, newName);
+      CommandContext context, String metalake, String newName) {
+    return new UpdateMetalakeName(context, metalake, newName);
   }
 
   protected CatalogAudit newCatalogAudit(
@@ -902,12 +900,12 @@ public class TestableCommandLine {
   }
 
   protected MetalakeEnable newMetalakeEnable(
-      String url, boolean ignore, String metalake, boolean enableAllCatalogs) {
-    return new MetalakeEnable(url, ignore, metalake, enableAllCatalogs);
+      CommandContext context, String metalake, boolean enableAllCatalogs) {
+    return new MetalakeEnable(context, metalake, enableAllCatalogs);
   }
 
-  protected MetalakeDisable newMetalakeDisable(String url, boolean ignore, String metalake) {
-    return new MetalakeDisable(url, ignore, metalake);
+  protected MetalakeDisable newMetalakeDisable(CommandContext context, String metalake) {
+    return new MetalakeDisable(context, metalake);
   }
 
   protected CatalogEnable newCatalogEnable(
