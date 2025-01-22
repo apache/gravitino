@@ -26,12 +26,12 @@ use crate::opened_file::{FileHandle, OpenFileFlags, OpenedFile};
 use crate::opened_file_manager::OpenedFileManager;
 use async_trait::async_trait;
 use bytes::Bytes;
+use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
-use fuse3::FileType::{Directory, RegularFile};
 use tokio::sync::RwLock;
 
 /// DefaultRawFileSystem is a simple implementation for the file system.
@@ -87,7 +87,12 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
             None => {
                 // allocate new file id
                 file_stat.set_file_id(parent_file_id, self.next_file_id());
-                file_manager.insert(file_stat.parent_file_id, file_stat.file_id, &file_stat.path, file_stat.kind);
+                file_manager.insert(
+                    file_stat.parent_file_id,
+                    file_stat.file_id,
+                    &file_stat.path,
+                    file_stat.kind,
+                );
             }
             Some(file) => {
                 // use the exist file id
@@ -131,7 +136,13 @@ impl<T: PathFileSystem> DefaultRawFileSystem<T> {
         file_manager.remove(path);
     }
 
-    async fn insert_file_entry_locked(&self, parent_file_id: u64, file_id: u64, path: &Path, kind: FileType) {
+    async fn insert_file_entry_locked(
+        &self,
+        parent_file_id: u64,
+        file_id: u64,
+        path: &Path,
+        kind: FileType,
+    ) {
         let mut file_manager = self.file_entry_manager.write().await;
         file_manager.insert(parent_file_id, file_id, path, kind);
     }
@@ -160,7 +171,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             ROOT_DIR_PARENT_FILE_ID,
             ROOT_DIR_FILE_ID,
             Path::new(ROOT_DIR_PATH),
-            Directory
+            Directory,
         )
         .await;
 
@@ -168,7 +179,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             ROOT_DIR_FILE_ID,
             FS_META_FILE_ID,
             Path::new(FS_META_FILE_PATH),
-            RegularFile
+            RegularFile,
         )
         .await;
         self.fs.init().await
@@ -273,7 +284,7 @@ impl<T: PathFileSystem> RawFileSystem for DefaultRawFileSystem<T> {
             parent_file_id,
             file_without_id.file_stat.file_id,
             &file_without_id.file_stat.path,
-            RegularFile
+            RegularFile,
         )
         .await;
 
@@ -438,7 +449,7 @@ impl FileEntryManager {
             file_id,
             parent_file_id,
             path: path.into(),
-            kind: kind
+            kind: kind,
         };
         self.file_id_map.insert(file_id, file_entry.clone());
         self.file_path_map.insert(path.into(), file_entry);

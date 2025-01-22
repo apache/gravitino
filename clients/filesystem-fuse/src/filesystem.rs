@@ -350,7 +350,7 @@ pub(crate) mod tests {
         }
 
         async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
-            let file_stat = self.fs.stat(path, RegularFile).await;
+            let file_stat = self.fs.stat(path, expect_kind).await;
             assert!(file_stat.is_ok());
             let file_stat = file_stat.unwrap();
             self.assert_file_stat(&file_stat, path, expect_kind, expect_size);

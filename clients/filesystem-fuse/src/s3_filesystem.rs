@@ -24,13 +24,13 @@ use crate::open_dal_filesystem::OpenDalFileSystem;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
 use crate::utils::{parse_location, GvfsResult};
 use async_trait::async_trait;
+use fuse3::FileType;
 use log::error;
 use opendal::layers::LoggingLayer;
 use opendal::services::S3;
 use opendal::{Builder, Operator};
 use std::collections::HashMap;
 use std::path::Path;
-use fuse3::FileType;
 
 pub(crate) struct S3FileSystem {
     open_dal_fs: OpenDalFileSystem,

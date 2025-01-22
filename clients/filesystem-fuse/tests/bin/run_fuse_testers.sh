@@ -27,6 +27,8 @@ source ./gvfs_fuse.sh
 source ./localstatck.sh
 
 TEST_CONFIG_FILE=$CLIENT_FUSE_DIR/target/debug/gvfs-fuse.toml
+MOUNT_DIR=$CLIENT_FUSE_DIR/target/gvfs
+
 
 start_servers() {
   start_localstack

@@ -62,9 +62,13 @@ impl PathFileSystem for OpenDalFileSystem {
     async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat> {
         let file_name = match kind {
             Directory => build_dir_path(path),
-            _ => path.to_string_lossy().to_string()
+            _ => path.to_string_lossy().to_string(),
         };
-        let meta= self.op.stat(&file_name).await.map_err(opendal_error_to_errno)?;
+        let meta = self
+            .op
+            .stat(&file_name)
+            .await
+            .map_err(opendal_error_to_errno)?;
 
         let mut file_stat = FileStat::new_file_filestat_with_path(path, 0);
         self.opendal_meta_to_file_stat(&meta, &mut file_stat);
