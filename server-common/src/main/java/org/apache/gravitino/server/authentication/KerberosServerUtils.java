@@ -16,12 +16,10 @@ package org.apache.gravitino.server.authentication;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -354,7 +352,8 @@ public class KerberosServerUtils {
     }
 
     String getAsString() {
-        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8);
+      return new String(
+          bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8);
     }
 
     @Override
