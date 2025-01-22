@@ -28,13 +28,11 @@ use fuse3::raw::prelude::{
 };
 use fuse3::raw::reply::{DirectoryEntry, DirectoryEntryPlus};
 use fuse3::raw::Filesystem;
-use fuse3::{Errno, FileType, Inode, SetAttr, Timestamp};
-use futures_util::stream::{BoxStream, Stream};
-use futures_util::{stream, StreamExt};
-use std::ffi::{OsStr, OsString};
+use fuse3::{Inode, SetAttr, Timestamp};
+use futures_util::stream::{BoxStream};
+use futures_util::{StreamExt};
+use std::ffi::{OsStr};
 use std::fmt::Write;
-use std::pin::Pin;
-use std::sync::Arc;
 use tracing::{debug, error};
 
 /// A macro to log the result of an asynchronous method call in the context of FUSE operations.
@@ -566,27 +564,42 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
 
         match self.inner.readdir(req, parent, fh, offset).await {
             Ok(mut reply_dir) => {
-                // Ok(reply_dir)
-                // append them to debug_output (a String)
-                // and assign reply_dir.entries with new BoxStream
-
-                let mut stream = &mut reply_dir.entries;
-                // let mut stream = Pin::new(&mut reply_dir.entries.peekable());
-
-                let _ = stream.inspect(|entry_result| match entry_result {
-                    Ok(entry) => {
-                        // debug_output.push_str(format!("Directory entry: {:?}\n", entry).as_str());
-                        debug!("{}", format!("Directory entry: {:?}\n", entry).as_str());
+               // Chain the `inspect` method to the existing stream
+                reply_dir.entries = Box::pin(reply_dir.entries.inspect(|entry_result| {
+                    match entry_result {
+                        Ok(entry) => {
+                            debug!("Directory entry: {:?}", entry);
+                        }
+                        Err(e) => {
+                            debug!("Error reading directory entry: {:?}", e);
+                        }
                     }
-
-                    Err(e) => {
-                        // debug_output
-                        //     .push_str(format!("Error reading directory entry: {:?}\n", e).as_str());
-                        debug!("{}",format!("Error reading directory entry: {:?}\n", e).as_str());
-                    }
-                });
+                }));
 
                 Ok(reply_dir)
+
+
+                // let stream = &mut reply_dir.entries;
+                //
+                // let ins = stream.inspect(|entry_result| match entry_result {
+                //     Ok(entry) => {
+                //         // debug_output.push_str(format!("Directory entry: {:?}\n", entry).as_str());
+                //         debug!("{}", format!("Directory entry: {:?}\n", entry).as_str());
+                //     }
+                //
+                //     Err(e) => {
+                //         // debug_output
+                //         //     .push_str(format!("Error reading directory entry: {:?}\n", e).as_str());
+                //         debug!("{}",format!("Error reading directory entry: {:?}\n", e).as_str());
+                //     }
+                // });
+
+                // let e: Vec<_> = ins.collect().await;
+                // debug!("xxx collected {:?}", e);
+
+                // reply_dir.entries = Box::pin(stream);
+
+                // Ok(reply_dir)
             }
             Err(e) => {
                 debug_output
