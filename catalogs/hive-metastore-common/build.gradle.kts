@@ -61,6 +61,9 @@ dependencies {
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
+    // protobuf-java is not needed for Hive Metastore, and it will conflict with gcp authorizations
+    // library
+    exclude("com.google.protobuf", "protobuf-java")
   }
   implementation(libs.hadoop2.common) {
     exclude("*")
