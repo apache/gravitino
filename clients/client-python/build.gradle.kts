@@ -122,10 +122,10 @@ fun generatePypiProjectHomePage() {
     // relative path of the images in the how-to-use-python-client.md file is incorrect. We need
     // to fix the relative path of the images/markdown to the absolute path.
     val content = outputFile.readText()
-    val docsUrl = "https://datastrato.ai/docs/latest"
+    val docsUrl = "https://gravitino.apache.org/docs/latest"
 
     // Use regular expression to match the `[](./a/b/c.md?language=python)` or `[](./a/b/c.md#arg1)` link in the content
-    // Convert `[](./a/b/c.md?language=python)` to `[](https://datastrato.ai/docs/latest/a/b/c/language=python)`
+    // Convert `[](./a/b/c.md?language=python)` to `[](https://gravitino.apache.org/docs/latest/a/b/c/language=python)`
     val patternDocs = Regex("""(?<!!)\[([^\]]+)]\(\.\/([^)]+)\.md([?#][^)]+)?\)""")
     val contentUpdateDocs = patternDocs.replace(content) { matchResult ->
       val text = matchResult.groupValues[1]
