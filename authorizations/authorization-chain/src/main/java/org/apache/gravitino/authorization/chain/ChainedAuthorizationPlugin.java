@@ -55,16 +55,6 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
     ChainedAuthorizationProperties chainedAuthzProperties =
         new ChainedAuthorizationProperties(properties);
     chainedAuthzProperties.validate();
-    // Validate the properties for each plugin
-    chainedAuthzProperties
-        .plugins()
-        .forEach(
-            pluginName -> {
-              Map<String, String> pluginProperties =
-                  chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
-              String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
-              AuthorizationProperties.validate(authzProvider, pluginProperties);
-            });
     // Create the plugins
     chainedAuthzProperties
         .plugins()

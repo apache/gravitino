@@ -34,21 +34,4 @@ public abstract class AuthorizationProperties {
   public abstract String getPropertiesPrefix();
 
   public abstract void validate();
-
-  public static void validate(String type, Map<String, String> properties) {
-    switch (type) {
-      case "ranger":
-        RangerAuthorizationProperties rangerAuthorizationProperties =
-            new RangerAuthorizationProperties(properties);
-        rangerAuthorizationProperties.validate();
-        break;
-      case "chain":
-        ChainedAuthorizationProperties chainedAuthzProperties =
-            new ChainedAuthorizationProperties(properties);
-        chainedAuthzProperties.validate();
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported authorization properties type: " + type);
-    }
-  }
 }
