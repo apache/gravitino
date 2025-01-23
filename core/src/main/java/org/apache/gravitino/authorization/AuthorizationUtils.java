@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -476,7 +477,7 @@ public class AuthorizationUtils {
               Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
               if (schema.properties().containsKey(HiveConstants.LOCATION)) {
                 String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
-                if (schemaLocation != null && schemaLocation.isEmpty()) {
+                if (StringUtils.isNotBlank(schemaLocation)) {
                   locations.add(schemaLocation);
                 } else {
                   LOG.warn("Schema %s location is not found", ident);
@@ -497,7 +498,7 @@ public class AuthorizationUtils {
               Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
               if (table.properties().containsKey(HiveConstants.LOCATION)) {
                 String tableLocation = table.properties().get(HiveConstants.LOCATION);
-                if (tableLocation != null && tableLocation.isEmpty()) {
+                if (StringUtils.isNotBlank(tableLocation)) {
                   locations.add(tableLocation);
                 } else {
                   LOG.warn("Table %s location is not found", ident);

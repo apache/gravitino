@@ -18,20 +18,35 @@
  */
 package org.apache.gravitino.client;
 
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.model.ModelDTO;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic model. */
-class GenericModel implements Model {
+class GenericModel implements Model, SupportsTags {
 
   private final ModelDTO modelDTO;
 
-  GenericModel(ModelDTO modelDTO) {
+  private final MetadataObjectTagOperations objectTagOperations;
+
+  GenericModel(ModelDTO modelDTO, RESTClient restClient, Namespace modelNs) {
     this.modelDTO = modelDTO;
+    List<String> modelFullName =
+        Lists.newArrayList(modelNs.level(1), modelNs.level(2), modelDTO.name());
+    MetadataObject modelObject = MetadataObjects.of(modelFullName, MetadataObject.Type.MODEL);
+    this.objectTagOperations =
+        new MetadataObjectTagOperations(modelNs.level(0), modelObject, restClient);
   }
 
   @Override
@@ -61,7 +76,7 @@ class GenericModel implements Model {
 
   @Override
   public SupportsTags supportsTags() {
-    throw new UnsupportedOperationException("Not supported yet.");
+    return this;
   }
 
   @Override
@@ -85,5 +100,26 @@ class GenericModel implements Model {
   @Override
   public int hashCode() {
     return modelDTO.hashCode();
+  }
+
+  @Override
+  public String[] listTags() {
+    return objectTagOperations.listTags();
+  }
+
+  @Override
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Tag getTag(String name) throws NoSuchTagException {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove)
+      throws TagAlreadyAssociatedException {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 }
