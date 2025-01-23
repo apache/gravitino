@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -31,16 +32,37 @@ public class TestIcebergPropertiesConverter {
   @Test
   void testCatalogPropertiesWithHiveBackend() {
     Map<String, String> properties =
-        CONVERTER.toFlinkCatalogProperties(
-            ImmutableMap.of(
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
-                "hive-uri",
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
-                "hive-warehouse",
-                "key1",
-                "value1"));
+        CONVERTER.toGravitinoCatalogProperties(
+            Configuration.fromMap(
+                ImmutableMap.of(
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+                    "hive-uri",
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+                    "hive-warehouse",
+                    "key1",
+                    "value1",
+                    "flink.bypass.key2",
+                    "value2")));
+
+    Map<String, String> actual =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
+            "hive-uri",
+            IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+            "hive-warehouse",
+            "flink.bypass.key1", // Automatically add 'flink.bypass.'
+            "value1",
+            "flink.bypass.key2",
+            "value2");
+
+    Assertions.assertEquals(actual, properties);
+
+    Map<String, String> toFlinkProperties = CONVERTER.toFlinkCatalogProperties(actual);
+
     Assertions.assertEquals(
         ImmutableMap.of(
             CommonCatalogOptions.CATALOG_TYPE.key(),
@@ -50,23 +72,48 @@ public class TestIcebergPropertiesConverter {
             IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
             "hive-uri",
             IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
-            "hive-warehouse"),
-        properties);
+            "hive-warehouse",
+            "key1", // When returning to Flink, prefix 'flink.bypass.' Automatically removed.
+            "value1",
+            "key2", // When returning to Flink, prefix 'flink.bypass.' Automatically removed.
+            "value2"),
+        toFlinkProperties);
   }
 
   @Test
   void testCatalogPropertiesWithRestBackend() {
     Map<String, String> properties =
-        CONVERTER.toFlinkCatalogProperties(
-            ImmutableMap.of(
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-                IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
-                "rest-uri",
-                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
-                "rest-warehouse",
-                "key1",
-                "value1"));
+        CONVERTER.toGravitinoCatalogProperties(
+            Configuration.fromMap(
+                ImmutableMap.of(
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+                    IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+                    "rest-uri",
+                    IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+                    "rest-warehouse",
+                    "key1",
+                    "value1",
+                    "flink.bypass.key2",
+                    "value2")));
+
+    Map<String, String> actual =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
+            "rest-uri",
+            IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+            "rest-warehouse",
+            "flink.bypass.key1", // Automatically add 'flink.bypass.'
+            "value1",
+            "flink.bypass.key2",
+            "value2");
+
+    Assertions.assertEquals(actual, properties);
+
+    Map<String, String> toFlinkProperties = CONVERTER.toFlinkCatalogProperties(actual);
+
     Assertions.assertEquals(
         ImmutableMap.of(
             CommonCatalogOptions.CATALOG_TYPE.key(),
@@ -76,7 +123,11 @@ public class TestIcebergPropertiesConverter {
             IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
             "rest-uri",
             IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
-            "rest-warehouse"),
-        properties);
+            "rest-warehouse",
+            "key1", // When returning to Flink, prefix 'flink.bypass.' Automatically removed.
+            "value1",
+            "key2", // When returning to Flink, prefix 'flink.bypass.' Automatically removed.
+            "value2"),
+        toFlinkProperties);
   }
 }

@@ -19,11 +19,9 @@
 
 package org.apache.gravitino.flink.connector.iceberg;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
@@ -38,38 +36,21 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
           IcebergConstants.CATALOG_BACKEND, IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE);
 
   @Override
-  public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
-    Preconditions.checkArgument(
-        gravitinoProperties != null, "Iceberg Catalog properties should not be null.");
+  public String transformPropertyToGravitinoCatalog(String configKey) {
+    return IcebergPropertiesUtils.ICEBERG_CATALOG_CONFIG_TO_GRAVITINO.get(configKey);
+  }
 
-    Map<String, String> all = new HashMap<>();
-    if (gravitinoProperties != null) {
-      gravitinoProperties.forEach(
-          (k, v) -> {
-            if (k.startsWith(FLINK_PROPERTY_PREFIX)) {
-              String newKey = k.substring(FLINK_PROPERTY_PREFIX.length());
-              all.put(newKey, v);
-            }
-          });
-    }
-    Map<String, String> transformedProperties =
-        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProperties);
+  @Override
+  public String transformPropertyToFlinkCatalog(String configKey) {
 
-    if (transformedProperties != null) {
-      all.putAll(transformedProperties);
+    String icebergConfigKey = null;
+    if (IcebergPropertiesUtils.GRAVITINO_CONFIG_TO_ICEBERG.containsKey(configKey)) {
+      icebergConfigKey = IcebergPropertiesUtils.GRAVITINO_CONFIG_TO_ICEBERG.get(configKey);
     }
-    all.put(
-        CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoIcebergCatalogFactoryOptions.IDENTIFIER);
-    // Map "catalog-backend" to "catalog-type".
-    // TODO If catalog backend is CUSTOM, we need special compatibility logic.
-    GRAVITINO_CONFIG_TO_FLINK_ICEBERG.forEach(
-        (key, value) -> {
-          if (all.containsKey(key)) {
-            String config = all.remove(key);
-            all.put(value, config);
-          }
-        });
-    return all;
+    if (GRAVITINO_CONFIG_TO_FLINK_ICEBERG.containsKey(configKey)) {
+      icebergConfigKey = GRAVITINO_CONFIG_TO_FLINK_ICEBERG.get(configKey);
+    }
+    return icebergConfigKey;
   }
 
   @Override
@@ -78,7 +59,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
   }
 
   @Override
-  public Map<String, String> toFlinkTableProperties(Map<String, String> properties) {
-    return new HashMap<>(properties);
+  public String getFlinkCatalogType() {
+    return GravitinoIcebergCatalogFactoryOptions.IDENTIFIER;
   }
 }
