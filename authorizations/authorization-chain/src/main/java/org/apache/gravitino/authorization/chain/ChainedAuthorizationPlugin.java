@@ -72,8 +72,13 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
               try {
                 BaseAuthorization<?> authorization =
                     BaseAuthorization.createAuthorization(classLoader, authzProvider);
+
+                // Load the authorization plugin with the class loader of the catalog.
+                // Because the JDBC authorization plugin may load JDBC driver using the class
+                // loader.
                 AuthorizationPlugin authorizationPlugin =
-                    authorization.newPlugin(metalake, catalogProvider, pluginConfig);
+                    classLoader.withClassLoader(
+                        cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
                 plugins.add(authorizationPlugin);
               } catch (Exception e) {
                 throw new RuntimeException(e);
