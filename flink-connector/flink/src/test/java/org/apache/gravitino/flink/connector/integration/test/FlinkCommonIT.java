@@ -282,6 +282,45 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   @Test
   @EnabledIf("supportTableOperation")
+  public void testCreateTableWithPrimaryKey() {
+    String databaseName = "test_create_no_partition_table_db";
+    String tableName = "test_create_no_partition_table";
+    String comment = "test comment";
+    String key = "test key";
+    String value = "test value";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          sql(
+              "CREATE TABLE %s "
+                  + "(aa int, "
+                  + " bb int,"
+                  + " cc int,"
+                  + "  PRIMARY KEY (aa,bb) NOT ENFORCED"
+                  + ")"
+                  + " COMMENT '%s' WITH ("
+                  + "'%s' = '%s')",
+              tableName, comment, key, value);
+          Table table =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(1, table.index().length);
+          sql("INSERT INTO %s VALUES(1,2,3)", tableName);
+          sql("INSERT INTO %s VALUES(1,2,4)", tableName);
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName), ResultKind.SUCCESS_WITH_CONTENT, Row.of(1, 2, 4));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1));
+        },
+        true,
+        supportDropCascade());
+  }
+
+  @Test
+  @EnabledIf("supportTableOperation")
   public void testListTables() {
     String newSchema = "test_list_table_catalog";
     Column[] columns = new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};

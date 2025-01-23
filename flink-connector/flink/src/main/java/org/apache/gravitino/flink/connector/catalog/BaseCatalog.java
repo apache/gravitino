@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.utils.Lists;
@@ -40,6 +41,7 @@ import org.apache.flink.table.catalog.CatalogPartitionSpec;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
+import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -75,7 +77,12 @@ import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -276,8 +283,21 @@ public abstract class BaseCatalog extends AbstractCatalog {
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
     Transform[] partitions =
         partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
+
     try {
-      catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
+
+      Index[] indices = getIndices(resolvedTable);
+      catalog()
+          .asTableCatalog()
+          .createTable(
+              identifier,
+              columns,
+              comment,
+              properties,
+              partitions,
+              Distributions.NONE,
+              new SortOrder[0],
+              indices);
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
     } catch (TableAlreadyExistsException e) {
@@ -287,6 +307,18 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (Exception e) {
       throw new CatalogException(e);
     }
+  }
+
+  private static Index @NotNull [] getIndices(ResolvedCatalogBaseTable<?> resolvedTable) {
+    Optional<UniqueConstraint> primaryKey = resolvedTable.getResolvedSchema().getPrimaryKey();
+    List<String> primaryColumns = primaryKey.map(UniqueConstraint::getColumns).orElse(null);
+    if (primaryColumns == null) {
+      return new Index[0];
+    }
+    String[][] primaryFiled =
+        primaryColumns.stream().map(e -> new String[] {e}).toArray(String[][]::new);
+    Index primary = Indexes.primary("primary", primaryFiled);
+    return new Index[] {primary};
   }
 
   /**
@@ -520,6 +552,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
       builder
           .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
           .withComment(column.comment());
+    }
+    Index[] indices = table.index();
+    if (indices != null && indices.length == 1) {
+      builder.primaryKey(
+          Arrays.stream(indices[0].fieldNames()).map(arr -> arr[0]).collect(Collectors.toList()));
     }
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());

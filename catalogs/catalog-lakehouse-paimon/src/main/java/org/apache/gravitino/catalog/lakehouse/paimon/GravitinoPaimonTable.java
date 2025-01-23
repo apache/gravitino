@@ -140,18 +140,8 @@ public class GravitinoPaimonTable extends BaseTable {
 
     Preconditions.checkArgument(
         indexes.length == 1, "Paimon only supports no more than one Index.");
-
     Index primaryKeyIndex = indexes[0];
-    Arrays.stream(primaryKeyIndex.fieldNames())
-        .forEach(
-            filedName ->
-                Preconditions.checkArgument(
-                    filedName != null && filedName.length == 1,
-                    "The primary key columns should not be nested."));
-
-    return Arrays.stream(primaryKeyIndex.fieldNames())
-        .map(fieldName -> fieldName[0])
-        .collect(Collectors.toList());
+    return Arrays.stream(primaryKeyIndex.fieldNames()).map(e -> e[0]).collect(Collectors.toList());
   }
 
   private static Index[] constructIndexesFromPrimaryKeys(Table table) {
