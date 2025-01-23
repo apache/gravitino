@@ -33,7 +33,6 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.common.AuthorizationProperties;
 import org.apache.gravitino.authorization.common.ChainedAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
