@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -36,22 +37,27 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
     return JdbcPropertiesConverterHolder.INSTANCE;
   }
 
+  private static final Map<String, String> GRAVITINO_CONFIG_TO_JDBC =
+      ImmutableMap.of(
+          JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
+          JdbcPropertiesConstants.SPARK_JDBC_URL,
+          JdbcPropertiesConstants.GRAVITINO_JDBC_USER,
+          JdbcPropertiesConstants.SPARK_JDBC_USER,
+          JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD,
+          JdbcPropertiesConstants.SPARK_JDBC_PASSWORD,
+          JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER,
+          JdbcPropertiesConstants.SPARK_JDBC_DRIVER);
+
   @Override
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Jdbc Catalog properties should not be null");
     HashMap<String, String> jdbcProperties = new HashMap<>();
-    jdbcProperties.put(
-        JdbcPropertiesConstants.SPARK_JDBC_URL,
-        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
-    jdbcProperties.put(
-        JdbcPropertiesConstants.SPARK_JDBC_USER,
-        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
-    jdbcProperties.put(
-        JdbcPropertiesConstants.SPARK_JDBC_PASSWORD,
-        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD));
-    jdbcProperties.put(
-        JdbcPropertiesConstants.SPARK_JDBC_DRIVER,
-        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
+    properties.forEach(
+        (key, value) -> {
+          if (GRAVITINO_CONFIG_TO_JDBC.containsKey(key)) {
+            jdbcProperties.put(GRAVITINO_CONFIG_TO_JDBC.get(key), value);
+          }
+        });
     return jdbcProperties;
   }
 

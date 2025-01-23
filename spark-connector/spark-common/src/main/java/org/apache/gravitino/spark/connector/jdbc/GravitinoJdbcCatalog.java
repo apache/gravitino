@@ -30,6 +30,7 @@ import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.errors.QueryCompilationErrors;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -83,7 +84,25 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   public void createNamespace(String[] namespace, Map<String, String> metadata)
       throws NamespaceAlreadyExistsException {
-    super.createNamespace(
-        namespace, Maps.filterKeys(metadata, key -> key.equals(SupportsNamespaces.PROP_COMMENT)));
+    Map<String, String> properties = Maps.newHashMap();
+    if (!metadata.isEmpty()) {
+      metadata.forEach(
+          (k, v) -> {
+            switch (k) {
+              case SupportsNamespaces.PROP_COMMENT:
+                properties.put(k, v);
+                break;
+              case SupportsNamespaces.PROP_OWNER:
+                break;
+              case SupportsNamespaces.PROP_LOCATION:
+                throw new RuntimeException(
+                    QueryCompilationErrors.cannotCreateJDBCNamespaceUsingProviderError());
+              default:
+                throw new RuntimeException(
+                    QueryCompilationErrors.cannotCreateJDBCNamespaceWithPropertyError(k));
+            }
+          });
+    }
+    super.createNamespace(namespace, properties);
   }
 }
