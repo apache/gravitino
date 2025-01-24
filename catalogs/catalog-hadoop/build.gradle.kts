@@ -52,6 +52,8 @@ dependencies {
     exclude("org.eclipse.jetty", "*")
     exclude("io.netty")
     exclude("org.fusesource.leveldbjni")
+    // Exclude protobuf-java to avoid conflict with;
+    exclude("com.google.protobuf", "protobuf-java")
   }
   implementation(libs.slf4j.api)
   implementation(libs.awaitility)

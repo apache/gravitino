@@ -27,7 +27,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -224,6 +226,7 @@ class TestAuthorizationUtils {
   void testGetMetadataObjectLocation() throws IllegalAccessException {
     CatalogDispatcher catalogDispatcher = Mockito.mock(CatalogDispatcher.class);
     TableDispatcher tableDispatcher = Mockito.mock(TableDispatcher.class);
+    SchemaDispatcher schemaDispatcher = Mockito.mock(SchemaDispatcher.class);
     Catalog catalog = Mockito.mock(Catalog.class);
     Table table = Mockito.mock(Table.class);
 
@@ -234,6 +237,7 @@ class TestAuthorizationUtils {
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(
@@ -246,5 +250,17 @@ class TestAuthorizationUtils {
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.TABLE);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("gs://bucket/1", locations.get(0));
+
+    Schema schema = Mockito.mock(Schema.class);
+    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", "gs://bucket/2"));
+    Mockito.when(schemaDispatcher.loadSchema(Mockito.any())).thenReturn(schema);
+    Mockito.when(catalog.provider()).thenReturn("hadoop");
+    Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(catalog);
+
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("test", "catalog", "schema"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("gs://bucket/2", locations.get(0));
   }
 }
