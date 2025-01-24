@@ -71,6 +71,11 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   private static org.apache.gravitino.Catalog hiveCatalog;
 
+  @Override
+  protected boolean supportCreateTableWithPrimaryKey() {
+    return false;
+  }
+
   @BeforeAll
   void hiveStartUp() {
     initDefaultHiveCatalog();

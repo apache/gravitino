@@ -28,7 +28,6 @@ dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":server-common"))
-  implementation(libs.mysql.driver)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
