@@ -137,7 +137,6 @@ public class GravitinoPaimonTable extends BaseTable {
     if (indexes == null || indexes.length == 0) {
       return Collections.emptyList();
     }
-
     Preconditions.checkArgument(
         indexes.length == 1, "Paimon only supports no more than one Index.");
     Index primaryKeyIndex = indexes[0];

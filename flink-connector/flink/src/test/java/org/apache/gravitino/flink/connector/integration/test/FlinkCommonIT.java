@@ -51,6 +51,7 @@ import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -306,6 +307,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Table table =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertEquals(1, table.index().length);
+          Index index = table.index()[0];
+          Assertions.assertEquals("aa", index.fieldNames()[0][0]);
+          Assertions.assertEquals("bb", index.fieldNames()[1][0]);
           sql("INSERT INTO %s VALUES(1,2,3)", tableName);
           sql("INSERT INTO %s VALUES(1,2,4)", tableName);
           TestUtils.assertTableResult(
@@ -314,6 +318,27 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               sql("SELECT count(*) num FROM %s", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of(1));
+          sql("INSERT INTO %s VALUES(1,3,4)", tableName);
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1, 2, 4),
+              Row.of(1, 3, 4));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(2));
+          sql("INSERT INTO %s VALUES(2,2,4)", tableName);
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1, 2, 4),
+              Row.of(1, 3, 4),
+              Row.of(2, 2, 4));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(3));
         },
         true,
         supportDropCascade());
