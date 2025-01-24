@@ -288,8 +288,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   @Test
   @EnabledIf("supportCreateTableWithPrimaryKey")
   public void testCreateTableWithPrimaryKey() {
-    String databaseName = "test_create_no_partition_table_db";
-    String tableName = "test_create_no_partition_table";
+    String databaseName = "test_create_table_with_primary_key_db";
+    String tableName = "test_create_primary_key_table";
     String comment = "test comment";
     String key = "test key";
     String value = "test value";
