@@ -82,7 +82,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -309,7 +308,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
   }
 
-  private static Index @NotNull [] getIndices(ResolvedCatalogBaseTable<?> resolvedTable) {
+  private static Index[] getIndices(ResolvedCatalogBaseTable<?> resolvedTable) {
     Optional<UniqueConstraint> primaryKey = resolvedTable.getResolvedSchema().getPrimaryKey();
     List<String> primaryColumns = primaryKey.map(UniqueConstraint::getColumns).orElse(null);
     if (primaryColumns == null) {
