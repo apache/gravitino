@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.jdbc;
 
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
+
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
@@ -27,6 +30,12 @@ import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
 public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
+
+  protected String mysqlUrl;
+  protected String mysqlUsername;
+  protected String mysqlPassword;
+  protected String mysqlDriver;
+
   @Override
   protected boolean supportsSparkSQLClusteredBy() {
     return false;
@@ -75,6 +84,16 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
   @Override
   protected SparkTableInfoChecker getTableInfoChecker() {
     return SparkJdbcTableInfoChecker.create();
+  }
+
+  @Override
+  protected void initCatalogEnv() throws Exception {
+    ContainerSuite containerSuite = ContainerSuite.getInstance();
+    containerSuite.startMySQLContainer(MYSQL_CATALOG_MYSQL_IT);
+    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
+    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
+    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
+    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
   }
 
   @Override

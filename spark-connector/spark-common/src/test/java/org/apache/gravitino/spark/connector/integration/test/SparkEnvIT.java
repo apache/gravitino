@@ -19,12 +19,10 @@
 
 package org.apache.gravitino.spark.connector.integration.test;
 
-import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
 import static org.apache.gravitino.spark.connector.PropertiesConverter.SPARK_PROPERTY_PREFIX;
 import static org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED;
 
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,10 +56,6 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected String warehouse;
   protected FileSystem hdfs;
   protected String icebergRestServiceUri;
-  protected String mysqlUrl;
-  protected String mysqlUsername;
-  protected String mysqlPassword;
-  protected String mysqlDriver;
 
   private final String metalakeName = "test";
   private SparkSession sparkSession;
@@ -88,7 +82,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
       initIcebergRestServiceEnv();
     }
-    initMysqlEnv();
+    initCatalogEnv();
     // Start Gravitino server
     super.startIntegrationTest();
     initHdfsFileSystem();
@@ -158,13 +152,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
-  private void initMysqlEnv() throws SQLException {
-    containerSuite.startMySQLContainer(MYSQL_CATALOG_MYSQL_IT);
-    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
-  }
+  protected void initCatalogEnv() throws Exception {}
 
   private void initIcebergRestServiceEnv() {
     ignoreIcebergRestService = false;
