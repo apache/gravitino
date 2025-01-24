@@ -103,6 +103,7 @@ tasks {
       exclude("javax.servlet-*.jar")
       exclude("kerb-*.jar")
       exclude("kerby-*.jar")
+      exclude("protobuf-java-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
