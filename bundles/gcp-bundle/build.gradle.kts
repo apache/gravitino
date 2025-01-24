@@ -42,6 +42,12 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
   relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
+  relocate("com.google.protobuf", "org.apache.gravitino.gcp.shaded.com.google.protobuf")
+  relocate("io.grpc", "org.apache.gravitino.gcp.shaded.io.grpc")
+  relocate("com.google.iam", "org.apache.gravitino.gcp.shaded.com.google.iam")
+  relocate("com.google.longrunning", "org.apache.gravitino.gcp.shaded.com.google.longrunning")
+  relocate("com.google.api", "org.apache.gravitino.gcp.shaded.com.google.api")
+  relocate("com.google.auth", "org.apache.gravitino.gcp.shaded.com.google.auth")
   mergeServiceFiles()
 }
 
