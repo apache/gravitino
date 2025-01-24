@@ -34,6 +34,7 @@ use tokio::signal::unix::{signal, SignalKind};
 
 fn init_work_dirs(config: &AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
+    let data_dir_name = data_dir_name.canonicalize()?;
     if !data_dir_name.exists() {
         Err(io::Error::new(
             io::ErrorKind::NotFound,
@@ -182,6 +183,16 @@ fn main() -> Result<(), i32> {
                 return Err(-1);
             };
             let app_config = app_config.unwrap();
+
+            let mount_point = {
+                let path = Path::new(&mount_point).canonicalize();
+                if let Err(e) = path {
+                    error!("Failed to resolve mount point: {:?}", e);
+                    return Err(-1);
+                };
+                let path = path.unwrap();
+                path.to_string_lossy().to_string()
+            };
 
             let result = init_work_dirs(&app_config, &mount_point);
             if let Err(e) = result {
