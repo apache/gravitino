@@ -19,23 +19,41 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.annotation.DeveloperApi;
 
+/** Represents an event triggered before the creation of a tag. */
 @DeveloperApi
 public class CreateTagPreEvent extends TagPreEvent {
   private final TagInfo tagInfo;
 
+  /**
+   * Constructs a new {@code CreateTagPreEvent} instance.
+   *
+   * @param user
+   * @param metalake
+   * @param tagInfo
+   */
   public CreateTagPreEvent(String user, String metalake, TagInfo tagInfo) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagInfo.name()));
     this.tagInfo = tagInfo;
   }
 
+  /**
+   * Returns the information about the tag.
+   *
+   * @return the tag information
+   */
   public TagInfo tagInfo() {
     return tagInfo;
   }
 
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
   @Override
   public OperationType operationType() {
     return OperationType.CREATE_TAG;

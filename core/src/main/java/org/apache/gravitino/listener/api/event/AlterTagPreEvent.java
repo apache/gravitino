@@ -19,9 +19,9 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered before altering a tag. */
 @DeveloperApi
@@ -34,11 +34,11 @@ public class AlterTagPreEvent extends TagPreEvent {
    *
    * @param user The user responsible for the operation.
    * @param metalake The namespace of the tag.
-   * @param tagName The name of the tag being altered.
+   * @param name The name of the tag being altered.
    * @param changes The changes being applied to the tag.
    */
-  public AlterTagPreEvent(String user, String metalake, String tagName, TagChange[] changes) {
-    super(user, NameIdentifier.of(metalake, tagName));
+  public AlterTagPreEvent(String user, String metalake, String name, TagChange[] changes) {
+    super(user, NameIdentifierUtil.ofTag(metalake, name));
     this.changes = changes;
   }
 

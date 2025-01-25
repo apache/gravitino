@@ -25,6 +25,10 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents a pre-event for tag operations. */
 @DeveloperApi
 public abstract class TagPreEvent extends PreEvent {
+  /**
+   * @param user
+   * @param identifier
+   */
   protected TagPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }

@@ -19,14 +19,13 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /** Represents an event triggered before retrieving a tag for a specific metadata object. */
 @DeveloperApi
 public class GetTagForMetadataObjectPreEvent extends TagPreEvent {
-  private final String tagName;
+  private final String name;
 
   /**
    * Constructs the pre-event with user, metalake, metadata object, and tag name.
@@ -34,12 +33,12 @@ public class GetTagForMetadataObjectPreEvent extends TagPreEvent {
    * @param user The user initiating the operation.
    * @param metalake The metalake environment name.
    * @param metadataObject The metadata object associated with the tag.
-   * @param tagName The name of the tag being retrieved.
+   * @param name The name of the tag being retrieved.
    */
   public GetTagForMetadataObjectPreEvent(
-      String user, String metalake, MetadataObject metadataObject, String tagName) {
+      String user, String metalake, MetadataObject metadataObject, String name) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-    this.tagName = tagName;
+    this.name = name;
   }
 
   /**
@@ -48,7 +47,7 @@ public class GetTagForMetadataObjectPreEvent extends TagPreEvent {
    * @return The tag name.
    */
   public String getTagName() {
-    return tagName;
+    return name;
   }
 
   /**

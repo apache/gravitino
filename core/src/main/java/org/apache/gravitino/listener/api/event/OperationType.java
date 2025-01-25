@@ -98,5 +98,6 @@ public enum OperationType {
   VIEW_EXISTS,
   RENAME_VIEW,
   LIST_VIEW,
+
   UNKNOWN,
 }

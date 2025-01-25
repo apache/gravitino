@@ -25,11 +25,23 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 /** Represents an event triggered before listing tags for a metadata object. */
 @DeveloperApi
 public class ListTagsForMetadataObjectPreEvent extends TagPreEvent {
+  /**
+   * Constructs a new {@code ListTagsForMetadataObjectPreEvent} instance.
+   *
+   * @param user
+   * @param metalake
+   * @param metadataObject
+   */
   public ListTagsForMetadataObjectPreEvent(
       String user, String metalake, MetadataObject metadataObject) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
   }
 
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
   @Override
   public OperationType operationType() {
     return OperationType.LIST_TAGS_FOR_METADATA_OBJECT;

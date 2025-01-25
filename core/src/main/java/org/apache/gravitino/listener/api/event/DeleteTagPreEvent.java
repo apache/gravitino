@@ -18,17 +18,29 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered before deleting a tag. */
 @DeveloperApi
 public class DeleteTagPreEvent extends TagPreEvent {
 
-  public DeleteTagPreEvent(String user, String metalake, String tagName) {
-    super(user, NameIdentifier.of(metalake, tagName));
+  /**
+   * Constructs a new {@code DeleteTagPreEvent} instance.
+   *
+   * @param user
+   * @param metalake
+   * @param name
+   */
+  public DeleteTagPreEvent(String user, String metalake, String name) {
+    super(user, NameIdentifierUtil.ofTag(metalake, name));
   }
 
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
   @Override
   public OperationType operationType() {
     return OperationType.DELETE_TAG;

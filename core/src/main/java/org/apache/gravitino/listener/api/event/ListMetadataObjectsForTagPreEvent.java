@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -30,12 +29,17 @@ public class ListMetadataObjectsForTagPreEvent extends TagPreEvent {
    *
    * @param user The user performing the operation.
    * @param metalake The name of the Metalake environment.
-   * @param tagName The name of the tag.
+   * @param name The name of the tag.
    */
-  public ListMetadataObjectsForTagPreEvent(String user, String metalake, String tagName) {
-    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
+  public ListMetadataObjectsForTagPreEvent(String user, String metalake, String name) {
+    super(user, NameIdentifierUtil.ofTag(metalake, name));
   }
 
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
   @Override
   public OperationType operationType() {
     return OperationType.LIST_METADATA_OBJECTS_FOR_TAG;

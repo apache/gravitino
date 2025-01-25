@@ -21,12 +21,25 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
+/** Represents an event triggered before getting a tag. */
 @DeveloperApi
 public class GetTagPreEvent extends TagPreEvent {
-  public GetTagPreEvent(String user, String metalake, String tagName) {
-    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
+  /**
+   * Constructs a new {@code GetTagPreEvent} instance.
+   *
+   * @param user
+   * @param metalake
+   * @param name
+   */
+  public GetTagPreEvent(String user, String metalake, String name) {
+    super(user, NameIdentifierUtil.ofTag(metalake, name));
   }
 
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
   @Override
   public OperationType operationType() {
     return OperationType.GET_TAG;
