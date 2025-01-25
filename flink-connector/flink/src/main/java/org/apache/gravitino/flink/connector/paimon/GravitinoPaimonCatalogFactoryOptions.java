@@ -19,8 +19,17 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
+import org.apache.paimon.flink.FlinkCatalogOptions;
+
 public class GravitinoPaimonCatalogFactoryOptions {
 
   /** Identifier for the {@link GravitinoPaimonCatalog}. */
   public static final String IDENTIFIER = "gravitino-paimon";
+
+  public static final ConfigOption<String> DEFAULT_DATABASE =
+      ConfigOptions.key(FlinkCatalogOptions.DEFAULT_DATABASE.key())
+          .stringType()
+          .defaultValue(FlinkCatalogOptions.DEFAULT_DATABASE.defaultValue());
 }

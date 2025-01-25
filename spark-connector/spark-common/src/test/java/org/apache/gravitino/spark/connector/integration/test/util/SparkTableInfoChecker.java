@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.Data;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
 import org.apache.spark.sql.connector.expressions.Expressions;
@@ -34,17 +35,18 @@ import org.junit.jupiter.api.Assertions;
  * To create an expected SparkTableInfo for verifying the SQL execution result, only the explicitly
  * set fields will be checked.
  */
+@Data
 public class SparkTableInfoChecker {
   private SparkTableInfo expectedTableInfo = new SparkTableInfo();
   private Set<CheckField> checkFields = new LinkedHashSet<>();
 
-  private SparkTableInfoChecker() {}
+  protected SparkTableInfoChecker() {}
 
   public static SparkTableInfoChecker create() {
     return new SparkTableInfoChecker();
   }
 
-  private enum CheckField {
+  protected enum CheckField {
     NAME,
     COLUMN,
     PARTITION,
