@@ -81,7 +81,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract boolean supportDropCascade();
 
-  protected boolean supportCreateTableWithPrimaryKey() {
+  protected boolean supportsPrimaryKey() {
     return true;
   }
 
@@ -286,7 +286,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportCreateTableWithPrimaryKey")
+  @EnabledIf("supportsPrimaryKey")
   public void testCreateTableWithPrimaryKey() {
     String databaseName = "test_create_table_with_primary_key_db";
     String tableName = "test_create_primary_key_table";

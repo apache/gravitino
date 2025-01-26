@@ -64,7 +64,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
   private static org.apache.gravitino.Catalog icebergCatalog;
 
   @Override
-  protected boolean supportCreateTableWithPrimaryKey() {
+  protected boolean supportsPrimaryKey() {
     return false;
   }
 
