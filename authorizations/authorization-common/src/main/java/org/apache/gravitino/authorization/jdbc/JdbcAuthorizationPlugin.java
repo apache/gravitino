@@ -85,6 +85,13 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
     dataSource.setTestOnReturn(BaseObjectPoolConfig.DEFAULT_TEST_ON_RETURN);
     dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
     mappingProvider = new JdbcSecurableObjectMappingProvider();
+
+    try (Connection ignored = getConnection()) {
+      LOG.info("Load the JDBC driver first");
+    } catch (SQLException se) {
+      LOG.error("Jdbc authorization plugin exception: ", se);
+      throw toAuthorizationPluginException(se);
+    }
   }
 
   @Override
