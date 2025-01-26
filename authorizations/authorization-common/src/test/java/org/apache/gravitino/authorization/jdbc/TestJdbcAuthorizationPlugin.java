@@ -52,13 +52,13 @@ public class TestJdbcAuthorizationPlugin {
   private static final Map<String, String> properties =
       ImmutableMap.of(
           JdbcAuthorizationProperties.JDBC_URL,
-          "xx",
+          "jdbc:h2:mem:test",
           JdbcAuthorizationProperties.JDBC_USERNAME,
           "xx",
           JdbcAuthorizationProperties.JDBC_PASSWORD,
           "xx",
           JdbcAuthorizationProperties.JDBC_DRIVER,
-          "xx");
+          "org.h2.Driver");
 
   private static final JdbcAuthorizationPlugin plugin =
       new JdbcAuthorizationPlugin(properties) {

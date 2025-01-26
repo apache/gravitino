@@ -49,6 +49,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.h2db)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
