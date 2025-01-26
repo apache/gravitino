@@ -31,6 +31,7 @@ public class SparkJdbcMysqlCatalogIT33 extends SparkJdbcMysqlCatalogIT {
             .sessionState()
             .conf()
             .getConfString("spark.sql.catalog." + getCatalogName());
+
     Assertions.assertEquals(GravitinoJdbcCatalogSpark33.class.getName(), catalogClass);
   }
 }
