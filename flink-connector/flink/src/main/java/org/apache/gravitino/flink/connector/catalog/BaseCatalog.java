@@ -314,9 +314,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     if (primaryColumns == null) {
       return new Index[0];
     }
-    String[][] primaryFiled =
+    String[][] primaryField =
         primaryColumns.stream().map(e -> new String[] {e}).toArray(String[][]::new);
-    Index primary = Indexes.primary("primary", primaryFiled);
+    Index primary = Indexes.primary("primary", primaryField);
     return new Index[] {primary};
   }
 
