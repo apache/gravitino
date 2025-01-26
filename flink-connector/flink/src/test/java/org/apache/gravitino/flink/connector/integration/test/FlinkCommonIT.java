@@ -314,35 +314,57 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Index index = table.index()[0];
           Assertions.assertEquals("aa", index.fieldNames()[0][0]);
           Assertions.assertEquals("bb", index.fieldNames()[1][0]);
-          sql("INSERT INTO %s VALUES(1,2,3)", tableName);
-          sql("INSERT INTO %s VALUES(1,2,4)", tableName);
           TestUtils.assertTableResult(
-              sql("SELECT * FROM %s", tableName), ResultKind.SUCCESS_WITH_CONTENT, Row.of(1, 2, 4));
+              sql("INSERT INTO %s VALUES(1,2,3)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+
           TestUtils.assertTableResult(
               sql("SELECT count(*) num FROM %s", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of(1));
-          sql("INSERT INTO %s VALUES(1,3,4)", tableName);
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName), ResultKind.SUCCESS_WITH_CONTENT, Row.of(1, 2, 3));
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(1,2,4)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1));
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName), ResultKind.SUCCESS_WITH_CONTENT, Row.of(1, 2, 4));
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(1,3,4)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(2));
           TestUtils.assertTableResult(
               sql("SELECT * FROM %s", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of(1, 2, 4),
               Row.of(1, 3, 4));
           TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(2,2,4)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+
+          TestUtils.assertTableResult(
               sql("SELECT count(*) num FROM %s", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
-              Row.of(2));
-          sql("INSERT INTO %s VALUES(2,2,4)", tableName);
+              Row.of(3));
           TestUtils.assertTableResult(
               sql("SELECT * FROM %s", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of(1, 2, 4),
               Row.of(1, 3, 4),
               Row.of(2, 2, 4));
-          TestUtils.assertTableResult(
-              sql("SELECT count(*) num FROM %s", tableName),
-              ResultKind.SUCCESS_WITH_CONTENT,
-              Row.of(3));
         },
         true,
         supportDropCascade());
