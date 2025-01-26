@@ -62,7 +62,6 @@ import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
-
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
@@ -461,7 +460,7 @@ public class AuthorizationUtils {
               // The Hive default schema location is Hive warehouse directory
               String defaultSchemaLocation =
                   getHiveDefaultLocation(ident.namespace().level(0), ident.name());
-              if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
+              if (StringUtils.isNotBlank(defaultSchemaLocation)) {
                 locations.add(defaultSchemaLocation);
               }
             } else if (catalogObj.provider().equals("hadoop")) {
