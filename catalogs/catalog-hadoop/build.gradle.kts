@@ -52,6 +52,8 @@ dependencies {
     exclude("org.eclipse.jetty", "*")
     exclude("io.netty")
     exclude("org.fusesource.leveldbjni")
+    // Exclude protobuf-java to avoid conflict with;
+    exclude("com.google.protobuf", "protobuf-java")
   }
   implementation(libs.slf4j.api)
   implementation(libs.awaitility)
@@ -101,6 +103,9 @@ tasks {
       exclude("javax.servlet-*.jar")
       exclude("kerb-*.jar")
       exclude("kerby-*.jar")
+      // As L55-56 takes no effect actually in the final distribution package, we need to exclude
+      // protobuf-java here
+      exclude("protobuf-java-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
