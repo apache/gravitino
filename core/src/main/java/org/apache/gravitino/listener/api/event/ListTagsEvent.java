@@ -26,16 +26,19 @@ import org.apache.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public final class ListTagsEvent extends TagEvent {
   private final String metalake;
+  private final String[] tagNames;
 
   /**
    * Constructs an instance of {@code ListTagEvent}.
    *
    * @param user The username of the individual who initiated the tag listing.
    * @param metalake The namespace from which tags were listed.
+   * @param tagNames The list of tag names that were retrieved.
    */
-  public ListTagsEvent(String user, String metalake) {
+  public ListTagsEvent(String user, String metalake, String[] tagNames) {
     super(user, NameIdentifier.of(metalake));
     this.metalake = metalake;
+    this.tagNames = tagNames;
   }
 
   /**
@@ -45,6 +48,15 @@ public final class ListTagsEvent extends TagEvent {
    */
   public String metalake() {
     return metalake;
+  }
+
+  /**
+   * Provides the tag names associated with this event.
+   *
+   * @return The tag names that were listed.
+   */
+  public String[] getTagNames() {
+    return tagNames;
   }
 
   /**

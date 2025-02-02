@@ -22,7 +22,7 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.listener.api.info.TagInfo;
 
 /**
  * Represents an event that is triggered upon successfully retrieving a tag for a metadata object.
@@ -32,7 +32,7 @@ public final class GetTagForMetadataObjectEvent extends TagEvent {
   private final String metalake;
   private final MetadataObject metadataObject;
   private final String tagName;
-  private final Tag tag;
+  private final TagInfo tagInfo;
 
   /**
    * Constructs an instance of {@code GetTagForMetadataObjectEvent}.
@@ -41,15 +41,19 @@ public final class GetTagForMetadataObjectEvent extends TagEvent {
    * @param metalake The metalake from which the tag was retrieved.
    * @param metadataObject The metadata object for which the tag was retrieved.
    * @param tagName The name of the tag being retrieved.
-   * @param tag The {@link Tag} object representing the retrieved tag.
+   * @param tagInfo The {@link TagInfo} object representing the retrieved tag.
    */
   public GetTagForMetadataObjectEvent(
-      String user, String metalake, MetadataObject metadataObject, String tagName, Tag tag) {
+      String user,
+      String metalake,
+      MetadataObject metadataObject,
+      String tagName,
+      TagInfo tagInfo) {
     super(user, NameIdentifier.of(metalake));
     this.metalake = metalake;
     this.metadataObject = metadataObject;
     this.tagName = tagName;
-    this.tag = tag;
+    this.tagInfo = tagInfo;
   }
 
   /**
@@ -80,12 +84,12 @@ public final class GetTagForMetadataObjectEvent extends TagEvent {
   }
 
   /**
-   * Provides the retrieved tag object.
+   * Provides the retrieved tag info object.
    *
-   * @return The {@link Tag} object.
+   * @return The {@link TagInfo} object.
    */
-  public Tag tag() {
-    return tag;
+  public TagInfo tagInfo() {
+    return tagInfo;
   }
 
   /**
