@@ -29,10 +29,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public final class GetTagForMetadataObjectEvent extends TagEvent {
-  private final String metalake;
-  private final MetadataObject metadataObject;
-  private final String tagName;
-  private final TagInfo tagInfo;
 
   /**
    * Constructs an instance of {@code GetTagForMetadataObjectEvent}.
@@ -50,46 +46,6 @@ public final class GetTagForMetadataObjectEvent extends TagEvent {
       String tagName,
       TagInfo tagInfo) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-    this.metalake = metalake;
-    this.metadataObject = metadataObject;
-    this.tagName = tagName;
-    this.tagInfo = tagInfo;
-  }
-
-  /**
-   * Provides the metalake associated with this event.
-   *
-   * @return The metalake from which the tag was retrieved.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Provides the metadata object associated with this event.
-   *
-   * @return The {@link MetadataObject} for which the tag was retrieved.
-   */
-  public MetadataObject metadataObject() {
-    return metadataObject;
-  }
-
-  /**
-   * Provides the name of the retrieved tag.
-   *
-   * @return The name of the tag.
-   */
-  public String tagName() {
-    return tagName;
-  }
-
-  /**
-   * Provides the retrieved tag info object.
-   *
-   * @return The {@link TagInfo} object.
-   */
-  public TagInfo tagInfo() {
-    return tagInfo;
   }
 
   /**

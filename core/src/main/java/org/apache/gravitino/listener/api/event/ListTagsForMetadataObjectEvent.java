@@ -26,10 +26,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 /** Represents an event that is triggered upon successfully listing tags for a metadata object. */
 @DeveloperApi
 public final class ListTagsForMetadataObjectEvent extends TagEvent {
-  private final String metalake;
-  private final MetadataObject metadataObject;
-  private final String[] tags;
-
   /**
    * Constructs an instance of {@code ListTagsForMetadataObjectEvent}.
    *
@@ -41,36 +37,6 @@ public final class ListTagsForMetadataObjectEvent extends TagEvent {
   public ListTagsForMetadataObjectEvent(
       String user, String metalake, MetadataObject metadataObject, String[] tags) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-    this.metalake = metalake;
-    this.metadataObject = metadataObject;
-    this.tags = tags;
-  }
-
-  /**
-   * Provides the metalake associated with this event.
-   *
-   * @return The metalake from which tags were listed.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Provides the metadata object associated with this event.
-   *
-   * @return The {@link MetadataObject} for which tags were listed.
-   */
-  public MetadataObject metadataObject() {
-    return metadataObject;
-  }
-
-  /**
-   * Provides the tags associated with this event.
-   *
-   * @return An array of tag names.
-   */
-  public String[] tags() {
-    return tags;
   }
 
   /**

@@ -20,16 +20,12 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is triggered upon successfully listing metadata objects for a tag. */
 @DeveloperApi
 public final class ListMetadataObjectsForTagEvent extends TagEvent {
-  private final String metalake;
-  private final String tagName;
-  private final MetadataObject[] metadataObjects;
-
   /**
    * Constructs an instance of {@code ListMetadataObjectsForTagEvent}.
    *
@@ -41,37 +37,7 @@ public final class ListMetadataObjectsForTagEvent extends TagEvent {
    */
   public ListMetadataObjectsForTagEvent(
       String user, String metalake, String tagName, MetadataObject[] metadataObjects) {
-    super(user, NameIdentifier.of(metalake));
-    this.metalake = metalake;
-    this.tagName = tagName;
-    this.metadataObjects = metadataObjects;
-  }
-
-  /**
-   * Provides the metalake associated with this event.
-   *
-   * @return The metalake from which metadata objects were listed.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Provides the name of the tag associated with this event.
-   *
-   * @return The name of the tag.
-   */
-  public String tagName() {
-    return tagName;
-  }
-
-  /**
-   * Provides the metadata objects associated with this event.
-   *
-   * @return An array of {@link MetadataObject}.
-   */
-  public MetadataObject[] metadataObjects() {
-    return metadataObjects;
+    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
   }
 
   /**

@@ -28,8 +28,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public final class AssociateTagsForMetadataObjectEvent extends TagEvent {
-  private final String metalake;
-  private final MetadataObject metadataObject;
   private final String[] tagsToAdd;
   private final String[] tagsToRemove;
   private final String[] associatedTags;
@@ -52,29 +50,9 @@ public final class AssociateTagsForMetadataObjectEvent extends TagEvent {
       String[] tagsToRemove,
       String[] associatedTags) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-    this.metalake = metalake;
-    this.metadataObject = metadataObject;
-    this.tagsToAdd = tagsToAdd;
-    this.tagsToRemove = tagsToRemove;
-    this.associatedTags = associatedTags;
-  }
-
-  /**
-   * Provides the metalake associated with this event.
-   *
-   * @return The metalake from which the tags were associated.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Provides the metadata object associated with this event.
-   *
-   * @return The {@link MetadataObject} with which the tags were associated.
-   */
-  public MetadataObject metadataObject() {
-    return metadataObject;
+    this.tagsToAdd = tagsToAdd.clone();
+    this.tagsToRemove = tagsToRemove.clone();
+    this.associatedTags = associatedTags.clone();
   }
 
   /**

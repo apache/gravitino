@@ -25,8 +25,6 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /** Represents an event that is triggered upon the successful listing of tags. */
 @DeveloperApi
 public final class ListTagsEvent extends TagEvent {
-  private final String metalake;
-  private final String[] tagNames;
 
   /**
    * Constructs an instance of {@code ListTagEvent}.
@@ -37,26 +35,6 @@ public final class ListTagsEvent extends TagEvent {
    */
   public ListTagsEvent(String user, String metalake, String[] tagNames) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagNames[0]));
-    this.metalake = metalake;
-    this.tagNames = tagNames;
-  }
-
-  /**
-   * Provides the metalake associated with this event.
-   *
-   * @return The metalake from which tags were listed.
-   */
-  public String metalake() {
-    return metalake;
-  }
-
-  /**
-   * Provides the tag names associated with this event.
-   *
-   * @return The tag names that were listed.
-   */
-  public String[] getTagNames() {
-    return tagNames;
   }
 
   /**
