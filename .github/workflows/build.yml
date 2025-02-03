@@ -90,7 +90,7 @@ jobs:
           ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
 
       - name: Upload unit tests report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: unit test report
@@ -129,7 +129,7 @@ jobs:
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
 
       - name: Upload unit tests report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: unit test report
