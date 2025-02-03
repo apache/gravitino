@@ -66,13 +66,13 @@ const schema = yup.object().shape({
       yup.object().shape({
         name: yup
           .string()
-          .required('This aliase is required')
-          .test('not-number', 'Aliase cannot be a number or numeric string', value => {
+          .required('The alias is required')
+          .test('not-number', 'Alias cannot be a number or a numeric string', value => {
             return value === undefined || isNaN(Number(value))
           })
       })
     )
-    .test('unique', 'Aliase must be unique', (aliases, ctx) => {
+    .test('unique', 'Alias must be unique', (aliases, ctx) => {
       const values = aliases?.filter(a => !!a.name).map(a => a.name)
       const duplicates = values.filter((value, index, self) => self.indexOf(value) !== index)
 
@@ -81,7 +81,7 @@ const schema = yup.object().shape({
 
         return ctx.createError({
           path: `aliases.${duplicateIndex}.name`,
-          message: 'This aliase is duplicated'
+          message: 'This alias is duplicated'
         })
       }
 
@@ -326,7 +326,7 @@ const LinkVersionDialog = props => {
                                   field.onChange(event)
                                   trigger('aliases')
                                 }}
-                                label={`Aliase ${index + 1}`}
+                                label={`Alias ${index + 1}`}
                                 error={!!errors.aliases?.[index]?.name || !!errors.aliases?.message}
                                 helperText={errors.aliases?.[index]?.name?.message || errors.aliases?.message}
                                 fullWidth
