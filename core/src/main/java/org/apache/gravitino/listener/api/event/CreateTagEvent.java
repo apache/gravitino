@@ -19,9 +19,9 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is activated upon the successful creation of a tag. */
 @DeveloperApi
@@ -37,7 +37,7 @@ public final class CreateTagEvent extends TagEvent {
    * @param createdTagInfo The final state of the tag post-creation.
    */
   public CreateTagEvent(String user, String metalake, TagInfo createdTagInfo) {
-    super(user, NameIdentifier.of(metalake));
+    super(user, NameIdentifierUtil.ofTag(metalake, createdTagInfo.name()));
     this.createdTagInfo = createdTagInfo;
   }
 

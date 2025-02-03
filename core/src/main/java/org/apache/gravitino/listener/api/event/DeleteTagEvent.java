@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is generated after a tag is successfully deleted. */
 @DeveloperApi
@@ -33,11 +33,12 @@ public final class DeleteTagEvent extends TagEvent {
    *
    * @param user The user who initiated the delete tag operation.
    * @param metalake The metalake from which the tag was deleted.
+   * @param name The name of the tag.
    * @param isExists A boolean flag indicating whether the tag existed at the time of the delete
    *     operation.
    */
-  public DeleteTagEvent(String user, String metalake, boolean isExists) {
-    super(user, NameIdentifier.of(metalake));
+  public DeleteTagEvent(String user, String metalake, String name, boolean isExists) {
+    super(user, NameIdentifierUtil.ofTag(metalake, name));
     this.isExists = isExists;
   }
 

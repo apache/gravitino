@@ -19,9 +19,9 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is triggered upon successfully retrieving a tag. */
 @DeveloperApi
@@ -39,7 +39,7 @@ public final class GetTagEvent extends TagEvent {
    * @param tagInfo The {@link TagInfo} object representing the retrieved tag.
    */
   public GetTagEvent(String user, String metalake, String tagName, TagInfo tagInfo) {
-    super(user, NameIdentifier.of(metalake));
+    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
     this.metalake = metalake;
     this.tagName = tagName;
     this.tagInfo = tagInfo;

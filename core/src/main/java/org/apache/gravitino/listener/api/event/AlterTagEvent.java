@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered upon the successful alteration of a tag. */
 @DeveloperApi
@@ -42,7 +42,7 @@ public final class AlterTagEvent extends TagEvent {
    */
   public AlterTagEvent(
       String user, String metalake, TagChange[] tagChanges, TagInfo updatedTagInfo) {
-    super(user, NameIdentifier.of(metalake));
+    super(user, NameIdentifierUtil.ofTag(metalake, updatedTagInfo.name()));
     this.tagChanges = tagChanges;
     this.updatedTagInfo = updatedTagInfo;
   }

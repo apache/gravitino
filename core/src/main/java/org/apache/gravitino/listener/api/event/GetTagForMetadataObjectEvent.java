@@ -20,9 +20,9 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /**
  * Represents an event that is triggered upon successfully retrieving a tag for a metadata object.
@@ -49,7 +49,7 @@ public final class GetTagForMetadataObjectEvent extends TagEvent {
       MetadataObject metadataObject,
       String tagName,
       TagInfo tagInfo) {
-    super(user, NameIdentifier.of(metalake));
+    super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
     this.metalake = metalake;
     this.metadataObject = metadataObject;
     this.tagName = tagName;
