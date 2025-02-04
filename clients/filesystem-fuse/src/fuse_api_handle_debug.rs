@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 use crate::config::AppConfig;
 use crate::filesystem::{FileSystemContext, RawFileSystem};
 use crate::fuse_api_handle::FuseApiHandle;
@@ -29,9 +28,9 @@ use fuse3::raw::prelude::{
 use fuse3::raw::reply::{DirectoryEntry, DirectoryEntryPlus};
 use fuse3::raw::Filesystem;
 use fuse3::{Inode, SetAttr, Timestamp};
-use futures_util::stream::{BoxStream};
-use futures_util::{StreamExt};
-use std::ffi::{OsStr};
+use futures_util::stream::{self, BoxStream};
+use futures_util::StreamExt;
+use std::ffi::OsStr;
 use std::fmt::Write;
 use tracing::{debug, error};
 
@@ -531,14 +530,6 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     where
         T: 'a;
 
-    // type DirEntryStream = Stream<Item = fuse3::Result<DirectoryEntry>>;
-
-    // type DirEntryStream<'a> = Stream<'a, fuse3::Result<DirectoryEntry>>
-    // where
-    //     T: 'a;
-    //
-    // type DirEntryStream<'a> = Stream<Item = fuse3::Result<DirectoryEntry>> + Send + 'a;
-
     #[allow(clippy::needless_lifetimes)]
     async fn readdir<'a>(
         &'a self,
@@ -547,101 +538,56 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: u64,
         offset: i64,
     ) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(parent).await?;
         debug!(
             req.unique,
             ?req,
-            parent = ?stat.name,
+            parent = ?parent_path_name,
             ?fh,
             ?offset,
             "readdir started"
         );
 
-        let mut debug_output = String::new();
-
         match self.inner.readdir(req, parent, fh, offset).await {
             Ok(mut reply_dir) => {
-               // Chain the `inspect` method to the existing stream
-                reply_dir.entries = Box::pin(reply_dir.entries.inspect(|entry_result| {
+                let mut entries = Vec::new();
+
+                while let Some(entry_result) = reply_dir.entries.next().await {
                     match entry_result {
                         Ok(entry) => {
-                            debug!("Directory entry: {:?}", entry);
+                            entries.push(entry);
                         }
                         Err(e) => {
-                            debug!("Error reading directory entry: {:?}", e);
+                            return Err(e.into());
                         }
                     }
-                }));
+                }
 
-                Ok(reply_dir)
+                let entries_info = entries
+                    .iter()
+                    .map(|entry| format!("{:?}", entry))
+                    .collect::<Vec<String>>()
+                    .join(", ");
 
+                debug!(
+                    req.unique,
+                    ?req,
+                    parent = ?parent_path_name,
+                    ?fh,
+                    ?offset,
+                    entries = %entries_info,
+                    "readdir completed"
+                );
 
-                // let stream = &mut reply_dir.entries;
-                //
-                // let ins = stream.inspect(|entry_result| match entry_result {
-                //     Ok(entry) => {
-                //         // debug_output.push_str(format!("Directory entry: {:?}\n", entry).as_str());
-                //         debug!("{}", format!("Directory entry: {:?}\n", entry).as_str());
-                //     }
-                //
-                //     Err(e) => {
-                //         // debug_output
-                //         //     .push_str(format!("Error reading directory entry: {:?}\n", e).as_str());
-                //         debug!("{}",format!("Error reading directory entry: {:?}\n", e).as_str());
-                //     }
-                // });
-
-                // let e: Vec<_> = ins.collect().await;
-                // debug!("xxx collected {:?}", e);
-
-                // reply_dir.entries = Box::pin(stream);
-
-                // Ok(reply_dir)
+                Ok(ReplyDirectory {
+                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
+                })
             }
             Err(e) => {
-                debug_output
-                    .push_str(format!("Error reading directory entries: {:?}\n", e).as_str());
+                error!("Error reading directory: {:?}", e);
                 Err(e)
             }
         }
-
-        // while let Some(entry_result) = res.entries.collect() {
-        //
-        //
-        // }
-        // while let Some(entry_result) = res.entries.next().await {
-        //     match entry_result {
-        //         Ok(entry) => debug!(?entry, "READDIR result"),
-        //         Err(e) => error!("Error reading directory entry: {:?}", e),
-        //     }
-        // }
-
-        // log_result!(
-        //     self.inner.readdir(req, parent, fh, offset),
-        //     "READDIR",
-        //     req,
-        //     stream,
-        //     // |entry: &DirectoryEntry| { debug!("Hello") }
-        //     |entry: &DirectoryEntry| {
-        //         format!(
-        //             "{{ inode: {}, kind: {}, name: \"{}\", offset: {} }}",
-        //             entry.inode,
-        //             match entry.kind {
-        //                 FileType::Directory => "Directory",
-        //                 FileType::RegularFile => "File",
-        //                 FileType::Symlink => "Symlink",
-        //                 _ => "Other",
-        //             },
-        //             entry.name.to_string_lossy(),
-        //             entry.offset
-        //         )
-        //     }
-        // )
-
-        // log_result!(self.inner.readdir(req, parent, fh, offset), "READDIR", req)
     }
 
     async fn releasedir(
@@ -676,6 +622,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
             .await?;
+
         debug!(
             req.unique,
             ?req,
@@ -707,31 +654,61 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         offset: u64,
         lock_owner: u64,
     ) -> fuse3::Result<ReplyDirectoryPlus<Self::DirEntryPlusStream<'a>>> {
+        let parent_path_name = self.inner.get_file_path(parent).await?;
         debug!(
             req.unique,
             ?req,
-            ?parent,
+            parent = ?parent_path_name,
             ?fh,
             ?offset,
             ?lock_owner,
             "readdirplus started"
         );
 
-        let mut res = self
+        match self
             .inner
             .readdirplus(req, parent, fh, offset, lock_owner)
-            .await?;
-        while let Some(entry_result) = res.entries.next().await {
-            match entry_result {
-                Ok(entry) => println!("Directory entry plus: {:?}", entry),
-                Err(e) => eprintln!("Error reading directory entry plus: {:?}", e),
+            .await
+        {
+            Ok(mut reply_dir_plus) => {
+                let mut entries = Vec::new();
+
+                while let Some(entry_result) = reply_dir_plus.entries.next().await {
+                    match entry_result {
+                        Ok(entry) => {
+                            entries.push(entry);
+                        }
+                        Err(e) => {
+                            return Err(e.into());
+                        }
+                    }
+                }
+
+                let entries_info = entries
+                    .iter()
+                    .map(|entry| format!("{:?}", entry))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                debug!(
+                    req.unique,
+                    ?req,
+                    parent = ?parent_path_name,
+                    ?fh,
+                    ?offset,
+                    ?lock_owner,
+                    entries = %entries_info,
+                    "readdirplus completed"
+                );
+
+                Ok(ReplyDirectoryPlus {
+                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
+                })
+            }
+            Err(e) => {
+                error!("Error reading directory plus: {:?}", e);
+                Err(e)
             }
         }
-
-        log_result!(
-            self.inner.readdirplus(req, parent, fh, offset, lock_owner),
-            "readdirplus",
-            req
-        )
     }
 }
