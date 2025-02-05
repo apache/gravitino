@@ -84,4 +84,6 @@ public class IcebergConstants {
 
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
+
+  public static final String ICEBERG_VERSION = "1.6.1";
 }
