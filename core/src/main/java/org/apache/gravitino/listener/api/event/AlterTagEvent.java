@@ -43,7 +43,7 @@ public final class AlterTagEvent extends TagEvent {
   public AlterTagEvent(
       String user, String metalake, TagChange[] tagChanges, TagInfo updatedTagInfo) {
     super(user, NameIdentifierUtil.ofTag(metalake, updatedTagInfo.name()));
-    this.tagChanges = tagChanges.clone();
+    this.tagChanges = tagChanges != null ? tagChanges.clone() : new TagChange[0];
     this.updatedTagInfo = updatedTagInfo;
   }
 

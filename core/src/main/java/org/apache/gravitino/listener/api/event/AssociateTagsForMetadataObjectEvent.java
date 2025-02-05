@@ -50,9 +50,9 @@ public final class AssociateTagsForMetadataObjectEvent extends TagEvent {
       String[] tagsToRemove,
       String[] associatedTags) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-    this.tagsToAdd = tagsToAdd.clone();
-    this.tagsToRemove = tagsToRemove.clone();
-    this.associatedTags = associatedTags.clone();
+    this.tagsToAdd = tagsToAdd != null ? tagsToAdd.clone() : new String[0];
+    this.tagsToRemove = tagsToRemove != null ? tagsToRemove.clone() : new String[0];
+    this.associatedTags = associatedTags != null ? associatedTags.clone() : new String[0];
   }
 
   /**
