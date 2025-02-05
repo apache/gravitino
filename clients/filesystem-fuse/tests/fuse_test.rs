@@ -425,7 +425,7 @@ impl SequenceFileOperationTest {
                 .append(true)
                 .open(fs_test.test_dir.join(file_name));
             if let Err(e) = result {
-                assert_eq!(e.to_string(), "Bad file descriptor (os error 9)");
+                assert_eq!(e.to_string(), "Invalid argument (os error 22)");
                 return;
             }
 
