@@ -71,5 +71,7 @@ test-s3:
 test: doc-test
 	cargo test --no-fail-fast --all-targets --all-features --workspace
 
+test-all: test test-s3 test-fuse-it	
+
 clean:
 	cargo clean

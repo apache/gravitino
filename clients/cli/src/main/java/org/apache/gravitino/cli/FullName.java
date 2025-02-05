@@ -42,6 +42,20 @@ public class FullName {
   }
 
   /**
+   * Retrieves the level of the full name.
+   *
+   * @return The level of the full name, or -1 if line does not contain a {@code --name} option.
+   */
+  public int getLevel() {
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      return names.length;
+    }
+
+    return -1;
+  }
+
+  /**
    * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
    * variable or the Gravitino config file.
    *

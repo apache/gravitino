@@ -23,12 +23,12 @@ the future versions.
 
 :::info
 1. Metadata objects are objects that are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
-   `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, etc. A metadata object is combined by a `type` and a
+   `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `MODEL`, etc. A metadata object is combined by a `type` and a
    comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
    "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
    object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
    "catalog1.schema1.table1.column1" with type "COLUMN".
-2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `COLUMN` objects can be tagged.
+2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`.
@@ -204,8 +204,8 @@ client.deleteTag("tag2");
 
 ## Tag associations
 
-Gravitino allows you to associate and disassociate tags with metadata objects. Currently, only
-`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC` objects can be tagged.
+Gravitino allows you to associate and disassociate tags with metadata objects. Currently,
+`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
 
 ### Associate and disassociate tags with a metadata object
 

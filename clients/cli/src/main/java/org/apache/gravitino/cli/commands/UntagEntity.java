@@ -20,15 +20,18 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
+import org.apache.gravitino.cli.utils.FullNameUtil;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
 public class UntagEntity extends Command {
@@ -62,18 +65,42 @@ public class UntagEntity extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
 
-      // TODO fileset and topic
-      if (name.hasTableName()) {
+      if (name.getLevel() == 3) {
         String catalog = name.getCatalogName();
-        String schema = name.getSchemaName();
-        String table = name.getTableName();
-        Table gTable =
-            client
-                .loadCatalog(catalog)
-                .asTableCatalog()
-                .loadTable(NameIdentifier.of(schema, table));
-        removeTags = gTable.supportsTags().associateTags(null, tags);
-        entity = table;
+        Catalog catalogObject = client.loadCatalog(catalog);
+        switch (catalogObject.type()) {
+          case RELATIONAL:
+            String table = name.getTableName();
+            entity = table;
+            Table gTable = catalogObject.asTableCatalog().loadTable(FullNameUtil.toTable(name));
+            removeTags = gTable.supportsTags().associateTags(null, tags);
+            break;
+
+          case MODEL:
+            String model = name.getModelName();
+            entity = model;
+            Model gModel = catalogObject.asModelCatalog().getModel(FullNameUtil.toModel(name));
+            removeTags = gModel.supportsTags().associateTags(null, tags);
+            break;
+
+          case FILESET:
+            String fileset = name.getFilesetName();
+            entity = fileset;
+            Fileset gFileset =
+                catalogObject.asFilesetCatalog().loadFileset(FullNameUtil.toFileset(name));
+            removeTags = gFileset.supportsTags().associateTags(null, tags);
+            break;
+
+          case MESSAGING:
+            String topic = name.getTopicName();
+            entity = topic;
+            Topic gTopic = catalogObject.asTopicCatalog().loadTopic(FullNameUtil.toTopic(name));
+            removeTags = gTopic.supportsTags().associateTags(null, tags);
+            break;
+
+          default:
+            break;
+        }
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();

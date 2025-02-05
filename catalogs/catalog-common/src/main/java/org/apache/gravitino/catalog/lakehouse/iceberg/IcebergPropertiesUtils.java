@@ -33,6 +33,7 @@ public class IcebergPropertiesUtils {
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
   // change it to `catalogType` automatically and pass it to Iceberg.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_ICEBERG;
+  public static final Map<String, String> ICEBERG_CATALOG_CONFIG_TO_GRAVITINO;
 
   static {
     Map<String, String> map = new HashMap();
@@ -65,6 +66,14 @@ public class IcebergPropertiesUtils {
         AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
         IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
+
+    Map<String, String> icebergCatalogConfigToGravitino = new HashMap<>();
+    map.forEach(
+        (key, value) -> {
+          icebergCatalogConfigToGravitino.put(value, key);
+        });
+    ICEBERG_CATALOG_CONFIG_TO_GRAVITINO =
+        Collections.unmodifiableMap(icebergCatalogConfigToGravitino);
   }
 
   /**

@@ -30,9 +30,10 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
    3. `apache/gravitino:0.1.0` if this is a gravitino server image.
    4. `apache/gravitino-iceberg-rest:0.1.0` if this is an iceberg-rest server image.
 6. You must enter the correct `docker user name`and `publish docker token` before you can execute run `Publish Docker Image` workflow.
-7. Wait for the workflow to complete. You can see a new Docker image shown in the [Apache Docker Hub](https://hub.docker.com/u/apache) repository.
+7. If you want to update the latest tag, select the box for `Whether to update the latest tag`.
+8. Wait for the workflow to complete. You can see a new Docker image shown in the [Apache Docker Hub](https://hub.docker.com/u/apache) repository.
 
-![Publish Docker image](assets/publish-docker-image.jpg)
+![Publish Docker image](assets/publish-docker-image.png)
 
 ## More details of Apache Gravitino Docker images
 

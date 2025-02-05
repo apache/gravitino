@@ -9,7 +9,7 @@ license: "This software is licensed under the Apache License version 2."
 ## Introduction
 
 Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports [S3](hadoop-catalog-with-S3.md), [GCS](hadoop-catalog-with-gcs.md), [OSS](hadoop-catalog-with-oss.md) and [Azure Blob Storage](hadoop-catalog-with-adls.md) through Hadoop catalog. 
+the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports [S3](hadoop-catalog-with-s3.md), [GCS](hadoop-catalog-with-gcs.md), [OSS](hadoop-catalog-with-oss.md) and [Azure Blob Storage](hadoop-catalog-with-adls.md) through Hadoop catalog. 
 
 The rest of this document will use HDFS or local file as an example to illustrate how to use the Hadoop catalog. For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, please refer to the corresponding document for more details.
 
@@ -130,7 +130,7 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 | `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
 | `credential-providers`                | The credential provider types, separated by comma.                                                     | (none)                   | No       | 0.8.0-incubating |
 
-Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-provider` setting in the following order of precedence:
+Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-providers` setting in the following order of precedence:
 
 1. Fileset properties
 2. Schema properties
