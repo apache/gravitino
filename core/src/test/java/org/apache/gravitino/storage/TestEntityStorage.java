@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -83,6 +84,9 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.relational.RelationalBackend;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
@@ -136,7 +140,7 @@ public class TestEntityStorage {
       if (type.equalsIgnoreCase("h2")) {
         // The following properties are used to create the JDBC connection; they are just for test,
         // in the real world, they will be set automatically by the configuration file if you set
-        // ENTITY_RELATIONAL_STOR as EMBEDDED_ENTITY_RELATIONAL_STORE.
+        // ENTITY_RELATIONAL_STORE as EMBEDDED_ENTITY_RELATIONAL_STORE.
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
             .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
@@ -170,6 +174,15 @@ public class TestEntityStorage {
             "converter",
             new PostgreSQLExceptionConverter(),
             true);
+
+        RelationalEntityStore store =
+            (RelationalEntityStore) EntityStoreFactory.createEntityStore(config);
+        store.initialize(config);
+        Field f = FieldUtils.getField(RelationalEntityStore.class, "backend", true);
+        RelationalBackend backend = (RelationalBackend) f.get(store);
+        RelationalGarbageCollector garbageCollector =
+            new RelationalGarbageCollector(backend, config);
+        garbageCollector.collectAndClean();
 
       } else {
         throw new UnsupportedOperationException("Unsupported entity store type: " + type);

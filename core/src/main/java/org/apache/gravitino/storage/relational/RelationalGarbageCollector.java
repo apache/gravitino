@@ -68,7 +68,8 @@ public final class RelationalGarbageCollector implements Closeable {
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
-  private void collectAndClean() {
+  @VisibleForTesting
+  public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
     LOG.info("Thread {} start to collect garbage...", threadId);
 

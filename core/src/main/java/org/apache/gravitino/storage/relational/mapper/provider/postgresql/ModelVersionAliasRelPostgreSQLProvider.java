@@ -98,4 +98,14 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
         + ModelMetaMapper.TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0) AND deleted_at = 0";
   }
+
+  @Override
+  public String deleteModelVersionAliasRelsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }
