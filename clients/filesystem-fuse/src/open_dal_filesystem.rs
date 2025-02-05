@@ -27,11 +27,13 @@ use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
 use log::error;
 use opendal::{Buffer, EntryMode, ErrorKind, Metadata, Operator};
+use std::mem::swap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub(crate) struct OpenDalFileSystem {
     op: Operator,
+    block_size: u32,
 }
 
 impl OpenDalFileSystem {}
@@ -39,8 +41,11 @@ impl OpenDalFileSystem {}
 impl OpenDalFileSystem {
     const WRITE_BUFFER_SIZE: usize = 5 * 1024 * 1024;
 
-    pub(crate) fn new(op: Operator, _config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
-        Self { op: op }
+    pub(crate) fn new(op: Operator, config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
+        Self {
+            op: op,
+            block_size: config.filesystem.block_size,
+        }
     }
 
     fn opendal_meta_to_file_stat(&self, meta: &Metadata, file_stat: &mut FileStat) {
@@ -124,7 +129,7 @@ impl PathFileSystem for OpenDalFileSystem {
         }
         if !flags.is_create() && flags.is_append() {
             error!("The file system does not support open a exists file with the append mode");
-            return Err(Errno::from(libc::EBADF));
+            return Err(Errno::from(libc::EINVAL));
         }
 
         if flags.is_truncate() {
@@ -140,7 +145,10 @@ impl PathFileSystem for OpenDalFileSystem {
                 .writer_with(&file_name)
                 .await
                 .map_err(opendal_error_to_errno)?;
-            file.writer = Some(Box::new(FileWriterImpl::new(writer)));
+            file.writer = Some(Box::new(FileWriterImpl::new(
+                writer,
+                Self::WRITE_BUFFER_SIZE + self.block_size as usize,
+            )));
         }
 
         Ok(file)
@@ -228,13 +236,15 @@ impl FileReader for FileReaderImpl {
 struct FileWriterImpl {
     writer: opendal::Writer,
     buffer: Vec<u8>,
+    buffer_size: usize,
 }
 
 impl FileWriterImpl {
-    fn new(writer: opendal::Writer) -> Self {
+    fn new(writer: opendal::Writer, buffer_size: usize) -> Self {
         Self {
             writer,
-            buffer: Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE + 4096),
+            buffer_size: buffer_size,
+            buffer: Vec::with_capacity(buffer_size),
         }
     }
 }
@@ -243,9 +253,8 @@ impl FileWriterImpl {
 impl FileWriter for FileWriterImpl {
     async fn write(&mut self, _offset: u64, data: &[u8]) -> Result<u32> {
         if self.buffer.len() > OpenDalFileSystem::WRITE_BUFFER_SIZE {
-            let mut new_buffer: Vec<u8> =
-                Vec::with_capacity(OpenDalFileSystem::WRITE_BUFFER_SIZE + 4096);
-            new_buffer.append(&mut self.buffer);
+            let mut new_buffer: Vec<u8> = Vec::with_capacity(self.buffer_size);
+            swap(&mut new_buffer, &mut self.buffer);
 
             self.writer
                 .write(new_buffer)
@@ -259,7 +268,7 @@ impl FileWriter for FileWriterImpl {
     async fn close(&mut self) -> Result<()> {
         if !self.buffer.is_empty() {
             let mut new_buffer: Vec<u8> = vec![];
-            new_buffer.append(&mut self.buffer);
+            swap(&mut new_buffer, &mut self.buffer);
             self.writer
                 .write(new_buffer)
                 .await
