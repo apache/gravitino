@@ -26,19 +26,26 @@ use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
 use log::error;
-use opendal::{EntryMode, ErrorKind, Metadata, Operator};
+use opendal::{Buffer, EntryMode, ErrorKind, Metadata, Operator};
+use std::mem::swap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub(crate) struct OpenDalFileSystem {
     op: Operator,
+    block_size: u32,
 }
 
 impl OpenDalFileSystem {}
 
 impl OpenDalFileSystem {
-    pub(crate) fn new(op: Operator, _config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
-        Self { op: op }
+    const WRITE_BUFFER_SIZE: usize = 5 * 1024 * 1024;
+
+    pub(crate) fn new(op: Operator, config: &AppConfig, _fs_context: &FileSystemContext) -> Self {
+        Self {
+            op: op,
+            block_size: config.filesystem.block_size,
+        }
     }
 
     fn opendal_meta_to_file_stat(&self, meta: &Metadata, file_stat: &mut FileStat) {
@@ -120,14 +127,30 @@ impl PathFileSystem for OpenDalFileSystem {
                 .map_err(opendal_error_to_errno)?;
             file.reader = Some(Box::new(FileReaderImpl { reader }));
         }
-        if flags.is_write() || flags.is_create() || flags.is_append() || flags.is_truncate() {
+        if !flags.is_create() && flags.is_append() {
+            error!("The file system does not support open a exists file with the append mode");
+            return Err(Errno::from(libc::EINVAL));
+        }
+
+        if flags.is_truncate() {
+            self.op
+                .write(&file_name, Buffer::new())
+                .await
+                .map_err(opendal_error_to_errno)?;
+        }
+
+        if flags.is_write() || flags.is_append() || flags.is_truncate() {
             let writer = self
                 .op
                 .writer_with(&file_name)
                 .await
                 .map_err(opendal_error_to_errno)?;
-            file.writer = Some(Box::new(FileWriterImpl { writer }));
+            file.writer = Some(Box::new(FileWriterImpl::new(
+                writer,
+                Self::WRITE_BUFFER_SIZE + self.block_size as usize,
+            )));
         }
+
         Ok(file)
     }
 
@@ -141,15 +164,17 @@ impl PathFileSystem for OpenDalFileSystem {
 
     async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
         let file_name = path.to_string_lossy().to_string();
+        if flags.is_exclusive() {
+            let meta = self.op.stat(&file_name).await;
+            if meta.is_ok() {
+                return Err(Errno::from(libc::EEXIST));
+            }
+        }
 
-        let mut writer = self
-            .op
-            .writer_with(&file_name)
+        self.op
+            .write(&file_name, Buffer::new())
             .await
             .map_err(opendal_error_to_errno)?;
-
-        writer.close().await.map_err(opendal_error_to_errno)?;
-
         let file = self.open_file(path, flags).await?;
         Ok(file)
     }
@@ -210,19 +235,45 @@ impl FileReader for FileReaderImpl {
 
 struct FileWriterImpl {
     writer: opendal::Writer,
+    buffer: Vec<u8>,
+    buffer_size: usize,
+}
+
+impl FileWriterImpl {
+    fn new(writer: opendal::Writer, buffer_size: usize) -> Self {
+        Self {
+            writer,
+            buffer_size: buffer_size,
+            buffer: Vec::with_capacity(buffer_size),
+        }
+    }
 }
 
 #[async_trait]
 impl FileWriter for FileWriterImpl {
     async fn write(&mut self, _offset: u64, data: &[u8]) -> Result<u32> {
-        self.writer
-            .write(data.to_vec())
-            .await
-            .map_err(opendal_error_to_errno)?;
+        if self.buffer.len() > OpenDalFileSystem::WRITE_BUFFER_SIZE {
+            let mut new_buffer: Vec<u8> = Vec::with_capacity(self.buffer_size);
+            swap(&mut new_buffer, &mut self.buffer);
+
+            self.writer
+                .write(new_buffer)
+                .await
+                .map_err(opendal_error_to_errno)?;
+        }
+        self.buffer.extend(data);
         Ok(data.len() as u32)
     }
 
     async fn close(&mut self) -> Result<()> {
+        if !self.buffer.is_empty() {
+            let mut new_buffer: Vec<u8> = vec![];
+            swap(&mut new_buffer, &mut self.buffer);
+            self.writer
+                .write(new_buffer)
+                .await
+                .map_err(opendal_error_to_errno)?;
+        }
         self.writer.close().await.map_err(opendal_error_to_errno)?;
         Ok(())
     }
@@ -260,10 +311,12 @@ fn opendal_filemode_to_filetype(mode: EntryMode) -> FileType {
 #[cfg(test)]
 mod test {
     use crate::config::AppConfig;
+    use crate::open_dal_filesystem::OpenDalFileSystem;
     use crate::s3_filesystem::extract_s3_config;
     use crate::s3_filesystem::tests::s3_test_config;
     use crate::test_enable_with;
     use crate::RUN_TEST_WITH_S3;
+    use bytes::Buf;
     use opendal::layers::LoggingLayer;
     use opendal::{services, Builder, Operator};
 
@@ -326,5 +379,64 @@ mod test {
                 println!("Delete failed: {:?}", e);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn s3_ut_test_s3_write() {
+        test_enable_with!(RUN_TEST_WITH_S3);
+        let config = s3_test_config();
+
+        let op = create_opendal(&config);
+        let path = "/s1/fileset1/gvfs_test/test_dir/test_file";
+        let mut writer = op.writer_with(path).await.unwrap();
+
+        let mut buffer: Vec<u8> = vec![];
+        let num_batch = 10 * 1024;
+        for i in 0..num_batch {
+            let data = vec![i as u8; num_batch];
+            buffer.extend(&data);
+
+            if buffer.len() > OpenDalFileSystem::WRITE_BUFFER_SIZE {
+                writer.write(buffer).await.unwrap();
+                buffer = vec![];
+            };
+        }
+
+        if !buffer.is_empty() {
+            writer.write(buffer).await.unwrap();
+        }
+        writer.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn s3_ut_test_s3_read() {
+        test_enable_with!(RUN_TEST_WITH_S3);
+        let config = s3_test_config();
+
+        let op = create_opendal(&config);
+        let path = "/s1/fileset1/test_dir/test_big_file";
+        let meta = op.stat(path).await;
+        if meta.is_err() {
+            println!("stat error: {:?}", meta.err());
+            return;
+        }
+        let reader = op.reader(path).await.unwrap();
+
+        let mut buffer = Vec::new();
+
+        let batch_size = 1024;
+        let mut start = 0;
+        let mut end = batch_size;
+        loop {
+            let buf = reader.read(start..end).await.unwrap();
+            if buf.is_empty() {
+                break;
+            }
+            buffer.extend_from_slice(buf.chunk());
+            start = end;
+            end += batch_size;
+        }
+
+        println!("Read {} bytes.", buffer.len());
     }
 }
