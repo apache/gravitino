@@ -21,7 +21,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser, Debug)]
 #[command(
     name = "gvfs-fuse",
-    version = "1.0",
+    version = "0.1",
     about = "A FUSE-based file system client"
 )]
 pub(crate) struct Arguments {
@@ -36,7 +36,7 @@ pub(crate) enum Commands {
         mount_point: String,
 
         #[arg(help = "The URI of the GVFS fileset")]
-        location: String,
+        fileset_location: String,
 
         #[arg(short, long)]
         config: Option<String>,

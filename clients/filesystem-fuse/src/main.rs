@@ -172,7 +172,7 @@ fn main() -> Result<(), i32> {
     match args.command {
         Commands::Mount {
             mount_point,
-            location,
+            fileset_location,
             config,
             debug: _,
             foreground,
@@ -201,14 +201,14 @@ fn main() -> Result<(), i32> {
             }
 
             let result = if foreground {
-                mount_fuse(app_config, mount_point, location)
+                mount_fuse(app_config, mount_point, fileset_location)
             } else {
                 let result = make_daemon(&app_config);
                 if let Err(e) = result {
                     error!("Failed to daemonize: {:?}", e);
                     return Err(-1);
                 };
-                mount_fuse(app_config, mount_point, location)
+                mount_fuse(app_config, mount_point, fileset_location)
             };
 
             if let Err(e) = result {
