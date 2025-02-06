@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -125,6 +126,7 @@ public class MetadataObjects {
       case TABLE:
       case FILESET:
       case TOPIC:
+      case MODEL:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:
@@ -151,6 +153,9 @@ public class MetadataObjects {
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
+    if (type == MetadataObject.Type.ROLE) {
+      return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.ROLE);
+    }
 
     return MetadataObjects.of(parts, type);
   }

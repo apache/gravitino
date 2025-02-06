@@ -116,6 +116,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            request.validate();
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
               MetadataObject metadataObject =
@@ -131,10 +132,10 @@ public class RoleOperations {
 
               Set<Privilege> privileges = Sets.newHashSet(object.privileges());
               AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
-              for (Privilege privilege : object.privileges()) {
-                AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
-              }
               try {
+                for (Privilege privilege : object.privileges()) {
+                  AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
+                }
                 MetadataObjectUtil.checkMetadataObject(metalake, object);
               } catch (NoSuchMetadataObjectException nsm) {
                 throw new IllegalMetadataObjectException(nsm);

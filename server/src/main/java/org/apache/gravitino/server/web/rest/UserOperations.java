@@ -112,11 +112,13 @@ public class UserOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new UserResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.addUser(metalake, request.getName())))));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new UserResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.addUser(metalake, request.getName()))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.ADD, request.getName(), metalake, e);

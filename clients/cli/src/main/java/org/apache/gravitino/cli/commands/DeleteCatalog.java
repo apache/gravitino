@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
@@ -61,14 +62,13 @@ public class DeleteCatalog extends Command {
       GravitinoClient client = buildClient(metalake);
       deleted = client.dropCatalog(catalog);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (CatalogInUseException catalogInUseException) {
+      System.err.println(catalog + ErrorMessages.ENTITY_IN_USE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (deleted) {

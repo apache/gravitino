@@ -25,19 +25,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-
-  compileOnly(libs.hadoop3.common)
-
-  implementation(libs.commons.lang3)
-  // runtime used
-  implementation(libs.commons.logging)
+  implementation(project(":bundles:azure"))
   implementation(libs.hadoop3.abs)
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -49,7 +40,9 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
   relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
-  relocate("com.google.guava", "org.apache.gravitino.azure.shaded.com.google.guava")
+  relocate("com.google.common", "org.apache.gravitino.azure.shaded.com.google.common")
+  relocate("org.eclipse.jetty", "org.apache.gravitino.azure.shaded.org.eclipse.jetty")
+  mergeServiceFiles()
 }
 
 tasks.jar {

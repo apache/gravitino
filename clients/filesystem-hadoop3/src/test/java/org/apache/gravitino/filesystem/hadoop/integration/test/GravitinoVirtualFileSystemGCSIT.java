@@ -20,7 +20,6 @@
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -61,7 +60,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBlockSize = 64 * 1024 * 1024;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
     catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -91,16 +90,15 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
-    conf.set(FS_FILESYSTEM_PROVIDERS, "gcs");
+    conf.set(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
   }
 
   @AfterAll
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();

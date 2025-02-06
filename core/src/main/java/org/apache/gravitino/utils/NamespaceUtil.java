@@ -20,6 +20,8 @@ package org.apache.gravitino.utils;
 
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
@@ -68,6 +70,16 @@ public class NamespaceUtil {
    */
   public static Namespace ofTable(String metalake, String catalog, String schema) {
     return Namespace.of(metalake, catalog, schema);
+  }
+
+  /**
+   * Create a namespace for tag.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for tag
+   */
+  public static Namespace ofTag(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.TAG_SCHEMA_NAME);
   }
 
   /**
@@ -131,6 +143,20 @@ public class NamespaceUtil {
   public static Namespace ofModelVersion(
       String metalake, String catalog, String schema, String model) {
     return Namespace.of(metalake, catalog, schema, model);
+  }
+
+  /**
+   * Convert a model name identifier to a model version namespace.
+   *
+   * @param modelIdent The model name identifier
+   * @return A model version namespace
+   */
+  public static Namespace toModelVersionNs(NameIdentifier modelIdent) {
+    return ofModelVersion(
+        modelIdent.namespace().level(0),
+        modelIdent.namespace().level(1),
+        modelIdent.namespace().level(2),
+        modelIdent.name());
   }
 
   /**

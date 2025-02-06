@@ -32,16 +32,20 @@ public class AreYouSure {
    * @return {@code true} if the action is to continue {@code false} otherwise.
    */
   public static boolean really(boolean force) {
-    Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8.name());
-
     /* force option for scripting */
     if (force) {
       return true;
     }
 
-    System.out.println(
-        "This command could result in data loss or other issues. Are you sure you want to do this? (Y/N)");
-    String answer = scanner.next();
-    return answer.equals("Y");
+    try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8.name())) {
+      System.out.println(
+          "This command could result in data loss or other issues. Are you sure you want to do this? (Y/N)");
+      String answer = scanner.next();
+      return "Y".equals(answer);
+    } catch (Exception e) {
+      System.err.println("Error while reading user input: " + e.getMessage());
+      Main.exit(-1);
+    }
+    return false;
   }
 }

@@ -41,11 +41,15 @@ import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -202,12 +206,30 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to credential operations.
+   *
+   * @return A Consumer representing the credential error handler.
+   */
+  public static Consumer<ErrorResponse> credentialErrorHandler() {
+    return CredentialErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates an error handler specific to Owner operations.
    *
    * @return A Consumer representing the Owner error handler.
    */
   public static Consumer<ErrorResponse> ownerErrorHandler() {
     return OwnerErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Model operations.
+   *
+   * @return A Consumer representing the Model error handler.
+   */
+  public static Consumer<ErrorResponse> modelErrorHandler() {
+    return ModelErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -858,6 +880,39 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to Credential operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class CredentialErrorHandler extends RestErrorHandler {
+
+    private static final CredentialErrorHandler INSTANCE = new CredentialErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Error handler specific to Tag operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class TagErrorHandler extends RestErrorHandler {
@@ -933,6 +988,69 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Model operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class ModelErrorHandler extends RestErrorHandler {
+
+    private static final ModelErrorHandler INSTANCE = new ModelErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMsg);
+          } else if (errorResponse.getType().equals(NoSuchModelException.class.getSimpleName())) {
+            throw new NoSuchModelException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchModelVersionException.class.getSimpleName())) {
+            throw new NoSuchModelVersionException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(ModelAlreadyExistsException.class.getSimpleName())) {
+            throw new ModelAlreadyExistsException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(ModelVersionAliasesAlreadyExistException.class.getSimpleName())) {
+            throw new ModelVersionAliasesAlreadyExistException(errorMsg);
+          } else {
+            throw new AlreadyExistsException(errorMsg);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMsg);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
 
         default:
           super.accept(errorResponse);

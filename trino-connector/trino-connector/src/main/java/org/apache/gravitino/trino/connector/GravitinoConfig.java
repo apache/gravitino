@@ -237,7 +237,7 @@ public class GravitinoConfig {
                 properties.getProperty(TRINO_CATALOG_MANAGEMENT))) {
           throw new TrinoException(
               GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
-              "Gravitino connector works only at catalog.management = static mode");
+              "Gravitino connector works only at catalog.management = dynamic mode");
         }
       } catch (IOException e) {
         throw new TrinoException(

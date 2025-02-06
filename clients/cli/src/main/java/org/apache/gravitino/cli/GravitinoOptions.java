@@ -45,6 +45,7 @@ public class GravitinoOptions {
   public static final String OWNER = "owner";
   public static final String PARTITION = "partition";
   public static final String POSITION = "position";
+  public static final String PRIVILEGE = "privilege";
   public static final String PROPERTIES = "properties";
   public static final String PROPERTY = "property";
   public static final String PROVIDER = "provider";
@@ -58,6 +59,11 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String VALUE = "value";
   public static final String VERSION = "version";
+  public static final String ALL = "all";
+  public static final String ENABLE = "enable";
+  public static final String DISABLE = "disable";
+  public static final String ALIAS = "alias";
+  public static final String URI = "uri";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -83,6 +89,8 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(PARTITION, "display partition information"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
+    options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
+    options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));
@@ -100,12 +108,18 @@ public class GravitinoOptions {
     options.addOption(createArgOption(AUTO, "column value auto-increments (true/false)"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
-    options.addOption(createArgOption("r", ROLE, "role name"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
+    options.addOption(createSimpleOption(null, ALL, "on all entities"));
 
-    // Properties and tags can have multiple values
+    // model options
+    options.addOption(createArgOption(null, URI, "model version artifact"));
+    options.addOption(createArgsOption(null, ALIAS, "model aliases"));
+
+    // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
     options.addOption(createArgsOption("t", TAG, "tag name"));
+    options.addOption(createArgsOption(null, PRIVILEGE, "privilege(s)"));
+    options.addOption(createArgsOption("r", ROLE, "role name"));
 
     // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));

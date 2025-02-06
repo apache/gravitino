@@ -18,13 +18,12 @@
  */
 package org.apache.gravitino.spark.connector.catalog;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoClient;
 import org.slf4j.Logger;
@@ -42,7 +41,7 @@ public class GravitinoCatalogManager {
   private GravitinoCatalogManager(Supplier<GravitinoClient> clientBuilder) {
     this.gravitinoClient = clientBuilder.get();
     // Will not evict catalog by default
-    this.gravitinoCatalogs = CacheBuilder.newBuilder().build();
+    this.gravitinoCatalogs = Caffeine.newBuilder().build();
   }
 
   public static GravitinoCatalogManager create(Supplier<GravitinoClient> clientBuilder) {
@@ -69,8 +68,8 @@ public class GravitinoCatalogManager {
 
   public Catalog getGravitinoCatalogInfo(String name) {
     try {
-      return gravitinoCatalogs.get(name, () -> loadCatalog(name));
-    } catch (ExecutionException e) {
+      return gravitinoCatalogs.get(name, catalogName -> loadCatalog(catalogName));
+    } catch (Exception e) {
       LOG.error(String.format("Load catalog %s failed", name), e);
       throw new RuntimeException(e);
     }

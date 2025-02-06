@@ -34,7 +34,7 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 ```sql
 
 // Suppose hive_a is the Hive catalog name managed by Gravitino
-USE hive_a;
+USE CATALOG hive_a;
 
 CREATE DATABASE IF NOT EXISTS mydatabase;
 USE mydatabase;

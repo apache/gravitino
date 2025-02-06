@@ -59,7 +59,7 @@ class SimpleAuthenticator implements Authenticator {
     try {
       String[] userInformation =
           new String(Base64.getDecoder().decode(credential), StandardCharsets.UTF_8).split(":");
-      if (userInformation.length != 2) {
+      if (userInformation.length < 1 || userInformation[0].isEmpty()) {
         return ANONYMOUS_PRINCIPAL;
       }
       return new UserPrincipal(userInformation[0]);

@@ -53,13 +53,17 @@ public class RemoveMetalakeProperty extends Command {
       MetalakeChange change = MetalakeChange.removeProperty(property);
       client.alterMetalake(metalake, change);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(property + " property removed.");
+  }
+
+  @Override
+  public Command validate() {
+    validateProperty(property);
+    return super.validate();
   }
 }

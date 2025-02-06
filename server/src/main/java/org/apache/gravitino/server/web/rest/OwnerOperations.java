@@ -107,6 +107,7 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            request.validate();
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             ownerManager.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));

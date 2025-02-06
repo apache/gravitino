@@ -57,6 +57,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -69,6 +70,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -79,10 +81,10 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
@@ -654,7 +656,7 @@ public class TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag")
-            .withNamespace(TagManager.ofTagNamespace("metalake"))
+            .withNamespace(NamespaceUtil.ofTag("metalake"))
             .withComment("tag comment")
             .withAuditInfo(auditInfo)
             .build();
@@ -742,7 +744,7 @@ public class TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("another-tag")
-            .withNamespace(TagManager.ofTagNamespace("another-metalake"))
+            .withNamespace(NamespaceUtil.ofTag("another-metalake"))
             .withComment("another-tag comment")
             .withAuditInfo(auditInfo)
             .build();
@@ -948,6 +950,98 @@ public class TestJDBCBackend {
     // hard delete for old version fileset
     backend.hardDeleteLegacyData(Entity.EntityType.FILESET, Instant.now().toEpochMilli() + 1000);
     assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
+  }
+
+  @Test
+  public void testGetRoleIdByMetalakeIdAndName() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    String metalakeName = "testMetalake";
+    String catalogName = "catalog";
+    String roleNameWithDot = "role.with.dot";
+    String roleNameWithoutDot = "roleWithoutDot";
+
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            catalogName,
+            auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity roleWithDot =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            roleNameWithDot,
+            auditInfo,
+            catalogName);
+    backend.insert(roleWithDot, false);
+
+    RoleEntity roleWithoutDot =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            roleNameWithoutDot,
+            auditInfo,
+            catalogName);
+    backend.insert(roleWithoutDot, false);
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+
+    Long roleIdWithDot =
+        RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, roleNameWithDot);
+    assertEquals(roleWithDot.id(), roleIdWithDot);
+
+    Long roleIdWithoutDot =
+        RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, roleNameWithoutDot);
+    assertEquals(roleWithoutDot.id(), roleIdWithoutDot);
+  }
+
+  @Test
+  public void testInsertRelationWithDotInRoleName() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    String metalakeName = "testMetalake";
+    String catalogName = "catalog";
+    String roleNameWithDot = "role.with.dot";
+
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            catalogName,
+            auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            roleNameWithDot,
+            auditInfo,
+            catalogName);
+    backend.insert(role, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user",
+            auditInfo);
+    backend.insert(user, false);
+
+    backend.insertRelation(
+        OWNER_REL, role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type(), true);
+    assertEquals(1, countActiveOwnerRel(user.id()));
   }
 
   private boolean legacyRecordExistsInDB(Long id, Entity.EntityType entityType) {
@@ -1387,6 +1481,25 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withComment(comment)
         .withLatestVersion(latestVersion)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static ModelVersionEntity createModelVersionEntity(
+      NameIdentifier modelId,
+      Integer version,
+      String modelUri,
+      List<String> aliases,
+      String comment,
+      Map<String, String> properties,
+      AuditInfo auditInfo) {
+    return ModelVersionEntity.builder()
+        .withModelIdentifier(modelId)
+        .withVersion(version)
+        .withUri(modelUri)
+        .withAliases(aliases)
+        .withComment(comment)
         .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();

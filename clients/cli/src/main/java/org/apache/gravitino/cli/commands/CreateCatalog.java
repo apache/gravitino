@@ -72,16 +72,19 @@ public class CreateCatalog extends Command {
           comment,
           properties);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.METALAKE_EXISTS);
-      return;
+      exitWithError(ErrorMessages.METALAKE_EXISTS);
     } catch (CatalogAlreadyExistsException err) {
-      System.err.println(ErrorMessages.CATALOG_EXISTS);
-      return;
+      exitWithError(ErrorMessages.CATALOG_EXISTS);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(catalog + " catalog created");
+  }
+
+  @Override
+  public Command validate() {
+    if (provider == null) exitWithError(ErrorMessages.MISSING_PROVIDER);
+    return super.validate();
   }
 }

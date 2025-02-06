@@ -17,11 +17,17 @@
   under the License.
 -->
 
-# RFC-1: Design of transaction mechanism on key-value store
+# RFC-1: Design of transaction mechanism on key-value store (removed)
 
 | Revision | Owner | Date       |
 | :------- |-------|------------|
 | v0.1     | Qi Yu | 21/11/2023 |
+
+## ❌️ REMOVED
+
+Removed KV store on: 2024-12
+
+This document is no longer maintained and may contain outdated information.
 
 ## Background
 
@@ -63,13 +69,13 @@ The transaction process is as follows:
 5. Then we will write the new key-value pairs to the storage layer.
 
 **Commit stage**
-We would construct the commit mark tx_ts2 and save it to the storage layer. The value of tx_ts2 contains 
+We would construct the commit mark tx_ts2 and save it to the storage layer. The value of tx_ts2 contains
 all keys in the transaction.
 
 **Rollback stage**
-If any steps in prepare stage or commit stage fails, we will roll back the transaction. In fact, we 
-need to do nothing to roll back the transaction. Because we have added a version number to each key-value pair and 
-those keys in the failed transaction will not be visible to users. 
+If any steps in prepare stage or commit stage fails, we will roll back the transaction. In fact, we
+need to do nothing to roll back the transaction. Because we have added a version number to each key-value pair and
+those keys in the failed transaction will not be visible to users.
 
 
 ## Detail implementation
@@ -93,7 +99,7 @@ In the commit stage, we will put the following keys into the storage layer:
 ```
 KEY: 0x1E 1F FFFFFFFFFFFFFFFE  ---> VALUE: keys of the transaction involved. 
 ```
-- `1E`: prefix of transaction commit mark  
+- `1E`: prefix of transaction commit mark
 - `1F`: separator
 - `FFFFFFFFFFFFFFFE`: Represent tso 1. Note, we use 8 bytes to represent tso. How to convert 1 to `FFFFFFFFFFFFFFFE`? First we convert 1 to 0x0000000000000001, then we use `^` 0xFF to get the complement of 0x0000000000000001, then we get 0xFFFFFFFFFFFFFFFE.
 
@@ -112,10 +118,10 @@ If we want to get the value of key1, the process is as follows:
 3. Find the first key that with prefix `0x6B657931` and greater than start key `0x6B657931 1F FFFFFFFFFFFFFFFC`, we will get `0x6B657931 1F FFFFFFFFFFFFFFFD`
 4. If there exists the key `0x1E 1F FFFFFFFFFFFFFFFE`, means the transaction is committed, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`.
 5. or repeat steps 3
-6. If the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `0x00`, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`. if the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `0x01`, it means this key-value pair has been removed, so we return null. 
+6. If the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `0x00`, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`. if the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `0x01`, it means this key-value pair has been removed, so we return null.
 
 ### Delete process
-Delete steps are almost the same as that of write process except that the prefix of it is `0x01` instead of `0x00`. 
+Delete steps are almost the same as that of write process except that the prefix of it is `0x01` instead of `0x00`.
 
 Put key 'test1':
 ```
@@ -128,13 +134,13 @@ KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x01000000 00000000 76616C75653
 ```
 
 ### Scan and range query process
-Scan and range query are almost the same as that of read process, for more detailed information, please see related implementation `TransactionalKvBackendImpl`. 
+Scan and range query are almost the same as that of read process, for more detailed information, please see related implementation `TransactionalKvBackendImpl`.
 
 ## Key format after this modification
 
 - Keys that start with 0x'1D0000' store the contents of id-name mapping. for more please refer to class `KvNameMappingService`.
 - Keys that start with 0x'1D0001' store the data of current timestamp which is used for generating transaction id, for more please refer to class `TransactionIdGeneratorImpl`.
 - Keys that start with 0x'1D0002' store the information of storage layout version. For more please refer to `KvEntityStore#initStorageVersionInfo`
-- Keys that start with 0x'1D0003' store tha transaction id that was used by `KvGarbageCollector` last time.  
+- Keys that start with 0x'1D0003' store tha transaction id that was used by `KvGarbageCollector` last time.
 - Keys that start with 0x'1E' store transaction marks which mark the transaction is committed or not.
 - Other key spaces are used to store gravitino entities like `metalakes`,`catalogs`, `scheams`, `tables` and so on. it usually starts with from 0x'20'(space) to 0x'7F'(delete). For more please refer to class `KvEntityStoreImpl`.

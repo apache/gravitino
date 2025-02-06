@@ -30,7 +30,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.abs.fs.AzureFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.storage.ABSProperties;
+import org.apache.gravitino.storage.AzureProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -62,7 +62,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 32 * 1024 * 1024;
+    defaultBlockSize = 32 * 1024 * 1024;
 
     // This value is 1 for ABS, 3 for GCS, and 1 for S3A.
     defaultReplication = 1;
@@ -77,8 +77,8 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
     Map<String, String> properties = Maps.newHashMap();
 
-    properties.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
-    properties.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    properties.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    properties.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     properties.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog catalog =
@@ -95,10 +95,9 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
-    conf.set("fs.gvfs.filesystem.providers", AzureFileSystemProvider.ABS_PROVIDER_NAME);
     // Pass this configuration to the real file system
-    conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
-    conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    conf.set(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
+    conf.set(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     conf.set("fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem");
   }
 
@@ -134,13 +133,13 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
     Map<String, String> hadoopConfMap = FileSystemUtils.toHadoopConfigMap(map, ImmutableMap.of());
 
-    if (gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME) != null
-        && gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY) != null) {
+    if (gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME) != null
+        && gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY) != null) {
       hadoopConfMap.put(
           String.format(
               "fs.azure.account.key.%s.dfs.core.windows.net",
-              gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)),
-          gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY));
+              gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)),
+          gvfsConf.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
     }
 
     hadoopConfMap.forEach(absConf::set);

@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -61,6 +62,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,7 +131,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -214,7 +216,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // Case 1: The table is not created by Gravitino.
           if (stringId == null) {
             return EntityCombinedTable.of(alteredTable)
-                .withHiddenPropertiesSet(
+                .withHiddenProperties(
                     getHiddenPropertyNames(
                         getCatalogIdentifier(ident),
                         HasPropertyMetadata::tablePropertiesMetadata,
@@ -259,7 +261,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   stringId.id());
 
           return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-              .withHiddenPropertiesSet(
+              .withHiddenProperties(
                   getHiddenPropertyNames(
                       getCatalogIdentifier(ident),
                       HasPropertyMetadata::tablePropertiesMetadata,
@@ -277,8 +279,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
+    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
+        schemaIdentifier,
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
@@ -329,8 +332,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
+        schemaIdentifier,
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
@@ -415,13 +419,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .build();
     try {
       store.put(tableEntity, true);
+    } catch (EntityAlreadyExistsException e) {
+      LOG.error("Failed to import table {} with id {} to the store.", identifier, uid, e);
+      throw new UnsupportedOperationException(
+          "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+              + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import the table entity to the store.", e);
     }
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 getCatalogIdentifier(identifier),
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -441,7 +450,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // string identifier.
     if (stringId == null) {
       return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
@@ -460,7 +469,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             stringId.id());
 
     return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdentifier,
                 HasPropertyMetadata::tablePropertiesMetadata,
@@ -539,13 +548,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
 
     return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
   }

@@ -1,0 +1,47 @@
+gcli role [details|list|create|delete|grant|revoke]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+When granting or revoking privileges the following privileges can be used.
+
+create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants
+
+Note that some are only valid for certain entities.
+
+Example commands
+
+Display role details
+gcli role details --role admin
+
+List all roles
+gcli role list
+
+Show a roles's audit information
+gcli role details --role admin --audit
+
+Create a role
+gcli role create --role admin
+
+Delete a role
+gcli role delete --role admin
+
+Add a role to a user
+gcli user grant --user new_user --role admin
+
+Remove a role from a user
+gcli user revoke --user new_user --role admin
+
+Add a role to a group
+gcli group grant --group groupA --role admin
+
+Remove a role from a group
+gcli group revoke --group groupA --role admin
+
+Grant a privilege
+gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
+
+Revoke a privilege
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
+
+Revoke all privileges
+gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --all

@@ -20,14 +20,13 @@
 package org.apache.gravitino.credential;
 
 public class CredentialConstants {
-  public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
-  public static final String S3_TOKEN_CREDENTIAL_PROVIDER = "s3-token";
+  @Deprecated public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
+  public static final String CREDENTIAL_PROVIDERS = "credential-providers";
+  public static final String CREDENTIAL_CACHE_EXPIRE_RATIO = "credential-cache-expire-ratio";
+  public static final String CREDENTIAL_CACHE_MAX_SIZE = "credential-cache-max-size";
   public static final String S3_TOKEN_EXPIRE_IN_SECS = "s3-token-expire-in-secs";
-
-  public static final String GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE = "gcs-token";
-
-  public static final String OSS_TOKEN_CREDENTIAL_PROVIDER = "oss-token";
   public static final String OSS_TOKEN_EXPIRE_IN_SECS = "oss-token-expire-in-secs";
+  public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
 
   private CredentialConstants() {}
 }

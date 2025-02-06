@@ -26,7 +26,10 @@ import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
+import org.apache.gravitino.cli.commands.CatalogDisable;
+import org.apache.gravitino.cli.commands.CatalogEnable;
 import org.apache.gravitino.cli.commands.ClientVersion;
+import org.apache.gravitino.cli.commands.ColumnAudit;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.CreateGroup;
@@ -42,6 +45,7 @@ import org.apache.gravitino.cli.commands.DeleteColumn;
 import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
+import org.apache.gravitino.cli.commands.DeleteModel;
 import org.apache.gravitino.cli.commands.DeleteRole;
 import org.apache.gravitino.cli.commands.DeleteSchema;
 import org.apache.gravitino.cli.commands.DeleteTable;
@@ -49,7 +53,10 @@ import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.FilesetDetails;
+import org.apache.gravitino.cli.commands.GrantPrivilegesToRole;
+import org.apache.gravitino.cli.commands.GroupAudit;
 import org.apache.gravitino.cli.commands.GroupDetails;
+import org.apache.gravitino.cli.commands.LinkModel;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
@@ -61,6 +68,7 @@ import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListIndexes;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
+import org.apache.gravitino.cli.commands.ListModel;
 import org.apache.gravitino.cli.commands.ListRoles;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
@@ -72,7 +80,14 @@ import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
+import org.apache.gravitino.cli.commands.MetalakeDisable;
+import org.apache.gravitino.cli.commands.MetalakeEnable;
+import org.apache.gravitino.cli.commands.ModelAudit;
+import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
+import org.apache.gravitino.cli.commands.RegisterModel;
+import org.apache.gravitino.cli.commands.RemoveAllRoles;
+import org.apache.gravitino.cli.commands.RemoveAllTags;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
@@ -82,6 +97,9 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.RevokeAllPrivileges;
+import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
+import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
@@ -121,6 +139,7 @@ import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
 import org.apache.gravitino.cli.commands.UpdateTagName;
 import org.apache.gravitino.cli.commands.UpdateTopicComment;
+import org.apache.gravitino.cli.commands.UserAudit;
 import org.apache.gravitino.cli.commands.UserDetails;
 
 /*
@@ -196,8 +215,9 @@ public class TestableCommandLine {
     return new CatalogDetails(url, ignore, outputFormat, metalake, catalog);
   }
 
-  protected ListCatalogs newListCatalogs(String url, boolean ignore, String metalake) {
-    return new ListCatalogs(url, ignore, metalake);
+  protected ListCatalogs newListCatalogs(
+      String url, boolean ignore, String outputFormat, String metalake) {
+    return new ListCatalogs(url, ignore, outputFormat, metalake);
   }
 
   protected CreateCatalog newCreateCatalog(
@@ -297,8 +317,8 @@ public class TestableCommandLine {
   }
 
   protected ListTables newListTables(
-      String url, boolean ignore, String metalake, String catalog, String table) {
-    return new ListTables(url, ignore, metalake, catalog, table);
+      String url, boolean ignore, String metalake, String catalog, String schema) {
+    return new ListTables(url, ignore, metalake, catalog, schema);
   }
 
   protected DeleteTable newDeleteTable(
@@ -390,6 +410,10 @@ public class TestableCommandLine {
     return new ListUsers(url, ignore, metalake);
   }
 
+  protected UserAudit newUserAudit(String url, boolean ignore, String metalake, String user) {
+    return new UserAudit(url, ignore, metalake, user);
+  }
+
   protected CreateUser newCreateUser(String url, boolean ignore, String metalake, String user) {
     return new CreateUser(url, ignore, metalake, user);
   }
@@ -417,6 +441,10 @@ public class TestableCommandLine {
     return new ListGroups(url, ignore, metalake);
   }
 
+  protected GroupAudit newGroupAudit(String url, boolean ignore, String metalake, String group) {
+    return new GroupAudit(url, ignore, metalake, group);
+  }
+
   protected CreateGroup newCreateGroup(String url, boolean ignore, String metalake, String user) {
     return new CreateGroup(url, ignore, metalake, user);
   }
@@ -427,13 +455,18 @@ public class TestableCommandLine {
   }
 
   protected RemoveRoleFromGroup newRemoveRoleFromGroup(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new RemoveRoleFromGroup(url, ignore, metalake, user, role);
+      String url, boolean ignore, String metalake, String group, String role) {
+    return new RemoveRoleFromGroup(url, ignore, metalake, group, role);
+  }
+
+  protected RemoveAllRoles newRemoveAllRoles(
+      String url, boolean ignore, String metalake, String entity, String entityType) {
+    return new RemoveAllRoles(url, ignore, metalake, entity, entityType);
   }
 
   protected AddRoleToGroup newAddRoleToGroup(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new AddRoleToGroup(url, ignore, metalake, user, role);
+      String url, boolean ignore, String metalake, String group, String role) {
+    return new AddRoleToGroup(url, ignore, metalake, group, role);
   }
 
   protected RoleDetails newRoleDetails(String url, boolean ignore, String metalake, String role) {
@@ -444,13 +477,17 @@ public class TestableCommandLine {
     return new ListRoles(url, ignore, metalake);
   }
 
-  protected CreateRole newCreateRole(String url, boolean ignore, String metalake, String role) {
-    return new CreateRole(url, ignore, metalake, role);
+  protected RoleAudit newRoleAudit(String url, boolean ignore, String metalake, String role) {
+    return new RoleAudit(url, ignore, metalake, role);
+  }
+
+  protected CreateRole newCreateRole(String url, boolean ignore, String metalake, String[] roles) {
+    return new CreateRole(url, ignore, metalake, roles);
   }
 
   protected DeleteRole newDeleteRole(
-      String url, boolean ignore, boolean force, String metalake, String role) {
-    return new DeleteRole(url, ignore, force, metalake, role);
+      String url, boolean ignore, boolean force, String metalake, String[] roles) {
+    return new DeleteRole(url, ignore, force, metalake, roles);
   }
 
   protected TagDetails newTagDetails(String url, boolean ignore, String metalake, String tag) {
@@ -481,6 +518,11 @@ public class TestableCommandLine {
     return new RemoveTagProperty(url, ignore, metalake, tag, property);
   }
 
+  protected RemoveAllTags newRemoveAllTags(
+      String url, boolean ignore, String metalake, FullName name, boolean force) {
+    return new RemoveAllTags(url, ignore, metalake, name, force);
+  }
+
   protected ListTagProperties newListTagProperties(
       String url, boolean ignore, String metalake, String tag) {
     return new ListTagProperties(url, ignore, metalake, tag);
@@ -509,6 +551,17 @@ public class TestableCommandLine {
   protected UntagEntity newUntagEntity(
       String url, boolean ignore, String metalake, FullName name, String[] tags) {
     return new UntagEntity(url, ignore, metalake, name, tags);
+  }
+
+  protected ColumnAudit newColumnAudit(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String table,
+      String column) {
+    return new ColumnAudit(url, ignore, metalake, catalog, schema, table, column);
   }
 
   protected ListColumns newListColumns(
@@ -827,5 +880,102 @@ public class TestableCommandLine {
       String columnFile,
       String comment) {
     return new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment);
+  }
+
+  protected GrantPrivilegesToRole newGrantPrivilegesToRole(
+      String url,
+      boolean ignore,
+      String metalake,
+      String role,
+      FullName entity,
+      String[] privileges) {
+    return new GrantPrivilegesToRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected RevokePrivilegesFromRole newRevokePrivilegesFromRole(
+      String url,
+      boolean ignore,
+      String metalake,
+      String role,
+      FullName entity,
+      String[] privileges) {
+    return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected RevokeAllPrivileges newRevokeAllPrivileges(
+      String url, boolean ignore, String metalake, String role, FullName entity) {
+    return new RevokeAllPrivileges(url, ignore, metalake, role, entity);
+  }
+
+  protected MetalakeEnable newMetalakeEnable(
+      String url, boolean ignore, String metalake, boolean enableAllCatalogs) {
+    return new MetalakeEnable(url, ignore, metalake, enableAllCatalogs);
+  }
+
+  protected MetalakeDisable newMetalakeDisable(String url, boolean ignore, String metalake) {
+    return new MetalakeDisable(url, ignore, metalake);
+  }
+
+  protected CatalogEnable newCatalogEnable(
+      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
+    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
+  }
+
+  protected CatalogDisable newCatalogDisable(
+      String url, boolean ignore, String metalake, String catalog) {
+    return new CatalogDisable(url, ignore, metalake, catalog);
+  }
+
+  protected ListModel newListModel(
+      String url, boolean ignore, String metalake, String catalog, String schema) {
+    return new ListModel(url, ignore, metalake, catalog, schema);
+  }
+
+  protected ModelAudit newModelAudit(
+      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
+    return new ModelAudit(url, ignore, metalake, catalog, schema, model);
+  }
+
+  protected ModelDetails newModelDetails(
+      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
+    return new ModelDetails(url, ignore, metalake, catalog, schema, model);
+  }
+
+  protected RegisterModel newCreateModel(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      String comment,
+      Map<String, String> properties) {
+    return new RegisterModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+  }
+
+  protected DeleteModel newDeleteModel(
+      String url,
+      boolean ignore,
+      boolean force,
+      String metalake,
+      String catalog,
+      String schema,
+      String model) {
+    return new DeleteModel(url, ignore, force, metalake, catalog, schema, model);
+  }
+
+  protected LinkModel newLinkModel(
+      String url,
+      boolean ignore,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      String uri,
+      String[] alias,
+      String comment,
+      Map<String, String> properties) {
+    return new LinkModel(
+        url, ignore, metalake, catalog, schema, model, uri, alias, comment, properties);
   }
 }

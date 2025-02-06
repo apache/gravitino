@@ -22,14 +22,14 @@ package org.apache.gravitino.iceberg.integration.test;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.config.GCSCredentialConfig;
+import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.storage.GCSProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 // You should export GRAVITINO_GCS_BUCKET and GOOGLE_APPLICATION_CREDENTIALS to run the test
@@ -41,9 +41,10 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
   @Override
   void initEnv() {
     this.gcsWarehouse =
-        String.format("gs://%s/test", getFromEnvOrDefault("GRAVITINO_GCS_BUCKET", "bucketName"));
+        String.format(
+            "gs://%s/test", System.getenv().getOrDefault("GRAVITINO_GCS_BUCKET", "bucketName"));
     this.gcsCredentialPath =
-        getFromEnvOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credential.json");
+        System.getenv().getOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credential.json");
     if (ITUtils.isEmbedded()) {
       return;
     }
@@ -72,11 +73,10 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
+        GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX
-            + GCSCredentialConfig.GRAVITINO_GCS_CREDENTIAL_FILE_PATH,
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
         gcsCredentialPath);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.IO_IMPL,
@@ -88,7 +88,7 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
   private void copyGCSBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("gcp-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
   }
 
   private void downloadIcebergBundleJar() throws IOException {
@@ -99,10 +99,5 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
-  }
-
-  private String getFromEnvOrDefault(String envVar, String defaultValue) {
-    String envValue = System.getenv(envVar);
-    return Optional.ofNullable(envValue).orElse(defaultValue);
   }
 }

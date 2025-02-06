@@ -37,6 +37,8 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -231,6 +233,14 @@ public class SchemaMetaService {
                     mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    ModelVersionAliasRelMapper.class,
+                    mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ModelVersionMetaMapper.class,
+                    mapper -> mapper.softDeleteModelVersionMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     ModelMetaMapper.class,
                     mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)));
       } else {
@@ -306,21 +316,9 @@ public class SchemaMetaService {
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    Long parentEntityId = null;
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
-      switch (level) {
-        case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
-        case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
-          break;
-      }
-    }
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    builder.withMetalakeId(parentEntityIds[0]);
+    builder.withCatalogId(parentEntityIds[1]);
   }
 }

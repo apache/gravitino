@@ -20,7 +20,6 @@
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -62,7 +61,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBlockSize = 64 * 1024 * 1024;
 
     // The default replication factor is 1.
     defaultReplication = 1;
@@ -100,7 +99,6 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
     conf.set(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
     conf.set("fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
-    conf.set(FS_FILESYSTEM_PROVIDERS, "oss");
   }
 
   @AfterAll

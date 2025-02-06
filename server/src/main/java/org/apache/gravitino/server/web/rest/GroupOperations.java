@@ -90,11 +90,13 @@ public class GroupOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new GroupResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.addGroup(metalake, request.getName())))));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new GroupResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.addGroup(metalake, request.getName()))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
           OperationType.ADD, request.getName(), metalake, e);

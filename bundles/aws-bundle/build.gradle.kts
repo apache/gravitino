@@ -25,25 +25,21 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.common)
-
-  implementation(libs.aws.iam)
-  implementation(libs.aws.policy)
-  implementation(libs.aws.sts)
+  implementation(project(":bundles:aws"))
   implementation(libs.hadoop3.aws)
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 }
 
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
+
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.aws.shaded.org.apache.commons.lang3")
+  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
+  mergeServiceFiles()
 }
 
 tasks.jar {

@@ -47,6 +47,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
@@ -54,7 +55,6 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -377,6 +377,76 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertNull(loadTable.comment());
+  }
+
+  @Test
+  void testCreateTableWithNoneDistribution() {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table tableWithPartitionAndSortorder =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(tableName, tableWithPartitionAndSortorder.name());
+    Assertions.assertEquals(Distributions.RANGE, tableWithPartitionAndSortorder.distribution());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(Distributions.RANGE, loadTable.distribution());
+    tableCatalog.dropTable(tableIdentifier);
+
+    Table tableWithPartition =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            new SortOrder[0]);
+    Assertions.assertEquals(tableName, tableWithPartition.name());
+    Assertions.assertEquals(Distributions.HASH, tableWithPartition.distribution());
+
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(Distributions.HASH, loadTable.distribution());
+    tableCatalog.dropTable(tableIdentifier);
+
+    Table tableWithoutPartitionAndSortOrder =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            new Transform[0],
+            distribution,
+            new SortOrder[0]);
+    Assertions.assertEquals(tableName, tableWithoutPartitionAndSortOrder.name());
+    Assertions.assertEquals(Distributions.NONE, tableWithoutPartitionAndSortOrder.distribution());
+
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(Distributions.NONE, loadTable.distribution());
   }
 
   @Test
@@ -968,9 +1038,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         columns,
         table_comment,
         properties,
-        partitioning,
+        new Transform[0],
         distribution,
-        sortOrders);
+        new SortOrder[0]);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
 
@@ -981,8 +1051,8 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         Arrays.asList(columns),
         properties,
         distribution,
-        sortOrders,
-        partitioning,
+        new SortOrder[0],
+        new Transform[0],
         loadTable);
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
@@ -1179,7 +1249,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
-    Distribution distribution = Distributions.NONE;
+    Distribution distribution = Distributions.HASH;
 
     final SortOrder[] sortOrders =
         new SortOrder[] {

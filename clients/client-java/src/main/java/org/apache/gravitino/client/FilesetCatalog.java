@@ -31,6 +31,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
@@ -52,7 +54,8 @@ import org.apache.gravitino.rest.RESTUtils;
  * example, schemas and filesets list, creation, update and deletion. A Fileset catalog is under the
  * metalake.
  */
-class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.file.FilesetCatalog {
+class FilesetCatalog extends BaseSchemaCatalog
+    implements org.apache.gravitino.file.FilesetCatalog, SupportsCredentials {
 
   FilesetCatalog(
       Namespace namespace,
@@ -151,7 +154,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
-            .name(RESTUtils.encodeString(ident.name()))
+            .name(ident.name())
             .comment(comment)
             .type(type)
             .storageLocation(storageLocation)
@@ -194,7 +197,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
 
     FilesetResponse resp =
         restClient.put(
-            formatFilesetRequestPath(fullNamespace) + "/" + ident.name(),
+            formatFilesetRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             req,
             FilesetResponse.class,
             Collections.emptyMap(),
@@ -220,7 +223,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     DropResponse resp =
         restClient.delete(
-            formatFilesetRequestPath(fullNamespace) + "/" + ident.name(),
+            formatFilesetRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
@@ -263,6 +266,16 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
       // Clear the caller context
       CallerContext.CallerContextHolder.remove();
     }
+  }
+
+  @Override
+  public SupportsCredentials supportsCredentials() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public Credential[] getCredentials() {
+    return objectCredentialOperations.getCredentials();
   }
 
   @VisibleForTesting

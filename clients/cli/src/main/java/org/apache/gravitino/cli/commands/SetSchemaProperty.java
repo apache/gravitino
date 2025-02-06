@@ -70,19 +70,21 @@ public class SetSchemaProperty extends Command {
       SchemaChange change = SchemaChange.setProperty(property, value);
       client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(schema + " property set.");
+  }
+
+  @Override
+  public Command validate() {
+    validatePropertyAndValue(property, value);
+    return this;
   }
 }

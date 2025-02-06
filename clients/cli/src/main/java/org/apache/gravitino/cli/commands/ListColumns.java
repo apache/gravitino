@@ -19,7 +19,10 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 
 /** Displays the details of a table's columns. */
@@ -58,9 +61,12 @@ public class ListColumns extends TableCommand {
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       columns = tableCatalog().loadTable(name).columns();
-    } catch (Exception exp) {
-      System.err.println(exp.getMessage());
+    } catch (NoSuchTableException noSuchTableException) {
+      System.err.println(
+          ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
       return;
+    } catch (Exception exp) {
+      exitWithError(exp.getMessage());
     }
 
     StringBuilder all = new StringBuilder();
@@ -88,6 +94,6 @@ public class ListColumns extends TableCommand {
               + System.lineSeparator());
     }
 
-    System.out.print(all.toString());
+    System.out.print(all);
   }
 }

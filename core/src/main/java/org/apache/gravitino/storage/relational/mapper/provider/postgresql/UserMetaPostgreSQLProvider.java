@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
@@ -80,16 +81,29 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " JSON_AGG(rot.role_id) as roleIds"
         + " FROM "
         + USER_TABLE_NAME
-        + " ut LEFT OUTER JOIN "
+        + " ut LEFT OUTER JOIN ("
+        + " SELECT * FROM "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " rt ON rt.user_id = ut.user_id"
-        + " LEFT OUTER JOIN "
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.user_id = ut.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
         + ROLE_TABLE_NAME
-        + " rot ON rot.role_id = rt.role_id"
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
         + " WHERE "
         + " ut.deleted_at = 0 AND"
-        + " (rot.deleted_at = 0 OR rot.deleted_at is NULL) AND"
-        + " (rt.deleted_at = 0 OR rt.deleted_at is NULL) AND ut.metalake_id = #{metalakeId}"
+        + " ut.metalake_id = #{metalakeId}"
         + " GROUP BY ut.user_id";
+  }
+
+  @Override
+  public String deleteUserMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + USER_TABLE_NAME
+        + " WHERE user_id IN (SELECT user_id FROM "
+        + USER_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

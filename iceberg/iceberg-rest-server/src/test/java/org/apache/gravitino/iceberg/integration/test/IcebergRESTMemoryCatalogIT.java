@@ -20,7 +20,7 @@ package org.apache.gravitino.iceberg.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 
 public class IcebergRESTMemoryCatalogIT extends IcebergRESTServiceIT {

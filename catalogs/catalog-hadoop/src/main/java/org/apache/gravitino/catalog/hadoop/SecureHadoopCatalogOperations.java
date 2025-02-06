@@ -20,11 +20,16 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.security.auth.Subject;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -38,6 +43,9 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.credential.PathContext;
+import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -50,13 +58,14 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("removal")
 public class SecureHadoopCatalogOperations
-    implements CatalogOperations, SupportsSchemas, FilesetCatalog {
+    implements CatalogOperations, SupportsSchemas, FilesetCatalog, SupportsPathBasedCredentials {
 
   public static final Logger LOG = LoggerFactory.getLogger(SecureHadoopCatalogOperations.class);
 
@@ -66,12 +75,28 @@ public class SecureHadoopCatalogOperations
 
   private UserContext catalogUserContext;
 
+  private Map<String, String> catalogProperties;
+
   public SecureHadoopCatalogOperations() {
     this.hadoopCatalogOperations = new HadoopCatalogOperations();
   }
 
   public SecureHadoopCatalogOperations(EntityStore store) {
     this.hadoopCatalogOperations = new HadoopCatalogOperations(store);
+  }
+
+  @Override
+  public void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
+    hadoopCatalogOperations.initialize(config, info, propertiesMetadata);
+    this.catalogUserContext =
+        UserContext.getUserContext(
+            NameIdentifier.of(info.namespace(), info.name()),
+            config,
+            hadoopCatalogOperations.getHadoopConf(),
+            info);
+    this.catalogProperties = info.properties();
   }
 
   @VisibleForTesting
@@ -107,7 +132,7 @@ public class SecureHadoopCatalogOperations
     try {
       filesetEntity =
           hadoopCatalogOperations
-              .getStore()
+              .store()
               .get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Fileset {} does not exist", ident);
@@ -143,9 +168,7 @@ public class SecureHadoopCatalogOperations
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
       SchemaEntity schemaEntity =
-          hadoopCatalogOperations
-              .getStore()
-              .get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
+          hadoopCatalogOperations.store().get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
@@ -163,19 +186,6 @@ public class SecureHadoopCatalogOperations
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident, ioe);
     }
-  }
-
-  @Override
-  public void initialize(
-      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
-      throws RuntimeException {
-    hadoopCatalogOperations.initialize(config, info, propertiesMetadata);
-    catalogUserContext =
-        UserContext.getUserContext(
-            NameIdentifier.of(info.namespace(), info.name()),
-            config,
-            hadoopCatalogOperations.getHadoopConf(),
-            info);
   }
 
   @Override
@@ -245,6 +255,29 @@ public class SecureHadoopCatalogOperations
       String comment,
       Map<String, String> properties) {
     hadoopCatalogOperations.testConnection(catalogIdent, type, provider, comment, properties);
+  }
+
+  @Override
+  public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
+    Fileset fileset = loadFileset(filesetIdentifier);
+    String path = fileset.storageLocation();
+    Preconditions.checkState(
+        StringUtils.isNotBlank(path), "The location of fileset should not be empty.");
+
+    Set<String> providers =
+        CredentialUtils.getCredentialProvidersByOrder(
+            () -> fileset.properties(),
+            () -> {
+              Namespace namespace = filesetIdentifier.namespace();
+              NameIdentifier schemaIdentifier =
+                  NameIdentifierUtil.ofSchema(
+                      namespace.level(0), namespace.level(1), namespace.level(2));
+              return loadSchema(schemaIdentifier).properties();
+            },
+            () -> catalogProperties);
+    return providers.stream()
+        .map(provider -> new PathContext(path, provider))
+        .collect(Collectors.toList());
   }
 
   /**

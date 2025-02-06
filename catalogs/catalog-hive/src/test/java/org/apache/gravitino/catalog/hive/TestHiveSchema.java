@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.collect.Maps;

@@ -596,6 +596,7 @@ const CreateTableDialog = props => {
                                         handleColumnChange({ index, field: 'type', value: e.target.value })
                                       }
                                       error={!column.type.trim() || column.paramErrors}
+                                      labelId='select-column-type'
                                       data-refer={`column-type-${index}`}
                                       renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
                                     >
@@ -784,12 +785,12 @@ const CreateTableDialog = props => {
                         )}
                         {item.key && item.invalid && (
                           <FormHelperText className={'twc-text-error-main'}>
-                            Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                            characters, underscores, hyphens, or dots.
+                            Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                            underscores, hyphens, or dots.
                           </FormHelperText>
                         )}
                         {!item.key.trim() && (
-                          <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                          <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                         )}
                       </FormControl>
                     </Grid>

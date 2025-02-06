@@ -135,12 +135,7 @@ const CreateFilesetDialog = props => {
   }
 
   const addFields = () => {
-    const duplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
+    const duplicateKeys = innerProps.some(item => item.hasDuplicateKey)
 
     if (duplicateKeys) {
       return
@@ -173,16 +168,9 @@ const CreateFilesetDialog = props => {
   }
 
   const onSubmit = data => {
-    const duplicateKeys = innerProps
-      .filter(item => item.key.trim() !== '')
-      .some(
-        (item, index, filteredItems) =>
-          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
-      )
+    const hasError = innerProps.some(prop => prop.hasDuplicateKey || prop.invalid)
 
-    const invalidKeys = innerProps.some(i => i.invalid)
-
-    if (duplicateKeys || invalidKeys) {
+    if (hasError) {
       return
     }
 
@@ -461,12 +449,12 @@ const CreateFilesetDialog = props => {
                         )}
                         {item.key && item.invalid && (
                           <FormHelperText className={'twc-text-error-main'}>
-                            Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
-                            characters, underscores, hyphens, or dots.
+                            Valid key must starts with a letter/underscore, followed by alphanumeric characters,
+                            underscores, hyphens, or dots.
                           </FormHelperText>
                         )}
                         {!item.key.trim() && (
-                          <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
+                          <FormHelperText className={'twc-text-error-main'}>Key is required</FormHelperText>
                         )}
                       </FormControl>
                     </Grid>

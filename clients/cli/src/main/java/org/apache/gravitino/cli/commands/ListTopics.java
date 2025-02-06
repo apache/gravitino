@@ -61,14 +61,15 @@ public class ListTopics extends Command {
       GravitinoClient client = buildClient(metalake);
       topics = client.loadCatalog(catalog).asTopicCatalog().listTopics(name);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
-    String all = Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
+    String all =
+        topics.length == 0
+            ? "No topics exist."
+            : Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
     System.out.println(all);
   }
 }

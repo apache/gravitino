@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
@@ -237,7 +238,7 @@ public class AccessControlManager implements AccessControlDispatcher {
 
   @Override
   public Role grantPrivilegeToRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofRole(metalake, role),
@@ -247,7 +248,7 @@ public class AccessControlManager implements AccessControlDispatcher {
 
   @Override
   public Role revokePrivilegesFromRole(
-      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofRole(metalake, role),

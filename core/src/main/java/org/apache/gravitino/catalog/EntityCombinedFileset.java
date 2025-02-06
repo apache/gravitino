@@ -48,7 +48,7 @@ public final class EntityCombinedFileset implements Fileset {
     return new EntityCombinedFileset(fileset, null);
   }
 
-  public EntityCombinedFileset withHiddenPropertiesSet(Set<String> hiddenProperties) {
+  public EntityCombinedFileset withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;
   }

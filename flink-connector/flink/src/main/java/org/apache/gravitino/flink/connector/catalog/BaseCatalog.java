@@ -85,10 +85,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
   private final PartitionConverter partitionConverter;
 
-  protected BaseCatalog(String catalogName, String defaultDatabase) {
+  protected BaseCatalog(
+      String catalogName,
+      String defaultDatabase,
+      PropertiesConverter propertiesConverter,
+      PartitionConverter partitionConverter) {
     super(catalogName, defaultDatabase);
-    this.propertiesConverter = getPropertiesConverter();
-    this.partitionConverter = getPartitionConverter();
+    this.propertiesConverter = propertiesConverter;
+    this.partitionConverter = partitionConverter;
   }
 
   protected abstract AbstractCatalog realCatalog();
@@ -508,10 +512,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
     throw new UnsupportedOperationException();
   }
 
-  protected abstract PropertiesConverter getPropertiesConverter();
-
-  protected abstract PartitionConverter getPartitionConverter();
-
   protected CatalogBaseTable toFlinkTable(Table table) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
@@ -656,11 +656,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return schemaChanges.toArray(new SchemaChange[0]);
   }
 
-  private Catalog catalog() {
+  protected Catalog catalog() {
     return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
   }
 
-  private String catalogName() {
+  protected String catalogName() {
     return getName();
   }
 }

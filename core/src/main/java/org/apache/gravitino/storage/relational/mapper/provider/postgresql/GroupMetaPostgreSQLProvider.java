@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   @Override
@@ -80,16 +81,29 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " JSON_AGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
-        + " gt LEFT OUTER JOIN "
+        + " gt LEFT OUTER JOIN ("
+        + " SELECT * FROM "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " rt ON rt.group_id = gt.group_id"
-        + " LEFT OUTER JOIN "
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
         + ROLE_TABLE_NAME
-        + " rot ON rot.role_id = rt.role_id"
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
         + " WHERE "
         + " gt.deleted_at = 0 AND"
-        + " (rot.deleted_at = 0 OR rot.deleted_at is NULL) AND"
-        + " (rt.deleted_at = 0 OR rt.deleted_at is NULL) AND gt.metalake_id = #{metalakeId}"
+        + " gt.metalake_id = #{metalakeId}"
         + " GROUP BY gt.group_id";
+  }
+
+  @Override
+  public String deleteGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE group_id IN (SELECT group_id FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

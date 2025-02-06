@@ -18,13 +18,17 @@
 #
 [versions]
 awssdk = "2.28.3"
+azure-identity = "1.13.1"
+azure-storage-file-datalake = "12.20.0"
+reactor-netty-http = "1.2.1"
+reactor-netty-core = "1.2.1"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
 guava = "32.1.3-jre"
 lombok = "1.18.20"
 slf4j = "2.0.9"
-log4j = "2.22.0"
+log4j = "2.24.3"
 jetty = "9.4.51.v20230217"
 jersey = "2.41"
 mockito = "4.11.0"
@@ -32,12 +36,13 @@ airlift-json = "237"
 airlift-resolver = "1.6"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
-hadoop3 = "3.3.0"
+hadoop3 = "3.3.1"
 hadoop3-gcs = "1.9.4-hadoop3"
-hadoop3-abs = "3.3.0"
-hadoop3-aliyun = "3.3.0"
-hadoop-minikdc = "3.3.0"
+hadoop3-abs = "3.3.1"
+hadoop3-aliyun = "3.3.1"
+hadoop-minikdc = "3.3.1"
 htrace-core4 = "4.1.0-incubating"
+httpclient = "4.4.1"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
 commons-csv = "1.12.0"
@@ -50,7 +55,6 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-rocksdbjni = "7.10.2"
 iceberg = '1.5.2' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4spark = "1.4.1" # used for compile spark connector
 paimon = '0.8.0'
@@ -89,7 +93,6 @@ cglib = "2.2"
 ranger = "2.4.0"
 javax-jaxb-api = "2.3.1"
 javax-ws-rs-api = "2.1.1"
-protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
 gradle-extensions-plugin = '1.74'
 publish-plugin = '1.2.0'
@@ -121,8 +124,10 @@ aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", ve
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
 aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "awssdk" }
 aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssdk" }
-protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
-protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
+azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "azure-identity"}
+azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
+reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-http", version.ref = "reactor-netty-http"}
+reactor-netty-core = {group = "io.projectreactor.netty", name = "reactor-netty-core", version.ref = "reactor-netty-core"}
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
@@ -170,6 +175,8 @@ hadoop3-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = 
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
+hadoop3-client-api = { group = "org.apache.hadoop", name = "hadoop-client-api", version.ref = "hadoop3"}
+hadoop3-client-runtime = { group = "org.apache.hadoop", name = "hadoop-client-runtime", version.ref = "hadoop3"}
 hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
 hadoop3-gcs = { group = "com.google.cloud.bigdataoss", name = "gcs-connector", version.ref = "hadoop3-gcs"}
 hadoop3-oss = { group = "org.apache.hadoop", name = "hadoop-aliyun", version.ref = "hadoop3-aliyun"}
@@ -177,6 +184,7 @@ hadoop3-abs = { group = "org.apache.hadoop", name = "hadoop-azure", version.ref 
 htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
+httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
@@ -186,13 +194,14 @@ commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.
 commons-logging = { group = "commons-logging", name = "commons-logging", version.ref = "commons-logging" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
-rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle", version.ref = "iceberg" }
+iceberg-azure = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg" }
+iceberg-azure-bundle = { group = "org.apache.iceberg", name = "iceberg-azure-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
@@ -281,7 +290,6 @@ prometheus = ["prometheus-servlet", "prometheus-dropwizard", "prometheus-client"
 kerby = ["kerby-core", "kerby-simplekdc"]
 
 [plugins]
-protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless-plugin" }
 gradle-extensions = { id = "com.github.vlsi.gradle-extensions", version.ref = "gradle-extensions-plugin" }
 publish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "publish-plugin" }

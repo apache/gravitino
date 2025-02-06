@@ -22,9 +22,9 @@ package org.apache.gravitino.iceberg.integration.test;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
@@ -49,13 +49,14 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     this.warehouse =
         String.format(
             "oss://%s/gravitino-test",
-            getFromEnvOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
-    this.accessKey = getFromEnvOrDefault("GRAVITINO_OSS_ACCESS_KEY", "{ACCESS_KEY}");
-    this.secretKey = getFromEnvOrDefault("GRAVITINO_OSS_SECRET_KEY", "{SECRET_KEY}");
-    this.endpoint = getFromEnvOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
-    this.region = getFromEnvOrDefault("GRAVITINO_OSS_REGION", "oss-cn-hangzhou");
-    this.roleArn = getFromEnvOrDefault("GRAVITINO_OSS_ROLE_ARN", "{ROLE_ARN}");
-    this.externalId = getFromEnvOrDefault("GRAVITINO_OSS_EXTERNAL_ID", "");
+            System.getenv().getOrDefault("GRAVITINO_OSS_BUCKET", "{BUCKET_NAME}"));
+    this.accessKey = System.getenv().getOrDefault("GRAVITINO_OSS_ACCESS_KEY", "{ACCESS_KEY}");
+    this.secretKey = System.getenv().getOrDefault("GRAVITINO_OSS_SECRET_KEY", "{SECRET_KEY}");
+    this.endpoint =
+        System.getenv().getOrDefault("GRAVITINO_OSS_ENDPOINT", "{GRAVITINO_OSS_ENDPOINT}");
+    this.region = System.getenv().getOrDefault("GRAVITINO_OSS_REGION", "oss-cn-hangzhou");
+    this.roleArn = System.getenv().getOrDefault("GRAVITINO_OSS_ROLE_ARN", "{ROLE_ARN}");
+    this.externalId = System.getenv().getOrDefault("GRAVITINO_OSS_EXTERNAL_ID", "");
 
     if (ITUtils.isEmbedded()) {
       return;
@@ -85,8 +86,8 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-        CredentialConstants.OSS_TOKEN_CREDENTIAL_PROVIDER);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
+        OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE);
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_REGION, region);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
@@ -125,11 +126,8 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
   private void copyAliyunOSSJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    // Iceberg doesn't provide Iceberg Aliyun bundle jar, so use Gravitino aliyun bundle to provide
+    // OSS packages.
     BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
-  }
-
-  private String getFromEnvOrDefault(String envVar, String defaultValue) {
-    String envValue = System.getenv(envVar);
-    return Optional.ofNullable(envValue).orElse(defaultValue);
   }
 }

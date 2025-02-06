@@ -48,10 +48,10 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
+import org.apache.gravitino.authorization.ranger.RangerHadoopSQLSecurableObject;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
-import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
-import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -80,7 +80,7 @@ public class RangerHiveIT {
 
   @BeforeAll
   public static void setup() {
-    RangerITEnv.init();
+    RangerITEnv.init(RangerITEnv.currentFunName(), true);
 
     rangerAuthHivePlugin = RangerITEnv.rangerAuthHivePlugin;
     rangerHelper = RangerITEnv.rangerHelper;
@@ -343,18 +343,19 @@ public class RangerHiveIT {
     AuthorizationSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateAuthorizationSecurableObject(
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
-            RangerMetadataObject.Type.TABLE,
+            "",
+            RangerHadoopSQLMetadataObject.Type.TABLE,
             ImmutableSet.of(
                 new RangerPrivileges.RangerHivePrivilegeImpl(
                     RangerPrivileges.RangerHadoopSQLPrivilege.ALL, Privilege.Condition.ALLOW)));
-    Assertions.assertNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
+    Assertions.assertNull(rangerAuthHivePlugin.findManagedPolicy(rangerSecurableObject));
 
     // Add a policy for `db3.tab1`
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab1"),
         GravitinoITUtils.genRandomName(currentFunName()));
     // findManagedPolicy function use precise search, so return not null
-    Assertions.assertNotNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
+    Assertions.assertNotNull(rangerAuthHivePlugin.findManagedPolicy(rangerSecurableObject));
   }
 
   @Test
@@ -460,8 +461,8 @@ public class RangerHiveIT {
         Collections.singletonList(policyItem));
   }
 
-  static boolean deleteHivePolicy(RangerSecurableObject rangerSecurableObject) {
-    RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
+  static boolean deleteHivePolicy(RangerHadoopSQLSecurableObject rangerSecurableObject) {
+    RangerPolicy policy = rangerAuthHivePlugin.findManagedPolicy(rangerSecurableObject);
     if (policy != null) {
       try {
         RangerITEnv.rangerClient.deletePolicy(policy.getId());
@@ -890,18 +891,21 @@ public class RangerHiveIT {
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
     assertFindManagedPolicyItems(role, true);
+    Assertions.assertEquals(
+        6, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
 
     Assertions.assertTrue(
-        rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(metadataObject)));
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.remove(metadataObject, ImmutableList.of())));
     assertFindManagedPolicyItems(role, false);
 
     Assertions.assertEquals(
-        6, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
     rangerClient
         .getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME)
         .forEach(
             policy -> {
-              Assertions.assertFalse(rangerHelper.hasGravitinoManagedPolicyItem(policy));
+              Assertions.assertFalse(RangerHelper.hasGravitinoManagedPolicyItem(policy));
             });
   }
 
@@ -937,7 +941,8 @@ public class RangerHiveIT {
         4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
 
     Assertions.assertTrue(
-        rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(schemaObject)));
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.remove(schemaObject, ImmutableList.of())));
     RoleEntity roleVerify =
         RoleEntity.builder()
             .withId(1L)
@@ -947,7 +952,13 @@ public class RangerHiveIT {
             .build();
     assertFindManagedPolicyItems(roleVerify, false);
     Assertions.assertEquals(
-        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+        2, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.remove(tableObject, ImmutableList.of())));
+    Assertions.assertEquals(
+        0, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
   }
 
   @Test
@@ -980,7 +991,8 @@ public class RangerHiveIT {
     assertFindManagedPolicyItems(role, true);
 
     Assertions.assertTrue(
-        rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(tableObject)));
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.remove(tableObject, ImmutableList.of())));
     RoleEntity verifyScheamRole =
         RoleEntity.builder()
             .withId(1L)
@@ -998,7 +1010,7 @@ public class RangerHiveIT {
     assertFindManagedPolicyItems(verifyScheamRole, true);
     assertFindManagedPolicyItems(verifyTableRole, false);
     Assertions.assertEquals(
-        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+        2, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
   }
 
   @Test
@@ -1247,7 +1259,7 @@ public class RangerHiveIT {
                     .map(
                         rangerSecurableObject -> {
                           LOG.info("rangerSecurableObject: " + rangerSecurableObject);
-                          return rangerHelper.findManagedPolicy(rangerSecurableObject);
+                          return rangerAuthHivePlugin.findManagedPolicy(rangerSecurableObject);
                         }))
         .filter(Objects::nonNull)
         .collect(Collectors.toList());

@@ -25,20 +25,38 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestFulllName {
 
   private Options options;
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
 
   @BeforeEach
   public void setUp() {
+    Main.useExit = false;
     options = new GravitinoOptions().options();
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -65,8 +83,7 @@ public class TestFulllName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
-    String metalakeName = fullName.getMetalakeName();
-    assertNull(metalakeName);
+    assertThrows(RuntimeException.class, fullName::getMetalakeName);
   }
 
   @Test
@@ -92,6 +109,21 @@ public class TestFulllName {
 
     String namePart = fullName.getNamePart(3);
     assertNull(namePart);
+  }
+
+  @Test
+  public void hasPartName() throws ParseException {
+    String[] argsWithoutName = {"catalog", "details", "--metalake", "metalake"};
+    CommandLine commandLineWithoutName = new DefaultParser().parse(options, argsWithoutName);
+    FullName fullNameWithoutName = new FullName(commandLineWithoutName);
+    assertFalse(fullNameWithoutName.hasName());
+
+    String[] argsWithName = {
+      "catalog", "details", "--metalake", "metalake", "--name", "Hive_catalog"
+    };
+    CommandLine commandLineWithName = new DefaultParser().parse(options, argsWithName);
+    FullName fullNameWithName = new FullName(commandLineWithName);
+    assertTrue(fullNameWithName.hasName());
   }
 
   @Test
@@ -151,5 +183,92 @@ public class TestFulllName {
     assertTrue(fullName.hasSchemaName());
     assertTrue(fullName.hasTableName());
     assertTrue(fullName.hasColumnName());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testMissingName() throws ParseException {
+    String[] args = {"column", "list", "-m", "demo_metalake", "-i"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    fullName.getCatalogName();
+    fullName.getSchemaName();
+    fullName.getTableName();
+    fullName.getColumnName();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MISSING_NAME);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testMalformedName() throws ParseException {
+    String[] args = {"column", "list", "-m", "demo_metalake", "-i", "--name", "Hive_catalog"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    fullName.getCatalogName();
+    fullName.getSchemaName();
+    fullName.getTableName();
+    fullName.getColumnName();
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(output, ErrorMessages.MALFORMED_NAME);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalake() throws ParseException {
+    String[] args = {
+      "table", "list", "-i", "-m", "demo_metalake", "--name", "Hive_catalog.default"
+    };
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    String metalakeName = fullName.getMetalakeName();
+    assertEquals(metalakeName, "demo_metalake");
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  public void testGetMetalakeWithoutMetalakeOption() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertThrows(RuntimeException.class, fullName::getMetalakeName);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(errOutput, ErrorMessages.MISSING_METALAKE);
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromCatalog() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(1, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromSchema() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(2, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromTable() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default.sales"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(3, fullName.getLevel());
+  }
+
+  @Test
+  @SuppressWarnings("DefaultCharset")
+  void testGetLevelFromColumn() throws ParseException {
+    String[] args = {"table", "list", "-i", "--name", "Hive_catalog.default.sales.columns"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertEquals(4, fullName.getLevel());
   }
 }

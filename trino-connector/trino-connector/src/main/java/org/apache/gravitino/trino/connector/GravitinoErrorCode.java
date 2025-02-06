@@ -23,6 +23,7 @@ import static io.trino.spi.ErrorType.EXTERNAL;
 import io.trino.spi.ErrorCode;
 import io.trino.spi.ErrorCodeSupplier;
 import io.trino.spi.ErrorType;
+import java.util.List;
 
 public enum GravitinoErrorCode implements ErrorCodeSupplier {
   GRAVITINO_UNSUPPORTED_TRINO_VERSION(0, EXTERNAL),
@@ -63,5 +64,10 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   @Override
   public ErrorCode toErrorCode() {
     return errorCode;
+  }
+
+  public static String toSimpleErrorMessage(Exception e) {
+    List<String> lines = e.getMessage().lines().toList();
+    return lines.size() > 1 ? lines.get(0) + lines.get(1) : lines.get(0);
   }
 }

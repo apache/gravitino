@@ -104,6 +104,25 @@ const DetailsView = () => {
             </Grid>
           </>
         ) : null}
+
+        {activatedItem?.uri && (
+          <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              URI
+            </Typography>
+            {renderFieldText({ value: activatedItem?.uri })}
+          </Grid>
+        )}
+
+        {activatedItem?.aliases && (
+          <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              Aliases
+            </Typography>
+            {renderFieldText({ value: activatedItem?.aliases?.join(', ') })}
+          </Grid>
+        )}
+
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment

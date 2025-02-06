@@ -34,7 +34,7 @@ public class RemoveRoleFromGroup extends Command {
   protected String role;
 
   /**
-   * Removes a role from a group.
+   * Remove a role from a group.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -50,7 +50,7 @@ public class RemoveRoleFromGroup extends Command {
     this.role = role;
   }
 
-  /** Adds a role to a group. */
+  /** Remove a role from a group. */
   @Override
   public void handle() {
     try {
@@ -59,17 +59,13 @@ public class RemoveRoleFromGroup extends Command {
       roles.add(role);
       client.revokeRolesFromGroup(roles, group);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ROLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(role + " removed from " + group);

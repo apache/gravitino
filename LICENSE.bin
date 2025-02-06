@@ -304,6 +304,7 @@
    Apache Iceberg Aliyun
    Apache Iceberg api
    Apache Iceberg AWS
+   Apache Iceberg Azure
    Apache Iceberg core
    Apache Iceberg Hive metastore
    Apache Iceberg GCP
@@ -373,6 +374,7 @@
    Apache Arrow
    Rome
    Jettison
+   Awaitility
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -384,7 +386,6 @@
 
    JSR305
    LevelDB JNI
-   RocksDB JNI
    JCraft
    Javolution
    ANTLR4

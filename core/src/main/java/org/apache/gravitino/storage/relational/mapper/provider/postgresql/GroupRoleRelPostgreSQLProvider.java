@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupRoleRelBaseSQLProvider;
+import org.apache.ibatis.annotations.Param;
 
 public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider {
   @Override
@@ -69,5 +70,15 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String deleteGroupRoleRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

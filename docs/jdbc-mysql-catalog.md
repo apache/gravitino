@@ -107,9 +107,10 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `VarChar`          | `VarChar`           |
 | `FixedChar`        | `FixedChar`         |
 | `Binary`           | `Binary`            |
+| `BOOLEAN`          | `BIT`               |
 
 :::info
-MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
@@ -184,6 +185,12 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------|------------|-----------|---------------|
 | `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No        | No         | Yes       | 0.4.0         |
 | `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |
+
+
+:::note
+Some MySQL storage engines, such as FEDERATED, are not enabled by default and require additional configuration to use. For example, to enable the FEDERATED engine, set federated=1 in the MySQL configuration file. Similarly, engines like ndbinfo, MRG_MYISAM, and PERFORMANCE_SCHEMA may also require specific prerequisites or configurations. For detailed instructions, 
+refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html).
+:::
 
 ### Table indexes
 

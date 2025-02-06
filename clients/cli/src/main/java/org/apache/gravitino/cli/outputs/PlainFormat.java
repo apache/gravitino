@@ -28,34 +28,40 @@ import org.apache.gravitino.Metalake;
 public class PlainFormat {
   public static void output(Object object) {
     if (object instanceof Metalake) {
-      new MetalakeStringFormat().output((Metalake) object);
+      new MetalakePlainFormat().output((Metalake) object);
     } else if (object instanceof Metalake[]) {
-      new MetalakesStringFormat().output((Metalake[]) object);
+      new MetalakesPlainFormat().output((Metalake[]) object);
     } else if (object instanceof Catalog) {
-      new CatalogStringFormat().output((Catalog) object);
+      new CatalogPlainFormat().output((Catalog) object);
+    } else if (object instanceof Catalog[]) {
+      new CatalogsPlainFormat().output((Catalog[]) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
   }
 
-  static final class MetalakeStringFormat implements OutputFormat<Metalake> {
+  static final class MetalakePlainFormat implements OutputFormat<Metalake> {
     @Override
     public void output(Metalake metalake) {
       System.out.println(metalake.name() + "," + metalake.comment());
     }
   }
 
-  static final class MetalakesStringFormat implements OutputFormat<Metalake[]> {
+  static final class MetalakesPlainFormat implements OutputFormat<Metalake[]> {
     @Override
     public void output(Metalake[] metalakes) {
-      List<String> metalakeNames =
-          Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
-      String all = String.join(System.lineSeparator(), metalakeNames);
-      System.out.println(all);
+      if (metalakes.length == 0) {
+        System.out.println("No metalakes exist.");
+      } else {
+        List<String> metalakeNames =
+            Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
+        String all = String.join(System.lineSeparator(), metalakeNames);
+        System.out.println(all);
+      }
     }
   }
 
-  static final class CatalogStringFormat implements OutputFormat<Catalog> {
+  static final class CatalogPlainFormat implements OutputFormat<Catalog> {
     @Override
     public void output(Catalog catalog) {
       System.out.println(
@@ -66,6 +72,20 @@ public class PlainFormat {
               + catalog.provider()
               + ","
               + catalog.comment());
+    }
+  }
+
+  static final class CatalogsPlainFormat implements OutputFormat<Catalog[]> {
+    @Override
+    public void output(Catalog[] catalogs) {
+      if (catalogs.length == 0) {
+        System.out.println("No catalogs exist.");
+      } else {
+        List<String> catalogNames =
+            Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
+        String all = String.join(System.lineSeparator(), catalogNames);
+        System.out.println(all);
+      }
     }
   }
 }

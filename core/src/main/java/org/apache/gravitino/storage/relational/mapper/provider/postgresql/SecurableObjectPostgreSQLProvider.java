@@ -32,6 +32,7 @@ import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLProvider {
+  @Override
   public String batchSoftDeleteSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
     return "<script>"
@@ -142,5 +143,15 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + " ft WHERE ft.schema_id = #{schemaId} AND "
         + "ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
         + ")";
+  }
+
+  @Override
+  public String deleteSecurableObjectsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

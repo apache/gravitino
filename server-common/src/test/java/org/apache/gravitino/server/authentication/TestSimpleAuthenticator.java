@@ -47,11 +47,34 @@ public class TestSimpleAuthenticator {
             .authenticateToken(
                 AuthConstants.AUTHORIZATION_BASIC_HEADER.getBytes(StandardCharsets.UTF_8))
             .getName());
+    String fullCredentials = "test-user:123";
+    String basicToken =
+        AuthConstants.AUTHORIZATION_BASIC_HEADER
+            + Base64.getEncoder().encodeToString(fullCredentials.getBytes(StandardCharsets.UTF_8));
+    Assertions.assertEquals(
+        fullCredentials.split(":")[0],
+        simpleAuthenticator
+            .authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8))
+            .getName());
+    String credentialsOnlyHaveUsername = "test-user:";
+    basicToken =
+        AuthConstants.AUTHORIZATION_BASIC_HEADER
+            + Base64.getEncoder()
+                .encodeToString(credentialsOnlyHaveUsername.getBytes(StandardCharsets.UTF_8));
+    Assertions.assertEquals(
+        fullCredentials.split(":")[0],
+        simpleAuthenticator
+            .authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8))
+            .getName());
+    String credentialsOnlyHavePassword = ":123";
+    basicToken =
+        AuthConstants.AUTHORIZATION_BASIC_HEADER
+            + Base64.getEncoder()
+                .encodeToString(credentialsOnlyHavePassword.getBytes(StandardCharsets.UTF_8));
     Assertions.assertEquals(
         AuthConstants.ANONYMOUS_USER,
         simpleAuthenticator
-            .authenticateToken(
-                (AuthConstants.AUTHORIZATION_BASIC_HEADER + "xx").getBytes(StandardCharsets.UTF_8))
+            .authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8))
             .getName());
     Assertions.assertEquals(
         "gravitino",

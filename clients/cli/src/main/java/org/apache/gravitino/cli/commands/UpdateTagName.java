@@ -39,7 +39,7 @@ public class UpdateTagName extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the tag.
    * @param tag The name of the catalog.
-   * @param name The new metalake name.
+   * @param name The new tag name.
    */
   public UpdateTagName(
       String url, boolean ignoreVersions, String metalake, String tag, String name) {
@@ -57,14 +57,11 @@ public class UpdateTagName extends Command {
       TagChange change = TagChange.rename(name);
       client.alterTag(tag, change);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TAG);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     System.out.println(tag + " name changed.");

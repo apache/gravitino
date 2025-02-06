@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 
@@ -34,6 +35,8 @@ public class TableFormat {
       new MetalakesTableFormat().output((Metalake[]) object);
     } else if (object instanceof Catalog) {
       new CatalogTableFormat().output((Catalog) object);
+    } else if (object instanceof Catalog[]) {
+      new CatalogsTableFormat().output((Catalog[]) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -53,13 +56,17 @@ public class TableFormat {
   static final class MetalakesTableFormat implements OutputFormat<Metalake[]> {
     @Override
     public void output(Metalake[] metalakes) {
-      List<String> headers = Collections.singletonList("metalake");
-      List<List<String>> rows = new ArrayList<>();
-      for (int i = 0; i < metalakes.length; i++) {
-        rows.add(Arrays.asList(metalakes[i].name()));
+      if (metalakes.length == 0) {
+        System.out.println("No metalakes exist.");
+      } else {
+        List<String> headers = Collections.singletonList("metalake");
+        List<List<String>> rows = new ArrayList<>();
+        for (int i = 0; i < metalakes.length; i++) {
+          rows.add(Arrays.asList(metalakes[i].name()));
+        }
+        TableFormatImpl tableFormat = new TableFormatImpl();
+        tableFormat.print(headers, rows);
       }
-      TableFormatImpl tableFormat = new TableFormatImpl();
-      tableFormat.print(headers, rows);
     }
   }
 
@@ -79,12 +86,35 @@ public class TableFormat {
     }
   }
 
+  static final class CatalogsTableFormat implements OutputFormat<Catalog[]> {
+    @Override
+    public void output(Catalog[] catalogs) {
+      if (catalogs.length == 0) {
+        System.out.println("No catalogs exist.");
+      } else {
+        List<String> headers = Collections.singletonList("catalog");
+        List<List<String>> rows = new ArrayList<>();
+        for (int i = 0; i < catalogs.length; i++) {
+          rows.add(Arrays.asList(catalogs[i].name()));
+        }
+        TableFormatImpl tableFormat = new TableFormatImpl();
+        tableFormat.print(headers, rows);
+      }
+    }
+  }
+
   static final class TableFormatImpl {
     private int[] maxElementLengths;
-    private final String horizontalDelimiter = "-";
-    private final String verticalDelimiter = "|";
-    private final String crossDelimiter = "+";
-    private final String indent = " ";
+    // This expression is primarily used to match characters that have a display width of
+    // 2, such as characters from Korean, Chinese
+    private static final Pattern FULL_WIDTH_PATTERN =
+        Pattern.compile(
+            "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
+    private int[][] elementOutputWidths;
+    private static final String horizontalDelimiter = "-";
+    private static final String verticalDelimiter = "|";
+    private static final String crossDelimiter = "+";
+    private static final String indent = " ";
 
     public void debug() {
       System.out.println();
@@ -96,10 +126,9 @@ public class TableFormat {
         throw new IllegalArgumentException("Number of columns is not equal.");
       }
       maxElementLengths = new int[headers.size()];
+      elementOutputWidths = new int[rows.size()][headers.size()];
       updateMaxLengthsFromList(headers);
       updateMaxLengthsFromNestedList(rows);
-
-      // print headers
       printLine();
       System.out.println();
       for (int i = 0; i < headers.size(); ++i) {
@@ -115,9 +144,22 @@ public class TableFormat {
       for (int i = 0; i < rows.size(); ++i) {
         List<String> columns = rows.get(i);
         for (int j = 0; j < columns.size(); ++j) {
-          System.out.printf(
-              verticalDelimiter + indent + "%-" + maxElementLengths[j] + "s" + indent,
-              columns.get(j));
+          String column = columns.get(j);
+          // Handle cases where the width and number of characters are inconsistent
+          if (elementOutputWidths[i][j] != column.length()) {
+            if (elementOutputWidths[i][j] > maxElementLengths[j]) {
+              System.out.printf(
+                  verticalDelimiter + indent + "%-" + column.length() + "s" + indent, column);
+            } else {
+              int paddingLength =
+                  maxElementLengths[j] - (elementOutputWidths[i][j] - column.length());
+              System.out.printf(
+                  verticalDelimiter + indent + "%-" + paddingLength + "s" + indent, column);
+            }
+          } else {
+            System.out.printf(
+                verticalDelimiter + indent + "%-" + maxElementLengths[j] + "s" + indent, column);
+          }
         }
         System.out.println(verticalDelimiter);
       }
@@ -130,18 +172,40 @@ public class TableFormat {
       String s;
       for (int i = 0; i < elements.size(); ++i) {
         s = elements.get(i);
-        if (s.length() > maxElementLengths[i]) maxElementLengths[i] = s.length();
+        if (getOutputWidth(s) > maxElementLengths[i]) maxElementLengths[i] = getOutputWidth(s);
       }
     }
 
     private void updateMaxLengthsFromNestedList(List<List<String>> elements) {
+      int rowIdx = 0;
       for (List<String> row : elements) {
         String s;
         for (int i = 0; i < row.size(); ++i) {
           s = row.get(i);
-          if (s.length() > maxElementLengths[i]) maxElementLengths[i] = s.length();
+          int consoleWidth = getOutputWidth(s);
+          elementOutputWidths[rowIdx][i] = consoleWidth;
+          if (consoleWidth > maxElementLengths[i]) maxElementLengths[i] = consoleWidth;
         }
+        rowIdx++;
       }
+    }
+
+    private int getOutputWidth(String s) {
+      int width = 0;
+      for (int i = 0; i < s.length(); i++) {
+        width += getCharWidth(s.charAt(i));
+      }
+
+      return width;
+    }
+
+    private static int getCharWidth(char ch) {
+      String s = String.valueOf(ch);
+      if (FULL_WIDTH_PATTERN.matcher(s).find()) {
+        return 2;
+      }
+
+      return 1;
     }
 
     private void printLine() {

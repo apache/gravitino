@@ -97,4 +97,8 @@ public class ModelMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteModelMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String updateModelLatestVersion(@Param("modelId") Long modelId) {
+    return getProvider().updateModelLatestVersion(modelId);
+  }
 }

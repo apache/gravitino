@@ -205,7 +205,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                   getStringIdFromProperties(alteredTopic.properties()).id());
 
           return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
-              .withHiddenPropertiesSet(
+              .withHiddenProperties(
                   getHiddenPropertyNames(
                       catalogIdent,
                       HasPropertyMetadata::topicPropertiesMetadata,
@@ -321,7 +321,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     StringIdentifier stringId = getStringIdFromProperties(topic.properties());
     if (stringId == null) {
       return EntityCombinedTopic.of(topic)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
           .withImported(isEntityExist(ident, TOPIC));
@@ -335,7 +335,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             getStringIdFromProperties(topic.properties()).id());
 
     return EntityCombinedTopic.of(topic, topicEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
         .withImported(topicEntity != null);
@@ -386,13 +386,13 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     } catch (Exception e) {
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)
-          .withHiddenPropertiesSet(
+          .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
     }
 
     return EntityCombinedTopic.of(topic, topicEntity)
-        .withHiddenPropertiesSet(
+        .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
   }

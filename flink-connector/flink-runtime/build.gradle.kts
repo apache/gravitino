@@ -41,6 +41,14 @@ val scalaVersion: String = "2.12"
 val artifactName = "gravitino-${project.name}_$scalaVersion"
 val baseName = "${rootProject.name}-flink-connector-runtime-${flinkMajorVersion}_$scalaVersion"
 
+configurations.all {
+  resolutionStrategy.eachDependency {
+    if (requested.group == "org.apache.logging.log4j") {
+      throw GradleException("Forbidden dependency 'org.apache.logging.log4j' found!")
+    }
+  }
+}
+
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":flink-connector:flink"))
