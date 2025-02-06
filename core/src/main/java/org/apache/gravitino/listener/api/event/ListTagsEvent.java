@@ -34,7 +34,10 @@ public final class ListTagsEvent extends TagEvent {
    * @param tagNames The list of tag names that were retrieved.
    */
   public ListTagsEvent(String user, String metalake, String[] tagNames) {
-    super(user, NameIdentifierUtil.ofTag(metalake, tagNames[0]));
+    super(
+        user,
+        NameIdentifierUtil.ofTag(
+            metalake, (tagNames != null && tagNames.length > 0) ? tagNames[0] : "NO TAG"));
   }
 
   /**
