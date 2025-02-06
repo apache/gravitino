@@ -36,10 +36,13 @@ use tracing::{debug, error};
 
 /// A macro to log the result of an asynchronous method call in the context of FUSE operations.
 ///
-/// This macro provides three variants for logging:
+/// This macro provides six variants for logging:
 /// 1. Without logging the reply (logs only the method status).
 /// 2. With default `Debug` formatting for the reply.
 /// 3. With a customizable formatting function for the reply.
+/// 4. With both Debug and custom formatting for the reply.
+/// 5. Special stream handling for `readdir` operations.
+/// 6. Special stream handling for `readdirplus` operations.
 ///
 /// # Usage
 ///
@@ -52,14 +55,27 @@ use tracing::{debug, error};
 ///
 /// // With a custom formatting function for the reply
 /// log_result!(method_call, "method_name", req, custom_format_fn);
+///
+/// // With both Debug and custom formatting
+/// log_result!(method_call, "method_name", req, debug, custom_format_fn);
+///
+/// // Special handling for readdir stream
+/// log_result!(method_call, "readdir", req, stream);
+///
+/// // Special handling for readdirplus stream
+/// log_result!(method_call, "readdirplus", req, stream);
 /// ```
 ///
 /// # Arguments
 ///
-/// - `$method_call`: The asynchronous method call to execute and log.
-/// - `$method_name`: A string representing the name of the method for logging purposes.
-/// - `$req`: The incoming FUSE request associated with the method call.
-/// - `$format_reply_fn`: (Optional) A custom formatting function to describe the reply more specifically.
+/// * `$method_call` - The asynchronous method call to execute and log.
+/// * `$method_name` - A string representing the name of the method for logging purposes.
+/// * `$req` - The incoming FUSE request associated with the method call.
+/// * Format Options (Optional):
+///     * No format option - Only logs method status
+///     * `debug` - Uses default Debug formatting for the reply
+///     * (`debug`, custom_format_fn) - Combines Debug output with custom formatted output
+///     * `stream` - Special handling for directory streams (only for "readdir"/"readdirplus")
 macro_rules! log_result {
    // No reply printing
    ($method_call:expr, $method_name:expr, $req:ident) => {
@@ -89,11 +105,100 @@ macro_rules! log_result {
         }
     };
 
-    // Format reply with custom formatting function
-    ($method_call:expr, $method_name:expr, $req:ident, $format_reply_fn:ident) => {
-            match $method_call.await {
+    // Format stream for readdir
+    ($method_call:expr, "readdir", $req:ident, stream) => {{
+        match $method_call.await {
+            Ok(mut reply_dir) => {
+                let mut entries = Vec::new();
+
+                while let Some(entry_result) = reply_dir.entries.next().await {
+                    match entry_result {
+                        Ok(entry) => {
+                            entries.push(entry);
+                        }
+                        Err(e) => {
+                            return Err(e.into());
+                        }
+                    }
+                }
+
+                let entries_info = format!("[{}]",
+                    entries
+                        .iter()
+                        .map(|entry| directory_entry_to_desc_str(entry))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
+
+                debug!(
+                    $req.unique,
+                    entries = entries_info,
+                    "readdir completed"
+                );
+
+                Ok(ReplyDirectory {
+                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
+                })
+            }
+            Err(e) => {
+                error!($req.unique, ?e, "readdir failed");
+                Err(e)
+            }
+        }
+    }};
+
+    // Format stream for readdirplus
+    ($method_call:expr, "readdirplus", $req:ident, stream) => {{
+        match $method_call.await {
+            Ok(mut reply_dir) => {
+                let mut entries = Vec::new();
+
+                while let Some(entry_result) = reply_dir.entries.next().await {
+                    match entry_result {
+                        Ok(entry) => {
+                            entries.push(entry);
+                        }
+                        Err(e) => {
+                            return Err(e.into());
+                        }
+                    }
+                }
+
+                let entries_info = format!("[{}]",
+                    entries
+                        .iter()
+                        .map(|entry| directory_entry_plus_to_desc_str(entry))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
+
+                debug!(
+                    $req.unique,
+                    entries = entries_info,
+                    "readdirplus completed"
+                );
+
+                Ok(ReplyDirectoryPlus {
+                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
+                })
+            }
+            Err(e) => {
+                error!($req.unique, ?e, "readdirplus failed");
+                Err(e)
+            }
+        }
+    }};
+
+	// For debug and custom formatting
+    ($method_call:expr, $method_name:expr, $req:ident, debug, $format_reply_fn:ident) => {
+        match $method_call.await {
             Ok(reply) => {
-                debug!($req.unique, reply = %$format_reply_fn(&reply), concat!($method_name, " completed"));
+                debug!(
+                    $req.unique,
+                    ?reply,
+                    reply_formatted = %$format_reply_fn(&reply),
+                    concat!($method_name, " completed")
+                );
                 Ok(reply)
             }
             Err(e) => {
@@ -102,48 +207,7 @@ macro_rules! log_result {
             }
         }
     };
-
-    // Format stream with custom formatting function
-    ($method_call:expr, $method_name:expr, $req:ident, stream, $format_reply_fn:expr) => {{
-        match $method_call.await {
-            Ok(reply_dir) => {
-                let mut stream = reply_dir.entries.peekable();
-                let mut debug_output = String::new();
-                while let Some(entry_result) = stream.peek().await {
-                    match entry_result {
-                        Ok(entry) => {
-                            debug_output.push_str(format!("Directory entry: {:?}\n", entry).as_str());
-                        }
-                        Err(e) => {
-                            debug_output.push_str(format!("Error reading directory entry: {:?}\n", e).as_str());
-                        }
-                    }
-                }
-
-                Ok(reply_dir)
-            }
-            Err(e) => {
-                error!(
-                    $req.unique,
-                    ?e,
-                    concat!($method_name, " failed")
-                );
-                Err(e)
-            }
-        }
-    }};
 }
-
-// async fn stream_to_desc_str<S>(mut res: ReplyDirectory<>) -> String {
-//     let mut s = String::new();
-//     while let Some(entry_result) = res.entries.next().await {
-//         match entry_result {
-//             Ok(entry) => s.push_str(format!("Directory entry: {:?}", entry).as_str()),
-//             Err(e) => s.push_str(format!("Error reading directory entry: {:?}", e).as_str()),
-//         }
-//     }
-//     s
-// }
 
 /// Convert `ReplyAttr` to descriptive string.
 ///
@@ -264,6 +328,36 @@ fn timestamp_to_desc_string(tstmp: Timestamp) -> String {
         .to_string()
 }
 
+/// Convert `DirectoryEntry` to descriptive string.
+///
+/// Example: `{ inode: 1234, kind: RegularFile, name: "file.txt", offset: 1 }`
+fn directory_entry_to_desc_str(entry: &DirectoryEntry) -> String {
+    let mut output = String::new();
+    write!(output, "{{ ").unwrap();
+    write!(output, "inode: {}, ", entry.inode).unwrap();
+    write!(output, "kind: {:?}, ", entry.kind).unwrap();
+    write!(output, "name: {}, ", entry.name.to_string_lossy()).unwrap();
+    write!(output, "offset: {} }}", entry.offset).unwrap();
+    output
+}
+
+/// Convert `DirectoryEntryPlus` to descriptive string.
+///
+/// Example: `{ inode: 1234, generation: 0, kind: RegularFile, name: "file.txt", offset: 1, attr: {...}, entry_ttl: 1s, attr_ttl: 1s }`
+fn directory_entry_plus_to_desc_str(entry: &DirectoryEntryPlus) -> String {
+    let mut output = String::new();
+    write!(output, "{{ ").unwrap();
+    write!(output, "inode: {}, ", entry.inode).unwrap();
+    write!(output, "generation: {}, ", entry.generation).unwrap();
+    write!(output, "kind: {:?}, ", entry.kind).unwrap();
+    write!(output, "name: {}, ", entry.name.to_string_lossy()).unwrap();
+    write!(output, "offset: {}, ", entry.offset).unwrap();
+    write!(output, "attr: {}, ", file_attr_to_desc_str(&entry.attr)).unwrap();
+    write!(output, "entry_ttl: {:?}, ", entry.entry_ttl).unwrap();
+    write!(output, "attr_ttl: {:?} }}", entry.attr_ttl).unwrap();
+    output
+}
+
 pub(crate) struct FuseApiHandleDebug<T: RawFileSystem> {
     inner: FuseApiHandle<T>,
 }
@@ -299,6 +393,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             self.inner.lookup(req, parent, name),
             "LOOKUP",
             req,
+            debug,
             reply_entry_to_desc_str
         )
     }
@@ -330,6 +425,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             self.inner.getattr(req, inode, fh, flags),
             "GETATTR",
             req,
+            debug,
             reply_attr_to_desc_str
         )
     }
@@ -351,6 +447,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             self.inner.setattr(req, inode, fh, set_attr),
             "setattr",
             req,
+            debug,
             reply_attr_to_desc_str
         )
     }
@@ -381,6 +478,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             self.inner.mkdir(req, parent, name, mode, umask),
             "mkdir",
             req,
+            debug,
             reply_entry_to_desc_str
         )
     }
@@ -548,46 +646,12 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "readdir started"
         );
 
-        match self.inner.readdir(req, parent, fh, offset).await {
-            Ok(mut reply_dir) => {
-                let mut entries = Vec::new();
-
-                while let Some(entry_result) = reply_dir.entries.next().await {
-                    match entry_result {
-                        Ok(entry) => {
-                            entries.push(entry);
-                        }
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                    }
-                }
-
-                let entries_info = entries
-                    .iter()
-                    .map(|entry| format!("{:?}", entry))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                debug!(
-                    req.unique,
-                    ?req,
-                    parent = ?parent_path_name,
-                    ?fh,
-                    ?offset,
-                    entries = %entries_info,
-                    "readdir completed"
-                );
-
-                Ok(ReplyDirectory {
-                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
-                })
-            }
-            Err(e) => {
-                error!("Error reading directory: {:?}", e);
-                Err(e)
-            }
-        }
+        log_result!(
+            self.inner.readdir(req, parent, fh, offset),
+            "readdir",
+            req,
+            stream
+        )
     }
 
     async fn releasedir(
@@ -637,6 +701,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             self.inner.create(req, parent, name, mode, flags),
             "create",
             req,
+            debug,
             reply_created_to_desc_str
         )
     }
@@ -665,50 +730,11 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "readdirplus started"
         );
 
-        match self
-            .inner
-            .readdirplus(req, parent, fh, offset, lock_owner)
-            .await
-        {
-            Ok(mut reply_dir_plus) => {
-                let mut entries = Vec::new();
-
-                while let Some(entry_result) = reply_dir_plus.entries.next().await {
-                    match entry_result {
-                        Ok(entry) => {
-                            entries.push(entry);
-                        }
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                    }
-                }
-
-                let entries_info = entries
-                    .iter()
-                    .map(|entry| format!("{:?}", entry))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                debug!(
-                    req.unique,
-                    ?req,
-                    parent = ?parent_path_name,
-                    ?fh,
-                    ?offset,
-                    ?lock_owner,
-                    entries = %entries_info,
-                    "readdirplus completed"
-                );
-
-                Ok(ReplyDirectoryPlus {
-                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
-                })
-            }
-            Err(e) => {
-                error!("Error reading directory plus: {:?}", e);
-                Err(e)
-            }
-        }
+        log_result!(
+            self.inner.readdirplus(req, parent, fh, offset, lock_owner),
+            "readdirplus",
+            req,
+            stream
+        )
     }
 }
