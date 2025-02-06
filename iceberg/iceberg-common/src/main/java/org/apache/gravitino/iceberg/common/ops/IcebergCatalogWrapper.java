@@ -219,8 +219,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     // Trino Analyzer try to get view from Iceberg catalog, return NoSuchViewException to keep
     // the compatibility with Trino.
     if (!(catalog instanceof ViewCatalog)) {
-      throw new NoSuchViewException(
-          String.format("Catalog %s doesn't support view", catalog.name()));
+      throw new NoSuchViewException("Catalog %s doesn't support view", catalog.name());
     }
     return CatalogHandlers.loadView(getViewCatalog(), viewIdentifier);
   }
