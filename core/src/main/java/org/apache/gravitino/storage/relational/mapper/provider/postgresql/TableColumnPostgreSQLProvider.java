@@ -59,4 +59,14 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
+
+  @Override
+  public String deleteColumnPOsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

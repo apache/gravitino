@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   @Override
@@ -94,5 +95,15 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " gt.deleted_at = 0 AND"
         + " gt.metalake_id = #{metalakeId}"
         + " GROUP BY gt.group_id";
+  }
+
+  @Override
+  public String deleteGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE group_id IN (SELECT group_id FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

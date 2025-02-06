@@ -50,9 +50,18 @@ if [ "$1" == "test" ]; then
   echo "Running tests..."
   cd $CLIENT_FUSE_DIR
   export RUN_TEST_WITH_FUSE=1
-  cargo test --test fuse_test fuse_it_
+  cargo test --test fuse_test fuse_it_ -- weak_consistency
 
 elif [ "$1" == "start" ]; then
+  # Start the servers
+  echo "Starting servers..."
+  start_servers
+
+elif [ "$1" == "restart" ]; then
+  # Stop the servers
+  echo "Stopping servers..."
+  stop_servers
+
   # Start the servers
   echo "Starting servers..."
   start_servers
