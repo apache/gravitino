@@ -61,7 +61,7 @@ if [ ! -f "bundles/${iceberg_aws_bundle}" ]; then
   curl -L -s -o bundles/${iceberg_aws_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${iceberg_version}/${iceberg_aws_bundle}
 fi
 
-iceberg_azure_bundle="iceberg-azure-bundle-{iceberg_version}.jar"
+iceberg_azure_bundle="iceberg-azure-bundle-${iceberg_version}.jar"
 if [ ! -f "bundles/${iceberg_azure_bundle}" ]; then
   curl -L -s -o bundles/${iceberg_azure_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-azure-bundle/${iceberg_version}/${iceberg_azure_bundle}
 fi
