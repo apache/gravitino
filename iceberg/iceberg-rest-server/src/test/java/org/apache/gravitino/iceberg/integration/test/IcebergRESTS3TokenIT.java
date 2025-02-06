@@ -115,7 +115,7 @@ public class IcebergRESTS3TokenIT extends IcebergRESTJdbcCatalogIT {
         String.format(
             "https://repo1.maven.org/maven2/org/apache/iceberg/"
                 + "iceberg-aws-bundle/%s/iceberg-aws-bundle-%s.jar",
-            IcebergConstants.ICEBERG_VERSION, IcebergConstants.ICEBERG_VERSION);
+            ITUtils.icebergVersion(), ITUtils.icebergVersion());
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
