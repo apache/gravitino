@@ -28,9 +28,9 @@ public class DeleteTagPreEvent extends TagPreEvent {
   /**
    * Constructs a new {@code DeleteTagPreEvent} instance.
    *
-   * @param user
-   * @param metalake
-   * @param name
+   * @param user The user who initiated the tag deletion operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param name The name of the tag to delete.
    */
   public DeleteTagPreEvent(String user, String metalake, String name) {
     super(user, NameIdentifierUtil.ofTag(metalake, name));

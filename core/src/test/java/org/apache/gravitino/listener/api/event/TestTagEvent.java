@@ -209,9 +209,9 @@ public class TestTagEvent {
     Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
     Assertions.assertEquals(AssociateTagsForMetadataObjectPreEvent.class, preEvent.getClass());
     Assertions.assertArrayEquals(
-        tagsToAdd, ((AssociateTagsForMetadataObjectPreEvent) preEvent).getTagsToAdd());
+        tagsToAdd, ((AssociateTagsForMetadataObjectPreEvent) preEvent).tagsToAdd());
     Assertions.assertArrayEquals(
-        tagsToRemove, ((AssociateTagsForMetadataObjectPreEvent) preEvent).getTagsToRemove());
+        tagsToRemove, ((AssociateTagsForMetadataObjectPreEvent) preEvent).tagsToRemove());
 
     Assertions.assertEquals(
         OperationType.ASSOCIATE_TAGS_FOR_METADATA_OBJECT, preEvent.operationType());
@@ -232,7 +232,7 @@ public class TestTagEvent {
 
     Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
     Assertions.assertEquals(GetTagForMetadataObjectPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(tag.name(), ((GetTagForMetadataObjectPreEvent) preEvent).getTagName());
+    Assertions.assertEquals(tag.name(), ((GetTagForMetadataObjectPreEvent) preEvent).tagName());
     Assertions.assertEquals(OperationType.GET_TAG_FOR_METADATA_OBJECT, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }

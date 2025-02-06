@@ -28,9 +28,9 @@ public class ListTagsForMetadataObjectPreEvent extends TagPreEvent {
   /**
    * Constructs a new {@code ListTagsForMetadataObjectPreEvent} instance.
    *
-   * @param user
-   * @param metalake
-   * @param metadataObject
+   * @param user The user who initiated the operation.
+   * @param metalake The metalake name where the metadata object resides.
+   * @param metadataObject The metadata object for which tags are being listed.
    */
   public ListTagsForMetadataObjectPreEvent(
       String user, String metalake, MetadataObject metadataObject) {

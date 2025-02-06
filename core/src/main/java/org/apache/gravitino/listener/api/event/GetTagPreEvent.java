@@ -27,9 +27,9 @@ public class GetTagPreEvent extends TagPreEvent {
   /**
    * Constructs a new {@code GetTagPreEvent} instance.
    *
-   * @param user
-   * @param metalake
-   * @param name
+   * @param user The user who initiated the get tag operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param name The name of the tag to get.
    */
   public GetTagPreEvent(String user, String metalake, String name) {
     super(user, NameIdentifierUtil.ofTag(metalake, name));

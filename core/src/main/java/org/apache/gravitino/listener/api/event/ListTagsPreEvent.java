@@ -27,8 +27,8 @@ public class ListTagsPreEvent extends TagPreEvent {
   /**
    * Constructs a new {@code ListTagsPreEvent} instance.
    *
-   * @param user
-   * @param metalake
+   * @param user The user who initiated the tag listing operation.
+   * @param metalake The metalake name where the tags are being listed.
    */
   public ListTagsPreEvent(String user, String metalake) {
     super(user, NameIdentifier.of(metalake));

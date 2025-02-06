@@ -31,9 +31,9 @@ public class CreateTagPreEvent extends TagPreEvent {
   /**
    * Constructs a new {@code CreateTagPreEvent} instance.
    *
-   * @param user
-   * @param metalake
-   * @param tagInfo
+   * @param user The user who initiated the tag creation operation.
+   * @param metalake The metalake name where the tag resides.
+   * @param tagInfo The information about the tag to be created.
    */
   public CreateTagPreEvent(String user, String metalake, TagInfo tagInfo) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagInfo.name()));

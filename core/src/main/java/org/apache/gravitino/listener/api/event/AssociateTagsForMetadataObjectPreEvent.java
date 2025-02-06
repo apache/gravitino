@@ -53,7 +53,7 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
    *
    * @return Array of tag names to be added.
    */
-  public String[] getTagsToAdd() {
+  public String[] tagsToAdd() {
     return tagsToAdd;
   }
 
@@ -62,7 +62,7 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
    *
    * @return Array of tag names to be removed.
    */
-  public String[] getTagsToRemove() {
+  public String[] tagsToRemove() {
     return tagsToRemove;
   }
 
