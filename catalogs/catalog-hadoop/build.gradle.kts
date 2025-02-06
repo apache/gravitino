@@ -52,6 +52,12 @@ dependencies {
     exclude("org.eclipse.jetty", "*")
     exclude("io.netty")
     exclude("org.fusesource.leveldbjni")
+    // Exclude `protobuf-java` 2.5.0 to avoid conflict with a higher version of `protobuf-java`
+    // in the authorization module. The reason is that the class loader of `catalog-hadoop` is the
+    // parent of the class loader of the authorization module, so the class loader of `catalog-hadoop`
+    // will load the class `protobuf-java` 2.5.0 first, which will cause the authorization module to
+    // fail to load the class `protobuf-java` 3.15.8.
+    exclude("com.google.protobuf", "protobuf-java")
   }
   implementation(libs.slf4j.api)
   implementation(libs.awaitility)
