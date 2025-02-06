@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TAB
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.TopicMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.ibatis.annotations.Param;
 
 public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
 
@@ -92,5 +93,15 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
         + " current_version = #{topicMeta.currentVersion},"
         + " last_version = #{topicMeta.lastVersion},"
         + " deleted_at = #{topicMeta.deletedAt}";
+  }
+
+  @Override
+  public String deleteTopicMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE topic_id IN (SELECT topic_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }
