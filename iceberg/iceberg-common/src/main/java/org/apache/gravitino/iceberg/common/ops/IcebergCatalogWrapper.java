@@ -216,10 +216,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadViewResponse loadView(TableIdentifier viewIdentifier) {
-    // Trino will try to list Iceberg view when listing tables, return empty list to avoid the
-    // unexpected exception.
+    // Trino Analyzer try to get view from Iceberg catalog, return NoSuchViewException to keep
+    // the compatibility with Trino.
     if (!(catalog instanceof ViewCatalog)) {
-      throw new NoSuchViewException("catalog doesn't support view");
+      throw new NoSuchViewException(
+          String.format("Catalog %s doesn't support view", catalog.name()));
     }
     return CatalogHandlers.loadView(getViewCatalog(), viewIdentifier);
   }
@@ -234,12 +235,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public boolean viewExists(TableIdentifier viewIdentifier) {
+    if (!(catalog instanceof ViewCatalog)) {
+      return false;
+    }
     return getViewCatalog().viewExists(viewIdentifier);
   }
 
   public ListTablesResponse listView(Namespace namespace) {
-    // Trino will try to list Iceberg view when listing tables, return empty list to avoid the
-    // unexpected exception.
+    // Trino try to list Iceberg view when listing tables in some version, return empty list to
+    // avoid the unexpected exception.
     if (!(catalog instanceof ViewCatalog)) {
       return ListTablesResponse.builder().build();
     }
