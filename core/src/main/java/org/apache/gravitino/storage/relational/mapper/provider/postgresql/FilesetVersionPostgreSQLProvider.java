@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.FilesetVersionMappe
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.ibatis.annotations.Param;
 
 public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvider {
   @Override
@@ -58,6 +59,16 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String deleteFilesetVersionsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + VERSION_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + VERSION_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 
   @Override

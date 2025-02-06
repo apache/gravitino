@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TA
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   @Override
@@ -80,5 +81,14 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+  }
+
+  public String deleteSchemaMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE schema_id IN (SELECT schema_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }
