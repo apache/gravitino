@@ -26,8 +26,10 @@ import org.apache.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public abstract class TagPreEvent extends PreEvent {
   /**
-   * @param user
-   * @param identifier
+   * Constructs a new {@code TagPreEvent} instance.
+   *
+   * @param user The user who initiated the tag operation.
+   * @param identifier The identifier of the tag involved in the operation.
    */
   protected TagPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
