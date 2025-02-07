@@ -70,13 +70,17 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(())
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
+    async fn stat(&self, path: &Path, _kind: FileType) -> Result<FileStat> {
         self.file_map
             .read()
             .unwrap()
             .get(path)
             .map(|x| self.create_file_stat(path, x))
             .ok_or(Errno::from(libc::ENOENT))
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
+        self.stat(path, RegularFile).await
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
@@ -92,7 +96,7 @@ impl PathFileSystem for MemoryFileSystem {
     }
 
     async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let file_stat = self.stat(path).await?;
+        let file_stat = self.stat(path, RegularFile).await?;
         let mut opened_file = OpenedFile::new(file_stat);
         match opened_file.file_stat.kind {
             Directory => Ok(opened_file),

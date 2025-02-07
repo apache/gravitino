@@ -37,8 +37,6 @@ check_gvfs_fuse_ready() {
 }
 
 start_gvfs_fuse() {
-  MOUNT_DIR=$CLIENT_FUSE_DIR/target/gvfs
-
   umount $MOUNT_DIR > /dev/null 2>&1 || true
   if [ ! -d "$MOUNT_DIR" ]; then
     echo "Create the mount point"
