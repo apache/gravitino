@@ -40,7 +40,7 @@ pub(crate) enum Commands {
         )]
         fileset_location: String,
 
-        #[arg(short, long)]
+        #[arg(short, long, help = "Path to the configuration file")]
         config: Option<String>,
 
         #[arg(short, long, help = "Debug level", default_value_t = 0)]
