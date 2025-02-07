@@ -35,7 +35,9 @@ pub(crate) enum Commands {
         #[arg(help = "Mount point for the filesystem")]
         mount_point: String,
 
-        #[arg(help = "The URI of the GVFS fileset")]
+        #[arg(
+            help = "The URI of the GVFS fileset, like gvfs://fileset/my_catalog/my_schema/my_fileset"
+        )]
         fileset_location: String,
 
         #[arg(short, long)]
