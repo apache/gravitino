@@ -16,7 +16,7 @@
 # under the License.
 from typing import Optional, Dict, List
 
-from gravitino.api.fileset import Fileset
+from gravitino.api.file.fileset import Fileset
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.credential.credential import Credential
