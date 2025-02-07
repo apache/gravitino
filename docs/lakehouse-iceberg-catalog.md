@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.6.1`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
