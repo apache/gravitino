@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Arrays;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -34,14 +35,12 @@ public class MetalakeEnable extends Command {
   /**
    * Enable a metalake
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param enableAllCatalogs Whether to enable all catalogs.
    */
-  public MetalakeEnable(
-      String url, boolean ignoreVersions, String metalake, boolean enableAllCatalogs) {
-    super(url, ignoreVersions);
+  public MetalakeEnable(CommandContext context, String metalake, boolean enableAllCatalogs) {
+    super(context);
     this.metalake = metalake;
     this.enableAllCatalogs = enableAllCatalogs;
   }
@@ -67,6 +66,6 @@ public class MetalakeEnable extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(msgBuilder);
+    printInformation(msgBuilder.toString());
   }
 }

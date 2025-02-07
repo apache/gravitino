@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.MetalakeChange;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -33,14 +34,12 @@ public class RemoveMetalakeProperty extends Command {
   /**
    * Remove a property of a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    */
-  public RemoveMetalakeProperty(
-      String url, boolean ignoreVersions, String metalake, String property) {
-    super(url, ignoreVersions);
+  public RemoveMetalakeProperty(CommandContext context, String metalake, String property) {
+    super(context);
     this.metalake = metalake;
     this.property = property;
   }
@@ -58,7 +57,7 @@ public class RemoveMetalakeProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(property + " property removed.");
+    printInformation(property + " property removed.");
   }
 
   @Override

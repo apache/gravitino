@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,16 +36,13 @@ public class UpdateMetalakeName extends Command {
   /**
    * Update the name of a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The new metalake name.
    */
-  public UpdateMetalakeName(
-      String url, boolean ignoreVersions, boolean force, String metalake, String name) {
-    super(url, ignoreVersions);
-    this.force = force;
+  public UpdateMetalakeName(CommandContext context, String metalake, String name) {
+    super(context);
+    this.force = context.force();
     this.metalake = metalake;
     this.name = name;
   }
@@ -67,6 +65,6 @@ public class UpdateMetalakeName extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(metalake + " name changed.");
+    printInformation(metalake + " name changed.");
   }
 }

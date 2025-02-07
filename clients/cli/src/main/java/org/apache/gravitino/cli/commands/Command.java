@@ -23,6 +23,7 @@ import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
 import com.google.common.base.Joiner;
 import java.io.File;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
@@ -49,9 +50,24 @@ public abstract class Command {
   private static final String SIMPLE_AUTH = "simple";
   private static final String OAUTH_AUTH = "oauth";
   private static final String KERBEROS_AUTH = "kerberos";
+
   private final String url;
   private final boolean ignoreVersions;
   private final String outputFormat;
+
+  protected CommandContext context = null; // TODO make final
+
+  /**
+   * Command constructor.
+   *
+   * @param context The command context.
+   */
+  public Command(CommandContext context) {
+    this.context = context;
+    this.url = context.url();
+    this.ignoreVersions = context.ignoreVersions();
+    this.outputFormat = context.outputFormat();
+  }
 
   /**
    * Command constructor.
@@ -86,6 +102,25 @@ public abstract class Command {
   public void exitWithError(String error) {
     System.err.println(error);
     Main.exit(-1);
+  }
+
+  /**
+   * Prints out an informational message, often to indicate a command has finished.
+   *
+   * @param message The message to display.
+   */
+  public void printInformation(String message) {
+    // so that future outoput could be suppressed
+    System.out.print(message);
+  }
+
+  /**
+   * Prints out an a results of a command.
+   *
+   * @param results The results to display.
+   */
+  public void printResults(String results) {
+    System.out.print(results);
   }
 
   /**

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -30,12 +31,11 @@ public class MetalakeDisable extends Command {
   /**
    * Disable metalake
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    */
-  public MetalakeDisable(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public MetalakeDisable(CommandContext context, String metalake) {
+    super(context);
     this.metalake = metalake;
   }
 
@@ -51,6 +51,6 @@ public class MetalakeDisable extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(metalake + " has been disabled.");
+    printInformation(metalake + " has been disabled.");
   }
 }
