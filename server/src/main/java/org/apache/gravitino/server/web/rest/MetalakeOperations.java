@@ -51,8 +51,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
@@ -137,9 +135,7 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            Metalake metalake =
-                TreeLockUtils.doWithTreeLock(
-                    identifier, LockType.READ, () -> metalakeDispatcher.loadMetalake(identifier));
+            Metalake metalake = metalakeDispatcher.loadMetalake(identifier);
             Response response = Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
             LOG.info("Metalake loaded: {}", metalake.name());
             return response;

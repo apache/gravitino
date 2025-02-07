@@ -340,24 +340,22 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
-    return TreeLockUtils.doWithTreeLock(
-        metalakeIdent,
-        LockType.READ,
-        () -> {
-          checkMetalake(metalakeIdent, store);
-          try {
-            List<CatalogEntity> catalogEntities =
-                store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
-
-            return catalogEntities.stream()
-                .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
-                .toArray(Catalog[]::new);
-
-          } catch (IOException ioe) {
-            LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    try {
+      List<CatalogEntity> catalogEntities =
+          TreeLockUtils.doWithTreeLock(
+              metalakeIdent,
+              LockType.READ,
+              () -> {
+                checkMetalake(metalakeIdent, store);
+                return store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
+              });
+      return catalogEntities.stream()
+          .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
+          .toArray(Catalog[]::new);
+    } catch (IOException ioe) {
+      LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   /**
@@ -370,7 +368,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-
     return TreeLockUtils.doWithTreeLock(
         ident,
         LockType.READ,
@@ -402,35 +399,34 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
+    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+    long uid = idGenerator.nextId();
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    Instant now = Instant.now();
+    String creator = PrincipalUtils.getCurrentPrincipal().getName();
+    CatalogEntity e =
+        CatalogEntity.builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withType(type)
+            .withProvider(provider)
+            .withComment(comment)
+            .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(creator)
+                    .withCreateTime(now)
+                    .withLastModifier(creator)
+                    .withLastModifiedTime(now)
+                    .build())
+            .build();
+
     return TreeLockUtils.doWithTreeLock(
         metalakeIdent,
         LockType.WRITE,
         () -> {
           checkMetalake(metalakeIdent, store);
-          Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
-
-          long uid = idGenerator.nextId();
-          StringIdentifier stringId = StringIdentifier.fromId(uid);
-          Instant now = Instant.now();
-          String creator = PrincipalUtils.getCurrentPrincipal().getName();
-          CatalogEntity e =
-              CatalogEntity.builder()
-                  .withId(uid)
-                  .withName(ident.name())
-                  .withNamespace(ident.namespace())
-                  .withType(type)
-                  .withProvider(provider)
-                  .withComment(comment)
-                  .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
-                  .withAuditInfo(
-                      AuditInfo.builder()
-                          .withCreator(creator)
-                          .withCreateTime(now)
-                          .withLastModifier(creator)
-                          .withLastModifiedTime(now)
-                          .build())
-                  .build();
-
           boolean needClean = true;
           try {
             store.put(e, false /* overwrite */);

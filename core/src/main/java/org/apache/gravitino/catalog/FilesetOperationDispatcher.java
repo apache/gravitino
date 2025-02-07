@@ -79,23 +79,22 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () -> {
-          Fileset fileset =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
-                  NoSuchFilesetException.class);
-          // Currently we only support maintaining the Fileset in the Gravitino's store.
-          return EntityCombinedFileset.of(fileset)
-              .withHiddenProperties(
-                  getHiddenPropertyNames(
-                      catalogIdent,
-                      HasPropertyMetadata::filesetPropertiesMetadata,
-                      fileset.properties()));
-        });
+    Fileset fileset =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+                    NoSuchFilesetException.class));
+    // Currently we only support maintaining the Fileset in the Gravitino's store.
+    return EntityCombinedFileset.of(fileset)
+        .withHiddenProperties(
+            getHiddenPropertyNames(
+                catalogIdent,
+                HasPropertyMetadata::filesetPropertiesMetadata,
+                fileset.properties()));
   }
 
   /**
@@ -124,42 +123,40 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    doWithCatalog(
+        catalogIdent,
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  validatePropertyForCreate(p.filesetPropertiesMetadata(), properties);
+                  return null;
+                }),
+        IllegalArgumentException.class);
+    long uid = idGenerator.nextId();
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    Map<String, String> updatedProperties =
+        StringIdentifier.newPropertiesWithId(stringId, properties);
 
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> {
-          doWithCatalog(
-              catalogIdent,
-              c ->
-                  c.doWithPropertiesMeta(
-                      p -> {
-                        validatePropertyForCreate(p.filesetPropertiesMetadata(), properties);
-                        return null;
-                      }),
-              IllegalArgumentException.class);
-          long uid = idGenerator.nextId();
-          StringIdentifier stringId = StringIdentifier.fromId(uid);
-          Map<String, String> updatedProperties =
-              StringIdentifier.newPropertiesWithId(stringId, properties);
-
-          Fileset createdFileset =
-              doWithCatalog(
-                  catalogIdent,
-                  c ->
-                      c.doWithFilesetOps(
-                          f ->
-                              f.createFileset(
-                                  ident, comment, type, storageLocation, updatedProperties)),
-                  NoSuchSchemaException.class,
-                  FilesetAlreadyExistsException.class);
-          return EntityCombinedFileset.of(createdFileset)
-              .withHiddenProperties(
-                  getHiddenPropertyNames(
-                      catalogIdent,
-                      HasPropertyMetadata::filesetPropertiesMetadata,
-                      createdFileset.properties()));
-        });
+    Fileset createdFileset =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(ident.namespace().levels()),
+            LockType.WRITE,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c ->
+                        c.doWithFilesetOps(
+                            f ->
+                                f.createFileset(
+                                    ident, comment, type, storageLocation, updatedProperties)),
+                    NoSuchSchemaException.class,
+                    FilesetAlreadyExistsException.class));
+    return EntityCombinedFileset.of(createdFileset)
+        .withHiddenProperties(
+            getHiddenPropertyNames(
+                catalogIdent,
+                HasPropertyMetadata::filesetPropertiesMetadata,
+                createdFileset.properties()));
   }
 
   /**
@@ -180,26 +177,26 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> {
-          validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
+    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          Fileset alteredFileset =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
-                  NoSuchFilesetException.class,
-                  IllegalArgumentException.class);
-          return EntityCombinedFileset.of(alteredFileset)
-              .withHiddenProperties(
-                  getHiddenPropertyNames(
-                      catalogIdent,
-                      HasPropertyMetadata::filesetPropertiesMetadata,
-                      alteredFileset.properties()));
-        });
+    Fileset alteredFileset =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(ident.namespace().levels()),
+            LockType.WRITE,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
+                    NoSuchFilesetException.class,
+                    IllegalArgumentException.class));
+
+    return EntityCombinedFileset.of(alteredFileset)
+        .withHiddenProperties(
+            getHiddenPropertyNames(
+                catalogIdent,
+                HasPropertyMetadata::filesetPropertiesMetadata,
+                alteredFileset.properties()));
   }
 
   /**

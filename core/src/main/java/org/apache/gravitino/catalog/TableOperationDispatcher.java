@@ -197,11 +197,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ident.namespace().levels()),
         LockType.WRITE,
         () -> {
-          validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           Table alteredTable =
               doWithCatalog(
@@ -333,11 +333,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     return TreeLockUtils.doWithTreeLock(
         schemaIdentifier,
         LockType.WRITE,
         () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -355,7 +355,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // catalog into account.
           //
           // For managed table, we should take the return value of the store operation into account.
-          boolean droppedFromStore = false;
+          boolean droppedFromStore;
           try {
             droppedFromStore = store.delete(ident, TABLE);
           } catch (NoSuchEntityException e) {

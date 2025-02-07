@@ -130,56 +130,53 @@ public class OwnerManager {
 
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    OwnerImpl owner = new OwnerImpl();
+    try {
+      List<? extends Entity> entities =
+          TreeLockUtils.doWithTreeLock(
+              ident,
+              LockType.READ,
+              () ->
+                  store
+                      .relationOperations()
+                      .listEntitiesByRelation(
+                          SupportsRelationOperations.Type.OWNER_REL,
+                          ident,
+                          MetadataObjectUtil.toEntityType(metadataObject)));
 
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () -> {
-          try {
-            OwnerImpl owner = new OwnerImpl();
-            List<? extends Entity> entities =
-                store
-                    .relationOperations()
-                    .listEntitiesByRelation(
-                        SupportsRelationOperations.Type.OWNER_REL,
-                        ident,
-                        MetadataObjectUtil.toEntityType(metadataObject));
+      if (entities.isEmpty()) {
+        return Optional.empty();
+      }
 
-            if (entities.isEmpty()) {
-              return Optional.empty();
-            }
+      if (entities.size() != 1) {
+        throw new IllegalStateException(
+            String.format("The number of the owner %s must be 1", metadataObject.fullName()));
+      }
 
-            if (entities.size() != 1) {
-              throw new IllegalStateException(
-                  String.format("The number of the owner %s must be 1", metadataObject.fullName()));
-            }
+      Entity entity = entities.get(0);
+      if (!(entity instanceof UserEntity) && !(entity instanceof GroupEntity)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Doesn't support owner entity class %s", entities.get(0).getClass().getName()));
+      }
 
-            Entity entity = entities.get(0);
-            if (!(entity instanceof UserEntity) && !(entity instanceof GroupEntity)) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Doesn't support owner entity class %s",
-                      entities.get(0).getClass().getName()));
-            }
-
-            if (entities.get(0) instanceof UserEntity) {
-              UserEntity user = (UserEntity) entities.get(0);
-              owner.name = user.name();
-              owner.type = Owner.Type.USER;
-            } else if (entities.get(0) instanceof GroupEntity) {
-              GroupEntity group = (GroupEntity) entities.get(0);
-              owner.name = group.name();
-              owner.type = Owner.Type.GROUP;
-            }
-            return Optional.of(owner);
-          } catch (NoSuchEntityException nse) {
-            throw new NoSuchMetadataObjectException(
-                "The metadata object of %s isn't found", metadataObject.fullName());
-          } catch (IOException ioe) {
-            LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+      if (entities.get(0) instanceof UserEntity) {
+        UserEntity user = (UserEntity) entities.get(0);
+        owner.name = user.name();
+        owner.type = Owner.Type.USER;
+      } else if (entities.get(0) instanceof GroupEntity) {
+        GroupEntity group = (GroupEntity) entities.get(0);
+        owner.name = group.name();
+        owner.type = Owner.Type.GROUP;
+      }
+      return Optional.of(owner);
+    } catch (NoSuchEntityException nse) {
+      throw new NoSuchMetadataObjectException(
+          "The metadata object of %s isn't found", metadataObject.fullName());
+    } catch (IOException ioe) {
+      LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   private static class OwnerImpl implements Owner {

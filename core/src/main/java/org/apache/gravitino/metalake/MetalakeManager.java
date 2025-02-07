@@ -123,20 +123,20 @@ public class MetalakeManager implements MetalakeDispatcher {
    */
   @Override
   public BaseMetalake[] listMetalakes() {
-    return TreeLockUtils.doWithRootTreeLock(
-        LockType.READ,
-        () -> {
-          try {
-            return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
-                .map(this::newMetalakeWithResolvedProperties)
-                .toArray(BaseMetalake[]::new);
-          } catch (IOException ioe) {
-            LOG.error("Listing Metalakes failed due to storage issues.", ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
-  }
+    try {
+      List<BaseMetalake> metalakes =
+          TreeLockUtils.doWithRootTreeLock(
+              LockType.READ,
+              () -> store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE));
 
+      return metalakes.stream()
+          .map(this::newMetalakeWithResolvedProperties)
+          .toArray(BaseMetalake[]::new);
+    } catch (IOException ioe) {
+      LOG.error("Listing Metalakes failed due to storage issues", ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
   /**
    * Loads a Metalake.
    *
@@ -148,8 +148,12 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
-      return newMetalakeWithResolvedProperties(
-          store.get(ident, EntityType.METALAKE, BaseMetalake.class));
+      BaseMetalake baseMetalake =
+          TreeLockUtils.doWithTreeLock(
+              ident,
+              LockType.READ,
+              () -> store.get(ident, EntityType.METALAKE, BaseMetalake.class));
+      return newMetalakeWithResolvedProperties(baseMetalake);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
