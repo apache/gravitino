@@ -24,6 +24,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
+// FuseConfig
 pub(crate) const CONF_FUSE_FILE_MASK: ConfigEntity<u32> = ConfigEntity::new(
     FuseConfig::MODULE_NAME,
     "file_mask",
@@ -45,13 +46,28 @@ pub(crate) const CONF_FUSE_FS_TYPE: ConfigEntity<&'static str> = ConfigEntity::n
     "memory",
 );
 
-pub(crate) const CONF_FUSE_CONFIG_PATH: ConfigEntity<&'static str> = ConfigEntity::new(
+pub(crate) const CONF_FUSE_CONFIG_FILE_PATH: ConfigEntity<&'static str> = ConfigEntity::new(
     FuseConfig::MODULE_NAME,
     "config_path",
     "The path of the FUSE configuration file",
-    "/etc/gvfs/gvfs.toml",
+    "/etc/gvfs-fuse/config.toml",
 );
 
+pub(crate) const CONF_FUSE_DATA_DIR: ConfigEntity<&'static str> = ConfigEntity::new(
+    FuseConfig::MODULE_NAME,
+    "data_dir",
+    "The data path of GVFS FUSE",
+    "/var/data/gvfs-fuse",
+);
+
+pub(crate) const CONF_FUSE_LOG_DIR: ConfigEntity<&'static str> = ConfigEntity::new(
+    FuseConfig::MODULE_NAME,
+    "log_dir",
+    "The log path of GVFS FUSE",
+    "logs", //relative to the data path
+);
+
+// FilesystemConfig
 pub(crate) const CONF_FILESYSTEM_BLOCK_SIZE: ConfigEntity<u32> = ConfigEntity::new(
     FilesystemConfig::MODULE_NAME,
     "block_size",
@@ -59,6 +75,7 @@ pub(crate) const CONF_FILESYSTEM_BLOCK_SIZE: ConfigEntity<u32> = ConfigEntity::n
     4096,
 );
 
+// GravitinoConfig
 pub(crate) const CONF_GRAVITINO_URI: ConfigEntity<&'static str> = ConfigEntity::new(
     GravitinoConfig::MODULE_NAME,
     "uri",
@@ -125,9 +142,23 @@ impl Default for DefaultConfig {
             ConfigValue::String(CONF_FUSE_FS_TYPE),
         );
         configs.insert(
-            Self::compose_key(CONF_FUSE_CONFIG_PATH),
-            ConfigValue::String(CONF_FUSE_CONFIG_PATH),
+            Self::compose_key(CONF_FUSE_CONFIG_FILE_PATH),
+            ConfigValue::String(CONF_FUSE_CONFIG_FILE_PATH),
         );
+        configs.insert(
+            Self::compose_key(CONF_FUSE_DATA_DIR),
+            ConfigValue::String(CONF_FUSE_DATA_DIR),
+        );
+        configs.insert(
+            Self::compose_key(CONF_FUSE_LOG_DIR),
+            ConfigValue::String(CONF_FUSE_LOG_DIR),
+        );
+
+        configs.insert(
+            Self::compose_key(CONF_FILESYSTEM_BLOCK_SIZE),
+            ConfigValue::U32(CONF_FILESYSTEM_BLOCK_SIZE),
+        );
+
         configs.insert(
             Self::compose_key(CONF_GRAVITINO_URI),
             ConfigValue::String(CONF_GRAVITINO_URI),
@@ -135,10 +166,6 @@ impl Default for DefaultConfig {
         configs.insert(
             Self::compose_key(CONF_GRAVITINO_METALAKE),
             ConfigValue::String(CONF_GRAVITINO_METALAKE),
-        );
-        configs.insert(
-            Self::compose_key(CONF_FILESYSTEM_BLOCK_SIZE),
-            ConfigValue::U32(CONF_FILESYSTEM_BLOCK_SIZE),
         );
 
         DefaultConfig { configs }
@@ -205,38 +232,39 @@ impl AppConfig {
             .unwrap_or_else(|e| panic!("Failed to set default for {}: {}", entity.name, e))
     }
 
-    pub fn from_file(config_file_path: Option<&str>) -> GvfsResult<AppConfig> {
+    pub fn from_file(config_file_path: Option<String>) -> GvfsResult<AppConfig> {
         let builder = Self::crete_default_config_builder();
 
         let config_path = {
             if config_file_path.is_some() {
                 let path = config_file_path.unwrap();
                 //check config file exists
-                if fs::metadata(path).is_err() {
+                if fs::metadata(&path).is_err() {
                     return Err(
                         ConfigNotFound.to_error("The configuration file not found".to_string())
                     );
                 }
-                info!("Use configuration file: {}", path);
+                info!("Use configuration file: {}", &path);
                 path
             } else {
-                //use default config
-                if fs::metadata(CONF_FUSE_CONFIG_PATH.default).is_err() {
+                if fs::metadata(CONF_FUSE_CONFIG_FILE_PATH.default).is_err() {
+                    //use default config
                     warn!(
                         "The default configuration file is not found, using the default configuration"
                     );
                     return Ok(AppConfig::default());
                 } else {
+                    //use the default configuration file
                     warn!(
                         "Using the default config file {}",
-                        CONF_FUSE_CONFIG_PATH.default
+                        CONF_FUSE_CONFIG_FILE_PATH.default
                     );
                 }
-                CONF_FUSE_CONFIG_PATH.default
+                CONF_FUSE_CONFIG_FILE_PATH.default.to_string()
             }
         };
         let config = builder
-            .add_source(config::File::with_name(config_path).required(true))
+            .add_source(config::File::with_name(&config_path).required(true))
             .build();
         if let Err(e) = config {
             let msg = format!("Failed to build configuration: {}", e);
@@ -265,7 +293,11 @@ pub struct FuseConfig {
     #[serde(default)]
     pub fs_type: String,
     #[serde(default)]
-    pub config_path: String,
+    pub config_file_path: String,
+    #[serde(default)]
+    pub data_dir: String,
+    #[serde(default)]
+    pub log_dir: String,
     #[serde(default)]
     pub properties: HashMap<String, String>,
 }
@@ -302,9 +334,11 @@ mod test {
 
     #[test]
     fn test_config_from_file() {
-        let config = AppConfig::from_file(Some("tests/conf/config_test.toml")).unwrap();
+        let config = AppConfig::from_file(Some("tests/conf/config_test.toml".to_string())).unwrap();
         assert_eq!(config.fuse.file_mask, 0o644);
         assert_eq!(config.fuse.dir_mask, 0o755);
+        assert_eq!(config.fuse.data_dir, "/target/gvfs-fuse");
+        assert_eq!(config.fuse.log_dir, "/target/gvfs-fuse/logs");
         assert_eq!(config.filesystem.block_size, 8192);
         assert_eq!(config.gravitino.uri, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "test");
@@ -323,6 +357,8 @@ mod test {
         let config = AppConfig::default();
         assert_eq!(config.fuse.file_mask, 0o600);
         assert_eq!(config.fuse.dir_mask, 0o700);
+        assert_eq!(config.fuse.data_dir, "/var/data/gvfs-fuse");
+        assert_eq!(config.fuse.log_dir, "logs");
         assert_eq!(config.filesystem.block_size, 4096);
         assert_eq!(config.gravitino.uri, "http://localhost:8090");
         assert_eq!(config.gravitino.metalake, "");
