@@ -191,6 +191,9 @@ allprojects {
         param.environment("NEED_CREATE_DOCKER_NETWORK", "true")
       }
 
+      val icebergVersion: String = libs.versions.iceberg.get()
+      param.systemProperty("ICEBERG_VERSION", icebergVersion)
+
       // Change poll image pause time from 30s to 60s
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
       val jdbcDatabase = project.properties["jdbcBackend"] as? String ?: "h2"

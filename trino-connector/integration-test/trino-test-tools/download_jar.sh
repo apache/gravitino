@@ -62,8 +62,8 @@ download_postgresql_jar() {
 }
 
 download_iceberg_aws_bundle() {
-  download_jar "iceberg-aws-bundle--1.5.2.jar" \
-  "https://jdbc.postgresql.org/download/iceberg-aws-bundle--1.5.2.jar" \
+  download_jar "iceberg-aws-bundle-1.6.1.jar" \
+  "https://jdbc.postgresql.org/download/iceberg-aws-bundle-1.6.1.jar" \
   "$GRAVITINO_SERVER_DIR/catalogs/lakehouse-iceberg/libs"
 }
 

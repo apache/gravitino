@@ -35,6 +35,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 // You should export GRAVITINO_GCS_BUCKET and GOOGLE_APPLICATION_CREDENTIALS to run the test
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
 public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
+
   private String gcsWarehouse;
   private String gcsCredentialPath;
 
@@ -92,10 +93,11 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
   }
 
   private void downloadIcebergBundleJar() throws IOException {
-    String icebergBundleJarName = "iceberg-gcp-bundle-1.5.2.jar";
     String icebergBundleJarUri =
-        "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/1.5.2/"
-            + icebergBundleJarName;
+        String.format(
+            "https://repo1.maven.org/maven2/org/apache/iceberg/"
+                + "iceberg-gcp-bundle/%s/iceberg-gcp-bundle-%s.jar",
+            ITUtils.icebergVersion(), ITUtils.icebergVersion());
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);

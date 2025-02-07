@@ -115,7 +115,10 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn init(&self) -> Result<()>;
 
     /// Get the file stat by file path, if the file exists, return the file stat
-    async fn stat(&self, path: &Path) -> Result<FileStat>;
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat>;
+
+    /// Lookup the file stat by file path, if the file exists, return the file stat
+    async fn lookup(&self, path: &Path) -> Result<FileStat>;
 
     /// Read the directory by file path, if the directory exists, return the file stat list
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>>;
@@ -318,7 +321,7 @@ pub(crate) mod tests {
 
         pub(crate) async fn test_path_file_system(&mut self) {
             // test root dir
-            let resutl = self.fs.stat(Path::new("/")).await;
+            let resutl = self.fs.stat(Path::new("/"), Directory).await;
             assert!(resutl.is_ok());
             let root_file_stat = resutl.unwrap();
             self.assert_file_stat(&root_file_stat, Path::new("/"), Directory, 0);
@@ -347,7 +350,7 @@ pub(crate) mod tests {
         }
 
         async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
-            let file_stat = self.fs.stat(path).await;
+            let file_stat = self.fs.stat(path, expect_kind).await;
             assert!(file_stat.is_ok());
             let file_stat = file_stat.unwrap();
             self.assert_file_stat(&file_stat, path, expect_kind, expect_size);
@@ -403,7 +406,7 @@ pub(crate) mod tests {
         }
 
         async fn test_file_not_found(&self, path: &Path) {
-            let not_found_file = self.fs.stat(path).await;
+            let not_found_file = self.fs.stat(path, RegularFile).await;
             assert!(not_found_file.is_err());
         }
 
