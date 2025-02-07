@@ -77,15 +77,15 @@ use tracing::{debug, error};
 ///     * (`debug`, custom_format_fn) - Combines Debug output with custom formatted output
 ///     * `stream` - Special handling for directory streams (only for "readdir"/"readdirplus")
 macro_rules! log_result {
-   // No reply printing
-   ($method_call:expr, $method_name:expr, $req:ident) => {
+    // No reply printing
+    ($method_call:expr, $method_name:expr, $req:ident) => {
         match $method_call.await {
             Ok(reply) => {
-                debug!($req.unique, concat!($method_name, " completed"));
+                debug!($req.unique, "{} completed", $method_name.to_uppercase());
                 Ok(reply)
             }
             Err(e) => {
-                error!($req.unique, ?e, concat!($method_name, " failed"));
+                error!($req.unique, ?e, "{} failed", $method_name.to_uppercase());
                 Err(e)
             }
         }
@@ -95,11 +95,16 @@ macro_rules! log_result {
     ($method_call:expr, $method_name:expr, $req:ident, debug) => {
         match $method_call.await {
             Ok(reply) => {
-                debug!($req.unique, ?reply, concat!($method_name, " completed"));
+                debug!(
+                    $req.unique,
+                    ?reply,
+                    "{} completed",
+                    $method_name.to_uppercase()
+                );
                 Ok(reply)
             }
             Err(e) => {
-                error!($req.unique, ?e, concat!($method_name, " failed"));
+                error!($req.unique, ?e, "{} failed", $method_name.to_uppercase());
                 Err(e)
             }
         }
@@ -122,7 +127,8 @@ macro_rules! log_result {
                     }
                 }
 
-                let entries_info = format!("[{}]",
+                let entries_info = format!(
+                    "[{}]",
                     entries
                         .iter()
                         .map(|entry| directory_entry_to_desc_str(entry))
@@ -130,18 +136,14 @@ macro_rules! log_result {
                         .join(", ")
                 );
 
-                debug!(
-                    $req.unique,
-                    entries = entries_info,
-                    "readdir completed"
-                );
+                debug!($req.unique, entries = entries_info, "READDIR completed");
 
                 Ok(ReplyDirectory {
                     entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
                 })
             }
             Err(e) => {
-                error!($req.unique, ?e, "readdir failed");
+                error!($req.unique, ?e, "READDIR failed");
                 Err(e)
             }
         }
@@ -164,7 +166,8 @@ macro_rules! log_result {
                     }
                 }
 
-                let entries_info = format!("[{}]",
+                let entries_info = format!(
+                    "[{}]",
                     entries
                         .iter()
                         .map(|entry| directory_entry_plus_to_desc_str(entry))
@@ -172,37 +175,34 @@ macro_rules! log_result {
                         .join(", ")
                 );
 
-                debug!(
-                    $req.unique,
-                    entries = entries_info,
-                    "readdirplus completed"
-                );
+                debug!($req.unique, entries = entries_info, "READDIRPLUS completed");
 
                 Ok(ReplyDirectoryPlus {
                     entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
                 })
             }
             Err(e) => {
-                error!($req.unique, ?e, "readdirplus failed");
+                error!($req.unique, ?e, "READDIRPLUS failed");
                 Err(e)
             }
         }
     }};
 
-	// For debug and custom formatting
+    // For debug and custom formatting
     ($method_call:expr, $method_name:expr, $req:ident, debug, $format_reply_fn:ident) => {
         match $method_call.await {
             Ok(reply) => {
                 debug!(
                     $req.unique,
                     ?reply,
-                    reply_formatted = %$format_reply_fn(&reply),
-                    concat!($method_name, " completed")
+                    reply_formatted = $format_reply_fn(&reply),
+                    "{} completed",
+                    $method_name.to_uppercase()
                 );
                 Ok(reply)
             }
             Err(e) => {
-                error!($req.unique, ?e, concat!($method_name, " failed"));
+                error!($req.unique, ?e, "{} failed", $method_name.to_uppercase());
                 Err(e)
             }
         }
@@ -372,14 +372,14 @@ impl<T: RawFileSystem> FuseApiHandleDebug<T> {
 
 impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     async fn init(&self, req: Request) -> fuse3::Result<ReplyInit> {
-        debug!(req.unique, ?req, "init");
+        debug!(req.unique, ?req, "INIT");
         log_result!(self.inner.init(req), "init", req, debug)
     }
 
     async fn destroy(&self, req: Request) {
-        debug!(req.unique, ?req, "destroy started");
+        debug!(req.unique, ?req, "DESTROY started");
         self.inner.destroy(req).await;
-        debug!(req.unique, "destroy completed");
+        debug!(req.unique, "DESTROY completed");
     }
 
     async fn lookup(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<ReplyEntry> {
@@ -391,7 +391,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
 
         log_result!(
             self.inner.lookup(req, parent, name),
-            "LOOKUP",
+            "lookup",
             req,
             debug,
             reply_entry_to_desc_str
@@ -423,7 +423,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
 
         log_result!(
             self.inner.getattr(req, inode, fh, flags),
-            "GETATTR",
+            "getattr",
             req,
             debug,
             reply_attr_to_desc_str
@@ -441,11 +441,11 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, "filename" = ?stat.name, ?fh, ?set_attr, "setattr started");
+        debug!(req.unique, ?req, "filename" = ?stat.name, ?fh, ?set_attr, "SETATTR started");
 
         log_result!(
             self.inner.setattr(req, inode, fh, set_attr),
-            "setattr",
+            "SETATTR",
             req,
             debug,
             reply_attr_to_desc_str
@@ -471,7 +471,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             ?name,
             mode,
             umask,
-            "mkdir started"
+            "MKDIR started"
         );
 
         log_result!(
@@ -488,7 +488,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, parent = ?parent_stat.name, ?name, "unlink started");
+        debug!(req.unique, ?req, parent = ?parent_stat.name, ?name, "UNLINK started");
 
         log_result!(self.inner.unlink(req, parent, name), "unlink", req)
     }
@@ -498,7 +498,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, parent = ?parent_stat.name, ?name, "rmdir started");
+        debug!(req.unique, ?req, parent = ?parent_stat.name, ?name, "RMDIR started");
 
         log_result!(self.inner.rmdir(req, parent, name), "rmdir", req)
     }
@@ -508,7 +508,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, "filename" = ?stat.name, ?flags, "open started");
+        debug!(req.unique, ?req, "filename" = ?stat.name, ?flags, "OPEN started");
 
         log_result!(self.inner.open(req, inode, flags), "open", req, debug)
     }
@@ -561,7 +561,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             data_len = data.len(),
             ?write_flags,
             ?flags,
-            "write started"
+            "WRITE started"
         );
 
         log_result!(
@@ -577,7 +577,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, "filename" = ?stat.name, "statfs started");
+        debug!(req.unique, ?req, "filename" = ?stat.name, "STATFS started");
 
         log_result!(self.inner.statfs(req, inode), "statfs", req, debug)
     }
@@ -603,7 +603,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             ?flags,
             ?lock_owner,
             ?flush,
-            "release started"
+            "RELEASE started"
         );
 
         log_result!(
@@ -618,7 +618,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, "dirname" = ?stat.name, ?flags, "opendir started");
+        debug!(req.unique, ?req, "dirname" = ?stat.name, ?flags, "OPENDIR started");
 
         log_result!(self.inner.opendir(req, inode, flags), "opendir", req, debug)
     }
@@ -643,7 +643,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             parent = ?parent_path_name,
             ?fh,
             ?offset,
-            "readdir started"
+            "READDIR started"
         );
 
         log_result!(
@@ -665,7 +665,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             .inner
             .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
             .await?;
-        debug!(req.unique, ?req, "dirname" = ?stat.name, ?fh, ?flags, "releasedir started");
+        debug!(req.unique, ?req, "dirname" = ?stat.name, ?fh, ?flags, "RELEASEDIR started");
 
         log_result!(
             self.inner.releasedir(req, inode, fh, flags),
@@ -694,7 +694,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "filename" = ?name,
             ?mode,
             ?flags,
-            "create started"
+            "CREATE started"
         );
 
         log_result!(
