@@ -97,7 +97,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
     resp.validate();
 
-    return new GenericModel(resp.getModel());
+    return new GenericModel(resp.getModel(), restClient, modelFullNs);
   }
 
   @Override
@@ -118,7 +118,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
 
     resp.validate();
-    return new GenericModel(resp.getModel());
+    return new GenericModel(resp.getModel(), restClient, modelFullNs);
   }
 
   @Override

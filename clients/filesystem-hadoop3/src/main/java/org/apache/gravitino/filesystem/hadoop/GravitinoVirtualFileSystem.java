@@ -322,8 +322,10 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 return provider.getFileSystem(filePath, totalProperty);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
+                    ioe,
                     "Exception occurs when create new FileSystem for actual uri: %s, msg: %s",
-                    uri, ioe);
+                    uri,
+                    ioe.getMessage());
               }
             });
 

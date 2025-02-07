@@ -115,7 +115,10 @@ pub(crate) trait PathFileSystem: Send + Sync {
     async fn init(&self) -> Result<()>;
 
     /// Get the file stat by file path, if the file exists, return the file stat
-    async fn stat(&self, path: &Path) -> Result<FileStat>;
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat>;
+
+    /// Lookup the file stat by file path, if the file exists, return the file stat
+    async fn lookup(&self, path: &Path) -> Result<FileStat>;
 
     /// Read the directory by file path, if the directory exists, return the file stat list
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>>;
@@ -297,7 +300,7 @@ pub trait FileWriter: Sync + Send {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use libc::{O_APPEND, O_CREAT, O_RDONLY};
+    use libc::{O_CREAT, O_RDONLY, O_WRONLY};
     use std::collections::HashMap;
     use std::path::Component;
 
@@ -318,7 +321,7 @@ pub(crate) mod tests {
 
         pub(crate) async fn test_path_file_system(&mut self) {
             // test root dir
-            let resutl = self.fs.stat(Path::new("/")).await;
+            let resutl = self.fs.stat(Path::new("/"), Directory).await;
             assert!(resutl.is_ok());
             let root_file_stat = resutl.unwrap();
             self.assert_file_stat(&root_file_stat, Path::new("/"), Directory, 0);
@@ -347,7 +350,7 @@ pub(crate) mod tests {
         }
 
         async fn test_stat_file(&mut self, path: &Path, expect_kind: FileType, expect_size: u64) {
-            let file_stat = self.fs.stat(path).await;
+            let file_stat = self.fs.stat(path, expect_kind).await;
             assert!(file_stat.is_ok());
             let file_stat = file_stat.unwrap();
             self.assert_file_stat(&file_stat, path, expect_kind, expect_size);
@@ -403,7 +406,7 @@ pub(crate) mod tests {
         }
 
         async fn test_file_not_found(&self, path: &Path) {
-            let not_found_file = self.fs.stat(path).await;
+            let not_found_file = self.fs.stat(path, RegularFile).await;
             assert!(not_found_file.is_err());
         }
 
@@ -461,7 +464,11 @@ pub(crate) mod tests {
 
             // Test create file
             let file_handle = self
-                .test_create_file(parent_file_id, "file1.txt".as_ref())
+                .test_create_file(
+                    parent_file_id,
+                    "file1.txt".as_ref(),
+                    (O_CREAT | O_WRONLY) as u32,
+                )
                 .await;
 
             // Test write file
@@ -545,11 +552,13 @@ pub(crate) mod tests {
             self.files.insert(file_stat.file_id, file_stat);
         }
 
-        async fn test_create_file(&mut self, root_file_id: u64, name: &OsStr) -> FileHandle {
-            let file = self
-                .fs
-                .create_file(root_file_id, name, (O_CREAT | O_APPEND) as u32)
-                .await;
+        async fn test_create_file(
+            &mut self,
+            root_file_id: u64,
+            name: &OsStr,
+            flags: u32,
+        ) -> FileHandle {
+            let file = self.fs.create_file(root_file_id, name, flags).await;
             assert!(file.is_ok());
             let file = file.unwrap();
             assert!(file.handle_id > 0);

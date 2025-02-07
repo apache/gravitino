@@ -37,6 +37,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -59,6 +60,10 @@ public class TagIT extends BaseIT {
   private static Catalog relationalCatalog;
   private static Schema schema;
   private static Table table;
+
+  private static Catalog modelCatalog;
+  private static Schema modelSchema;
+  private static Model model;
 
   private static Column column;
 
@@ -108,6 +113,29 @@ public class TagIT extends BaseIT {
                 "comment",
                 Collections.emptyMap());
     column = Arrays.stream(table.columns()).filter(c -> c.name().equals("col1")).findFirst().get();
+
+    // Create model catalog
+    String modelCatalogName = GravitinoITUtils.genRandomName("tag_it_model_catalog");
+    Assertions.assertFalse(metalake.catalogExists(modelCatalogName));
+    modelCatalog =
+        metalake.createCatalog(
+            modelCatalogName, Catalog.Type.MODEL, "comment", Collections.emptyMap());
+
+    // Create model schema
+    String modelSchemaName = GravitinoITUtils.genRandomName("tag_it_model_schema");
+    Assertions.assertFalse(modelCatalog.asSchemas().schemaExists(modelSchemaName));
+    modelSchema =
+        modelCatalog.asSchemas().createSchema(modelSchemaName, "comment", Collections.emptyMap());
+
+    // Create model
+    String modelName = GravitinoITUtils.genRandomName("tag_it_model");
+    Assertions.assertFalse(
+        modelCatalog.asModelCatalog().modelExists(NameIdentifier.of(modelSchemaName, modelName)));
+    model =
+        modelCatalog
+            .asModelCatalog()
+            .registerModel(
+                NameIdentifier.of(modelSchemaName, modelName), "comment", Collections.emptyMap());
   }
 
   @AfterAll
@@ -115,6 +143,11 @@ public class TagIT extends BaseIT {
     relationalCatalog.asTableCatalog().dropTable(NameIdentifier.of(schema.name(), table.name()));
     relationalCatalog.asSchemas().dropSchema(schema.name(), true);
     metalake.dropCatalog(relationalCatalog.name(), true);
+
+    modelCatalog.asModelCatalog().deleteModel(NameIdentifier.of(modelSchema.name(), model.name()));
+    modelCatalog.asSchemas().dropSchema(modelSchema.name(), true);
+    metalake.dropCatalog(modelCatalog.name(), true);
+
     client.dropMetalake(metalakeName, true);
 
     if (client != null) {
@@ -652,5 +685,85 @@ public class TagIT extends BaseIT {
 
     String[] associatedTags1 = relationalCatalog.supportsTags().listTags();
     Assertions.assertArrayEquals(new String[] {tag2.name()}, associatedTags1);
+  }
+
+  @Test
+  public void testAssociateTagsToModel() {
+    Tag tag1 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_model_tag1"),
+            "comment1",
+            Collections.emptyMap());
+    Tag tag2 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_model_tag2"),
+            "comment2",
+            Collections.emptyMap());
+    Tag tag3 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_model_tag3"),
+            "comment3",
+            Collections.emptyMap());
+
+    // Associate tags to catalog
+    modelCatalog.supportsTags().associateTags(new String[] {tag1.name()}, null);
+
+    // Associate tags to schema
+    modelSchema.supportsTags().associateTags(new String[] {tag2.name()}, null);
+
+    // Associate tags to model
+    model.supportsTags().associateTags(new String[] {tag3.name()}, null);
+
+    // Test list associated tags for model
+    String[] tags1 = model.supportsTags().listTags();
+    Assertions.assertEquals(3, tags1.length);
+    Set<String> tagNames = Sets.newHashSet(tags1);
+    Assertions.assertTrue(tagNames.contains(tag1.name()));
+    Assertions.assertTrue(tagNames.contains(tag2.name()));
+    Assertions.assertTrue(tagNames.contains(tag3.name()));
+
+    // Test list associated tags with details for model
+    Tag[] tags2 = model.supportsTags().listTagsInfo();
+    Assertions.assertEquals(3, tags2.length);
+
+    Set<Tag> nonInheritedTags =
+        Arrays.stream(tags2).filter(tag -> !tag.inherited().get()).collect(Collectors.toSet());
+    Set<Tag> inheritedTags =
+        Arrays.stream(tags2).filter(tag -> tag.inherited().get()).collect(Collectors.toSet());
+
+    Assertions.assertEquals(1, nonInheritedTags.size());
+    Assertions.assertEquals(2, inheritedTags.size());
+    Assertions.assertTrue(nonInheritedTags.contains(tag3));
+    Assertions.assertTrue(inheritedTags.contains(tag1));
+    Assertions.assertTrue(inheritedTags.contains(tag2));
+
+    // Test get associated tag for model
+    Tag resultTag1 = model.supportsTags().getTag(tag1.name());
+    Assertions.assertEquals(tag1, resultTag1);
+    Assertions.assertTrue(resultTag1.inherited().get());
+
+    Tag resultTag2 = model.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2, resultTag2);
+    Assertions.assertTrue(resultTag2.inherited().get());
+
+    Tag resultTag3 = model.supportsTags().getTag(tag3.name());
+    Assertions.assertEquals(tag3, resultTag3);
+    Assertions.assertFalse(resultTag3.inherited().get());
+
+    // Test get objects associated with tag
+    Assertions.assertEquals(1, tag1.associatedObjects().count());
+    Assertions.assertEquals(modelCatalog.name(), tag1.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG, tag1.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, tag2.associatedObjects().count());
+    Assertions.assertEquals(modelSchema.name(), tag2.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.SCHEMA, tag2.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, tag3.associatedObjects().count());
+    Assertions.assertEquals(model.name(), tag3.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.MODEL, tag3.associatedObjects().objects()[0].type());
   }
 }

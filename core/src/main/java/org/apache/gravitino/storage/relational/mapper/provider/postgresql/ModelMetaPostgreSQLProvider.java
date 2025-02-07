@@ -83,4 +83,14 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
+
+  @Override
+  public String deleteModelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE model_id IN (SELECT model_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

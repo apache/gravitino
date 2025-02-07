@@ -97,6 +97,7 @@ import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RemoveTopicProperty;
+import org.apache.gravitino.cli.commands.RevokeAllPrivileges;
 import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
 import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
@@ -897,6 +898,11 @@ public class TestableCommandLine {
       FullName entity,
       String[] privileges) {
     return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+  }
+
+  protected RevokeAllPrivileges newRevokeAllPrivileges(
+      String url, boolean ignore, String metalake, String role, FullName entity) {
+    return new RevokeAllPrivileges(url, ignore, metalake, role, entity);
   }
 
   protected MetalakeEnable newMetalakeEnable(

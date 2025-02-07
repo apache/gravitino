@@ -87,4 +87,14 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " AND last_version = #{oldMetalakeMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
+
+  @Override
+  public String deleteMetalakeMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE metalake_id IN (SELECT metalake_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

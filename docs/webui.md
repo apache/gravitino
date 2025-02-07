@@ -680,7 +680,7 @@ Click on the `LINK VERSION` button displays the dialog to link a version.
 Link a version needs these fields:
 
 1. **URI**(**_required_**): the uri of the version.
-2. **Aliases**(**_required_**): the aliases of the version, aliase cannot be number or number string.
+2. **Aliases**(**_required_**): the aliases of the version, an alias cannot be a number or number string.
 3. **Comment**(_optional_): the comment of the model.
 4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 

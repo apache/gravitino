@@ -198,4 +198,14 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
         + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
   }
+
+  @Override
+  public String deleteTagEntityRelsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

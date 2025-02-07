@@ -25,6 +25,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserRoleRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
+import org.apache.ibatis.annotations.Param;
 
 public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   @Override
@@ -98,5 +99,15 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
         + " last_version = VALUES(last_version),"
         + " deleted_at = VALUES(deleted_at)"
         + "</script>";
+  }
+
+  @Override
+  public String deleteUserRoleRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }
