@@ -19,15 +19,9 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
-import com.google.common.collect.Maps;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
-import org.apache.paimon.catalog.FileSystemCatalogFactory;
 
 public class PaimonPropertiesConverter implements PropertiesConverter {
 
@@ -36,45 +30,23 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
   private PaimonPropertiesConverter() {}
 
   @Override
-  public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
-    Map<String, String> gravitinoProperties = Maps.newHashMap();
-    Map<String, String> flinkConfMap = flinkConf.toMap();
-    for (Map.Entry<String, String> entry : flinkConfMap.entrySet()) {
-      String gravitinoKey =
-          PaimonPropertiesUtils.PAIMON_CATALOG_CONFIG_TO_GRAVITINO.get(entry.getKey());
-      if (gravitinoKey != null) {
-        gravitinoProperties.put(gravitinoKey, entry.getValue());
-      } else if (!entry.getKey().startsWith(FLINK_PROPERTY_PREFIX)) {
-        gravitinoProperties.put(FLINK_PROPERTY_PREFIX + entry.getKey(), entry.getValue());
-      } else {
-        gravitinoProperties.put(entry.getKey(), entry.getValue());
-      }
+  public String transformPropertyToGravitinoCatalog(String configKey) {
+    if (configKey.equalsIgnoreCase(PaimonConstants.METASTORE)) {
+      return PaimonConstants.CATALOG_BACKEND;
     }
-    gravitinoProperties.put(
-        PaimonConstants.CATALOG_BACKEND,
-        flinkConfMap.getOrDefault(PaimonConstants.METASTORE, FileSystemCatalogFactory.IDENTIFIER));
-    return gravitinoProperties;
+    return PaimonPropertiesUtils.PAIMON_CATALOG_CONFIG_TO_GRAVITINO.get(configKey);
   }
 
   @Override
-  public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
-    Map<String, String> all = new HashMap<>();
-    gravitinoProperties.forEach(
-        (key, value) -> {
-          String flinkConfigKey = key;
-          if (key.startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX)) {
-            flinkConfigKey = key.substring(PropertiesConverter.FLINK_PROPERTY_PREFIX.length());
-          }
-          all.put(flinkConfigKey, value);
-        });
-    Map<String, String> paimonCatalogProperties =
-        PaimonPropertiesUtils.toPaimonCatalogProperties(all);
-    paimonCatalogProperties.put(
-        PaimonConstants.METASTORE,
-        paimonCatalogProperties.getOrDefault(
-            PaimonConstants.CATALOG_BACKEND, FileSystemCatalogFactory.IDENTIFIER));
-    paimonCatalogProperties.put(
-        CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoPaimonCatalogFactoryOptions.IDENTIFIER);
-    return paimonCatalogProperties;
+  public String transformPropertyToFlinkCatalog(String configKey) {
+    if (configKey.equals(PaimonConstants.CATALOG_BACKEND)) {
+      return PaimonConstants.METASTORE;
+    }
+    return PaimonPropertiesUtils.GRAVITINO_CONFIG_TO_PAIMON.get(configKey);
+  }
+
+  @Override
+  public String getFlinkCatalogType() {
+    return GravitinoPaimonCatalogFactoryOptions.IDENTIFIER;
   }
 }

@@ -100,4 +100,14 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " AND last_version = #{oldTagMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
+
+  @Override
+  public String deleteTagMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TAG_TABLE_NAME
+        + " WHERE tag_id IN (SELECT tag_id FROM "
+        + TAG_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

@@ -394,8 +394,8 @@ components:
             - "TABLE"
             - "FILESET"
             - "TOPIC"
-            - "ROLE"
-            - "METALAKE"
+            - "MODEL"
+            - "COLUMN"
 
 
   requests:

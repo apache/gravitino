@@ -82,6 +82,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
       initIcebergRestServiceEnv();
     }
+    initCatalogEnv();
     // Start Gravitino server
     super.startIntegrationTest();
     initHdfsFileSystem();
@@ -150,6 +151,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
   }
+
+  protected void initCatalogEnv() throws Exception {}
 
   private void initIcebergRestServiceEnv() {
     ignoreIcebergRestService = false;

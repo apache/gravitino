@@ -44,6 +44,16 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   }
 
   @Override
+  public String deleteCatalogMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE catalog_id IN (SELECT catalog_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
   public String insertCatalogMetaOnDuplicateKeyUpdate(CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME

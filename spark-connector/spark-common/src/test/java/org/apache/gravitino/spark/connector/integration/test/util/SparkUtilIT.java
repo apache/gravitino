@@ -77,7 +77,7 @@ public abstract class SparkUtilIT extends BaseIT {
   // However, Paimon does not support create a database with a specified location.
   protected void createDatabaseIfNotExists(String database, String provider) {
     String locationClause =
-        "lakehouse-paimon".equalsIgnoreCase(provider)
+        "lakehouse-paimon".equalsIgnoreCase(provider) || provider.startsWith("jdbc")
             ? ""
             : String.format("LOCATION '/user/hive/%s'", database);
     sql(String.format("CREATE DATABASE IF NOT EXISTS %s %s", database, locationClause));

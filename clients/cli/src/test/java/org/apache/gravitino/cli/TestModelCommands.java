@@ -89,11 +89,7 @@ public class TestModelCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"));
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -112,12 +108,7 @@ public class TestModelCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            isNull(),
-            isNull());
+        .newListModel(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null);
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MISSING_NAME
@@ -141,12 +132,7 @@ public class TestModelCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            isNull());
+        .newListModel(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null);
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MALFORMED_NAME
@@ -171,12 +157,7 @@ public class TestModelCommands {
     doReturn(mockList)
         .when(commandLine)
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            eq("model"));
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "model");
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -197,12 +178,7 @@ public class TestModelCommands {
 
     verify(commandLine, never())
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            isNull(),
-            isNull(),
-            isNull());
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null);
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MISSING_NAME
@@ -230,12 +206,7 @@ public class TestModelCommands {
 
     verify(commandLine, never())
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            isNull(),
-            isNull());
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null);
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MALFORMED_NAME
@@ -261,12 +232,7 @@ public class TestModelCommands {
 
     verify(commandLine, never())
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            isNull());
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MALFORMED_NAME

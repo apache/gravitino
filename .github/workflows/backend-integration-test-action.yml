@@ -64,7 +64,7 @@ jobs:
           -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test 
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}

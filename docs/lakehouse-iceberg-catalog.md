@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.6.1`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -220,79 +220,12 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 
 ### Table distributions
 
-- Gravitino used by default `NoneDistribution`.
-
-<Tabs groupId='language' queryString>
-<TabItem value="json" label="JSON">
-
-```json
-{
-  "strategy": "none",
-  "number": 0,
-  "expressions": []
-}
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Distributions.NONE;
-```
-
-</TabItem>
-</Tabs>
-
-- Support `HashDistribution`, Hash distribute by partition key.
-
-<Tabs groupId='language' queryString>
-<TabItem value="json" label="JSON">
-
-```json
-{
-  "strategy": "hash",
-  "number": 0,
-  "expressions": []
-}
-```
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Distributions.HASH;
-```
-
-</TabItem>
-</Tabs>
-
-- Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
-
-<Tabs groupId='language' queryString>
-<TabItem value="json" label="JSON">
-
-```json
-{
-  "strategy": "range",
-  "number": 0,
-  "expressions": []
-}
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Distributions.RANGE;
-```
-
-</TabItem>
-</Tabs>
+- Support `HashDistribution`, which distribute data by partition key.
+- Support `RangeDistribution`, which distribute data by partition key or sort key for a SortOrder table.
+- Doesn't support `EvenDistribution`.
 
 :::info
-Iceberg automatically distributes the data according to the partition or table sort order. It is forbidden to specify distribution expressions.
-:::
-:::info
-Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
+If you doesn't specify distribution expressions, the table distribution will be adjusted to `RangeDistribution` for a sort order table, to `HashDistribution` for a partition table.
 :::
 
 ### Table column types

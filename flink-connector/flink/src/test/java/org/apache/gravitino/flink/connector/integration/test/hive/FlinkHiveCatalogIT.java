@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
@@ -73,7 +72,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static org.apache.gravitino.Catalog hiveCatalog;
 
   @BeforeAll
-  static void hiveStartUp() {
+  void hiveStartUp() {
     initDefaultHiveCatalog();
   }
 
@@ -83,13 +82,13 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     metalake.dropCatalog(DEFAULT_HIVE_CATALOG, true);
   }
 
-  protected static void initDefaultHiveCatalog() {
+  protected void initDefaultHiveCatalog() {
     Preconditions.checkNotNull(metalake);
     hiveCatalog =
         metalake.createCatalog(
             DEFAULT_HIVE_CATALOG,
             org.apache.gravitino.Catalog.Type.RELATIONAL,
-            "hive",
+            getProvider(),
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
   }
@@ -584,31 +583,22 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Override
+  protected Map<String, String> getCreateSchemaProps(String schemaName) {
+    return ImmutableMap.of("location", warehouse + "/" + schemaName);
+  }
+
+  @Override
   protected org.apache.gravitino.Catalog currentCatalog() {
     return hiveCatalog;
   }
 
-  protected void doWithSchema(
-      org.apache.gravitino.Catalog catalog,
-      String schemaName,
-      Consumer<org.apache.gravitino.Catalog> action,
-      boolean dropSchema) {
-    Preconditions.checkNotNull(catalog);
-    Preconditions.checkNotNull(schemaName);
-    try {
-      tableEnv.useCatalog(catalog.name());
-      if (!catalog.asSchemas().schemaExists(schemaName)) {
-        catalog
-            .asSchemas()
-            .createSchema(
-                schemaName, null, ImmutableMap.of("location", warehouse + "/" + schemaName));
-      }
-      tableEnv.useDatabase(schemaName);
-      action.accept(catalog);
-    } finally {
-      if (dropSchema) {
-        catalog.asSchemas().dropSchema(schemaName, true);
-      }
-    }
+  @Override
+  protected String getProvider() {
+    return "hive";
+  }
+
+  @Override
+  protected boolean supportDropCascade() {
+    return true;
   }
 }

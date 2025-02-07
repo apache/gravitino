@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.ibatis.annotations.Param;
 
 public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
@@ -66,5 +67,15 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
         + " current_version = #{roleMeta.currentVersion},"
         + " last_version = #{roleMeta.lastVersion},"
         + " deleted_at = #{roleMeta.deletedAt}";
+  }
+
+  @Override
+  public String deleteRoleMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE role_id IN (SELECT role_id FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }
