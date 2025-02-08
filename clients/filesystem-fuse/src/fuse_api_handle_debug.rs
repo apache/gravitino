@@ -403,11 +403,15 @@ fn timestamp_to_desc_string(tstmp: Timestamp) -> String {
 /// Example: `{ inode: 1234, kind: RegularFile, name: "file.txt", offset: 1 }`
 fn directory_entry_to_desc_str(entry: &DirectoryEntry) -> String {
     let mut output = String::new();
-    write!(output, "{{ ").unwrap();
-    write!(output, "inode: {}, ", entry.inode).unwrap();
-    write!(output, "kind: {:?}, ", entry.kind).unwrap();
-    write!(output, "name: {}, ", entry.name.to_string_lossy()).unwrap();
-    write!(output, "offset: {} }}", entry.offset).unwrap();
+    write!(
+        output,
+        "{{ inode: {}, kind: {:?}, name: {}, offset: {} }}",
+        entry.inode,
+        entry.kind,
+        entry.name.to_string_lossy(),
+        entry.offset
+    )
+    .unwrap();
     output
 }
 
@@ -428,15 +432,8 @@ fn directory_entry_to_desc_str(entry: &DirectoryEntry) -> String {
 /// ```
 fn directory_entry_plus_to_desc_str(entry: &DirectoryEntryPlus) -> String {
     let mut output = String::new();
-    write!(output, "{{ ").unwrap();
-    write!(output, "inode: {}, ", entry.inode).unwrap();
-    write!(output, "generation: {}, ", entry.generation).unwrap();
-    write!(output, "kind: {:?}, ", entry.kind).unwrap();
-    write!(output, "name: {}, ", entry.name.to_string_lossy()).unwrap();
-    write!(output, "offset: {}, ", entry.offset).unwrap();
-    write!(output, "attr: {}, ", file_attr_to_desc_str(&entry.attr)).unwrap();
-    write!(output, "entry_ttl: {:?}, ", entry.entry_ttl).unwrap();
-    write!(output, "attr_ttl: {:?} }}", entry.attr_ttl).unwrap();
+    write!(output, "{{ inode: {}, generation: {}, kind: {:?}, name: {}, offset: {}, attr: {}, entry_ttl: {:?}, attr_ttl: {:?} }}", entry.inode, entry.generation, entry.kind, entry.name.to_string_lossy(), entry.offset, file_attr_to_desc_str(&entry.attr), entry.entry_ttl, entry.attr_ttl).unwrap();
+
     output
 }
 
