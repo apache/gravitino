@@ -19,8 +19,8 @@ from typing import Dict, List
 
 from gravitino.name_identifier import NameIdentifier
 from gravitino.api.catalog import Catalog
-from gravitino.api.model import Model
-from gravitino.api.model_version import ModelVersion
+from gravitino.api.model.model import Model
+from gravitino.api.model.model_version import ModelVersion
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_model import GenericModel
 from gravitino.client.generic_model_version import GenericModelVersion

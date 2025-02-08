@@ -37,8 +37,6 @@ check_gvfs_fuse_ready() {
 }
 
 start_gvfs_fuse() {
-  MOUNT_DIR=$CLIENT_FUSE_DIR/target/gvfs
-
   umount $MOUNT_DIR > /dev/null 2>&1 || true
   if [ ! -d "$MOUNT_DIR" ]; then
     echo "Create the mount point"
@@ -52,14 +50,15 @@ start_gvfs_fuse() {
   make build
 
   echo "Starting gvfs-fuse-daemon"
-  $CLIENT_FUSE_DIR/target/debug/gvfs-fuse $MOUNT_DIR $MOUNT_FROM_LOCATION $TEST_CONFIG_FILE > \
+  mkdir -p target/debug/gvfs-dir
+  $CLIENT_FUSE_DIR/target/debug/gvfs-fuse mount $MOUNT_DIR $MOUNT_FROM_LOCATION -c $TEST_CONFIG_FILE -f > \
     $CLIENT_FUSE_DIR/target/debug/fuse.log 2>&1 &
   check_gvfs_fuse_ready
   cd -
 }
 
 stop_gvfs_fuse() {
-  # Stop the gvfs-fuse process if it's running
-  pkill -INT gvfs-fuse || true
+  # Unmount the gvfs-fuse
+  $CLIENT_FUSE_DIR/target/debug/gvfs-fuse umount $MOUNT_DIR
   echo "Stopping gvfs-fuse-daemon"
 }

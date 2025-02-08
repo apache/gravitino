@@ -74,9 +74,9 @@ public class DeleteRole extends Command {
     }
 
     if (failedRoles.isEmpty()) {
-      System.out.println(COMMA_JOINER.join(successRoles) + " deleted.");
+      printInformation(COMMA_JOINER.join(successRoles) + " deleted.");
     } else {
-      System.err.println(
+      printInformation(
           COMMA_JOINER.join(successRoles)
               + " deleted, "
               + "but "
