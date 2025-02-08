@@ -423,7 +423,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
 
         log_result!(
             self.inner.getattr(req, inode, fh, flags),
-            "getattr",
+            "GETATTR",
             req,
             debug,
             reply_attr_to_desc_str
@@ -727,7 +727,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             ?fh,
             ?offset,
             ?lock_owner,
-            "readdirplus started"
+            "READDIRPLUS started"
         );
 
         log_result!(
