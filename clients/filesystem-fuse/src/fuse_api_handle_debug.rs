@@ -396,16 +396,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn lookup(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<ReplyEntry> {
-        let parent_stat = self
-            .inner
-            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(parent).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_stat.name,
+            parent = ?parent_path_name,
             ?name,
             "LOOKUP started"
         );
@@ -426,17 +423,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: Option<u64>,
         flags: u32,
     ) -> fuse3::Result<ReplyAttr> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?stat.name,
-            "file_id" = inode,
+            "filename" = ?filename,
             ?fh,
             ?flags,
             "GETATTR started"
@@ -458,17 +451,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: Option<u64>,
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?stat.name,
-            "file_id" = inode,
+            "filename" = ?filename,
             ?fh,
             ?set_attr,
             "SETATTR started"
@@ -491,16 +480,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         mode: u32,
         umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
-        let parent_stat = self
-            .inner
-            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(parent).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_stat.name,
+            parent = ?parent_path_name,
             ?name,
             mode,
             umask,
@@ -517,16 +503,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let parent_stat = self
-            .inner
-            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(parent).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_stat.name,
+            parent = ?parent_path_name,
             ?name,
             "UNLINK started"
         );
@@ -535,16 +518,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let parent_stat = self
-            .inner
-            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(parent).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_stat.name,
+            parent = ?parent_path_name,
             ?name,
             "RMDIR started"
         );
@@ -553,16 +533,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?stat.name,
+            "filename" = ?parent_path_name,
             "file_id" = inode,
             ?flags,
             "OPEN started"
@@ -579,14 +556,11 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         offset: u64,
         size: u32,
     ) -> fuse3::Result<ReplyData> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             ?req,
-            "filename" = ?stat.name,
+            "filename" = ?parent_path_name,
             ?fh,
             ?offset,
             ?size,
@@ -606,16 +580,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         write_flags: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyWrite> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?stat.name,
+            "filename" = ?parent_path_name,
             "file_id" = inode,
             ?fh,
             ?offset,
@@ -634,16 +605,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?stat.name,
+            "filename" = ?parent_path_name,
             "file_id" = inode,
             "STATFS started"
         );
@@ -660,16 +628,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         lock_owner: u64,
         flush: bool,
     ) -> fuse3::Result<()> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?stat.name,
+            "filename" = ?parent_path_name,
             "file_id" = inode,
             ?fh,
             ?flags,
@@ -686,16 +651,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "dirname" = ?stat.name,
+            "dirname" = ?parent_path_name,
             ?flags,
             "OPENDIR started"
         );
@@ -743,16 +705,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: u64,
         flags: u32,
     ) -> fuse3::Result<()> {
-        let stat = self
-            .inner
-            .get_modified_file_stat(inode, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "dirname" = ?stat.name,
+            "dirname" = ?parent_path_name,
             ?fh,
             ?flags,
             "RELEASEDIR started"
@@ -773,17 +732,14 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         mode: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyCreated> {
-        let parent_stat = self
-            .inner
-            .get_modified_file_stat(parent, Option::None, Option::None, Option::None)
-            .await?;
+        let parent_path_name = self.inner.get_file_path(parent).await?;
 
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "parent" = ?parent_stat.name,
+            "parent" = ?parent_path_name,
             "filename" = ?name,
             ?mode,
             ?flags,
