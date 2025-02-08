@@ -292,7 +292,7 @@ pub struct FuseConfig {
     pub dir_mask: u32,
     #[serde(default)]
     pub fs_type: String,
-    #[serde(default)]
+    #[serde(default = "default_fuse_debug")]
     pub fuse_debug: bool,
     #[serde(default)]
     pub config_file_path: String,
@@ -302,6 +302,10 @@ pub struct FuseConfig {
     pub log_dir: String,
     #[serde(default)]
     pub properties: HashMap<String, String>,
+}
+
+fn default_fuse_debug() -> bool {
+    true
 }
 
 impl FuseConfig {
