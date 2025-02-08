@@ -214,11 +214,13 @@ macro_rules! log_result {
 /// ```text
 /// ttl: 1s,
 /// FileAttr: {
-///     ino: 10000, size: 0, blocks: 0,
-///     atime: "2025-01-16 02:42:52.600436",
-///     mtime: "2025-01-16 02:42:52.600436",
-///     ctime: "2025-01-16 02:42:52.600436",
-///     crtime: "2025-01-16 02:42:52.600436",
+///     ino: 10000,
+///     size: 0,
+///     blocks: 0,
+///     atime: 2025-01-16 02:42:52.600436,
+///     mtime: 2025-01-16 02:42:52.600436,
+///     ctime: 2025-01-16 02:42:52.600436,
+///     crtime: 2025-01-16 02:42:52.600436,
 ///     kind: RegularFile,
 ///     perm: 600,
 ///     nlink: 1,
@@ -249,11 +251,13 @@ fn reply_attr_to_desc_str(reply_attr: &ReplyAttr) -> String {
 /// ```text
 /// ttl: 1s,
 /// FileAttr: {
-///     ino: 10001, size: 0, blocks: 1,
-///     atime: "2025-01-16 02:42:52.606512",
-///     mtime: "2025-01-16 02:42:52.606512",
-///     ctime: "2025-01-16 02:42:52.606512",
-///     crtime: "2025-01-16 02:42:52.606512",
+///     ino: 10001,
+///     size: 0,
+///     blocks: 1,
+///     atime: 2025-01-16 02:42:52.606512,
+///     mtime: 2025-01-16 02:42:52.606512,
+///     ctime: 2025-01-16 02:42:52.606512,
+///     crtime: 2025-01-16 02:42:52.606512,
 ///     kind: Directory,
 ///     perm: 700,
 ///     nlink: 0,
@@ -284,12 +288,15 @@ fn reply_entry_to_desc_str(reply_entry: &ReplyEntry) -> String {
 ///
 /// Example (pretty-printed for readability):
 /// ```text
-/// ttl: 1s, FileAttr: {
-///     ino: 10000, size: 0, blocks: 1,
-///     atime: "2025-01-16 02:47:32.126592",
-///     mtime: "2025-01-16 02:47:32.126592",
-///     ctime: "2025-01-16 02:47:32.126592",
-///     crtime: "2025-01-16 02:47:32.126592",
+/// ttl: 1s,
+/// FileAttr: {
+///     ino: 10000,
+///     size: 0,
+///     blocks: 1,
+///     atime: 2025-01-16 02:47:32.126592,
+///     mtime: 2025-01-16 02:47:32.126592,
+///     ctime: 2025-01-16 02:47:32.126592,
+///     crtime: 2025-01-16 02:47:32.126592,
 ///     kind: RegularFile,
 ///     perm: 600,
 ///     nlink: 0,
@@ -323,11 +330,13 @@ fn reply_created_to_desc_str(reply_created: &ReplyCreated) -> String {
 /// Example (pretty-printed for readability):
 /// ```text
 /// {
-///     ino: 10000, size: 0, blocks: 1,
-///     atime: "2025-01-10 22:53:45.491337",
-///     mtime: "2025-01-10 22:53:45.491337",
-///     ctime: "2025-01-10 22:53:45.491337",
-///     crtime: "2025-01-10 22:53:45.491337",
+///     ino: 10000,
+///     size: 0,
+///     blocks: 1,
+///     atime: 2025-01-10 22:53:45.491337,
+///     mtime: 2025-01-10 22:53:45.491337,
+///     ctime: 2025-01-10 22:53:45.491337,
+///     crtime: 2025-01-10 22:53:45.491337,
 ///     kind: RegularFile,
 ///     perm: 384,
 ///     nlink: 0,
