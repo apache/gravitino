@@ -590,7 +590,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             ?fh,
             ?offset,
             ?size,
-            "read started"
+            "READ started"
         );
 
         log_result!(self.inner.read(req, inode, fh, offset, size), "read", req)
