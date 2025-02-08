@@ -468,6 +468,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "gid" = req.gid,
             "pid" = req.pid,
             "filename" = ?stat.name,
+            "file_id" = inode,
             ?fh,
             ?set_attr,
             "SETATTR started"
@@ -562,6 +563,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "gid" = req.gid,
             "pid" = req.pid,
             "filename" = ?stat.name,
+            "file_id" = inode,
             ?flags,
             "OPEN started"
         );
@@ -614,6 +616,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "gid" = req.gid,
             "pid" = req.pid,
             "filename" = ?stat.name,
+            "file_id" = inode,
             ?fh,
             ?offset,
             data_len = data.len(),
@@ -641,6 +644,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "gid" = req.gid,
             "pid" = req.pid,
             "filename" = ?stat.name,
+            "file_id" = inode,
             "STATFS started"
         );
 
@@ -665,7 +669,8 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "pathname" = ?stat.name,
+            "filename" = ?stat.name,
+            "file_id" = inode,
             ?fh,
             ?flags,
             ?lock_owner,
