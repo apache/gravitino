@@ -47,7 +47,7 @@ public class AlterTagPreEvent extends TagPreEvent {
    *
    * @return An array of {@link TagChange}.
    */
-  public TagChange[] getChanges() {
+  public TagChange[] changes() {
     return changes;
   }
 

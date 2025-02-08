@@ -128,7 +128,7 @@ public class TestTagEvent {
     Assertions.assertEquals(OperationType.ALTER_TAG, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    TagChange[] eventChanges = ((AlterTagPreEvent) preEvent).getChanges();
+    TagChange[] eventChanges = ((AlterTagPreEvent) preEvent).changes();
     Assertions.assertArrayEquals(changes, eventChanges);
   }
 
