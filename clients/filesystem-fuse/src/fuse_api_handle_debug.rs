@@ -402,7 +402,8 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_path_name,
+            "parent" = ?parent_path_name,
+            "parent_id" = parent,
             ?name,
             "LOOKUP started"
         );
@@ -486,7 +487,8 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_path_name,
+            "parent" = ?parent_path_name,
+            "parent_id" = parent,
             ?name,
             mode,
             umask,
@@ -509,7 +511,8 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            parent = ?parent_path_name,
+            "parent" = ?parent_path_name,
+            "parent_id" = parent,
             ?name,
             "UNLINK started"
         );
