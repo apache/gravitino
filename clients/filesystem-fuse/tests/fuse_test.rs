@@ -45,7 +45,7 @@ impl FuseTestEnv {
         info!("Start gvfs fuse server");
         let mount_point = self.mount_point.clone();
 
-        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_memory.toml"))
+        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_memory.toml".to_string()))
             .expect("Failed to load config");
         ASYNC_RUNTIME.spawn(async move {
             let result = gvfs_mount(&mount_point, "", &config).await;

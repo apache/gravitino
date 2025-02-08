@@ -21,7 +21,7 @@ use crate::filesystem::{FileStat, FileSystemCapacity, FileSystemContext, PathFil
 use crate::gravitino_client::GravitinoClient;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
 use async_trait::async_trait;
-use fuse3::Errno;
+use fuse3::{Errno, FileType};
 use std::path::{Path, PathBuf};
 
 /// GravitinoFileSystem is a filesystem that is associated with a fileset in Gravitino.
@@ -74,9 +74,16 @@ impl PathFileSystem for GravitinoFilesetFileSystem {
         self.physical_fs.init().await
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat> {
         let raw_path = self.gvfs_path_to_raw_path(path);
-        let mut file_stat = self.physical_fs.stat(&raw_path).await?;
+        let mut file_stat = self.physical_fs.stat(&raw_path, kind).await?;
+        file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
+        Ok(file_stat)
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
+        let raw_path = self.gvfs_path_to_raw_path(path);
+        let mut file_stat = self.physical_fs.lookup(&raw_path).await?;
         file_stat.path = self.raw_path_to_gvfs_path(&file_stat.path)?;
         Ok(file_stat)
     }

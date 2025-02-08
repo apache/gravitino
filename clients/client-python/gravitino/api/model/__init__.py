@@ -14,26 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-# fuse settings
-[fuse]
-file_mask = 0o600
-dir_mask = 0o700
-fs_type = "memory"
-data_path = "target/gvfs-fuse"
-
-[fuse.properties]
-
-# filesystem settings
-[filesystem]
-block_size = 8192
-
-# Gravitino settings
-[gravitino]
-uri = "http://localhost:8090"
-metalake = "your_metalake"
-
-# extend settings
-[extend_config]
-s3-access_key_id = "your access_key"
-s3-secret_access_key = "your_secret_key"

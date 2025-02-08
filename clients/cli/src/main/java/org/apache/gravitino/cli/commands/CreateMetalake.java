@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -30,13 +31,12 @@ public class CreateMetalake extends Command {
   /**
    * Create a new metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param comment The metalake's comment.
    */
-  public CreateMetalake(String url, boolean ignoreVersions, String metalake, String comment) {
-    super(url, ignoreVersions);
+  public CreateMetalake(CommandContext context, String metalake, String comment) {
+    super(context);
     this.metalake = metalake;
     this.comment = comment;
   }
@@ -53,6 +53,6 @@ public class CreateMetalake extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(metalake + " created");
+    printInformation(metalake + " created");
   }
 }

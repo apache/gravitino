@@ -24,6 +24,7 @@ use crate::open_dal_filesystem::OpenDalFileSystem;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
 use crate::utils::{parse_location, GvfsResult};
 use async_trait::async_trait;
+use fuse3::FileType;
 use log::error;
 use opendal::layers::LoggingLayer;
 use opendal::services::S3;
@@ -94,8 +95,12 @@ impl PathFileSystem for S3FileSystem {
         Ok(())
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
-        self.open_dal_fs.stat(path).await
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat> {
+        self.open_dal_fs.stat(path, kind).await
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
+        self.open_dal_fs.lookup(path).await
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
@@ -255,7 +260,7 @@ pub(crate) mod tests {
             config_file_name = source_file_name;
         }
 
-        AppConfig::from_file(Some(config_file_name)).unwrap()
+        AppConfig::from_file(Some(config_file_name.to_string())).unwrap()
     }
 
     #[tokio::test]

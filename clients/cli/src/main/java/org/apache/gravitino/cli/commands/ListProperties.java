@@ -20,9 +20,19 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
+import org.apache.gravitino.cli.CommandContext;
 
 /** List the properties of a metalake. */
 public class ListProperties extends Command {
+
+  /**
+   * List the properties of an entity.
+   *
+   * @param context The command context.
+   */
+  public ListProperties(CommandContext context) {
+    super(context);
+  }
 
   /**
    * List the properties of an entity.

@@ -66,7 +66,24 @@ impl PathFileSystem for OpenDalFileSystem {
         Ok(())
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat> {
+        let file_name = match kind {
+            Directory => build_dir_path(path),
+            _ => path.to_string_lossy().to_string(),
+        };
+        let meta = self
+            .op
+            .stat(&file_name)
+            .await
+            .map_err(opendal_error_to_errno)?;
+
+        let mut file_stat = FileStat::new_file_filestat_with_path(path, 0);
+        self.opendal_meta_to_file_stat(&meta, &mut file_stat);
+
+        Ok(file_stat)
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
         let file_name = path.to_string_lossy().to_string();
         let meta_result = self.op.stat(&file_name).await;
 
@@ -114,7 +131,7 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
-        let file_stat = self.stat(path).await?;
+        let file_stat = self.stat(path, RegularFile).await?;
         debug_assert!(file_stat.kind == RegularFile);
 
         let mut file = OpenedFile::new(file_stat);
@@ -155,7 +172,7 @@ impl PathFileSystem for OpenDalFileSystem {
     }
 
     async fn open_dir(&self, path: &Path, _flags: OpenFileFlags) -> Result<OpenedFile> {
-        let file_stat = self.stat(path).await?;
+        let file_stat = self.stat(path, Directory).await?;
         debug_assert!(file_stat.kind == Directory);
 
         let opened_file = OpenedFile::new(file_stat);
@@ -185,7 +202,7 @@ impl PathFileSystem for OpenDalFileSystem {
             .create_dir(&dir_name)
             .await
             .map_err(opendal_error_to_errno)?;
-        let file_stat = self.stat(path).await?;
+        let file_stat = self.stat(path, Directory).await?;
         Ok(file_stat)
     }
 

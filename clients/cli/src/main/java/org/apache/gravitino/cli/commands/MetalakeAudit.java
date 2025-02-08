@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -31,12 +32,11 @@ public class MetalakeAudit extends AuditCommand {
   /**
    * Displays metalake audit information.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    */
-  public MetalakeAudit(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public MetalakeAudit(CommandContext context, String metalake) {
+    super(context);
     this.metalake = metalake;
   }
 

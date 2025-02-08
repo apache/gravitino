@@ -49,6 +49,9 @@ macro_rules! test_enable_with {
 pub const RUN_TEST_WITH_S3: &str = "RUN_TEST_WITH_S3";
 pub const RUN_TEST_WITH_FUSE: &str = "RUN_TEST_WITH_FUSE";
 
+pub const LOG_FILE_NAME: &str = "gvfs-fuse.log";
+pub const PID_FILE_NAME: &str = "gvfs-fuse.pid";
+
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {
     gvfs_fuse::mount(mount_to, mount_from, config).await
 }
