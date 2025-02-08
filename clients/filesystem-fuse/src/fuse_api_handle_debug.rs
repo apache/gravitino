@@ -194,8 +194,7 @@ macro_rules! log_result {
             Ok(reply) => {
                 debug!(
                     $req.unique,
-                    ?reply,
-                    reply_formatted = $format_reply_fn(&reply),
+                    reply = $format_reply_fn(&reply),
                     "{} completed",
                     $method_name.to_uppercase()
                 );
@@ -233,10 +232,10 @@ macro_rules! log_result {
 fn reply_attr_to_desc_str(reply_attr: &ReplyAttr) -> String {
     let mut output = String::new();
 
-    write!(output, "ttl: {:?}, ", reply_attr.ttl).unwrap();
     write!(
         output,
-        "FileAttr: {}",
+        "ttl: {:?}, FileAttr: {}",
+        reply_attr.ttl,
         file_attr_to_desc_str(&reply_attr.attr)
     )
     .unwrap();
@@ -269,14 +268,14 @@ fn reply_attr_to_desc_str(reply_attr: &ReplyAttr) -> String {
 fn reply_entry_to_desc_str(reply_entry: &ReplyEntry) -> String {
     let mut output = String::new();
 
-    write!(output, "ttl: {:?}, ", reply_entry.ttl).unwrap();
     write!(
         output,
-        "FileAttr: {}, ",
-        file_attr_to_desc_str(&reply_entry.attr)
+        "ttl: {:?}, FileAttr: {}, generation: {}",
+        reply_entry.ttl,
+        file_attr_to_desc_str(&reply_entry.attr),
+        reply_entry.generation
     )
     .unwrap();
-    write!(output, "generation: {}", reply_entry.generation).unwrap();
 
     output
 }
@@ -306,15 +305,15 @@ fn reply_entry_to_desc_str(reply_entry: &ReplyEntry) -> String {
 fn reply_created_to_desc_str(reply_created: &ReplyCreated) -> String {
     let mut output = String::new();
 
-    write!(output, "ttl: {:?}, ", reply_created.ttl).unwrap();
     write!(
         output,
-        "FileAttr: {}, ",
-        file_attr_to_desc_str(&reply_created.attr)
+        "ttl: {:?}, FileAttr: {}, generation: {}, fh: {}",
+        reply_created.ttl,
+        file_attr_to_desc_str(&reply_created.attr),
+        reply_created.generation,
+        reply_created.fh
     )
     .unwrap();
-    write!(output, "generation: {}, ", reply_created.generation).unwrap();
-    write!(output, "fh: {}", reply_created.fh).unwrap();
 
     output
 }
@@ -342,51 +341,40 @@ fn reply_created_to_desc_str(reply_created: &ReplyCreated) -> String {
 fn file_attr_to_desc_str(attr: &FileAttr) -> String {
     let mut output = String::new();
 
-    write!(output, "{{ ").unwrap();
-
-    write!(output, "ino: {}, ", attr.ino).unwrap();
-    write!(output, "size: {}, ", attr.size).unwrap();
-    write!(output, "blocks: {}, ", attr.blocks).unwrap();
     write!(
         output,
-        "atime: {:?}, ",
-        timestamp_to_desc_string(attr.atime)
+        "{{ ino: {}, size: {}, blocks: {}, ",
+        attr.ino, attr.size, attr.blocks
     )
     .unwrap();
     write!(
         output,
-        "mtime: {:?}, ",
-        timestamp_to_desc_string(attr.mtime)
-    )
-    .unwrap();
-    write!(
-        output,
-        "ctime: {:?}, ",
-        timestamp_to_desc_string(attr.ctime)
+        "atime: {}, mtime: {}, ctime: {}, ",
+        timestamp_to_desc_string(attr.atime),
+        timestamp_to_desc_string(attr.mtime),
+        timestamp_to_desc_string(attr.ctime),
     )
     .unwrap();
     #[cfg(target_os = "macos")]
     {
         write!(
             output,
-            "crtime: {:?}, ",
+            "crtime: {}, ",
             timestamp_to_desc_string(attr.crtime)
         )
         .unwrap();
     }
-    write!(output, "kind: {:?}, ", attr.kind).unwrap();
-    write!(output, "perm: {:o}, ", attr.perm).unwrap();
-    write!(output, "nlink: {}, ", attr.nlink).unwrap();
-    write!(output, "uid: {}, ", attr.uid).unwrap();
-    write!(output, "gid: {}, ", attr.gid).unwrap();
-    write!(output, "rdev: {}, ", attr.rdev).unwrap();
+    write!(
+        output,
+        "kind: {:?}, perm: {:o}, nlink: {}, uid: {}, gid: {}, rdev: {}, ",
+        attr.kind, attr.perm, attr.nlink, attr.uid, attr.gid, attr.rdev
+    )
+    .unwrap();
     #[cfg(target_os = "macos")]
     {
         write!(output, "flags: {}, ", attr.flags).unwrap();
     }
-    write!(output, "blksize: {}", attr.blksize).unwrap();
-
-    write!(output, " }}").unwrap();
+    write!(output, "blksize: {} }}", attr.blksize).unwrap();
 
     output
 }
