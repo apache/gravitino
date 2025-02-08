@@ -211,7 +211,25 @@ macro_rules! log_result {
 
 /// Convert `ReplyAttr` to descriptive string.
 ///
-/// Example: `ttl: 1s, FileAttr: { ino: 10000, size: 0, blocks: 0, atime: "2025-01-16 02:42:52.600436", mtime: "2025-01-16 02:42:52.600436", ctime: "2025-01-16 02:42:52.600436", crtime: "2025-01-16 02:42:52.600436", kind: RegularFile, perm: 600, nlink: 1, uid: 501, gid: 20, rdev: 0, flags: 0, blksize: 8192 }`
+/// Example (pretty-printed for readability):
+/// ```text
+/// ttl: 1s,
+/// FileAttr: {
+///     ino: 10000, size: 0, blocks: 0,
+///     atime: "2025-01-16 02:42:52.600436",
+///     mtime: "2025-01-16 02:42:52.600436",
+///     ctime: "2025-01-16 02:42:52.600436",
+///     crtime: "2025-01-16 02:42:52.600436",
+///     kind: RegularFile,
+///     perm: 600,
+///     nlink: 1,
+///     uid: 501,
+///     gid: 20,
+///     rdev: 0,
+///     flags: 0,
+///     blksize: 8192
+/// }
+/// ```
 fn reply_attr_to_desc_str(reply_attr: &ReplyAttr) -> String {
     let mut output = String::new();
 
@@ -228,7 +246,26 @@ fn reply_attr_to_desc_str(reply_attr: &ReplyAttr) -> String {
 
 /// Convert `ReplyEntry` to descriptive string.
 ///
-/// Example: `ttl: 1s, FileAttr: { ino: 10001, size: 0, blocks: 1, atime: "2025-01-16 02:42:52.606512", mtime: "2025-01-16 02:42:52.606512", ctime: "2025-01-16 02:42:52.606512", crtime: "2025-01-16 02:42:52.606512", kind: Directory, perm: 700, nlink: 0, uid: 501, gid: 20, rdev: 0, flags: 0, blksize: 8192 }, generation: 0`
+/// Example (pretty-printed for readability):
+/// ```text
+/// ttl: 1s,
+/// FileAttr: {
+///     ino: 10001, size: 0, blocks: 1,
+///     atime: "2025-01-16 02:42:52.606512",
+///     mtime: "2025-01-16 02:42:52.606512",
+///     ctime: "2025-01-16 02:42:52.606512",
+///     crtime: "2025-01-16 02:42:52.606512",
+///     kind: Directory,
+///     perm: 700,
+///     nlink: 0,
+///     uid: 501,
+///     gid: 20,
+///     rdev: 0,
+///     flags: 0,
+///     blksize: 8192
+/// },
+/// generation: 0
+/// ```
 fn reply_entry_to_desc_str(reply_entry: &ReplyEntry) -> String {
     let mut output = String::new();
 
@@ -246,7 +283,26 @@ fn reply_entry_to_desc_str(reply_entry: &ReplyEntry) -> String {
 
 /// Convert `ReplyCreated` to descriptive string.
 ///
-/// Example: `ttl: 1s, FileAttr: { ino: 10000, size: 0, blocks: 1, atime: "2025-01-16 02:47:32.126592", mtime: "2025-01-16 02:47:32.126592", ctime: "2025-01-16 02:47:32.126592", crtime: "2025-01-16 02:47:32.126592", kind: RegularFile, perm: 600, nlink: 0, uid: 501, gid: 20, rdev: 0, flags: 0, blksize: 8192 }, generation: 0, fh: 1`
+/// Example (pretty-printed for readability):
+/// ```text
+/// ttl: 1s, FileAttr: {
+///     ino: 10000, size: 0, blocks: 1,
+///     atime: "2025-01-16 02:47:32.126592",
+///     mtime: "2025-01-16 02:47:32.126592",
+///     ctime: "2025-01-16 02:47:32.126592",
+///     crtime: "2025-01-16 02:47:32.126592",
+///     kind: RegularFile,
+///     perm: 600,
+///     nlink: 0,
+///     uid: 501,
+///     gid: 20,
+///     rdev: 0,
+///     flags: 0,
+///     blksize: 8192
+/// },
+/// generation: 0,
+/// fh: 1
+/// ```
 fn reply_created_to_desc_str(reply_created: &ReplyCreated) -> String {
     let mut output = String::new();
 
@@ -265,7 +321,24 @@ fn reply_created_to_desc_str(reply_created: &ReplyCreated) -> String {
 
 /// Convert `FileAttr` to descriptive string.
 ///
-/// Example: `{ ino: 10000, size: 0, blocks: 1, atime: "2025-01-10 22:53:45.491337", mtime: "2025-01-10 22:53:45.491337", ctime: "2025-01-10 22:53:45.491337", crtime: "2025-01-10 22:53:45.491337", kind: RegularFile, perm: 384, nlink: 0, uid: 501, gid: 20, rdev: 0, flags: 0, blksize: 8192 }`
+/// Example (pretty-printed for readability):
+/// ```text
+/// {
+///     ino: 10000, size: 0, blocks: 1,
+///     atime: "2025-01-10 22:53:45.491337",
+///     mtime: "2025-01-10 22:53:45.491337",
+///     ctime: "2025-01-10 22:53:45.491337",
+///     crtime: "2025-01-10 22:53:45.491337",
+///     kind: RegularFile,
+///     perm: 384,
+///     nlink: 0,
+///     uid: 501,
+///     gid: 20,
+///     rdev: 0,
+///     flags: 0,
+///     blksize: 8192
+/// }
+/// ```
 fn file_attr_to_desc_str(attr: &FileAttr) -> String {
     let mut output = String::new();
 
@@ -343,7 +416,19 @@ fn directory_entry_to_desc_str(entry: &DirectoryEntry) -> String {
 
 /// Convert `DirectoryEntryPlus` to descriptive string.
 ///
-/// Example: `{ inode: 1234, generation: 0, kind: RegularFile, name: "file.txt", offset: 1, attr: {...}, entry_ttl: 1s, attr_ttl: 1s }`
+/// Example (pretty-printed for readability):
+/// ```text
+/// {
+///     inode: 1234,
+///     generation: 0,
+///     kind: RegularFile,
+///     name: "file.txt",
+///     offset: 1,
+///     attr: {...},
+///     entry_ttl: 1s,
+///     attr_ttl: 1s
+/// }
+/// ```
 fn directory_entry_plus_to_desc_str(entry: &DirectoryEntryPlus) -> String {
     let mut output = String::new();
     write!(output, "{{ ").unwrap();
