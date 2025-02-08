@@ -536,13 +536,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?parent_path_name,
+            "filename" = ?filename,
             "file_id" = inode,
             ?flags,
             "OPEN started"
@@ -559,11 +559,11 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         offset: u64,
         size: u32,
     ) -> fuse3::Result<ReplyData> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             ?req,
-            "filename" = ?parent_path_name,
+            "filename" = ?filename,
             ?fh,
             ?offset,
             ?size,
@@ -583,13 +583,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         write_flags: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyWrite> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?parent_path_name,
+            "filename" = ?filename,
             "file_id" = inode,
             ?fh,
             ?offset,
@@ -608,13 +608,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?parent_path_name,
+            "filename" = ?filename,
             "file_id" = inode,
             "STATFS started"
         );
@@ -631,13 +631,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         lock_owner: u64,
         flush: bool,
     ) -> fuse3::Result<()> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let filename = self.inner.get_file_path(inode).await?;
         debug!(
             req.unique,
             "uid" = req.uid,
             "gid" = req.gid,
             "pid" = req.pid,
-            "filename" = ?parent_path_name,
+            "filename" = ?filename,
             "file_id" = inode,
             ?fh,
             ?flags,
@@ -743,6 +743,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "gid" = req.gid,
             "pid" = req.pid,
             "parent" = ?parent_path_name,
+            "parent_id" = parent,
             "filename" = ?name,
             ?mode,
             ?flags,
