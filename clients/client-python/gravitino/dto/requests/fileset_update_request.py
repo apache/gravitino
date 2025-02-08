@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.api.fileset_change import FilesetChange
+from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.rest.rest_message import RESTRequest
 
 

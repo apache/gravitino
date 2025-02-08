@@ -19,7 +19,7 @@ from typing import Optional, Dict
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.api.model import Model
+from gravitino.api.model.model import Model
 from gravitino.dto.audit_dto import AuditDTO
 
 

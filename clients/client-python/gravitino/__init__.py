@@ -17,8 +17,8 @@
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.schema import Schema
-from gravitino.api.fileset import Fileset
-from gravitino.api.fileset_change import FilesetChange
+from gravitino.api.file.fileset import Fileset
+from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.api.schema_change import SchemaChange
 from gravitino.client.gravitino_client import GravitinoClient

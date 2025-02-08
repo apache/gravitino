@@ -21,8 +21,8 @@ from typing import List, Dict
 from gravitino.api.catalog import Catalog
 from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.credential.credential import Credential
-from gravitino.api.fileset import Fileset
-from gravitino.api.fileset_change import FilesetChange
+from gravitino.api.file.fileset import Fileset
+from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_fileset import GenericFileset
