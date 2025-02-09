@@ -352,16 +352,13 @@ fn file_attr_to_desc_str(attr: &FileAttr) -> String {
 
     write!(
         output,
-        "{{ ino: {}, size: {}, blocks: {}, ",
-        attr.ino, attr.size, attr.blocks
-    )
-    .unwrap();
-    write!(
-        output,
-        "atime: {}, mtime: {}, ctime: {}, ",
+        "{{ ino: {}, size: {}, blocks: {}, atime: {}, mtime: {}, ctime: {}, ",
+        attr.ino,
+        attr.size,
+        attr.blocks,
         timestamp_to_desc_string(attr.atime),
         timestamp_to_desc_string(attr.mtime),
-        timestamp_to_desc_string(attr.ctime),
+        timestamp_to_desc_string(attr.ctime)
     )
     .unwrap();
     #[cfg(target_os = "macos")]
