@@ -28,9 +28,9 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 use tokio::runtime::Runtime;
-use tracing::{error, info};
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
+use tracing::{error, info};
 
 fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();

@@ -21,7 +21,6 @@ use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::RUN_TEST_WITH_FUSE;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
-use tracing::{error, info};
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
@@ -32,6 +31,7 @@ use std::{env, fs};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
+use tracing::{error, info};
 
 static ASYNC_RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
@@ -497,5 +497,3 @@ fn test_fuse_with_memory_fs() {
     let test_dir = Path::new(&test.mount_point).join("test_dir");
     run_tests(&test_dir);
 }
-
-
