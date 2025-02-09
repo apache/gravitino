@@ -19,10 +19,10 @@
 use crate::error::ErrorCode::{ConfigNotFound, InvalidConfig};
 use crate::utils::GvfsResult;
 use config::{builder, Config};
-use tracing::{error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
+use tracing::{error, info, warn};
 
 // FuseConfig
 pub(crate) const CONF_FUSE_FILE_MASK: ConfigEntity<u32> = ConfigEntity::new(
