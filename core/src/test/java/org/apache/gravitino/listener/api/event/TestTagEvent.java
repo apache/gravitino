@@ -24,15 +24,19 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.TagEventDispatcher;
+import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,6 +47,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestTagEvent {
   private TagEventDispatcher failureDispatcher;
+  private TagEventDispatcher dispatcher;
   private DummyEventListener dummyEventListener;
   private Tag tag;
 
@@ -53,6 +58,183 @@ public class TestTagEvent {
     EventBus eventBus = new EventBus(Arrays.asList(dummyEventListener));
     TagDispatcher tagExceptionDispatcher = mockExceptionTagDispatcher();
     this.failureDispatcher = new TagEventDispatcher(eventBus, tagExceptionDispatcher);
+    TagDispatcher tagDispatcher = mockTagDispatcher();
+    this.dispatcher = new TagEventDispatcher(eventBus, tagDispatcher);
+  }
+
+  @Test
+  void testListTagsEvent() {
+    dispatcher.listTags("metalake");
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+
+    Assertions.assertEquals("metalake", Objects.requireNonNull(preEvent.identifier()).toString());
+    Assertions.assertEquals(ListTagsPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_TAG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testListTagsInfo() {
+    dispatcher.listTagsInfo("metalake");
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+
+    Assertions.assertEquals("metalake", Objects.requireNonNull(preEvent.identifier()).toString());
+    Assertions.assertEquals(ListTagsInfoPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_TAGS_INFO, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testGetTag() {
+    dispatcher.getTag("metalake", tag.name());
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = NameIdentifierUtil.ofTag("metalake", tag.name());
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(GetTagPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_TAG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testCreateTag() {
+    dispatcher.createTag("metalake", tag.name(), tag.comment(), tag.properties());
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = NameIdentifierUtil.ofTag("metalake", tag.name());
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(CreateTagPreEvent.class, preEvent.getClass());
+
+    TagInfo tagInfo = ((CreateTagPreEvent) preEvent).tagInfo();
+    Assertions.assertEquals(tag.name(), tagInfo.name());
+    Assertions.assertEquals(tag.properties(), tagInfo.properties());
+    Assertions.assertEquals(tag.comment(), tagInfo.comment());
+
+    Assertions.assertEquals(OperationType.CREATE_TAG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testAlterTag() {
+    TagChange change1 = TagChange.rename("newName");
+    TagChange[] changes = {change1};
+
+    dispatcher.alterTag("metalake", tag.name(), changes);
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = NameIdentifierUtil.ofTag("metalake", tag.name());
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(AlterTagPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_TAG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    TagChange[] eventChanges = ((AlterTagPreEvent) preEvent).changes();
+    Assertions.assertArrayEquals(changes, eventChanges);
+  }
+
+  @Test
+  void testDeleteTag() {
+    dispatcher.deleteTag("metalake", tag.name());
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = NameIdentifierUtil.ofTag("metalake", tag.name());
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(DeleteTagPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_TAG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testListMetadataObjectsForTag() {
+    dispatcher.listMetadataObjectsForTag("metalake", tag.name());
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = NameIdentifierUtil.ofTag("metalake", tag.name());
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListMetadataObjectsForTagPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testListTagsForMetadataObject() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+
+    dispatcher.listTagsForMetadataObject("metalake", metadataObject);
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListTagsForMetadataObjectPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_TAGS_FOR_METADATA_OBJECT, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testListTagsInfoForMetadataObject() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    dispatcher.listTagsInfoForMetadataObject("metalake", metadataObject);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListTagsInfoForMetadataObjectPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(
+        OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testAssociateTagsForMetadataObject() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+
+    String[] tagsToAdd = {"tag1", "tag2"};
+    String[] tagsToRemove = {"tag3"};
+
+    dispatcher.associateTagsForMetadataObject("metalake", metadataObject, tagsToAdd, tagsToRemove);
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(AssociateTagsForMetadataObjectPreEvent.class, preEvent.getClass());
+    Assertions.assertArrayEquals(
+        tagsToAdd, ((AssociateTagsForMetadataObjectPreEvent) preEvent).tagsToAdd());
+    Assertions.assertArrayEquals(
+        tagsToRemove, ((AssociateTagsForMetadataObjectPreEvent) preEvent).tagsToRemove());
+
+    Assertions.assertEquals(
+        OperationType.ASSOCIATE_TAGS_FOR_METADATA_OBJECT, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testGetTagForMetadataObject() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+
+    dispatcher.getTagForMetadataObject("metalake", metadataObject, tag.name());
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(GetTagForMetadataObjectPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(tag.name(), ((GetTagForMetadataObjectPreEvent) preEvent).tagName());
+    Assertions.assertEquals(OperationType.GET_TAG_FOR_METADATA_OBJECT, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -240,5 +422,10 @@ public class TestTagEvent {
         invocation -> {
           throw new GravitinoRuntimeException("Exception for all methods");
         });
+  }
+
+  private TagDispatcher mockTagDispatcher() {
+    TagDispatcher mockDispatcher = mock(TagDispatcher.class);
+    return mockDispatcher;
   }
 }
