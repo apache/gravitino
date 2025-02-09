@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+use std::mem::swap;
 use crate::config::AppConfig;
 use crate::filesystem::{
     FileReader, FileStat, FileSystemCapacity, FileSystemContext, FileWriter, PathFileSystem, Result,
@@ -26,7 +27,7 @@ use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
 use tracing::error;
-use opendal::{EntryMode, ErrorKind, Metadata, Operator};
+use opendal::{Buffer, EntryMode, ErrorKind, Metadata, Operator};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 

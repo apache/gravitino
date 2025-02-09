@@ -22,8 +22,6 @@ use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::RUN_TEST_WITH_FUSE;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
 use tracing::{error, info};
-use std::sync::Arc;
-use std::thread::sleep;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
