@@ -65,15 +65,15 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
 
         if let Some(size) = size {
             file_stat.size = size;
-        }
+        };
 
         if let Some(atime) = atime {
             file_stat.atime = atime;
-        }
+        };
 
         if let Some(mtime) = mtime {
             file_stat.mtime = mtime;
-        }
+        };
 
         Ok(file_stat)
     }
@@ -122,7 +122,6 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
         }
 
         let file_stat = self.fs.stat(inode).await?;
-
         Ok(ReplyAttr {
             ttl: self.default_ttl,
             attr: fstat_to_file_attr(&file_stat, &self.fs_context),
@@ -262,7 +261,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     type DirEntryStream<'a>
-    = BoxStream<'a, fuse3::Result<DirectoryEntry>>
+        = BoxStream<'a, fuse3::Result<DirectoryEntry>>
     where
         T: 'a;
 
@@ -342,7 +341,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandle<T> {
     }
 
     type DirEntryPlusStream<'a>
-    = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
+        = BoxStream<'a, fuse3::Result<DirectoryEntryPlus>>
     where
         T: 'a;
 
