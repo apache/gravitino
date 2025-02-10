@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -36,15 +37,13 @@ public class SchemaDetails extends Command {
   /**
    * Displays the details of a schema.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    */
-  public SchemaDetails(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-    super(url, ignoreVersions);
+  public SchemaDetails(CommandContext context, String metalake, String catalog, String schema) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -69,7 +68,7 @@ public class SchemaDetails extends Command {
     }
 
     if (result != null) {
-      System.out.println(result.name() + "," + result.comment());
+      printInformation(result.name() + "," + result.comment());
     }
   }
 }
