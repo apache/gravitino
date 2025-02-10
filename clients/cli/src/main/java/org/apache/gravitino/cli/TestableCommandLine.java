@@ -203,60 +203,57 @@ public class TestableCommandLine {
     return new UpdateMetalakeName(context, metalake, newName);
   }
 
-  protected CatalogAudit newCatalogAudit(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new CatalogAudit(url, ignore, metalake, catalog);
+  protected CatalogAudit newCatalogAudit(CommandContext context, String metalake, String catalog) {
+    return new CatalogAudit(context, metalake, catalog);
   }
 
   protected CatalogDetails newCatalogDetails(
-      String url, boolean ignore, String outputFormat, String metalake, String catalog) {
-    return new CatalogDetails(url, ignore, outputFormat, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new CatalogDetails(context, metalake, catalog);
   }
 
-  protected ListCatalogs newListCatalogs(
-      String url, boolean ignore, String outputFormat, String metalake) {
-    return new ListCatalogs(url, ignore, outputFormat, metalake);
+  protected ListCatalogs newListCatalogs(CommandContext context, String metalake) {
+    return new ListCatalogs(context, metalake);
   }
 
   protected CreateCatalog newCreateCatalog(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String provider,
       String comment,
       Map<String, String> properties) {
-    return new CreateCatalog(url, ignore, metalake, catalog, provider, comment, properties);
+    return new CreateCatalog(context, metalake, catalog, provider, comment, properties);
   }
 
   protected DeleteCatalog newDeleteCatalog(
-      String url, boolean ignore, boolean force, String metalake, String catalog) {
-    return new DeleteCatalog(url, ignore, force, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new DeleteCatalog(context, metalake, catalog);
   }
 
   protected SetCatalogProperty newSetCatalogProperty(
-      String url, boolean ignore, String metalake, String catalog, String property, String value) {
-    return new SetCatalogProperty(url, ignore, metalake, catalog, property, value);
+      CommandContext context, String metalake, String catalog, String property, String value) {
+    return new SetCatalogProperty(context, metalake, catalog, property, value);
   }
 
   protected RemoveCatalogProperty newRemoveCatalogProperty(
-      String url, boolean ignore, String metalake, String catalog, String property) {
-    return new RemoveCatalogProperty(url, ignore, metalake, catalog, property);
+      CommandContext context, String metalake, String catalog, String property) {
+    return new RemoveCatalogProperty(context, metalake, catalog, property);
   }
 
   protected ListCatalogProperties newListCatalogProperties(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new ListCatalogProperties(url, ignore, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new ListCatalogProperties(context, metalake, catalog);
   }
 
   protected UpdateCatalogComment newUpdateCatalogComment(
-      String url, boolean ignore, String metalake, String catalog, String comment) {
-    return new UpdateCatalogComment(url, ignore, metalake, catalog, comment);
+      CommandContext context, String metalake, String catalog, String comment) {
+    return new UpdateCatalogComment(context, metalake, catalog, comment);
   }
 
   protected UpdateCatalogName newUpdateCatalogName(
-      String url, boolean ignore, String metalake, String catalog, String newName) {
-    return new UpdateCatalogName(url, ignore, metalake, catalog, newName);
+      CommandContext context, String metalake, String catalog, String newName) {
+    return new UpdateCatalogName(context, metalake, catalog, newName);
   }
 
   protected SchemaAudit newSchemaAudit(
@@ -892,13 +889,13 @@ public class TestableCommandLine {
   }
 
   protected CatalogEnable newCatalogEnable(
-      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
-    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
+      CommandContext context, String metalake, String catalog, boolean enableMetalake) {
+    return new CatalogEnable(context, metalake, catalog, enableMetalake);
   }
 
   protected CatalogDisable newCatalogDisable(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new CatalogDisable(url, ignore, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new CatalogDisable(context, metalake, catalog);
   }
 
   protected ListModel newListModel(
