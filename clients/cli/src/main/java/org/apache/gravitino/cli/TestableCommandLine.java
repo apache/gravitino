@@ -305,99 +305,89 @@ public class TestableCommandLine {
   }
 
   protected TableAudit newTableAudit(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableAudit(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableAudit(context, metalake, catalog, schema, table);
   }
 
   protected TableDetails newTableDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableDetails(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableDetails(context, metalake, catalog, schema, table);
   }
 
   protected ListTables newListTables(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListTables(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListTables(context, metalake, catalog, schema);
   }
 
   protected DeleteTable newDeleteTable(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    return new DeleteTable(url, ignore, force, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new DeleteTable(context, metalake, catalog, schema, table);
   }
 
   protected ListIndexes newListIndexes(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new ListIndexes(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new ListIndexes(context, metalake, catalog, schema, table);
   }
 
   protected TablePartition newTablePartition(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TablePartition(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TablePartition(context, metalake, catalog, schema, table);
   }
 
   protected TableDistribution newTableDistribution(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableDistribution(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableDistribution(context, metalake, catalog, schema, table);
   }
 
   protected TableSortOrder newTableSortOrder(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableSortOrder(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableSortOrder(context, metalake, catalog, schema, table);
   }
 
   protected UpdateTableComment newUpdateTableComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String comment) {
-    return new UpdateTableComment(url, ignore, metalake, catalog, schema, table, comment);
+    return new UpdateTableComment(context, metalake, catalog, schema, table, comment);
   }
 
   protected UpdateTableName newUpdateTableName(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String rename) {
-    return new UpdateTableName(url, ignore, metalake, catalog, schema, table, rename);
+    return new UpdateTableName(context, metalake, catalog, schema, table, rename);
   }
 
   protected SetTableProperty newSetTableProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String property,
       String value) {
-    return new SetTableProperty(url, ignore, metalake, catalog, schema, table, property, value);
+    return new SetTableProperty(context, metalake, catalog, schema, table, property, value);
   }
 
   protected RemoveTableProperty newRemoveTableProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String property) {
-    return new RemoveTableProperty(url, ignore, metalake, catalog, schema, table, property);
+    return new RemoveTableProperty(context, metalake, catalog, schema, table, property);
   }
 
   protected ListTableProperties newListTableProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new ListTableProperties(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new ListTableProperties(context, metalake, catalog, schema, table);
   }
 
   protected UserDetails newUserDetails(String url, boolean ignore, String metalake, String user) {
@@ -869,15 +859,14 @@ public class TestableCommandLine {
   }
 
   protected CreateTable newCreateTable(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String columnFile,
       String comment) {
-    return new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment);
+    return new CreateTable(context, metalake, catalog, schema, table, columnFile, comment);
   }
 
   protected GrantPrivilegesToRole newGrantPrivilegesToRole(
