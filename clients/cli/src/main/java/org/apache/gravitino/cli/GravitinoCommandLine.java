@@ -138,7 +138,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.ROLE)) {
       new RoleCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
-      new ModelCommandHandler(this, line, command, ignore).handle();
+      new ModelCommandHandler(this, line, command, context).handle();
     }
   }
 
