@@ -285,7 +285,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
     try {
 
-      Index[] indices = getGrivatinoIndeics(resolvedTable);
+      Index[] indices = getGrivatinoIndices(resolvedTable);
       catalog()
           .asTableCatalog()
           .createTable(
@@ -308,7 +308,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
   }
 
-  private static Index[] getGrivatinoIndeics(ResolvedCatalogBaseTable<?> resolvedTable) {
+  private static Index[] getGrivatinoIndices(ResolvedCatalogBaseTable<?> resolvedTable) {
     Optional<UniqueConstraint> primaryKey = resolvedTable.getResolvedSchema().getPrimaryKey();
     List<String> primaryColumns = primaryKey.map(UniqueConstraint::getColumns).orElse(null);
     if (primaryColumns == null) {
@@ -554,28 +554,31 @@ public abstract class BaseCatalog extends AbstractCatalog {
           .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
           .withComment(column.comment());
     }
-    handleFlinkPrimaryKey(table, builder);
+    Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
+    flinkPrimaryKey.ifPresent(builder::primaryKey);
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 
-  private static void handleFlinkPrimaryKey(
-      Table table, org.apache.flink.table.api.Schema.Builder builder) {
+  private static Optional<List<String>> getFlinkPrimaryKey(Table table) {
     List<Index> primaryKeyList =
         Arrays.stream(table.index())
             .filter(index -> index.type() == Index.IndexType.PRIMARY_KEY)
             .collect(Collectors.toList());
     if (primaryKeyList.isEmpty()) {
-      return;
+      return Optional.empty();
     }
     Preconditions.checkArgument(
         primaryKeyList.size() == 1, "More than one primary key is not supported.");
-    builder.primaryKey(
+    List<String> primaryKeyFieldList =
         Arrays.stream(primaryKeyList.get(0).fieldNames())
             .map(fieldNames -> fieldNames[0])
-            .collect(Collectors.toList()));
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        !primaryKeyFieldList.isEmpty(), "The primary key must contain at least one field.");
+    return Optional.of(primaryKeyFieldList);
   }
 
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
