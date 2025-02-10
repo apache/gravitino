@@ -24,7 +24,7 @@ public class ErrorMessages {
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String COLUMN_EXISTS = "Column already exists.";
   public static final String DELETE_ANONYMOUS_USER =
-      "Can't delete anonymous user. This will cause unexpected " + "behavior.";
+      "Can't delete anonymous user. This will cause unexpected behavior.";
   public static final String FILESET_EXISTS = "Fileset already exists.";
   public static final String GROUP_EXISTS = "Group already exists.";
   public static final String METALAKE_EXISTS = "Metalake already exists.";
