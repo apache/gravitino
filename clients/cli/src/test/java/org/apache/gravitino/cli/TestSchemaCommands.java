@@ -108,7 +108,7 @@ class TestSchemaCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newSchemaDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+            GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo", "catalog", "schema");
     doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();

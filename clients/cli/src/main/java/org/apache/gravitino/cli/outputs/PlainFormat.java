@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.Schema;
 
 /** Plain format to print a pretty string to standard out. */
 public class PlainFormat {
@@ -35,6 +36,8 @@ public class PlainFormat {
       new CatalogPlainFormat().output((Catalog) object);
     } else if (object instanceof Catalog[]) {
       new CatalogsPlainFormat().output((Catalog[]) object);
+    } else if (object instanceof Schema) {
+      new SchemaPlainFormat().output((Schema) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -85,6 +88,17 @@ public class PlainFormat {
             Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
         String all = String.join(System.lineSeparator(), catalogNames);
         System.out.println(all);
+      }
+    }
+  }
+
+  static final class SchemaPlainFormat implements OutputFormat<Schema> {
+    @Override
+    public void output(Schema schema) {
+      if (schema == null) {
+        System.out.println("No schemas exist.");
+      } else {
+        System.out.println(schema.name() + "," + schema.comment());
       }
     }
   }
