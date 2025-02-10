@@ -178,7 +178,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return fileset_resp.fileset()
+        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def alter_fileset(self, ident: NameIdentifier, *changes) -> Fileset:
         """Update a fileset metadata in the catalog.
@@ -187,7 +187,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
             ident: A fileset identifier, which should be "schema.fileset" format.
             changes: The changes to apply to the fileset.
 
-        Args:
+        Raises:
             IllegalArgumentException If the changes are invalid.
             NoSuchFilesetException If the fileset does not exist.
 
@@ -212,7 +212,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return fileset_resp.fileset()
+        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def drop_fileset(self, ident: NameIdentifier) -> bool:
         """Drop a fileset from the catalog.
