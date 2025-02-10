@@ -97,7 +97,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     if (!topic.imported()) {
       // Load the schema to make sure the schema is imported.
-      // This is not necessary for Kafka catalog.
+      // This is not necessary for Kafka catalogs.
       SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
@@ -151,7 +151,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    * @param changes The changes to apply to the topic.
    * @return The altered topic metadata.
    * @throws NoSuchTopicException If the topic does not exist.
-   * @throws IllegalArgumentException If the changes is rejected by the implementation.
+   * @throws IllegalArgumentException If any change is rejected by the implementation.
    */
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
@@ -233,10 +233,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                   c -> c.doWithTopicOps(t -> t.dropTopic(ident)),
                   RuntimeException.class);
 
-          // For unmanaged topic, it could happen that the topic:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // For the unmanaged topic, it could happen that the topic:
+          // 1. It's not found in the catalog (dropped directly from underlying sources)
+          // 2. It's found in the catalog but not in the store (not managed by Gravitino)
+          // 3. It's found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
           // In all situations, we try to delete the schema from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
@@ -275,7 +275,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     long uid;
     if (stringId != null) {
-      // For Kafka topic, the uid is coming from topic UUID, which is always existed.
+      // For Kafka topics, the uid is coming from topic UUID, which is always existed.
       LOG.warn(
           "The Topic uid {} existed but still needs to be imported, this could be happened "
               + "when Topic is created externally without leveraging Gravitino. In this "

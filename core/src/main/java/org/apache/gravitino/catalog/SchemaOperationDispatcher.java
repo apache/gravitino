@@ -311,10 +311,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // For unmanaged schema, it could happen that the schema:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
+          // For the unmanaged schema, it could happen that the schema:
+          // 1. It's not found in the catalog (dropped directly from underlying sources)
+          // 2. It's found in the catalog but not in the store (not managed by Gravitino)
+          // 3. It's found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
           // In all situations, we try to delete the schema from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
@@ -354,7 +354,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           stringId);
       uid = stringId.id();
     } else {
-      // If entity doesn't exist, we import the entity from the external system.
+      // If the entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }
 

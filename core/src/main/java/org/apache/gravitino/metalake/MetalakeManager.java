@@ -133,7 +133,7 @@ public class MetalakeManager implements MetalakeDispatcher {
           .map(this::newMetalakeWithResolvedProperties)
           .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
-      LOG.error("Listing Metalakes failed due to storage issues", ioe);
+      LOG.error("Listing Metalakes failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
     }
   }
