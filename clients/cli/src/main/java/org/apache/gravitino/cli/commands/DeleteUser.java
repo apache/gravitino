@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -53,7 +54,7 @@ public class DeleteUser extends Command {
   public void handle() {
     boolean deleted = false;
 
-    if ("anonymous".equalsIgnoreCase(user)) {
+    if (AuthConstants.ANONYMOUS_USER.equalsIgnoreCase(user)) {
       exitWithError(ErrorMessages.DELETE_ANONYMOUS_USER);
     }
 
