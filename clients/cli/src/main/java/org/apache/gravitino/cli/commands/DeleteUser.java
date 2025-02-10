@@ -53,6 +53,10 @@ public class DeleteUser extends Command {
   public void handle() {
     boolean deleted = false;
 
+    if ("anonymous".equalsIgnoreCase(user)) {
+      exitWithError(ErrorMessages.DELETE_ANONYMOUS_USER);
+    }
+
     if (!AreYouSure.really(force)) {
       return;
     }
