@@ -20,7 +20,7 @@ from typing import Optional, Dict
 
 from dataclasses_json import config
 
-from gravitino.api.fileset import Fileset
+from gravitino.api.file.fileset import Fileset
 from gravitino.rest.rest_message import RESTRequest
 
 

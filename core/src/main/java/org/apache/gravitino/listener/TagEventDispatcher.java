@@ -22,16 +22,27 @@ import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.listener.api.event.AlterTagFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterTagPreEvent;
 import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.CreateTagFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateTagPreEvent;
 import org.apache.gravitino.listener.api.event.DeleteTagFailureEvent;
+import org.apache.gravitino.listener.api.event.DeleteTagPreEvent;
 import org.apache.gravitino.listener.api.event.GetTagFailureEvent;
 import org.apache.gravitino.listener.api.event.GetTagForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.GetTagForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.GetTagPreEvent;
 import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagFailureEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsInfoPreEvent;
+import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -55,7 +66,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public String[] listTags(String metalake) {
-    // TODO: listTagsPreEvent
+    eventBus.dispatchEvent(new ListTagsPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       // TODO: listTagsEvent
       return dispatcher.listTags(metalake);
@@ -68,7 +79,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag[] listTagsInfo(String metalake) {
-    // TODO: listTagsInfoPreEvent
+    eventBus.dispatchEvent(new ListTagsInfoPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       // TODO: listTagsInfoEvent
       return dispatcher.listTagsInfo(metalake);
@@ -81,7 +92,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
-    // TODO: getTagPreEvent
+    eventBus.dispatchEvent(new GetTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
     try {
       // TODO: getTagEvent
       return dispatcher.getTag(metalake, name);
@@ -97,6 +108,9 @@ public class TagEventDispatcher implements TagDispatcher {
       String metalake, String name, String comment, Map<String, String> properties) {
     TagInfo tagInfo = new TagInfo(name, comment, properties);
     // TODO: createTagPreEvent
+
+    eventBus.dispatchEvent(
+        new CreateTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo));
     try {
       // TODO: createTagEvent
       return dispatcher.createTag(metalake, name, comment, properties);
@@ -109,7 +123,10 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag alterTag(String metalake, String name, TagChange... changes) {
-    // TODO: alterTagPreEvent
+    AlterTagPreEvent preEvent =
+        new AlterTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name, changes);
+
+    eventBus.dispatchEvent(preEvent);
     try {
       // TODO: alterTagEvent
       return dispatcher.alterTag(metalake, name, changes);
@@ -123,7 +140,10 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public boolean deleteTag(String metalake, String name) {
-    // TODO: deleteTagPreEvent
+    DeleteTagPreEvent preEvent =
+        new DeleteTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name);
+
+    eventBus.dispatchEvent(preEvent);
     try {
       // TODO: deleteTagEvent
       return dispatcher.deleteTag(metalake, name);
@@ -136,7 +156,8 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name) {
-    // TODO: listMetadataObjectsForTagPreEvent
+    eventBus.dispatchEvent(
+        new ListMetadataObjectsForTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
     try {
       // TODO: listMetadataObjectsForTagEvent
       return dispatcher.listMetadataObjectsForTag(metalake, name);
@@ -150,7 +171,10 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
-    // TODO: listTagsForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new ListTagsForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
+
     try {
       // TODO: listTagsForMetadataObjectEvent
       return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
@@ -164,7 +188,9 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject) {
-    // TODO: listTagsInfoForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new ListTagsInfoForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
     try {
       // TODO: listTagsInfoForMetadataObjectEvent
       return dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
@@ -179,7 +205,14 @@ public class TagEventDispatcher implements TagDispatcher {
   @Override
   public String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
-    // TODO: associateTagsForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new AssociateTagsForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(),
+            metalake,
+            metadataObject,
+            tagsToAdd,
+            tagsToRemove));
+
     try {
       // TODO: associateTagsForMetadataObjectEvent
       return dispatcher.associateTagsForMetadataObject(
@@ -199,7 +232,9 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name) {
-    // TODO: getTagForMetadataObjectPreEvent
+    eventBus.dispatchEvent(
+        new GetTagForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name));
     try {
       // TODO: getTagForMetadataObjectEvent
       return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);

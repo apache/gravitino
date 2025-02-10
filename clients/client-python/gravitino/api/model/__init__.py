@@ -14,32 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import Optional
-
-from gravitino.api.model.model import Model
-from gravitino.dto.audit_dto import AuditDTO
-from gravitino.dto.model_dto import ModelDTO
-
-
-class GenericModel(Model):
-
-    _model_dto: ModelDTO
-    """The model DTO object."""
-
-    def __init__(self, model_dto: ModelDTO):
-        self._model_dto = model_dto
-
-    def name(self) -> str:
-        return self._model_dto.name()
-
-    def comment(self) -> Optional[str]:
-        return self._model_dto.comment()
-
-    def properties(self) -> dict:
-        return self._model_dto.properties()
-
-    def latest_version(self) -> int:
-        return self._model_dto.latest_version()
-
-    def audit_info(self) -> AuditDTO:
-        return self._model_dto.audit_info()
