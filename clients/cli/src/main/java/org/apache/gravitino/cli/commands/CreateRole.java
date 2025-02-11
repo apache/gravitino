@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import com.google.common.base.Joiner;
 import java.util.Collections;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -33,13 +34,12 @@ public class CreateRole extends Command {
   /**
    * Create a new role.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param roles The array of roles.
    */
-  public CreateRole(String url, boolean ignoreVersions, String metalake, String[] roles) {
-    super(url, ignoreVersions);
+  public CreateRole(CommandContext context, String metalake, String[] roles) {
+    super(context);
     this.metalake = metalake;
     this.roles = roles;
   }
@@ -60,6 +60,6 @@ public class CreateRole extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(Joiner.on(", ").join(roles) + " created");
+    printInformation(Joiner.on(", ").join(roles) + " created");
   }
 }

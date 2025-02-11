@@ -114,7 +114,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     if (CommandActions.HELP.equals(command)) {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
-      new OwnerCommandHandler(this, line, command, ignore, entity).handle();
+      new OwnerCommandHandler(this, line, command, context, entity).handle();
     } else if (entity.equals(CommandEntities.COLUMN)) {
       new ColumnCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.TABLE)) {
@@ -136,7 +136,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.TAG)) {
       new TagCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.ROLE)) {
-      new RoleCommandHandler(this, line, command, ignore).handle();
+      new RoleCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
       new ModelCommandHandler(this, line, command, context).handle();
     }

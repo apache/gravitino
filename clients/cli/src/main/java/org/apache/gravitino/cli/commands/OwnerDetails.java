@@ -23,6 +23,7 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -38,15 +39,13 @@ public class OwnerDetails extends Command {
   /**
    * Displays the owner of an entity.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param entity The name of the entity.
    * @param entityType The type entity.
    */
-  public OwnerDetails(
-      String url, boolean ignoreVersions, String metalake, String entity, String entityType) {
-    super(url, ignoreVersions);
+  public OwnerDetails(CommandContext context, String metalake, String entity, String entityType) {
+    super(context);
     this.metalake = metalake;
     this.entity = entity;
 
@@ -83,9 +82,9 @@ public class OwnerDetails extends Command {
     }
 
     if (owner.isPresent()) {
-      System.out.println(owner.get().name());
+      printResults(owner.get().name());
     } else {
-      System.out.println("No owner");
+      printInformation("No owner");
     }
   }
 }
