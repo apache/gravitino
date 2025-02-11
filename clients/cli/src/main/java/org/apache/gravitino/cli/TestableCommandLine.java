@@ -645,86 +645,75 @@ public class TestableCommandLine {
   }
 
   protected FilesetDetails newFilesetDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
-    return new FilesetDetails(url, ignore, metalake, catalog, schema, fileset);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    return new FilesetDetails(context, metalake, catalog, schema, fileset);
   }
 
   protected ListFilesets newListFilesets(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListFilesets(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListFilesets(context, metalake, catalog, schema);
   }
 
   protected CreateFileset newCreateFileset(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String comment,
       Map<String, String> propertyMap) {
-    return new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap);
+    return new CreateFileset(context, metalake, catalog, schema, fileset, comment, propertyMap);
   }
 
   protected DeleteFileset newDeleteFileset(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String fileset) {
-    return new DeleteFileset(url, ignore, force, metalake, catalog, schema, fileset);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    return new DeleteFileset(context, metalake, catalog, schema, fileset);
   }
 
   protected UpdateFilesetComment newUpdateFilesetComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String comment) {
-    return new UpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment);
+    return new UpdateFilesetComment(context, metalake, catalog, schema, fileset, comment);
   }
 
   protected UpdateFilesetName newUpdateFilesetName(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String rename) {
-    return new UpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, rename);
+    return new UpdateFilesetName(context, metalake, catalog, schema, fileset, rename);
   }
 
   protected ListFilesetProperties newListFilesetProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
-    return new ListFilesetProperties(url, ignore, metalake, catalog, schema, fileset);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    return new ListFilesetProperties(context, metalake, catalog, schema, fileset);
   }
 
   protected SetFilesetProperty newSetFilesetProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String property,
       String value) {
-    return new SetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value);
+    return new SetFilesetProperty(context, metalake, catalog, schema, fileset, property, value);
   }
 
   protected RemoveFilesetProperty newRemoveFilesetProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String property) {
-    return new RemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property);
+    return new RemoveFilesetProperty(context, metalake, catalog, schema, fileset, property);
   }
 
   protected AddColumn newAddColumn(
