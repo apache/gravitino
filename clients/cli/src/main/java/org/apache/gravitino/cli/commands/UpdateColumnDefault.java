@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.DefaultConverter;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -44,8 +45,7 @@ public class UpdateColumnDefault extends Command {
   /**
    * Update the default type of a column.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -55,8 +55,7 @@ public class UpdateColumnDefault extends Command {
    * @param dataType The new default data type.
    */
   public UpdateColumnDefault(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -64,7 +63,7 @@ public class UpdateColumnDefault extends Command {
       String column,
       String defaultValue,
       String dataType) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -101,7 +100,7 @@ public class UpdateColumnDefault extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(column + " default changed.");
+    printInformation(column + " default changed.");
   }
 
   @Override

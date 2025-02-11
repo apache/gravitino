@@ -541,19 +541,18 @@ public class TestableCommandLine {
   }
 
   protected ColumnAudit newColumnAudit(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column) {
-    return new ColumnAudit(url, ignore, metalake, catalog, schema, table, column);
+    return new ColumnAudit(context, metalake, catalog, schema, table, column);
   }
 
   protected ListColumns newListColumns(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new ListColumns(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new ListColumns(context, metalake, catalog, schema, table);
   }
 
   protected SetOwner newSetOwner(
@@ -716,8 +715,7 @@ public class TestableCommandLine {
   }
 
   protected AddColumn newAddColumn(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -730,8 +728,7 @@ public class TestableCommandLine {
       boolean autoIncrement,
       String defaultValue) {
     return new AddColumn(
-        url,
-        ignore,
+        context,
         metalake,
         catalog,
         schema,
@@ -746,82 +743,72 @@ public class TestableCommandLine {
   }
 
   protected DeleteColumn newDeleteColumn(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column) {
-    return new DeleteColumn(url, ignore, metalake, catalog, schema, table, column);
+    return new DeleteColumn(context, metalake, catalog, schema, table, column);
   }
 
   protected UpdateColumnComment newUpdateColumnComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String comment) {
-    return new UpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment);
+    return new UpdateColumnComment(context, metalake, catalog, schema, table, column, comment);
   }
 
   protected UpdateColumnName newUpdateColumnName(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String rename) {
-    return new UpdateColumnName(url, ignore, metalake, catalog, schema, table, column, rename);
+    return new UpdateColumnName(context, metalake, catalog, schema, table, column, rename);
   }
 
   protected UpdateColumnDatatype newUpdateColumnDatatype(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String datatype) {
-    return new UpdateColumnDatatype(
-        url, ignore, metalake, catalog, schema, table, column, datatype);
+    return new UpdateColumnDatatype(context, metalake, catalog, schema, table, column, datatype);
   }
 
   protected UpdateColumnPosition newUpdateColumnPosition(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String position) {
-    return new UpdateColumnPosition(
-        url, ignore, metalake, catalog, schema, table, column, position);
+    return new UpdateColumnPosition(context, metalake, catalog, schema, table, column, position);
   }
 
   protected UpdateColumnNullability newUpdateColumnNullability(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       boolean nullable) {
-    return new UpdateColumnNullability(
-        url, ignore, metalake, catalog, schema, table, column, nullable);
+    return new UpdateColumnNullability(context, metalake, catalog, schema, table, column, nullable);
   }
 
   protected UpdateColumnAutoIncrement newUpdateColumnAutoIncrement(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -829,12 +816,11 @@ public class TestableCommandLine {
       String column,
       boolean autoIncrement) {
     return new UpdateColumnAutoIncrement(
-        url, ignore, metalake, catalog, schema, table, column, autoIncrement);
+        context, metalake, catalog, schema, table, column, autoIncrement);
   }
 
   protected UpdateColumnDefault newUpdateColumnDefault(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -843,7 +829,7 @@ public class TestableCommandLine {
       String defaultValue,
       String dataType) {
     return new UpdateColumnDefault(
-        url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType);
+        context, metalake, catalog, schema, table, column, defaultValue, dataType);
   }
 
   protected CreateTable newCreateTable(
