@@ -474,67 +474,65 @@ public class TestableCommandLine {
     return new DeleteRole(url, ignore, force, metalake, roles);
   }
 
-  protected TagDetails newTagDetails(String url, boolean ignore, String metalake, String tag) {
-    return new TagDetails(url, ignore, metalake, tag);
+  protected TagDetails newTagDetails(CommandContext context, String metalake, String tag) {
+    return new TagDetails(context, metalake, tag);
   }
 
-  protected ListAllTags newListTags(String url, boolean ignore, String metalake) {
-    return new ListAllTags(url, ignore, metalake);
+  protected ListAllTags newListTags(CommandContext context, String metalake) {
+    return new ListAllTags(context, metalake);
   }
 
   protected CreateTag newCreateTags(
-      String url, boolean ignore, String metalake, String[] tags, String comment) {
-    return new CreateTag(url, ignore, metalake, tags, comment);
+      CommandContext context, String metalake, String[] tags, String comment) {
+    return new CreateTag(context, metalake, tags, comment);
   }
 
-  protected DeleteTag newDeleteTag(
-      String url, boolean ignore, boolean force, String metalake, String[] tags) {
-    return new DeleteTag(url, ignore, force, metalake, tags);
+  protected DeleteTag newDeleteTag(CommandContext context, String metalake, String[] tags) {
+    return new DeleteTag(context, metalake, tags);
   }
 
   protected SetTagProperty newSetTagProperty(
-      String url, boolean ignore, String metalake, String tag, String property, String value) {
-    return new SetTagProperty(url, ignore, metalake, tag, property, value);
+      CommandContext context, String metalake, String tag, String property, String value) {
+    return new SetTagProperty(context, metalake, tag, property, value);
   }
 
   protected RemoveTagProperty newRemoveTagProperty(
-      String url, boolean ignore, String metalake, String tag, String property) {
-    return new RemoveTagProperty(url, ignore, metalake, tag, property);
+      CommandContext context, String metalake, String tag, String property) {
+    return new RemoveTagProperty(context, metalake, tag, property);
   }
 
-  protected RemoveAllTags newRemoveAllTags(
-      String url, boolean ignore, String metalake, FullName name, boolean force) {
-    return new RemoveAllTags(url, ignore, metalake, name, force);
+  protected RemoveAllTags newRemoveAllTags(CommandContext context, String metalake, FullName name) {
+    return new RemoveAllTags(context, metalake, name);
   }
 
   protected ListTagProperties newListTagProperties(
-      String url, boolean ignore, String metalake, String tag) {
-    return new ListTagProperties(url, ignore, metalake, tag);
+      CommandContext context, String metalake, String tag) {
+    return new ListTagProperties(context, metalake, tag);
   }
 
   protected UpdateTagComment newUpdateTagComment(
-      String url, boolean ignore, String metalake, String tag, String comment) {
-    return new UpdateTagComment(url, ignore, metalake, tag, comment);
+      CommandContext context, String metalake, String tag, String comment) {
+    return new UpdateTagComment(context, metalake, tag, comment);
   }
 
   protected UpdateTagName newUpdateTagName(
-      String url, boolean ignore, String metalake, String tag, String newName) {
-    return new UpdateTagName(url, ignore, metalake, tag, newName);
+      CommandContext context, String metalake, String tag, String newName) {
+    return new UpdateTagName(context, metalake, tag, newName);
   }
 
   protected ListEntityTags newListEntityTags(
-      String url, boolean ignore, String metalake, FullName name) {
-    return new ListEntityTags(url, ignore, metalake, name);
+      CommandContext context, String metalake, FullName name) {
+    return new ListEntityTags(context, metalake, name);
   }
 
   protected TagEntity newTagEntity(
-      String url, boolean ignore, String metalake, FullName name, String[] tags) {
-    return new TagEntity(url, ignore, metalake, name, tags);
+      CommandContext context, String metalake, FullName name, String[] tags) {
+    return new TagEntity(context, metalake, name, tags);
   }
 
   protected UntagEntity newUntagEntity(
-      String url, boolean ignore, String metalake, FullName name, String[] tags) {
-    return new UntagEntity(url, ignore, metalake, name, tags);
+      CommandContext context, String metalake, FullName name, String[] tags) {
+    return new UntagEntity(context, metalake, name, tags);
   }
 
   protected ColumnAudit newColumnAudit(
