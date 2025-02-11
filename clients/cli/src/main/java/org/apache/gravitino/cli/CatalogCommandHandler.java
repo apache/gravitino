@@ -34,7 +34,6 @@ public class CatalogCommandHandler extends CommandHandler {
   private final CommandLine line;
   private final String command;
   private final CommandContext context;
-  private final String url;
   private final FullName name;
   private final String metalake;
   private String catalog;
@@ -57,8 +56,7 @@ public class CatalogCommandHandler extends CommandHandler {
     this.command = command;
     this.context = context;
 
-    this.url = getUrl(line);
-    this.context.setUrl(this.url);
+    this.context.setUrl(getUrl(line));
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
   }
