@@ -30,6 +30,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.client.GravitinoClient;
@@ -46,15 +47,14 @@ public class RevokeAllPrivileges extends MetadataCommand {
   /**
    * Revokes all privileges from a role to an entity or all entities.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    * @param entity The name of the entity.
    */
   public RevokeAllPrivileges(
-      String url, boolean ignoreVersions, String metalake, String role, FullName entity) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String role, FullName entity) {
+    super(context);
     this.metalake = metalake;
     this.role = role;
     this.entity = entity;
@@ -86,8 +86,11 @@ public class RevokeAllPrivileges extends MetadataCommand {
       exitWithError(e.getMessage());
     }
 
-    if (revokedPrivileges.isEmpty()) outputRevokedPrivileges("No privileges revoked.");
-    outputRevokedPrivileges(revokedPrivileges);
+    if (revokedPrivileges.isEmpty()) {
+      printInformation("No privileges revoked.");
+    } else {
+      outputRevokedPrivileges(revokedPrivileges);
+    }
   }
 
   private List<SecurableObject> getMatchedObjects(GravitinoClient client) {
@@ -106,14 +109,10 @@ public class RevokeAllPrivileges extends MetadataCommand {
       revokedInfoList.add(entry.getKey() + ": " + COMMA_JOINER.join(revokedPrivilegesList));
     }
 
-    System.out.println("Revoked privileges:");
+    printInformation("Revoked privileges:");
     for (String info : revokedInfoList) {
-      System.out.println(info);
+      printResults(info);
     }
-  }
-
-  private void outputRevokedPrivileges(String message) {
-    System.out.println(message);
   }
 
   /**

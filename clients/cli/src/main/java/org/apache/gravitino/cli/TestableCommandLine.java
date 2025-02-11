@@ -453,25 +453,24 @@ public class TestableCommandLine {
     return new AddRoleToGroup(url, ignore, metalake, group, role);
   }
 
-  protected RoleDetails newRoleDetails(String url, boolean ignore, String metalake, String role) {
-    return new RoleDetails(url, ignore, metalake, role);
+  protected RoleDetails newRoleDetails(CommandContext context, String metalake, String role) {
+    return new RoleDetails(context, metalake, role);
   }
 
-  protected ListRoles newListRoles(String url, boolean ignore, String metalake) {
-    return new ListRoles(url, ignore, metalake);
+  protected ListRoles newListRoles(CommandContext context, String metalake) {
+    return new ListRoles(context, metalake);
   }
 
-  protected RoleAudit newRoleAudit(String url, boolean ignore, String metalake, String role) {
-    return new RoleAudit(url, ignore, metalake, role);
+  protected RoleAudit newRoleAudit(CommandContext context, String metalake, String role) {
+    return new RoleAudit(context, metalake, role);
   }
 
-  protected CreateRole newCreateRole(String url, boolean ignore, String metalake, String[] roles) {
-    return new CreateRole(url, ignore, metalake, roles);
+  protected CreateRole newCreateRole(CommandContext context, String metalake, String[] roles) {
+    return new CreateRole(context, metalake, roles);
   }
 
-  protected DeleteRole newDeleteRole(
-      String url, boolean ignore, boolean force, String metalake, String[] roles) {
-    return new DeleteRole(url, ignore, force, metalake, roles);
+  protected DeleteRole newDeleteRole(CommandContext context, String metalake, String[] roles) {
+    return new DeleteRole(context, metalake, roles);
   }
 
   protected TagDetails newTagDetails(String url, boolean ignore, String metalake, String tag) {
@@ -553,19 +552,18 @@ public class TestableCommandLine {
   }
 
   protected SetOwner newSetOwner(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String entity,
       String entityType,
       String owner,
       boolean isGroup) {
-    return new SetOwner(url, ignore, metalake, entity, entityType, owner, isGroup);
+    return new SetOwner(context, metalake, entity, entityType, owner, isGroup);
   }
 
   protected OwnerDetails newOwnerDetails(
-      String url, boolean ignore, String metalake, String entity, String entityType) {
-    return new OwnerDetails(url, ignore, metalake, entity, entityType);
+      CommandContext context, String metalake, String entity, String entityType) {
+    return new OwnerDetails(context, metalake, entity, entityType);
   }
 
   protected ListTopics newListTopics(
@@ -831,28 +829,18 @@ public class TestableCommandLine {
   }
 
   protected GrantPrivilegesToRole newGrantPrivilegesToRole(
-      String url,
-      boolean ignore,
-      String metalake,
-      String role,
-      FullName entity,
-      String[] privileges) {
-    return new GrantPrivilegesToRole(url, ignore, metalake, role, entity, privileges);
+      CommandContext context, String metalake, String role, FullName entity, String[] privileges) {
+    return new GrantPrivilegesToRole(context, metalake, role, entity, privileges);
   }
 
   protected RevokePrivilegesFromRole newRevokePrivilegesFromRole(
-      String url,
-      boolean ignore,
-      String metalake,
-      String role,
-      FullName entity,
-      String[] privileges) {
-    return new RevokePrivilegesFromRole(url, ignore, metalake, role, entity, privileges);
+      CommandContext context, String metalake, String role, FullName entity, String[] privileges) {
+    return new RevokePrivilegesFromRole(context, metalake, role, entity, privileges);
   }
 
   protected RevokeAllPrivileges newRevokeAllPrivileges(
-      String url, boolean ignore, String metalake, String role, FullName entity) {
-    return new RevokeAllPrivileges(url, ignore, metalake, role, entity);
+      CommandContext context, String metalake, String role, FullName entity) {
+    return new RevokeAllPrivileges(context, metalake, role, entity);
   }
 
   protected MetalakeEnable newMetalakeEnable(

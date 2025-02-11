@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -39,8 +40,7 @@ public class SetOwner extends Command {
   /**
    * Sets the owner of an entity.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param entity The name of the entity.
    * @param entityType The type entity.
@@ -48,14 +48,13 @@ public class SetOwner extends Command {
    * @param isGroup True if the owner is a group, false if it is not.
    */
   public SetOwner(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String entity,
       String entityType,
       String owner,
       boolean isGroup) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.entity = entity;
     this.owner = owner;
@@ -97,6 +96,6 @@ public class SetOwner extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println("Set owner to " + owner);
+    printInformation("Set owner to " + owner);
   }
 }
