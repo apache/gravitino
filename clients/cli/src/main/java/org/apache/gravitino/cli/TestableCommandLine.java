@@ -573,74 +573,64 @@ public class TestableCommandLine {
   }
 
   protected ListTopics newListTopics(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListTopics(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListTopics(context, metalake, catalog, schema);
   }
 
   protected TopicDetails newTopicDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
-    return new TopicDetails(url, ignore, metalake, catalog, schema, topic);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    return new TopicDetails(context, metalake, catalog, schema, topic);
   }
 
   protected CreateTopic newCreateTopic(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String comment) {
-    return new CreateTopic(url, ignore, metalake, catalog, schema, topic, comment);
+    return new CreateTopic(context, metalake, catalog, schema, topic, comment);
   }
 
   protected DeleteTopic newDeleteTopic(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String topic) {
-    return new DeleteTopic(url, ignore, force, metalake, catalog, schema, topic);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    return new DeleteTopic(context, metalake, catalog, schema, topic);
   }
 
   protected UpdateTopicComment newUpdateTopicComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String comment) {
-    return new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment);
+    return new UpdateTopicComment(context, metalake, catalog, schema, topic, comment);
   }
 
   protected SetTopicProperty newSetTopicProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String property,
       String value) {
-    return new SetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value);
+    return new SetTopicProperty(context, metalake, catalog, schema, topic, property, value);
   }
 
   protected RemoveTopicProperty newRemoveTopicProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String property) {
-    return new RemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property);
+    return new RemoveTopicProperty(context, metalake, catalog, schema, topic, property);
   }
 
   protected ListTopicProperties newListTopicProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
-    return new ListTopicProperties(url, ignore, metalake, catalog, schema, topic);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    return new ListTopicProperties(context, metalake, catalog, schema, topic);
   }
 
   protected FilesetDetails newFilesetDetails(

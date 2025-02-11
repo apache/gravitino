@@ -23,6 +23,7 @@ import com.google.common.base.Joiner;
 import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -37,15 +38,13 @@ public class ListTopics extends Command {
   /**
    * List the names of all topics in a schema.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    */
-  public ListTopics(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-    super(url, ignoreVersions);
+  public ListTopics(CommandContext context, String metalake, String catalog, String schema) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -70,6 +69,6 @@ public class ListTopics extends Command {
         topics.length == 0
             ? "No topics exist."
             : Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
-    System.out.println(all);
+    printResults(all);
   }
 }
