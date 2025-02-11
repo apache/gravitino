@@ -129,7 +129,7 @@ public class TagEntity extends Command {
 
     String all = tagsToAdd.length == 0 ? "nothing" : String.join(",", tagsToAdd);
 
-    printResults(entity + " now tagged with " + all);
+    printInformation(entity + " now tagged with " + all);
   }
 
   @Override

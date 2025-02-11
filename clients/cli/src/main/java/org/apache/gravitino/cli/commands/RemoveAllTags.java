@@ -150,9 +150,10 @@ public class RemoveAllTags extends Command {
     }
 
     if (tags.length > 0) {
-      printResults(entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
+      printInformation(
+          entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
     } else {
-      printResults(entity + " has no tags");
+      printInformation(entity + " has no tags");
     }
   }
 
