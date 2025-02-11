@@ -53,8 +53,10 @@ public class ListGroups extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = groups.length == 0 ? "No groups exist." : String.join(",", groups);
-
-    printInformation(all);
+    if (groups.length == 0) {
+      printInformation("No groups found in metalake " + metalake);
+    } else {
+      printResults(String.join(",", groups));
+    }
   }
 }

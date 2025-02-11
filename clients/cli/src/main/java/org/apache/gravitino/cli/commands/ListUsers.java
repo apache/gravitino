@@ -53,8 +53,10 @@ public class ListUsers extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = users.length == 0 ? "No users exist." : String.join(",", users);
-
-    printResults(all);
+    if (users.length == 0) {
+      printInformation("No users exist.");
+    } else {
+      printResults(String.join(",", users));
+    }
   }
 }

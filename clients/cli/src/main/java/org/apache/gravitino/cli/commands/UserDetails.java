@@ -60,8 +60,10 @@ public class UserDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = roles.isEmpty() ? "The user has no roles." : String.join(",", roles);
-
-    printResults(all);
+    if (roles.isEmpty()) {
+      printInformation("The user has no roles.");
+    } else {
+      printResults(String.join(",", roles));
+    }
   }
 }

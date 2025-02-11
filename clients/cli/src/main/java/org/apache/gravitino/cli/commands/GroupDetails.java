@@ -60,8 +60,10 @@ public class GroupDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = roles.isEmpty() ? "The group has no roles." : String.join(",", roles);
-
-    printInformation(all);
+    if (roles == null) {
+      printInformation("The group has no roles.");
+    } else {
+      printResults(String.join(",", roles));
+    }
   }
 }
