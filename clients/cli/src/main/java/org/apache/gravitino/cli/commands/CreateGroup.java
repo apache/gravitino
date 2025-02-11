@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -31,13 +32,12 @@ public class CreateGroup extends Command {
   /**
    * Create a new group.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    */
-  public CreateGroup(String url, boolean ignoreVersions, String metalake, String group) {
-    super(url, ignoreVersions);
+  public CreateGroup(CommandContext context, String metalake, String group) {
+    super(context);
     this.metalake = metalake;
     this.group = group;
   }
@@ -56,6 +56,6 @@ public class CreateGroup extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(group + " created");
+    printInformation(group + " created");
   }
 }
