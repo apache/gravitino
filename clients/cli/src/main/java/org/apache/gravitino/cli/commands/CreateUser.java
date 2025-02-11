@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -31,13 +32,12 @@ public class CreateUser extends Command {
   /**
    * Create a new User.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public CreateUser(String url, boolean ignoreVersions, String metalake, String user) {
-    super(url, ignoreVersions);
+  public CreateUser(CommandContext context, String metalake, String user) {
+    super(context);
     this.metalake = metalake;
     this.user = user;
   }
@@ -56,6 +56,6 @@ public class CreateUser extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(user + " created");
+    printInformation(user + " created");
   }
 }

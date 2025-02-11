@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.List;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -33,13 +34,12 @@ public class GroupDetails extends Command {
   /**
    * Displays the roles in a group.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    */
-  public GroupDetails(String url, boolean ignoreVersions, String metalake, String group) {
-    super(url, ignoreVersions);
+  public GroupDetails(CommandContext context, String metalake, String group) {
+    super(context);
     this.metalake = metalake;
     this.group = group;
   }
@@ -60,8 +60,10 @@ public class GroupDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = roles.isEmpty() ? "The group has no roles." : String.join(",", roles);
-
-    System.out.println(all);
+    if (roles == null) {
+      printInformation("The group has no roles.");
+    } else {
+      printResults(String.join(",", roles));
+    }
   }
 }

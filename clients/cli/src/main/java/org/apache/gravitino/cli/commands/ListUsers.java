@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -31,12 +32,11 @@ public class ListUsers extends Command {
   /**
    * Lists all users in a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    */
-  public ListUsers(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public ListUsers(CommandContext context, String metalake) {
+    super(context);
     this.metalake = metalake;
   }
 
@@ -53,8 +53,10 @@ public class ListUsers extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = users.length == 0 ? "No users exist." : String.join(",", users);
-
-    System.out.println(all);
+    if (users.length == 0) {
+      printInformation("No users exist.");
+    } else {
+      printResults(String.join(",", users));
+    }
   }
 }

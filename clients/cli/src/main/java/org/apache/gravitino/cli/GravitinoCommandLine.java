@@ -130,9 +130,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.FILESET)) {
       new FilesetCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.USER)) {
-      new UserCommandHandler(this, line, command, ignore).handle();
+      new UserCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
-      new GroupCommandHandler(this, line, command, ignore).handle();
+      new GroupCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.TAG)) {
       new TagCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.ROLE)) {

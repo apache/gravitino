@@ -386,71 +386,69 @@ public class TestableCommandLine {
     return new ListTableProperties(context, metalake, catalog, schema, table);
   }
 
-  protected UserDetails newUserDetails(String url, boolean ignore, String metalake, String user) {
-    return new UserDetails(url, ignore, metalake, user);
+  protected UserDetails newUserDetails(CommandContext context, String metalake, String user) {
+    return new UserDetails(context, metalake, user);
   }
 
-  protected ListUsers newListUsers(String url, boolean ignore, String metalake) {
-    return new ListUsers(url, ignore, metalake);
+  protected ListUsers newListUsers(CommandContext context, String metalake) {
+    return new ListUsers(context, metalake);
   }
 
-  protected UserAudit newUserAudit(String url, boolean ignore, String metalake, String user) {
-    return new UserAudit(url, ignore, metalake, user);
+  protected UserAudit newUserAudit(CommandContext context, String metalake, String user) {
+    return new UserAudit(context, metalake, user);
   }
 
-  protected CreateUser newCreateUser(String url, boolean ignore, String metalake, String user) {
-    return new CreateUser(url, ignore, metalake, user);
+  protected CreateUser newCreateUser(CommandContext context, String metalake, String user) {
+    return new CreateUser(context, metalake, user);
   }
 
-  protected DeleteUser newDeleteUser(
-      String url, boolean ignore, boolean force, String metalake, String user) {
-    return new DeleteUser(url, ignore, force, metalake, user);
+  protected DeleteUser newDeleteUser(CommandContext context, String metalake, String user) {
+    return new DeleteUser(context, metalake, user);
   }
 
   protected RemoveRoleFromUser newRemoveRoleFromUser(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new RemoveRoleFromUser(url, ignore, metalake, user, role);
+      CommandContext context, String metalake, String user, String role) {
+    return new RemoveRoleFromUser(context, metalake, user, role);
   }
 
   protected AddRoleToUser newAddRoleToUser(
-      String url, boolean ignore, String metalake, String user, String role) {
-    return new AddRoleToUser(url, ignore, metalake, user, role);
+      CommandContext context, String metalake, String user, String role) {
+    return new AddRoleToUser(context, metalake, user, role);
   }
 
-  protected GroupDetails newGroupDetails(String url, boolean ignore, String metalake, String user) {
-    return new GroupDetails(url, ignore, metalake, user);
+  protected GroupDetails newGroupDetails(CommandContext context, String metalake, String user) {
+    return new GroupDetails(context, metalake, user);
   }
 
-  protected ListGroups newListGroups(String url, boolean ignore, String metalake) {
-    return new ListGroups(url, ignore, metalake);
+  protected ListGroups newListGroups(CommandContext context, String metalake) {
+    return new ListGroups(context, metalake);
   }
 
-  protected GroupAudit newGroupAudit(String url, boolean ignore, String metalake, String group) {
-    return new GroupAudit(url, ignore, metalake, group);
+  protected GroupAudit newGroupAudit(CommandContext context, String metalake, String group) {
+    return new GroupAudit(context, metalake, group);
   }
 
-  protected CreateGroup newCreateGroup(String url, boolean ignore, String metalake, String user) {
-    return new CreateGroup(url, ignore, metalake, user);
+  protected CreateGroup newCreateGroup(CommandContext context, String metalake, String user) {
+    return new CreateGroup(context, metalake, user);
   }
 
-  protected DeleteGroup newDeleteGroup(
-      String url, boolean ignore, boolean force, String metalake, String user) {
-    return new DeleteGroup(url, ignore, force, metalake, user);
+  protected DeleteGroup newDeleteGroup(CommandContext context, String metalake, String user) {
+    return new DeleteGroup(context, metalake, user);
   }
 
   protected RemoveRoleFromGroup newRemoveRoleFromGroup(
-      String url, boolean ignore, String metalake, String group, String role) {
-    return new RemoveRoleFromGroup(url, ignore, metalake, group, role);
+      CommandContext context, String metalake, String group, String role) {
+    return new RemoveRoleFromGroup(context, metalake, group, role);
   }
 
   protected RemoveAllRoles newRemoveAllRoles(
-      String url, boolean ignore, String metalake, String entity, String entityType) {
-    return new RemoveAllRoles(url, ignore, metalake, entity, entityType);
+      CommandContext context, String metalake, String entity, String entityType) {
+    return new RemoveAllRoles(context, metalake, entity, entityType);
   }
 
   protected AddRoleToGroup newAddRoleToGroup(
-      String url, boolean ignore, String metalake, String group, String role) {
-    return new AddRoleToGroup(url, ignore, metalake, group, role);
+      CommandContext context, String metalake, String group, String role) {
+    return new AddRoleToGroup(context, metalake, group, role);
   }
 
   protected RoleDetails newRoleDetails(String url, boolean ignore, String metalake, String role) {
