@@ -574,7 +574,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
         primaryKeyList.size() == 1, "More than one primary key is not supported.");
     List<String> primaryKeyFieldList =
         Arrays.stream(primaryKeyList.get(0).fieldNames())
-            .map(fieldNames -> fieldNames[0])
+            .map(
+                fieldNames -> {
+                  Preconditions.checkArgument(
+                      fieldNames.length > 1, "The primary key columns should not be nested.");
+                  return fieldNames[0];
+                })
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         !primaryKeyFieldList.isEmpty(), "The primary key must contain at least one field.");
