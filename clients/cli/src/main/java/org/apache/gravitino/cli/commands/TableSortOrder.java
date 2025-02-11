@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 
 /** Displays the details of a table's sort order. */
@@ -31,21 +32,15 @@ public class TableSortOrder extends TableCommand {
   /**
    * Displays the details of a table's sort order.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    * @param table The name of the table.
    */
   public TableSortOrder(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    super(context, metalake, catalog);
     this.schema = schema;
     this.table = table;
   }
@@ -62,8 +57,10 @@ public class TableSortOrder extends TableCommand {
       exitWithError(exp.getMessage());
     }
     for (SortOrder sortOrder : sortOrders) {
-      System.out.printf(
-          "%s,%s,%s%n", sortOrder.expression(), sortOrder.direction(), sortOrder.nullOrdering());
+      String result =
+          String.format(
+              "%s,%s,%s", sortOrder.expression(), sortOrder.direction(), sortOrder.nullOrdering());
+      printResults(result);
     }
   }
 }

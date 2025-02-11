@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import com.google.common.base.Joiner;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -34,13 +35,12 @@ public class ListSchema extends Command {
   /**
    * Lists all schemas in a catalog.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
-  public ListSchema(String url, boolean ignoreVersions, String metalake, String catalog) {
-    super(url, ignoreVersions);
+  public ListSchema(CommandContext context, String metalake, String catalog) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
   }
@@ -62,6 +62,6 @@ public class ListSchema extends Command {
 
     String all = schemas.length == 0 ? "No schemas exist." : Joiner.on(",").join(schemas);
 
-    System.out.println(all);
+    printInformation(all);
   }
 }

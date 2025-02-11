@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.CatalogInUseException;
@@ -35,16 +36,13 @@ public class DeleteCatalog extends Command {
   /**
    * Delete a catalog.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
-  public DeleteCatalog(
-      String url, boolean ignoreVersions, boolean force, String metalake, String catalog) {
-    super(url, ignoreVersions);
-    this.force = force;
+  public DeleteCatalog(CommandContext context, String metalake, String catalog) {
+    super(context);
+    this.force = context.force();
     this.metalake = metalake;
     this.catalog = catalog;
   }
@@ -72,9 +70,9 @@ public class DeleteCatalog extends Command {
     }
 
     if (deleted) {
-      System.out.println(catalog + " deleted.");
+      printInformation(catalog + " deleted.");
     } else {
-      System.out.println(catalog + " not deleted.");
+      printInformation(catalog + " not deleted.");
     }
   }
 }

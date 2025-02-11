@@ -22,6 +22,8 @@ package org.apache.gravitino.cli;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -87,7 +89,7 @@ class TestSchemaCommands {
                 mockCommandLine, mockOptions, CommandEntities.SCHEMA, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListSchema(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+        .newListSchema(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -108,7 +110,7 @@ class TestSchemaCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newSchemaDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
@@ -129,7 +131,7 @@ class TestSchemaCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newSchemaAudit(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
@@ -152,12 +154,11 @@ class TestSchemaCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateSchema(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "comment");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("comment"));
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -177,7 +178,7 @@ class TestSchemaCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteSchema(
-            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "catalog", "schema");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -198,7 +199,7 @@ class TestSchemaCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteSchema(
-            GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "catalog", "schema");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -222,13 +223,12 @@ class TestSchemaCommands {
     doReturn(mockSetProperty)
         .when(commandLine)
         .newSetSchemaProperty(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "property",
-            "value");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("property"),
+            eq("value"));
     doReturn(mockSetProperty).when(mockSetProperty).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperty).handle();
@@ -237,16 +237,10 @@ class TestSchemaCommands {
   @Test
   void testSetSchemaPropertyCommandWithoutPropertyAndValue() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     SetSchemaProperty spySetProperty =
-        spy(
-            new SetSchemaProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                null,
-                null));
+        spy(new SetSchemaProperty(mockContext, "metalake_demo", "catalog", "schema", null, null));
 
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
@@ -257,16 +251,12 @@ class TestSchemaCommands {
   @Test
   void testSetSchemaPropertyCommandWithoutProperty() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     SetSchemaProperty spySetProperty =
         spy(
             new SetSchemaProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                null,
-                "value"));
+                mockContext, "metalake_demo", "catalog", "schema", null, "value"));
 
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
@@ -277,16 +267,12 @@ class TestSchemaCommands {
   @Test
   void testSetSchemaPropertyCommandWithoutValue() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     SetSchemaProperty spySetProperty =
         spy(
             new SetSchemaProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                "property",
-                null));
+                mockContext, "metalake_demo", "catalog", "schema", "property", null));
 
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
@@ -310,12 +296,12 @@ class TestSchemaCommands {
     doReturn(mockRemoveProperty)
         .when(commandLine)
         .newRemoveSchemaProperty(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "property");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("property"));
+
     doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
@@ -324,15 +310,10 @@ class TestSchemaCommands {
   @Test
   void testRemoveSchemaPropertyCommandWithoutProperty() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     RemoveSchemaProperty mockRemoveProperty =
-        spy(
-            new RemoveSchemaProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "demo_metalake",
-                "catalog",
-                "schema",
-                null));
+        spy(new RemoveSchemaProperty(mockContext, "demo_metalake", "catalog", "schema", null));
 
     assertThrows(RuntimeException.class, mockRemoveProperty::validate);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -353,7 +334,7 @@ class TestSchemaCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListSchemaProperties(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
@@ -374,7 +355,7 @@ class TestSchemaCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListSchema(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null);
+        .newListSchema(any(CommandContext.class), eq("metalake_demo"), eq(null));
     assertTrue(
         errContent.toString().contains(ErrorMessages.MISSING_ENTITIES + CommandEntities.CATALOG));
   }

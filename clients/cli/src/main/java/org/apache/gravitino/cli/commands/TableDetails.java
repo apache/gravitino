@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.rel.Table;
 
 /** Displays the details of a table. */
@@ -31,21 +32,15 @@ public class TableDetails extends TableCommand {
   /**
    * Displays the details of a table.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    * @param table The name of the table.
    */
   public TableDetails(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    super(context, metalake, catalog);
     this.schema = schema;
     this.table = table;
   }
@@ -62,6 +57,6 @@ public class TableDetails extends TableCommand {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(gTable.name() + "," + gTable.comment());
+    printInformation(gTable.name() + "," + gTable.comment());
   }
 }

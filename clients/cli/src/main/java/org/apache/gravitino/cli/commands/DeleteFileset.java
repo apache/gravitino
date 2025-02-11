@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -39,24 +40,16 @@ public class DeleteFileset extends Command {
   /**
    * Delete a fileset.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param fileset The name of the fileset.
    */
   public DeleteFileset(
-      String url,
-      boolean ignoreVersions,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String fileset) {
-    super(url, ignoreVersions);
-    this.force = force;
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    super(context);
+    this.force = context.force();
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -89,9 +82,9 @@ public class DeleteFileset extends Command {
     }
 
     if (deleted) {
-      System.out.println(fileset + " deleted.");
+      printInformation(fileset + " deleted.");
     } else {
-      System.out.println(fileset + " not deleted.");
+      printInformation(fileset + " not deleted.");
     }
   }
 }

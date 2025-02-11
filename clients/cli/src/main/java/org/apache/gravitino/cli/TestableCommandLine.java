@@ -203,201 +203,187 @@ public class TestableCommandLine {
     return new UpdateMetalakeName(context, metalake, newName);
   }
 
-  protected CatalogAudit newCatalogAudit(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new CatalogAudit(url, ignore, metalake, catalog);
+  protected CatalogAudit newCatalogAudit(CommandContext context, String metalake, String catalog) {
+    return new CatalogAudit(context, metalake, catalog);
   }
 
   protected CatalogDetails newCatalogDetails(
-      String url, boolean ignore, String outputFormat, String metalake, String catalog) {
-    return new CatalogDetails(url, ignore, outputFormat, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new CatalogDetails(context, metalake, catalog);
   }
 
-  protected ListCatalogs newListCatalogs(
-      String url, boolean ignore, String outputFormat, String metalake) {
-    return new ListCatalogs(url, ignore, outputFormat, metalake);
+  protected ListCatalogs newListCatalogs(CommandContext context, String metalake) {
+    return new ListCatalogs(context, metalake);
   }
 
   protected CreateCatalog newCreateCatalog(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String provider,
       String comment,
       Map<String, String> properties) {
-    return new CreateCatalog(url, ignore, metalake, catalog, provider, comment, properties);
+    return new CreateCatalog(context, metalake, catalog, provider, comment, properties);
   }
 
   protected DeleteCatalog newDeleteCatalog(
-      String url, boolean ignore, boolean force, String metalake, String catalog) {
-    return new DeleteCatalog(url, ignore, force, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new DeleteCatalog(context, metalake, catalog);
   }
 
   protected SetCatalogProperty newSetCatalogProperty(
-      String url, boolean ignore, String metalake, String catalog, String property, String value) {
-    return new SetCatalogProperty(url, ignore, metalake, catalog, property, value);
+      CommandContext context, String metalake, String catalog, String property, String value) {
+    return new SetCatalogProperty(context, metalake, catalog, property, value);
   }
 
   protected RemoveCatalogProperty newRemoveCatalogProperty(
-      String url, boolean ignore, String metalake, String catalog, String property) {
-    return new RemoveCatalogProperty(url, ignore, metalake, catalog, property);
+      CommandContext context, String metalake, String catalog, String property) {
+    return new RemoveCatalogProperty(context, metalake, catalog, property);
   }
 
   protected ListCatalogProperties newListCatalogProperties(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new ListCatalogProperties(url, ignore, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new ListCatalogProperties(context, metalake, catalog);
   }
 
   protected UpdateCatalogComment newUpdateCatalogComment(
-      String url, boolean ignore, String metalake, String catalog, String comment) {
-    return new UpdateCatalogComment(url, ignore, metalake, catalog, comment);
+      CommandContext context, String metalake, String catalog, String comment) {
+    return new UpdateCatalogComment(context, metalake, catalog, comment);
   }
 
   protected UpdateCatalogName newUpdateCatalogName(
-      String url, boolean ignore, String metalake, String catalog, String newName) {
-    return new UpdateCatalogName(url, ignore, metalake, catalog, newName);
+      CommandContext context, String metalake, String catalog, String newName) {
+    return new UpdateCatalogName(context, metalake, catalog, newName);
   }
 
   protected SchemaAudit newSchemaAudit(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new SchemaAudit(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new SchemaAudit(context, metalake, catalog, schema);
   }
 
   protected SchemaDetails newSchemaDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new SchemaDetails(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new SchemaDetails(context, metalake, catalog, schema);
   }
 
-  protected ListSchema newListSchema(String url, boolean ignore, String metalake, String catalog) {
-    return new ListSchema(url, ignore, metalake, catalog);
+  protected ListSchema newListSchema(CommandContext context, String metalake, String catalog) {
+    return new ListSchema(context, metalake, catalog);
   }
 
   protected CreateSchema newCreateSchema(
-      String url, boolean ignore, String metalake, String catalog, String schema, String comment) {
-    return new CreateSchema(url, ignore, metalake, catalog, schema, comment);
+      CommandContext context, String metalake, String catalog, String schema, String comment) {
+    return new CreateSchema(context, metalake, catalog, schema, comment);
   }
 
   protected DeleteSchema newDeleteSchema(
-      String url, boolean ignore, boolean force, String metalake, String catalog, String schema) {
-    return new DeleteSchema(url, ignore, force, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new DeleteSchema(context, metalake, catalog, schema);
   }
 
   protected SetSchemaProperty newSetSchemaProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String property,
       String value) {
-    return new SetSchemaProperty(url, ignore, metalake, catalog, schema, property, value);
+    return new SetSchemaProperty(context, metalake, catalog, schema, property, value);
   }
 
   protected RemoveSchemaProperty newRemoveSchemaProperty(
-      String url, boolean ignore, String metalake, String catalog, String schema, String property) {
-    return new RemoveSchemaProperty(url, ignore, metalake, catalog, schema, property);
+      CommandContext context, String metalake, String catalog, String schema, String property) {
+    return new RemoveSchemaProperty(context, metalake, catalog, schema, property);
   }
 
   protected ListSchemaProperties newListSchemaProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListSchemaProperties(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListSchemaProperties(context, metalake, catalog, schema);
   }
 
   protected TableAudit newTableAudit(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableAudit(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableAudit(context, metalake, catalog, schema, table);
   }
 
   protected TableDetails newTableDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableDetails(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableDetails(context, metalake, catalog, schema, table);
   }
 
   protected ListTables newListTables(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListTables(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListTables(context, metalake, catalog, schema);
   }
 
   protected DeleteTable newDeleteTable(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    return new DeleteTable(url, ignore, force, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new DeleteTable(context, metalake, catalog, schema, table);
   }
 
   protected ListIndexes newListIndexes(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new ListIndexes(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new ListIndexes(context, metalake, catalog, schema, table);
   }
 
   protected TablePartition newTablePartition(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TablePartition(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TablePartition(context, metalake, catalog, schema, table);
   }
 
   protected TableDistribution newTableDistribution(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableDistribution(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableDistribution(context, metalake, catalog, schema, table);
   }
 
   protected TableSortOrder newTableSortOrder(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new TableSortOrder(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new TableSortOrder(context, metalake, catalog, schema, table);
   }
 
   protected UpdateTableComment newUpdateTableComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String comment) {
-    return new UpdateTableComment(url, ignore, metalake, catalog, schema, table, comment);
+    return new UpdateTableComment(context, metalake, catalog, schema, table, comment);
   }
 
   protected UpdateTableName newUpdateTableName(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String rename) {
-    return new UpdateTableName(url, ignore, metalake, catalog, schema, table, rename);
+    return new UpdateTableName(context, metalake, catalog, schema, table, rename);
   }
 
   protected SetTableProperty newSetTableProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String property,
       String value) {
-    return new SetTableProperty(url, ignore, metalake, catalog, schema, table, property, value);
+    return new SetTableProperty(context, metalake, catalog, schema, table, property, value);
   }
 
   protected RemoveTableProperty newRemoveTableProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String property) {
-    return new RemoveTableProperty(url, ignore, metalake, catalog, schema, table, property);
+    return new RemoveTableProperty(context, metalake, catalog, schema, table, property);
   }
 
   protected ListTableProperties newListTableProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new ListTableProperties(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new ListTableProperties(context, metalake, catalog, schema, table);
   }
 
   protected UserDetails newUserDetails(String url, boolean ignore, String metalake, String user) {
@@ -552,19 +538,18 @@ public class TestableCommandLine {
   }
 
   protected ColumnAudit newColumnAudit(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column) {
-    return new ColumnAudit(url, ignore, metalake, catalog, schema, table, column);
+    return new ColumnAudit(context, metalake, catalog, schema, table, column);
   }
 
   protected ListColumns newListColumns(
-      String url, boolean ignore, String metalake, String catalog, String schema, String table) {
-    return new ListColumns(url, ignore, metalake, catalog, schema, table);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    return new ListColumns(context, metalake, catalog, schema, table);
   }
 
   protected SetOwner newSetOwner(
@@ -584,162 +569,140 @@ public class TestableCommandLine {
   }
 
   protected ListTopics newListTopics(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListTopics(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListTopics(context, metalake, catalog, schema);
   }
 
   protected TopicDetails newTopicDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
-    return new TopicDetails(url, ignore, metalake, catalog, schema, topic);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    return new TopicDetails(context, metalake, catalog, schema, topic);
   }
 
   protected CreateTopic newCreateTopic(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String comment) {
-    return new CreateTopic(url, ignore, metalake, catalog, schema, topic, comment);
+    return new CreateTopic(context, metalake, catalog, schema, topic, comment);
   }
 
   protected DeleteTopic newDeleteTopic(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String topic) {
-    return new DeleteTopic(url, ignore, force, metalake, catalog, schema, topic);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    return new DeleteTopic(context, metalake, catalog, schema, topic);
   }
 
   protected UpdateTopicComment newUpdateTopicComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String comment) {
-    return new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment);
+    return new UpdateTopicComment(context, metalake, catalog, schema, topic, comment);
   }
 
   protected SetTopicProperty newSetTopicProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String property,
       String value) {
-    return new SetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value);
+    return new SetTopicProperty(context, metalake, catalog, schema, topic, property, value);
   }
 
   protected RemoveTopicProperty newRemoveTopicProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String topic,
       String property) {
-    return new RemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property);
+    return new RemoveTopicProperty(context, metalake, catalog, schema, topic, property);
   }
 
   protected ListTopicProperties newListTopicProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema, String topic) {
-    return new ListTopicProperties(url, ignore, metalake, catalog, schema, topic);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    return new ListTopicProperties(context, metalake, catalog, schema, topic);
   }
 
   protected FilesetDetails newFilesetDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
-    return new FilesetDetails(url, ignore, metalake, catalog, schema, fileset);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    return new FilesetDetails(context, metalake, catalog, schema, fileset);
   }
 
   protected ListFilesets newListFilesets(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListFilesets(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListFilesets(context, metalake, catalog, schema);
   }
 
   protected CreateFileset newCreateFileset(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String comment,
       Map<String, String> propertyMap) {
-    return new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap);
+    return new CreateFileset(context, metalake, catalog, schema, fileset, comment, propertyMap);
   }
 
   protected DeleteFileset newDeleteFileset(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String fileset) {
-    return new DeleteFileset(url, ignore, force, metalake, catalog, schema, fileset);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    return new DeleteFileset(context, metalake, catalog, schema, fileset);
   }
 
   protected UpdateFilesetComment newUpdateFilesetComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String comment) {
-    return new UpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment);
+    return new UpdateFilesetComment(context, metalake, catalog, schema, fileset, comment);
   }
 
   protected UpdateFilesetName newUpdateFilesetName(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String rename) {
-    return new UpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, rename);
+    return new UpdateFilesetName(context, metalake, catalog, schema, fileset, rename);
   }
 
   protected ListFilesetProperties newListFilesetProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema, String fileset) {
-    return new ListFilesetProperties(url, ignore, metalake, catalog, schema, fileset);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    return new ListFilesetProperties(context, metalake, catalog, schema, fileset);
   }
 
   protected SetFilesetProperty newSetFilesetProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String property,
       String value) {
-    return new SetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value);
+    return new SetFilesetProperty(context, metalake, catalog, schema, fileset, property, value);
   }
 
   protected RemoveFilesetProperty newRemoveFilesetProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String property) {
-    return new RemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property);
+    return new RemoveFilesetProperty(context, metalake, catalog, schema, fileset, property);
   }
 
   protected AddColumn newAddColumn(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -752,8 +715,7 @@ public class TestableCommandLine {
       boolean autoIncrement,
       String defaultValue) {
     return new AddColumn(
-        url,
-        ignore,
+        context,
         metalake,
         catalog,
         schema,
@@ -768,82 +730,72 @@ public class TestableCommandLine {
   }
 
   protected DeleteColumn newDeleteColumn(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column) {
-    return new DeleteColumn(url, ignore, metalake, catalog, schema, table, column);
+    return new DeleteColumn(context, metalake, catalog, schema, table, column);
   }
 
   protected UpdateColumnComment newUpdateColumnComment(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String comment) {
-    return new UpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment);
+    return new UpdateColumnComment(context, metalake, catalog, schema, table, column, comment);
   }
 
   protected UpdateColumnName newUpdateColumnName(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String rename) {
-    return new UpdateColumnName(url, ignore, metalake, catalog, schema, table, column, rename);
+    return new UpdateColumnName(context, metalake, catalog, schema, table, column, rename);
   }
 
   protected UpdateColumnDatatype newUpdateColumnDatatype(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String datatype) {
-    return new UpdateColumnDatatype(
-        url, ignore, metalake, catalog, schema, table, column, datatype);
+    return new UpdateColumnDatatype(context, metalake, catalog, schema, table, column, datatype);
   }
 
   protected UpdateColumnPosition newUpdateColumnPosition(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String position) {
-    return new UpdateColumnPosition(
-        url, ignore, metalake, catalog, schema, table, column, position);
+    return new UpdateColumnPosition(context, metalake, catalog, schema, table, column, position);
   }
 
   protected UpdateColumnNullability newUpdateColumnNullability(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       boolean nullable) {
-    return new UpdateColumnNullability(
-        url, ignore, metalake, catalog, schema, table, column, nullable);
+    return new UpdateColumnNullability(context, metalake, catalog, schema, table, column, nullable);
   }
 
   protected UpdateColumnAutoIncrement newUpdateColumnAutoIncrement(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -851,12 +803,11 @@ public class TestableCommandLine {
       String column,
       boolean autoIncrement) {
     return new UpdateColumnAutoIncrement(
-        url, ignore, metalake, catalog, schema, table, column, autoIncrement);
+        context, metalake, catalog, schema, table, column, autoIncrement);
   }
 
   protected UpdateColumnDefault newUpdateColumnDefault(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -865,19 +816,18 @@ public class TestableCommandLine {
       String defaultValue,
       String dataType) {
     return new UpdateColumnDefault(
-        url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType);
+        context, metalake, catalog, schema, table, column, defaultValue, dataType);
   }
 
   protected CreateTable newCreateTable(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String columnFile,
       String comment) {
-    return new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment);
+    return new CreateTable(context, metalake, catalog, schema, table, columnFile, comment);
   }
 
   protected GrantPrivilegesToRole newGrantPrivilegesToRole(
@@ -915,56 +865,48 @@ public class TestableCommandLine {
   }
 
   protected CatalogEnable newCatalogEnable(
-      String url, boolean ignore, String metalake, String catalog, boolean enableMetalake) {
-    return new CatalogEnable(url, ignore, metalake, catalog, enableMetalake);
+      CommandContext context, String metalake, String catalog, boolean enableMetalake) {
+    return new CatalogEnable(context, metalake, catalog, enableMetalake);
   }
 
   protected CatalogDisable newCatalogDisable(
-      String url, boolean ignore, String metalake, String catalog) {
-    return new CatalogDisable(url, ignore, metalake, catalog);
+      CommandContext context, String metalake, String catalog) {
+    return new CatalogDisable(context, metalake, catalog);
   }
 
   protected ListModel newListModel(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListModel(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListModel(context, metalake, catalog, schema);
   }
 
   protected ModelAudit newModelAudit(
-      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
-    return new ModelAudit(url, ignore, metalake, catalog, schema, model);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new ModelAudit(context, metalake, catalog, schema, model);
   }
 
   protected ModelDetails newModelDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
-    return new ModelDetails(url, ignore, metalake, catalog, schema, model);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new ModelDetails(context, metalake, catalog, schema, model);
   }
 
   protected RegisterModel newCreateModel(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String model,
       String comment,
       Map<String, String> properties) {
-    return new RegisterModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+    return new RegisterModel(context, metalake, catalog, schema, model, comment, properties);
   }
 
   protected DeleteModel newDeleteModel(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String model) {
-    return new DeleteModel(url, ignore, force, metalake, catalog, schema, model);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new DeleteModel(context, metalake, catalog, schema, model);
   }
 
   protected LinkModel newLinkModel(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -974,6 +916,6 @@ public class TestableCommandLine {
       String comment,
       Map<String, String> properties) {
     return new LinkModel(
-        url, ignore, metalake, catalog, schema, model, uri, alias, comment, properties);
+        context, metalake, catalog, schema, model, uri, alias, comment, properties);
   }
 }

@@ -60,8 +60,9 @@ Gravitino supports different query engines to access the metadata. Currently, it
 [Trino](https://trino.io/), users can use Trino to query the metadata and data without needing to
 change the existing SQL dialects.
 
-In the meantime, other query engine support is on the roadmap, including
-[Apache Spark](https://spark.apache.org/), [Apache Flink](https://flink.apache.org/) and others.
+In addition, Gravitino has expanded its support to include [Apache Spark](https://spark.apache.org/)
+and [Apache Flink](https://flink.apache.org/), among other query engines. Further enhancements and
+additions to the supported query engines are also on the roadmap.
 
 ### AI asset management
 

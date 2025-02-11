@@ -116,19 +116,19 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
       new OwnerCommandHandler(this, line, command, ignore, entity).handle();
     } else if (entity.equals(CommandEntities.COLUMN)) {
-      new ColumnCommandHandler(this, line, command, ignore).handle();
+      new ColumnCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.TABLE)) {
-      new TableCommandHandler(this, line, command, ignore).handle();
+      new TableCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.SCHEMA)) {
-      new SchemaCommandHandler(this, line, command, ignore).handle();
+      new SchemaCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.CATALOG)) {
-      new CatalogCommandHandler(this, line, command, ignore).handle();
+      new CatalogCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       new MetalakeCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.TOPIC)) {
-      new TopicCommandHandler(this, line, command, ignore).handle();
+      new TopicCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.FILESET)) {
-      new FilesetCommandHandler(this, line, command, ignore).handle();
+      new FilesetCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.USER)) {
       new UserCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.GROUP)) {
@@ -138,7 +138,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (entity.equals(CommandEntities.ROLE)) {
       new RoleCommandHandler(this, line, command, ignore).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
-      new ModelCommandHandler(this, line, command, ignore).handle();
+      new ModelCommandHandler(this, line, command, context).handle();
     }
   }
 

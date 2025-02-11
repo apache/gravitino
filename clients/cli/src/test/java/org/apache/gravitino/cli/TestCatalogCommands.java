@@ -22,6 +22,10 @@ package org.apache.gravitino.cli;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,7 +43,6 @@ import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.CatalogDisable;
 import org.apache.gravitino.cli.commands.CatalogEnable;
-import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
@@ -70,11 +73,6 @@ class TestCatalogCommands {
   }
 
   @AfterEach
-  void restoreExitFlg() {
-    Main.useExit = true;
-  }
-
-  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -91,7 +89,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListCatalogs(GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo");
+        .newListCatalogs(any(CommandContext.class), eq("metalake_demo"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -111,8 +109,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DETAILS));
     doReturn(mockDetails)
         .when(commandLine)
-        .newCatalogDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, null, "metalake_demo", "catalog");
+        .newCatalogDetails(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
@@ -132,7 +129,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DETAILS));
     doReturn(mockAudit)
         .when(commandLine)
-        .newCatalogAudit(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+        .newCatalogAudit(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
@@ -163,13 +160,17 @@ class TestCatalogCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateCatalog(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "postgres",
-            "comment",
-            map);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("postgres"),
+            eq("comment"),
+            argThat(
+                stringStringMap ->
+                    stringStringMap.containsKey("key1")
+                        && stringStringMap.get("key1").equals(map.get("key1"))
+                        && stringStringMap.containsKey("key2")
+                        && stringStringMap.get("key2").equals("value2")));
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -178,16 +179,10 @@ class TestCatalogCommands {
   @Test
   void testCreateCatalogCommandWithoutProvider() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn("http://localhost:8080");
     CreateCatalog mockCreateCatalog =
-        spy(
-            new CreateCatalog(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                null,
-                "comment",
-                null));
+        spy(new CreateCatalog(mockContext, "metalake_demo", "catalog", null, "comment", null));
 
     assertThrows(RuntimeException.class, mockCreateCatalog::validate);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -207,8 +202,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DELETE));
     doReturn(mockDelete)
         .when(commandLine)
-        .newDeleteCatalog(
-            GravitinoCommandLine.DEFAULT_URL, false, false, "metalake_demo", "catalog");
+        .newDeleteCatalog(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -228,8 +222,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DELETE));
     doReturn(mockDelete)
         .when(commandLine)
-        .newDeleteCatalog(
-            GravitinoCommandLine.DEFAULT_URL, false, true, "metalake_demo", "catalog");
+        .newDeleteCatalog(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -253,12 +246,11 @@ class TestCatalogCommands {
     doReturn(mockSetProperty)
         .when(commandLine)
         .newSetCatalogProperty(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "property",
-            "value");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("property"),
+            eq("value"));
     doReturn(mockSetProperty).when(mockSetProperty).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperty).handle();
@@ -267,10 +259,10 @@ class TestCatalogCommands {
   @Test
   void testSetCatalogPropertyCommandWithoutPropertyAndValue() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn("http://localhost:8080");
     SetCatalogProperty mockSetProperty =
-        spy(
-            new SetCatalogProperty(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null));
+        spy(new SetCatalogProperty(mockContext, "metalake_demo", "catalog", null, null));
 
     assertThrows(RuntimeException.class, mockSetProperty::validate);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -280,15 +272,10 @@ class TestCatalogCommands {
   @Test
   void testSetCatalogPropertyCommandWithoutProperty() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn("http://localhost:8080");
     SetCatalogProperty mockSetProperty =
-        spy(
-            new SetCatalogProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                null,
-                "value"));
+        spy(new SetCatalogProperty(mockContext, "metalake_demo", "catalog", null, "value"));
 
     assertThrows(RuntimeException.class, mockSetProperty::validate);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -297,16 +284,10 @@ class TestCatalogCommands {
 
   @Test
   void testSetCatalogPropertyCommandWithoutValue() {
-    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn("http://localhost:8080");
     SetCatalogProperty mockSetProperty =
-        spy(
-            new SetCatalogProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "property",
-                null));
+        spy(new SetCatalogProperty(mockContext, "metalake_demo", "catalog", "property", null));
 
     assertThrows(RuntimeException.class, mockSetProperty::validate);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -329,7 +310,7 @@ class TestCatalogCommands {
     doReturn(mockRemoveProperty)
         .when(commandLine)
         .newRemoveCatalogProperty(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "property");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("property"));
     doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
@@ -337,11 +318,10 @@ class TestCatalogCommands {
 
   @Test
   void testRemoveCatalogPropertyCommandWithoutProperty() {
-    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn("http://localhost:8080");
     RemoveCatalogProperty mockRemoveProperty =
-        spy(
-            new RemoveCatalogProperty(
-                GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null));
+        spy(new RemoveCatalogProperty(mockContext, "metalake_demo", "catalog", null));
 
     assertThrows(RuntimeException.class, mockRemoveProperty::validate);
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -361,8 +341,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.PROPERTIES));
     doReturn(mockListProperties)
         .when(commandLine)
-        .newListCatalogProperties(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+        .newListCatalogProperties(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
@@ -384,7 +363,7 @@ class TestCatalogCommands {
     doReturn(mockUpdateComment)
         .when(commandLine)
         .newUpdateCatalogComment(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new comment");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("new comment"));
     doReturn(mockUpdateComment).when(mockUpdateComment).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateComment).handle();
@@ -407,7 +386,7 @@ class TestCatalogCommands {
     doReturn(mockUpdateName)
         .when(commandLine)
         .newUpdateCatalogName(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "new_name");
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("new_name"));
     doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
@@ -428,12 +407,7 @@ class TestCatalogCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newCatalogDetails(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            Command.OUTPUT_FORMAT_TABLE,
-            "metalake_demo",
-            "catalog");
+        .newCatalogDetails(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -459,7 +433,7 @@ class TestCatalogCommands {
     doReturn(mockEnable)
         .when(commandLine)
         .newCatalogEnable(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), anyBoolean());
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -482,7 +456,7 @@ class TestCatalogCommands {
     doReturn(mockEnable)
         .when(commandLine)
         .newCatalogEnable(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", true);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), anyBoolean());
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -503,7 +477,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
     doReturn(mockDisable)
         .when(commandLine)
-        .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+        .newCatalogDisable(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockDisable).when(mockDisable).validate();
     commandLine.handleCommandLine();
     verify(mockDisable).handle();
@@ -528,9 +502,9 @@ class TestCatalogCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newCatalogEnable(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", false);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), anyBoolean());
     verify(commandLine, never())
-        .newCatalogDisable(GravitinoCommandLine.DEFAULT_URL, false, "melake_demo", "catalog");
+        .newCatalogDisable(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
   }
 }
