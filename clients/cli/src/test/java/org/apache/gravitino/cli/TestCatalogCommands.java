@@ -70,7 +70,6 @@ class TestCatalogCommands {
     mockOptions = mock(Options.class);
     System.setOut(new PrintStream(outContent));
     System.setErr(new PrintStream(errContent));
-    Main.useExit = false;
   }
 
   @AfterEach
@@ -179,6 +178,7 @@ class TestCatalogCommands {
 
   @Test
   void testCreateCatalogCommandWithoutProvider() {
+    Main.useExit = false;
     CommandContext mockContext = mock(CommandContext.class);
     when(mockContext.url()).thenReturn("http://localhost:8080");
     CreateCatalog mockCreateCatalog =
@@ -258,6 +258,7 @@ class TestCatalogCommands {
 
   @Test
   void testSetCatalogPropertyCommandWithoutPropertyAndValue() {
+    Main.useExit = false;
     CommandContext mockContext = mock(CommandContext.class);
     when(mockContext.url()).thenReturn("http://localhost:8080");
     SetCatalogProperty mockSetProperty =
@@ -270,6 +271,7 @@ class TestCatalogCommands {
 
   @Test
   void testSetCatalogPropertyCommandWithoutProperty() {
+    Main.useExit = false;
     CommandContext mockContext = mock(CommandContext.class);
     when(mockContext.url()).thenReturn("http://localhost:8080");
     SetCatalogProperty mockSetProperty =
