@@ -116,7 +116,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
       new OwnerCommandHandler(this, line, command, ignore, entity).handle();
     } else if (entity.equals(CommandEntities.COLUMN)) {
-      new ColumnCommandHandler(this, line, command, ignore).handle();
+      new ColumnCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.TABLE)) {
       new TableCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.SCHEMA)) {

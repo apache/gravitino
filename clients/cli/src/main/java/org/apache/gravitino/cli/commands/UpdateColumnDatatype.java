@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.ParseType;
 import org.apache.gravitino.client.GravitinoClient;
@@ -44,8 +45,7 @@ public class UpdateColumnDatatype extends Command {
   /**
    * Update the data type of a column.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -54,15 +54,14 @@ public class UpdateColumnDatatype extends Command {
    * @param datatype The new data type name.
    */
   public UpdateColumnDatatype(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String datatype) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -97,6 +96,6 @@ public class UpdateColumnDatatype extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(column + " datatype changed to " + datatype + ".");
+    printInformation(column + " datatype changed to " + datatype + ".");
   }
 }
