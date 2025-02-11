@@ -21,8 +21,8 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -44,8 +44,7 @@ public class RegisterModel extends Command {
   /**
    * Register a model in the catalog
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of schema.
@@ -54,15 +53,14 @@ public class RegisterModel extends Command {
    * @param properties The properties of the model version.
    */
   public RegisterModel(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String model,
       String comment,
       Map<String, String> properties) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -94,10 +92,9 @@ public class RegisterModel extends Command {
     }
 
     if (registeredModel != null) {
-      System.out.println("Successful register " + registeredModel.name() + ".");
+      printInformation("Successful register " + registeredModel.name() + ".");
     } else {
-      System.err.println(ErrorMessages.REGISTER_FAILED + model + ".");
-      Main.exit(-1);
+      exitWithError(ErrorMessages.REGISTER_FAILED + model + ".");
     }
   }
 }

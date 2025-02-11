@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -39,21 +40,15 @@ public class ModelAudit extends AuditCommand {
   /**
    * Displays the audit information of a model.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param model The name of the model.
    */
   public ModelAudit(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String model) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -70,16 +65,16 @@ public class ModelAudit extends AuditCommand {
       ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
       result = modelCatalog.getModel(name);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
       return;
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
       return;
     } catch (NoSuchModelException err) {
-      System.err.println(ErrorMessages.UNKNOWN_MODEL);
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
       return;
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
+      exitWithError(exp.getMessage());
       return;
     }
 

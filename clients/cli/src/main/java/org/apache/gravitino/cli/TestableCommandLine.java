@@ -903,46 +903,38 @@ public class TestableCommandLine {
   }
 
   protected ListModel newListModel(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListModel(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListModel(context, metalake, catalog, schema);
   }
 
   protected ModelAudit newModelAudit(
-      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
-    return new ModelAudit(url, ignore, metalake, catalog, schema, model);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new ModelAudit(context, metalake, catalog, schema, model);
   }
 
   protected ModelDetails newModelDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema, String model) {
-    return new ModelDetails(url, ignore, metalake, catalog, schema, model);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new ModelDetails(context, metalake, catalog, schema, model);
   }
 
   protected RegisterModel newCreateModel(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String model,
       String comment,
       Map<String, String> properties) {
-    return new RegisterModel(url, ignore, metalake, catalog, schema, model, comment, properties);
+    return new RegisterModel(context, metalake, catalog, schema, model, comment, properties);
   }
 
   protected DeleteModel newDeleteModel(
-      String url,
-      boolean ignore,
-      boolean force,
-      String metalake,
-      String catalog,
-      String schema,
-      String model) {
-    return new DeleteModel(url, ignore, force, metalake, catalog, schema, model);
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new DeleteModel(context, metalake, catalog, schema, model);
   }
 
   protected LinkModel newLinkModel(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
@@ -952,6 +944,6 @@ public class TestableCommandLine {
       String comment,
       Map<String, String> properties) {
     return new LinkModel(
-        url, ignore, metalake, catalog, schema, model, uri, alias, comment, properties);
+        context, metalake, catalog, schema, model, uri, alias, comment, properties);
   }
 }
