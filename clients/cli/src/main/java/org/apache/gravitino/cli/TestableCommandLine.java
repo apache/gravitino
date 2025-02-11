@@ -260,48 +260,47 @@ public class TestableCommandLine {
   }
 
   protected SchemaAudit newSchemaAudit(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new SchemaAudit(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new SchemaAudit(context, metalake, catalog, schema);
   }
 
   protected SchemaDetails newSchemaDetails(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new SchemaDetails(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new SchemaDetails(context, metalake, catalog, schema);
   }
 
-  protected ListSchema newListSchema(String url, boolean ignore, String metalake, String catalog) {
-    return new ListSchema(url, ignore, metalake, catalog);
+  protected ListSchema newListSchema(CommandContext context, String metalake, String catalog) {
+    return new ListSchema(context, metalake, catalog);
   }
 
   protected CreateSchema newCreateSchema(
-      String url, boolean ignore, String metalake, String catalog, String schema, String comment) {
-    return new CreateSchema(url, ignore, metalake, catalog, schema, comment);
+      CommandContext context, String metalake, String catalog, String schema, String comment) {
+    return new CreateSchema(context, metalake, catalog, schema, comment);
   }
 
   protected DeleteSchema newDeleteSchema(
-      String url, boolean ignore, boolean force, String metalake, String catalog, String schema) {
-    return new DeleteSchema(url, ignore, force, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new DeleteSchema(context, metalake, catalog, schema);
   }
 
   protected SetSchemaProperty newSetSchemaProperty(
-      String url,
-      boolean ignore,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String property,
       String value) {
-    return new SetSchemaProperty(url, ignore, metalake, catalog, schema, property, value);
+    return new SetSchemaProperty(context, metalake, catalog, schema, property, value);
   }
 
   protected RemoveSchemaProperty newRemoveSchemaProperty(
-      String url, boolean ignore, String metalake, String catalog, String schema, String property) {
-    return new RemoveSchemaProperty(url, ignore, metalake, catalog, schema, property);
+      CommandContext context, String metalake, String catalog, String schema, String property) {
+    return new RemoveSchemaProperty(context, metalake, catalog, schema, property);
   }
 
   protected ListSchemaProperties newListSchemaProperties(
-      String url, boolean ignore, String metalake, String catalog, String schema) {
-    return new ListSchemaProperties(url, ignore, metalake, catalog, schema);
+      CommandContext context, String metalake, String catalog, String schema) {
+    return new ListSchemaProperties(context, metalake, catalog, schema);
   }
 
   protected TableAudit newTableAudit(
