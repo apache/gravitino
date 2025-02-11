@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.utils.FullNameUtil;
@@ -49,18 +50,15 @@ public class RemoveAllTags extends Command {
   /**
    * Removes all the tags of an entity
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
-   * @param force Force operation.
    */
-  public RemoveAllTags(
-      String url, boolean ignoreVersions, String metalake, FullName name, boolean force) {
-    super(url, ignoreVersions);
+  public RemoveAllTags(CommandContext context, String metalake, FullName name) {
+    super(context);
     this.metalake = metalake;
     this.name = name;
-    this.force = force;
+    this.force = context.force();
   }
 
   @Override
@@ -152,10 +150,9 @@ public class RemoveAllTags extends Command {
     }
 
     if (tags.length > 0) {
-      System.out.println(
-          entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
+      printResults(entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
     } else {
-      System.out.println(entity + " has no tags");
+      printResults(entity + " has no tags");
     }
   }
 
