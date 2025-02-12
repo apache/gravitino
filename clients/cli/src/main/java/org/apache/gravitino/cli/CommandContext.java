@@ -25,7 +25,6 @@ import org.apache.gravitino.cli.commands.Command;
 
 /* Context for a command */
 public class CommandContext {
-  public static final String DEFAULT_URL = "http://localhost:8090";
   private final boolean force;
   private final boolean ignoreVersions;
   private final String outputFormat;
@@ -127,7 +126,7 @@ public class CommandContext {
     }
 
     // Return the default localhost URL
-    return DEFAULT_URL;
+    return GravitinoCommandLine.DEFAULT_URL;
   }
 
   private boolean getIgnore() {

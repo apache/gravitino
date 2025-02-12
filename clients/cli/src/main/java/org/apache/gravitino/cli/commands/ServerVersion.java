@@ -45,6 +45,6 @@ public class ServerVersion extends Command {
       exitWithError(exp.getMessage());
     }
 
-    printInformation("Apache Gravitino " + version);
+    printResults("Apache Gravitino " + version);
   }
 }

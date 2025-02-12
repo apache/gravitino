@@ -44,6 +44,6 @@ public class ClientVersion extends Command {
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
-    printInformation("Apache Gravitino " + version);
+    printResults("Apache Gravitino " + version);
   }
 }

@@ -25,9 +25,6 @@ import org.apache.commons.cli.CommandLine;
 
 public abstract class CommandHandler {
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
-
-  public static final String DEFAULT_URL = "http://localhost:8090";
-
   private String authEnv;
   private boolean authSet = false;
 

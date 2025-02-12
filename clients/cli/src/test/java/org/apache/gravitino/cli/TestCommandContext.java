@@ -41,7 +41,7 @@ public class TestCommandContext {
   public void testCreateCommandContextWithDefaults() {
     CommandContext commandContext = new CommandContext(mockCommandLine);
 
-    Assertions.assertEquals(CommandContext.DEFAULT_URL, commandContext.url());
+    Assertions.assertEquals(GravitinoCommandLine.DEFAULT_URL, commandContext.url());
     Assertions.assertFalse(commandContext.ignoreVersions());
     Assertions.assertFalse(commandContext.force());
     Assertions.assertEquals(Command.OUTPUT_FORMAT_PLAIN, commandContext.outputFormat());
