@@ -269,6 +269,13 @@ subprojects {
     mavenLocal()
   }
 
+  // Temporarily locking in to avoid https://github.com/netplex/json-smart-v2/issues/240
+  configurations.all {
+    resolutionStrategy {
+      force("net.minidev:json-smart:2.3")
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -976,10 +983,3 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
-
-// Temporarily locking in to avoid https://github.com/netplex/json-smart-v2/issues/240
-configurations.all {
-  resolutionStrategy {
-    force("net.minidev:json-smart:2.3")
-  }
-}
