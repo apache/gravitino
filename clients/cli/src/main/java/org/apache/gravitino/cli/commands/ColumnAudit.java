@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -38,8 +39,7 @@ public class ColumnAudit extends AuditCommand {
   /**
    * Displays the audit information of a column.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -47,14 +47,13 @@ public class ColumnAudit extends AuditCommand {
    * @param column The name of the column.
    */
   public ColumnAudit(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -65,25 +64,20 @@ public class ColumnAudit extends AuditCommand {
   /** Displays the audit information of a specified column. */
   @Override
   public void handle() {
-    Catalog result;
+    Catalog result = null;
 
     try (GravitinoClient client = buildClient(metalake)) {
       result = client.loadCatalog(this.catalog);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchTableException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TABLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (NoSuchColumnException err) {
-      System.err.println(ErrorMessages.UNKNOWN_COLUMN);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_COLUMN);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (result != null) {

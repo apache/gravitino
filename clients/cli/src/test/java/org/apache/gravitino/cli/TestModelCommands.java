@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -88,12 +89,7 @@ public class TestModelCommands {
 
     doReturn(mockList)
         .when(commandLine)
-        .newListModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"));
+        .newListModel(any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -112,12 +108,7 @@ public class TestModelCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            isNull(),
-            isNull());
+        .newListModel(any(CommandContext.class), eq("metalake_demo"), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MISSING_NAME
@@ -141,12 +132,7 @@ public class TestModelCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            isNull());
+        .newListModel(any(CommandContext.class), eq("metalake_demo"), eq("catalog"), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MALFORMED_NAME
@@ -171,8 +157,7 @@ public class TestModelCommands {
     doReturn(mockList)
         .when(commandLine)
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -197,12 +182,7 @@ public class TestModelCommands {
 
     verify(commandLine, never())
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            isNull(),
-            isNull(),
-            isNull());
+            any(CommandContext.class), eq("metalake_demo"), isNull(), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MISSING_NAME
@@ -230,12 +210,7 @@ public class TestModelCommands {
 
     verify(commandLine, never())
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            isNull(),
-            isNull());
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MALFORMED_NAME
@@ -261,12 +236,7 @@ public class TestModelCommands {
 
     verify(commandLine, never())
         .newModelDetails(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
-            eq("metalake_demo"),
-            eq("catalog"),
-            eq("schema"),
-            isNull());
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         ErrorMessages.MALFORMED_NAME
@@ -292,7 +262,11 @@ public class TestModelCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newModelAudit(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "model");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"));
     doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
@@ -315,8 +289,7 @@ public class TestModelCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -345,8 +318,7 @@ public class TestModelCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -377,8 +349,7 @@ public class TestModelCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -414,8 +385,7 @@ public class TestModelCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -446,13 +416,11 @@ public class TestModelCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteModel(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "model");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -476,8 +444,7 @@ public class TestModelCommands {
     doReturn(linkModelMock)
         .when(commandLine)
         .newLinkModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -511,8 +478,7 @@ public class TestModelCommands {
     doReturn(linkModelMock)
         .when(commandLine)
         .newLinkModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),
@@ -533,12 +499,12 @@ public class TestModelCommands {
   @Test
   void testLinkModelCommandWithoutURI() {
     Main.useExit = false;
-
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     LinkModel spyLinkModel =
         spy(
             new LinkModel(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
+                mockContext,
                 "metalake_demo",
                 "catalog",
                 "schema",
@@ -579,8 +545,7 @@ public class TestModelCommands {
     doReturn(linkModelMock)
         .when(commandLine)
         .newLinkModel(
-            eq(GravitinoCommandLine.DEFAULT_URL),
-            eq(false),
+            any(CommandContext.class),
             eq("metalake_demo"),
             eq("catalog"),
             eq("schema"),

@@ -70,13 +70,17 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(())
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
+    async fn stat(&self, path: &Path, _kind: FileType) -> Result<FileStat> {
         self.file_map
             .read()
             .unwrap()
             .get(path)
             .map(|x| self.create_file_stat(path, x))
             .ok_or(Errno::from(libc::ENOENT))
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
+        self.stat(path, RegularFile).await
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
@@ -91,8 +95,8 @@ impl PathFileSystem for MemoryFileSystem {
         Ok(results)
     }
 
-    async fn open_file(&self, path: &Path, _flags: OpenFileFlags) -> Result<OpenedFile> {
-        let file_stat = self.stat(path).await?;
+    async fn open_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
+        let file_stat = self.stat(path, RegularFile).await?;
         let mut opened_file = OpenedFile::new(file_stat);
         match opened_file.file_stat.kind {
             Directory => Ok(opened_file),
@@ -105,8 +109,17 @@ impl PathFileSystem for MemoryFileSystem {
                     .unwrap()
                     .data
                     .clone();
-                opened_file.reader = Some(Box::new(MemoryFileReader { data: data.clone() }));
-                opened_file.writer = Some(Box::new(MemoryFileWriter { data: data }));
+                if flags.is_read() {
+                    opened_file.reader = Some(Box::new(MemoryFileReader { data: data.clone() }));
+                }
+                if flags.is_write() || flags.is_append() || flags.is_truncate() {
+                    opened_file.writer = Some(Box::new(MemoryFileWriter { data: data.clone() }));
+                }
+
+                if flags.is_truncate() {
+                    let mut data = data.lock().unwrap();
+                    data.clear();
+                }
                 Ok(opened_file)
             }
             _ => Err(Errno::from(libc::EBADF)),
@@ -117,27 +130,19 @@ impl PathFileSystem for MemoryFileSystem {
         self.open_file(path, flags).await
     }
 
-    async fn create_file(&self, path: &Path, _flags: OpenFileFlags) -> Result<OpenedFile> {
-        let mut file_map = self.file_map.write().unwrap();
-        if file_map.contains_key(path) {
+    async fn create_file(&self, path: &Path, flags: OpenFileFlags) -> Result<OpenedFile> {
+        if self.file_map.read().unwrap().contains_key(path) && flags.is_exclusive() {
             return Err(Errno::from(libc::EEXIST));
         }
 
-        let mut opened_file = OpenedFile::new(FileStat::new_file_filestat_with_path(path, 0));
-
-        let data = Arc::new(Mutex::new(Vec::new()));
-        file_map.insert(
-            opened_file.file_stat.path.clone(),
+        self.file_map.write().unwrap().insert(
+            path.to_path_buf(),
             MemoryFile {
                 kind: RegularFile,
-                data: data.clone(),
+                data: Arc::new(Mutex::new(Vec::new())),
             },
         );
-
-        opened_file.reader = Some(Box::new(MemoryFileReader { data: data.clone() }));
-        opened_file.writer = Some(Box::new(MemoryFileWriter { data: data }));
-
-        Ok(opened_file)
+        self.open_file(path, flags).await
     }
 
     async fn create_dir(&self, path: &Path) -> Result<FileStat> {

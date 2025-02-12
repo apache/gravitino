@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import java.util.List;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -38,15 +39,13 @@ public class RemoveAllRoles extends Command {
   /**
    * Removes all roles from a group or user.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param entity the name of the group or user.
    * @param entityType The type of the entity (group or user).
    */
-  public RemoveAllRoles(
-      String url, boolean ignoreVersions, String metalake, String entity, String entityType) {
-    super(url, ignoreVersions);
+  public RemoveAllRoles(CommandContext context, String metalake, String entity, String entityType) {
+    super(context);
     this.metalake = metalake;
     this.entity = entity;
     this.entityType = entityType;
@@ -77,6 +76,8 @@ public class RemoveAllRoles extends Command {
     } catch (Exception e) {
       exitWithError(e.getMessage());
     }
+
+    printInformation("All roles have been revoked from group " + entity);
   }
 
   /** Removes all roles from a user. */
@@ -94,5 +95,7 @@ public class RemoveAllRoles extends Command {
     } catch (Exception e) {
       exitWithError(e.getMessage());
     }
+
+    printInformation("All roles have been revoked from user " + entity);
   }
 }

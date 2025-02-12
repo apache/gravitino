@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -33,12 +34,11 @@ public class ListMetalakeProperties extends ListProperties {
   /**
    * List the properties of a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    */
-  public ListMetalakeProperties(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public ListMetalakeProperties(CommandContext context, String metalake) {
+    super(context);
     this.metalake = metalake;
   }
 

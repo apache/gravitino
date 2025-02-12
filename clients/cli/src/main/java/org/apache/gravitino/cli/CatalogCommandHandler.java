@@ -33,12 +33,10 @@ public class CatalogCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private String catalog;
-  private final String outputFormat;
 
   /**
    * Constructs a {@link CatalogCommandHandler} instance.
@@ -46,19 +44,20 @@ public class CatalogCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public CatalogCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
-    this.outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
   }
 
   /** Handles the command execution logic based on the provided command. */
@@ -126,12 +125,9 @@ public class CatalogCommandHandler extends CommandHandler {
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
-      gravitinoCommandLine.newCatalogAudit(url, ignore, metalake, catalog).validate().handle();
+      gravitinoCommandLine.newCatalogAudit(context, metalake, catalog).validate().handle();
     } else {
-      gravitinoCommandLine
-          .newCatalogDetails(url, ignore, outputFormat, metalake, catalog)
-          .validate()
-          .handle();
+      gravitinoCommandLine.newCatalogDetails(context, metalake, catalog).validate().handle();
     }
   }
 
@@ -143,18 +139,14 @@ public class CatalogCommandHandler extends CommandHandler {
 
     Map<String, String> propertyMap = new Properties().parse(properties);
     gravitinoCommandLine
-        .newCreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap)
+        .newCreateCatalog(context, metalake, catalog, provider, comment, propertyMap)
         .validate()
         .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine
-        .newDeleteCatalog(url, ignore, force, metalake, catalog)
-        .validate()
-        .handle();
+    gravitinoCommandLine.newDeleteCatalog(context, metalake, catalog).validate().handle();
   }
 
   /** Handles the "SET" command. */
@@ -162,7 +154,7 @@ public class CatalogCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetCatalogProperty(url, ignore, metalake, catalog, property, value)
+        .newSetCatalogProperty(context, metalake, catalog, property, value)
         .validate()
         .handle();
   }
@@ -171,17 +163,14 @@ public class CatalogCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveCatalogProperty(url, ignore, metalake, catalog, property)
+        .newRemoveCatalogProperty(context, metalake, catalog, property)
         .validate()
         .handle();
   }
 
   /** Handles the "PROPERTIES" command. */
   private void handlePropertiesCommand() {
-    gravitinoCommandLine
-        .newListCatalogProperties(url, ignore, metalake, catalog)
-        .validate()
-        .handle();
+    gravitinoCommandLine.newListCatalogProperties(context, metalake, catalog).validate().handle();
   }
 
   /** Handles the "UPDATE" command. */
@@ -193,25 +182,25 @@ public class CatalogCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.ENABLE)) {
       boolean enableMetalake = line.hasOption(GravitinoOptions.ALL);
       gravitinoCommandLine
-          .newCatalogEnable(url, ignore, metalake, catalog, enableMetalake)
+          .newCatalogEnable(context, metalake, catalog, enableMetalake)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.DISABLE)) {
-      gravitinoCommandLine.newCatalogDisable(url, ignore, metalake, catalog).validate().handle();
+      gravitinoCommandLine.newCatalogDisable(context, metalake, catalog).validate().handle();
     }
 
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String updateComment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateCatalogComment(url, ignore, metalake, catalog, updateComment)
+          .newUpdateCatalogComment(context, metalake, catalog, updateComment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateCatalogName(url, ignore, metalake, catalog, newName)
+          .newUpdateCatalogName(context, metalake, catalog, newName)
           .validate()
           .handle();
     }
@@ -219,6 +208,6 @@ public class CatalogCommandHandler extends CommandHandler {
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListCatalogs(url, ignore, outputFormat, metalake).validate().handle();
+    gravitinoCommandLine.newListCatalogs(context, metalake).validate().handle();
   }
 }

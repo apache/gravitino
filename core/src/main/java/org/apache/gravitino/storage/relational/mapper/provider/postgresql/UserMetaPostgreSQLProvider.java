@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
@@ -94,5 +95,15 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " ut.deleted_at = 0 AND"
         + " ut.metalake_id = #{metalakeId}"
         + " GROUP BY ut.user_id";
+  }
+
+  @Override
+  public String deleteUserMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + USER_TABLE_NAME
+        + " WHERE user_id IN (SELECT user_id FROM "
+        + USER_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

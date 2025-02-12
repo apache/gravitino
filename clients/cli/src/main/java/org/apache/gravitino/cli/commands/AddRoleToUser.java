@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.ArrayList;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -36,15 +37,13 @@ public class AddRoleToUser extends Command {
   /**
    * Adds a role to a user.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    * @param role The name of the role.
    */
-  public AddRoleToUser(
-      String url, boolean ignoreVersions, String metalake, String user, String role) {
-    super(url, ignoreVersions);
+  public AddRoleToUser(CommandContext context, String metalake, String user, String role) {
+    super(context);
     this.metalake = metalake;
     this.user = user;
     this.role = role;
@@ -68,6 +67,6 @@ public class AddRoleToUser extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(role + " added to " + user);
+    printInformation(role + " added to " + user);
   }
 }

@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -33,13 +34,12 @@ public class RoleAudit extends AuditCommand {
   /**
    * Displays the audit information of a role.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    */
-  public RoleAudit(String url, boolean ignoreVersions, String metalake, String role) {
-    super(url, ignoreVersions);
+  public RoleAudit(CommandContext context, String metalake, String role) {
+    super(context);
     this.metalake = metalake;
     this.role = role;
   }
@@ -47,19 +47,16 @@ public class RoleAudit extends AuditCommand {
   /** Displays the audit information of a specified role. */
   @Override
   public void handle() {
-    Role result;
+    Role result = null;
 
     try (GravitinoClient client = buildClient(metalake)) {
       result = client.getRole(this.role);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
-      System.err.println(ErrorMessages.UNKNOWN_ROLE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (result != null) {

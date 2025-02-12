@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,15 +36,13 @@ public class RemoveTagProperty extends Command {
   /**
    * Remove a property of a tag.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param property The name of the property.
    */
-  public RemoveTagProperty(
-      String url, boolean ignoreVersions, String metalake, String tag, String property) {
-    super(url, ignoreVersions);
+  public RemoveTagProperty(CommandContext context, String metalake, String tag, String property) {
+    super(context);
     this.metalake = metalake;
     this.tag = tag;
     this.property = property;
@@ -64,6 +63,6 @@ public class RemoveTagProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(property + " property removed.");
+    printInformation(property + " property removed.");
   }
 }

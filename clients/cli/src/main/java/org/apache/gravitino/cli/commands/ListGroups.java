@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -31,12 +32,11 @@ public class ListGroups extends Command {
   /**
    * Lists all groups in a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    */
-  public ListGroups(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public ListGroups(CommandContext context, String metalake) {
+    super(context);
     this.metalake = metalake;
   }
 
@@ -53,8 +53,10 @@ public class ListGroups extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = groups.length == 0 ? "No groups exist." : String.join(",", groups);
-
-    System.out.println(all);
+    if (groups.length == 0) {
+      printInformation("No groups found in metalake " + metalake);
+    } else {
+      printResults(String.join(",", groups));
+    }
   }
 }

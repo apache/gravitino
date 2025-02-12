@@ -29,8 +29,7 @@ public class TableCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String catalog;
@@ -43,16 +42,18 @@ public class TableCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public TableCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -129,32 +130,32 @@ public class TableCommandHandler extends CommandHandler {
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine
-          .newTableAudit(url, ignore, metalake, catalog, schema, table)
+          .newTableAudit(context, metalake, catalog, schema, table)
           .validate()
           .handle();
     } else if (line.hasOption(GravitinoOptions.INDEX)) {
       gravitinoCommandLine
-          .newListIndexes(url, ignore, metalake, catalog, schema, table)
+          .newListIndexes(context, metalake, catalog, schema, table)
           .validate()
           .handle();
     } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
       gravitinoCommandLine
-          .newTableDistribution(url, ignore, metalake, catalog, schema, table)
+          .newTableDistribution(context, metalake, catalog, schema, table)
           .validate()
           .handle();
     } else if (line.hasOption(GravitinoOptions.PARTITION)) {
       gravitinoCommandLine
-          .newTablePartition(url, ignore, metalake, catalog, schema, table)
+          .newTablePartition(context, metalake, catalog, schema, table)
           .validate()
           .handle();
     } else if (line.hasOption(GravitinoOptions.SORTORDER)) {
       gravitinoCommandLine
-          .newTableSortOrder(url, ignore, metalake, catalog, schema, table)
+          .newTableSortOrder(context, metalake, catalog, schema, table)
           .validate()
           .handle();
     } else {
       gravitinoCommandLine
-          .newTableDetails(url, ignore, metalake, catalog, schema, table)
+          .newTableDetails(context, metalake, catalog, schema, table)
           .validate()
           .handle();
     }
@@ -165,16 +166,15 @@ public class TableCommandHandler extends CommandHandler {
     String columnFile = line.getOptionValue(GravitinoOptions.COLUMNFILE);
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine
-        .newCreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment)
+        .newCreateTable(context, metalake, catalog, schema, table, columnFile, comment)
         .validate()
         .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteTable(url, ignore, force, metalake, catalog, schema, table)
+        .newDeleteTable(context, metalake, catalog, schema, table)
         .validate()
         .handle();
   }
@@ -184,7 +184,7 @@ public class TableCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetTableProperty(url, ignore, metalake, catalog, schema, table, property, value)
+        .newSetTableProperty(context, metalake, catalog, schema, table, property, value)
         .validate()
         .handle();
   }
@@ -193,21 +193,21 @@ public class TableCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveTableProperty(url, ignore, metalake, catalog, schema, table, property)
+        .newRemoveTableProperty(context, metalake, catalog, schema, table, property)
         .validate()
         .handle();
   }
   /** Handles the "PROPERTIES" command. */
   private void handlePropertiesCommand() {
     gravitinoCommandLine
-        .newListTableProperties(url, ignore, metalake, catalog, schema, table)
+        .newListTableProperties(context, metalake, catalog, schema, table)
         .validate()
         .handle();
   }
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListTables(url, ignore, metalake, catalog, schema).validate().handle();
+    gravitinoCommandLine.newListTables(context, metalake, catalog, schema).validate().handle();
   }
 
   /** Handles the "UPDATE" command. */
@@ -215,14 +215,14 @@ public class TableCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateTableComment(url, ignore, metalake, catalog, schema, table, comment)
+          .newUpdateTableComment(context, metalake, catalog, schema, table, comment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateTableName(url, ignore, metalake, catalog, schema, table, newName)
+          .newUpdateTableName(context, metalake, catalog, schema, table, newName)
           .validate()
           .handle();
     }

@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import com.google.common.base.Joiner;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -38,15 +39,13 @@ public class ListFilesets extends Command {
   /**
    * Lists all filesets in a schema.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    */
-  public ListFilesets(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-    super(url, ignoreVersions);
+  public ListFilesets(CommandContext context, String metalake, String catalog, String schema) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -73,6 +72,6 @@ public class ListFilesets extends Command {
 
     String all = filesets.length == 0 ? "No filesets exist." : Joiner.on(",").join(filesets);
 
-    System.out.println(all);
+    printResults(all);
   }
 }

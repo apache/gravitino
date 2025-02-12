@@ -20,6 +20,7 @@
 file_mask = 0o600
 dir_mask = 0o700
 fs_type = "memory"
+data_path = "target/gvfs-fuse"
 
 [fuse.properties]
 

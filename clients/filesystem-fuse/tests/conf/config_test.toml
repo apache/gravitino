@@ -20,6 +20,8 @@
 file_mask= 0o644
 dir_mask= 0o755
 fs_type = "memory"
+data_dir = "/target/gvfs-fuse"
+log_dir = "/target/gvfs-fuse/logs"
 
 [fuse.properties]
 key1 = "value1"

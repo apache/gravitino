@@ -29,8 +29,7 @@ public class TopicCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String catalog;
@@ -43,16 +42,18 @@ public class TopicCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public TopicCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -128,7 +129,7 @@ public class TopicCommandHandler extends CommandHandler {
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
     gravitinoCommandLine
-        .newTopicDetails(url, ignore, metalake, catalog, schema, topic)
+        .newTopicDetails(context, metalake, catalog, schema, topic)
         .validate()
         .handle();
   }
@@ -137,16 +138,15 @@ public class TopicCommandHandler extends CommandHandler {
   private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine
-        .newCreateTopic(url, ignore, metalake, catalog, schema, topic, comment)
+        .newCreateTopic(context, metalake, catalog, schema, topic, comment)
         .validate()
         .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteTopic(url, ignore, force, metalake, catalog, schema, topic)
+        .newDeleteTopic(context, metalake, catalog, schema, topic)
         .validate()
         .handle();
   }
@@ -156,7 +156,7 @@ public class TopicCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment)
+          .newUpdateTopicComment(context, metalake, catalog, schema, topic, comment)
           .validate()
           .handle();
     }
@@ -167,7 +167,7 @@ public class TopicCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value)
+        .newSetTopicProperty(context, metalake, catalog, schema, topic, property, value)
         .validate()
         .handle();
   }
@@ -176,7 +176,7 @@ public class TopicCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property)
+        .newRemoveTopicProperty(context, metalake, catalog, schema, topic, property)
         .validate()
         .handle();
   }
@@ -184,13 +184,13 @@ public class TopicCommandHandler extends CommandHandler {
   /** Handles the "PROPERTIES" command. */
   private void handlePropertiesCommand() {
     gravitinoCommandLine
-        .newListTopicProperties(url, ignore, metalake, catalog, schema, topic)
+        .newListTopicProperties(context, metalake, catalog, schema, topic)
         .validate()
         .handle();
   }
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListTopics(url, ignore, metalake, catalog, schema).validate().handle();
+    gravitinoCommandLine.newListTopics(context, metalake, catalog, schema).validate().handle();
   }
 }

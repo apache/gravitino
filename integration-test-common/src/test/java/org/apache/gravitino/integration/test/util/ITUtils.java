@@ -187,6 +187,10 @@ public class ITUtils {
     return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
   }
 
+  public static String icebergVersion() {
+    return System.getProperty("ICEBERG_VERSION");
+  }
+
   public static String getBundleJarSourceFile(String bundleName) {
     String jarName = ITUtils.getBundleJarName(bundleName);
     String gcsJars = ITUtils.joinPath(ITUtils.getBundleJarDirectory(bundleName), jarName);

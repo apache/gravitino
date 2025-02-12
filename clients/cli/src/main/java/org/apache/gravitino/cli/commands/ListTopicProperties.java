@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -40,21 +41,15 @@ public class ListTopicProperties extends ListProperties {
   /**
    * List the properties of a topic.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param topic The name of the topic.
    */
   public ListTopicProperties(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String topic) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String catalog, String schema, String topic) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

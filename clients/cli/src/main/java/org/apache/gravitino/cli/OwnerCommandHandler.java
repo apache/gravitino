@@ -27,8 +27,7 @@ public class OwnerCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String entityName;
@@ -42,21 +41,20 @@ public class OwnerCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    * @param entity The entity to execute the command on.
    */
   public OwnerCommandHandler(
       GravitinoCommandLine gravitinoCommandLine,
       CommandLine line,
       String command,
-      boolean ignore,
+      CommandContext context,
       String entity) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.owner = line.getOptionValue(GravitinoOptions.USER);
     this.group = line.getOptionValue(GravitinoOptions.GROUP);
     this.name = new FullName(line);
@@ -102,22 +100,19 @@ public class OwnerCommandHandler extends CommandHandler {
 
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
-    gravitinoCommandLine
-        .newOwnerDetails(url, ignore, metalake, entityName, entity)
-        .validate()
-        .handle();
+    gravitinoCommandLine.newOwnerDetails(context, metalake, entityName, entity).validate().handle();
   }
 
   /** Handles the "SET" command. */
   private void handleSetCommand() {
     if (owner != null && group == null) {
       gravitinoCommandLine
-          .newSetOwner(url, ignore, metalake, entityName, entity, owner, false)
+          .newSetOwner(context, metalake, entityName, entity, owner, false)
           .validate()
           .handle();
     } else if (owner == null && group != null) {
       gravitinoCommandLine
-          .newSetOwner(url, ignore, metalake, entityName, entity, group, true)
+          .newSetOwner(context, metalake, entityName, entity, group, true)
           .validate()
           .handle();
     } else {

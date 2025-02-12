@@ -92,7 +92,7 @@ jobs:
           ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:test
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: authorizations-integrate-test-reports-${{ matrix.java-version }}

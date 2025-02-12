@@ -162,10 +162,6 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(hiveMetastoreUri, properties.get(IcebergConstants.URI));
 
-    Assertions.assertEquals(
-        GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
-        properties.get(CommonCatalogOptions.CATALOG_TYPE.key()));
-
     // Get the created catalog.
     Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
     Assertions.assertTrue(catalog.isPresent());

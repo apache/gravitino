@@ -98,7 +98,7 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
             "create catalog %s with ("
                 + "'type'='gravitino-paimon', "
                 + "'warehouse'='%s',"
-                + "'catalog.backend'='filesystem'"
+                + "'metastore'='filesystem'"
                 + ")",
             catalogName, warehouse));
     String[] catalogs = tableEnv.listCatalogs();

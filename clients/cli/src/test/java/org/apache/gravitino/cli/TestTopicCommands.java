@@ -21,6 +21,9 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -87,8 +90,7 @@ class TestTopicCommands {
                 mockCommandLine, mockOptions, CommandEntities.TOPIC, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListTopics(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema");
+        .newListTopics(any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -108,7 +110,11 @@ class TestTopicCommands {
     doReturn(mockDetails)
         .when(commandLine)
         .newTopicDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"));
     doReturn(mockDetails).when(mockDetails).validate();
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
@@ -131,13 +137,12 @@ class TestTopicCommands {
     doReturn(mockCreate)
         .when(commandLine)
         .newCreateTopic(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic",
-            "comment");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"),
+            eq("comment"));
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
@@ -157,13 +162,11 @@ class TestTopicCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTopic(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -184,13 +187,11 @@ class TestTopicCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteTopic(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            true,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -213,13 +214,12 @@ class TestTopicCommands {
     doReturn(mockUpdate)
         .when(commandLine)
         .newUpdateTopicComment(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic",
-            "new comment");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"),
+            eq("new comment"));
     doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
@@ -240,7 +240,11 @@ class TestTopicCommands {
     doReturn(mockListProperties)
         .when(commandLine)
         .newListTopicProperties(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "topic");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"));
     doReturn(mockListProperties).when(mockListProperties).validate();
     commandLine.handleCommandLine();
     verify(mockListProperties).handle();
@@ -265,14 +269,13 @@ class TestTopicCommands {
     doReturn(mockSetProperties)
         .when(commandLine)
         .newSetTopicProperty(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic",
-            "property",
-            "value");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"),
+            eq("property"),
+            eq("value"));
     doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
@@ -281,17 +284,12 @@ class TestTopicCommands {
   @Test
   void testSetTopicPropertyCommandWithoutPropertyAndValue() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     SetTopicProperty spySetProperty =
         spy(
             new SetTopicProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                "topic",
-                null,
-                null));
+                mockContext, "metalake_demo", "catalog", "schema", "topic", null, null));
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -301,17 +299,12 @@ class TestTopicCommands {
   @Test
   void testSetTopicPropertyCommandWithoutProperty() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     SetTopicProperty spySetProperty =
         spy(
             new SetTopicProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                "topic",
-                null,
-                "value"));
+                mockContext, "metalake_demo", "catalog", "schema", "topic", null, "value"));
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -321,17 +314,12 @@ class TestTopicCommands {
   @Test
   void testSetTopicPropertyCommandWithoutValue() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     SetTopicProperty spySetProperty =
         spy(
             new SetTopicProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                "topic",
-                "property",
-                null));
+                mockContext, "metalake_demo", "catalog", "schema", "topic", "property", null));
     assertThrows(RuntimeException.class, spySetProperty::validate);
     verify(spySetProperty, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -355,13 +343,12 @@ class TestTopicCommands {
     doReturn(mockSetProperties)
         .when(commandLine)
         .newRemoveTopicProperty(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "topic",
-            "property");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("topic"),
+            eq("property"));
     doReturn(mockSetProperties).when(mockSetProperties).validate();
     commandLine.handleCommandLine();
     verify(mockSetProperties).handle();
@@ -370,16 +357,12 @@ class TestTopicCommands {
   @Test
   void testRemoveTopicPropertyCommandWithoutProperty() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     RemoveTopicProperty spyRemoveProperty =
         spy(
             new RemoveTopicProperty(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                "topic",
-                null));
+                mockContext, "metalake_demo", "catalog", "schema", "topic", null));
 
     assertThrows(RuntimeException.class, spyRemoveProperty::validate);
     verify(spyRemoveProperty, never()).handle();
@@ -400,7 +383,7 @@ class TestTopicCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListTopics(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null);
+        .newListTopics(any(CommandContext.class), eq("metalake_demo"), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -425,7 +408,7 @@ class TestTopicCommands {
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
-        .newListTopics(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null);
+        .newListTopics(any(CommandContext.class), eq("metalake_demo"), eq("catalog"), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -450,7 +433,7 @@ class TestTopicCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newTopicDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null);
+            any(CommandContext.class), eq("metalake_demo"), isNull(), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -479,7 +462,7 @@ class TestTopicCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newTopicDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -505,7 +488,7 @@ class TestTopicCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newTopicDetails(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "schema", null, null);
+            any(CommandContext.class), eq("metalake_demo"), eq("schema"), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,

@@ -20,17 +20,25 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
+import org.apache.gravitino.cli.utils.FullNameUtil;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.messaging.TopicCatalog;
+import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 
 /* Removes all the tags of an entity. */
 public class RemoveAllTags extends Command {
@@ -42,18 +50,15 @@ public class RemoveAllTags extends Command {
   /**
    * Removes all the tags of an entity
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
-   * @param force Force operation.
    */
-  public RemoveAllTags(
-      String url, boolean ignoreVersions, String metalake, FullName name, boolean force) {
-    super(url, ignoreVersions);
+  public RemoveAllTags(CommandContext context, String metalake, FullName name) {
+    super(context);
     this.metalake = metalake;
     this.name = name;
-    this.force = force;
+    this.force = context.force();
   }
 
   @Override
@@ -66,21 +71,54 @@ public class RemoveAllTags extends Command {
     try {
 
       GravitinoClient client = buildClient(metalake);
-      // TODO fileset and topic
-      if (name.hasTableName()) {
+
+      if (name.getLevel() == 3) {
         String catalog = name.getCatalogName();
-        String schema = name.getSchemaName();
-        String table = name.getTableName();
-        Table gTable =
-            client
-                .loadCatalog(catalog)
-                .asTableCatalog()
-                .loadTable(NameIdentifier.of(schema, table));
-        tags = gTable.supportsTags().listTags();
-        if (tags.length > 0) {
-          gTable.supportsTags().associateTags(null, tags);
+        Catalog catalogObject = client.loadCatalog(catalog);
+        switch (catalogObject.type()) {
+          case RELATIONAL:
+            entity = "table";
+            TableCatalog tableCatalog = catalogObject.asTableCatalog();
+            Table gTable = tableCatalog.loadTable(FullNameUtil.toTable(name));
+            tags = gTable.supportsTags().listTags();
+            if (tags.length > 0) {
+              gTable.supportsTags().associateTags(null, tags);
+            }
+            break;
+
+          case MODEL:
+            entity = "model";
+            ModelCatalog modelCatalog = catalogObject.asModelCatalog();
+            Model gModel = modelCatalog.getModel(FullNameUtil.toModel(name));
+            tags = gModel.supportsTags().listTags();
+            if (tags.length > 0) {
+              gModel.supportsTags().associateTags(null, tags);
+            }
+            break;
+
+          case FILESET:
+            entity = "fileset";
+            FilesetCatalog filesetCatalog = catalogObject.asFilesetCatalog();
+            Fileset gFileset = filesetCatalog.loadFileset(FullNameUtil.toFileset(name));
+            tags = gFileset.supportsTags().listTags();
+            if (tags.length > 0) {
+              gFileset.supportsTags().associateTags(null, tags);
+            }
+            break;
+
+          case MESSAGING:
+            entity = "topic";
+            TopicCatalog topicCatalog = catalogObject.asTopicCatalog();
+            Topic gTopic = topicCatalog.loadTopic(FullNameUtil.toTopic(name));
+            tags = gTopic.supportsTags().listTags();
+            if (tags.length > 0) {
+              gTopic.supportsTags().associateTags(null, tags);
+            }
+            break;
+
+          default:
+            break;
         }
-        entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
@@ -112,10 +150,10 @@ public class RemoveAllTags extends Command {
     }
 
     if (tags.length > 0) {
-      System.out.println(
+      printInformation(
           entity + " removed tags " + String.join(",", tags) + " now tagged with nothing");
     } else {
-      System.out.println(entity + " has no tags");
+      printInformation(entity + " has no tags");
     }
   }
 

@@ -52,13 +52,13 @@ public class TestJdbcAuthorizationPlugin {
   private static final Map<String, String> properties =
       ImmutableMap.of(
           JdbcAuthorizationProperties.JDBC_URL,
-          "xx",
+          "jdbc:h2:mem:test",
           JdbcAuthorizationProperties.JDBC_USERNAME,
           "xx",
           JdbcAuthorizationProperties.JDBC_PASSWORD,
           "xx",
           JdbcAuthorizationProperties.JDBC_DRIVER,
-          "xx");
+          "org.h2.Driver");
 
   private static final JdbcAuthorizationPlugin plugin =
       new JdbcAuthorizationPlugin(properties) {
@@ -74,9 +74,10 @@ public class TestJdbcAuthorizationPlugin {
           return Collections.emptyList();
         }
 
-        public void executeUpdateSQL(String sql, String ignoreErrorMsg) {
+        public boolean executeUpdateSQL(String sql, String ignoreErrorMsg) {
           Assertions.assertEquals(expectSQLs.get(currentSQLIndex), sql);
           currentSQLIndex++;
+          return true;
         }
       };
 
@@ -148,23 +149,21 @@ public class TestJdbcAuthorizationPlugin {
 
     // Test metalake object and different role change
     resetSQLIndex();
-    expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "GRANT SELECT ON TABLE *.* TO ROLE tmp");
+    expectSQLs = Lists.newArrayList("GRANT SELECT ON TABLE *.* TO ROLE tmp");
     SecurableObject metalakeObject =
         SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.SelectTable.allow()));
     RoleChange roleChange = RoleChange.addSecurableObject("tmp", metalakeObject);
     plugin.onRoleUpdated(role, roleChange);
 
     resetSQLIndex();
-    expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "REVOKE SELECT ON TABLE *.* FROM ROLE tmp");
+    expectSQLs = Lists.newArrayList("REVOKE SELECT ON TABLE *.* FROM ROLE tmp");
     roleChange = RoleChange.removeSecurableObject("tmp", metalakeObject);
     plugin.onRoleUpdated(role, roleChange);
 
     resetSQLIndex();
     expectSQLs =
         Lists.newArrayList(
-            "CREATE ROLE tmp",
-            "REVOKE SELECT ON TABLE *.* FROM ROLE tmp",
-            "GRANT CREATE ON TABLE *.* TO ROLE tmp");
+            "REVOKE SELECT ON TABLE *.* FROM ROLE tmp", "GRANT CREATE ON TABLE *.* TO ROLE tmp");
     SecurableObject newMetalakeObject =
         SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.CreateTable.allow()));
     roleChange = RoleChange.updateSecurableObject("tmp", metalakeObject, newMetalakeObject);
@@ -175,7 +174,7 @@ public class TestJdbcAuthorizationPlugin {
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.SelectTable.allow()));
     roleChange = RoleChange.addSecurableObject("tmp", catalogObject);
-    expectSQLs = Lists.newArrayList("CREATE ROLE tmp", "GRANT SELECT ON TABLE *.* TO ROLE tmp");
+    expectSQLs = Lists.newArrayList("GRANT SELECT ON TABLE *.* TO ROLE tmp");
     plugin.onRoleUpdated(role, roleChange);
 
     // Test schema object
@@ -184,8 +183,7 @@ public class TestJdbcAuthorizationPlugin {
         SecurableObjects.ofSchema(
             catalogObject, "schema", Lists.newArrayList(Privileges.SelectTable.allow()));
     roleChange = RoleChange.addSecurableObject("tmp", schemaObject);
-    expectSQLs =
-        Lists.newArrayList("CREATE ROLE tmp", "GRANT SELECT ON TABLE schema.* TO ROLE tmp");
+    expectSQLs = Lists.newArrayList("GRANT SELECT ON TABLE schema.* TO ROLE tmp");
     plugin.onRoleUpdated(role, roleChange);
 
     // Test table object
@@ -194,8 +192,18 @@ public class TestJdbcAuthorizationPlugin {
         SecurableObjects.ofTable(
             schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
     roleChange = RoleChange.addSecurableObject("tmp", tableObject);
-    expectSQLs =
-        Lists.newArrayList("CREATE ROLE tmp", "GRANT SELECT ON TABLE schema.table TO ROLE tmp");
+    expectSQLs = Lists.newArrayList("GRANT SELECT ON TABLE schema.table TO ROLE tmp");
+    plugin.onRoleUpdated(role, roleChange);
+
+    // Test the role with objects
+    resetSQLIndex();
+    role =
+        RoleEntity.builder()
+            .withId(-1L)
+            .withName("tmp")
+            .withSecurableObjects(Lists.newArrayList(tableObject))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
     plugin.onRoleUpdated(role, roleChange);
   }
 

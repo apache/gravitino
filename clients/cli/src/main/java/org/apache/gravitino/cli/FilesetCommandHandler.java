@@ -31,8 +31,7 @@ public class FilesetCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String catalog;
@@ -45,16 +44,18 @@ public class FilesetCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public FilesetCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -130,7 +131,7 @@ public class FilesetCommandHandler extends CommandHandler {
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
     gravitinoCommandLine
-        .newFilesetDetails(url, ignore, metalake, catalog, schema, fileset)
+        .newFilesetDetails(context, metalake, catalog, schema, fileset)
         .validate()
         .handle();
   }
@@ -141,16 +142,15 @@ public class FilesetCommandHandler extends CommandHandler {
     String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
     Map<String, String> propertyMap = new Properties().parse(properties);
     gravitinoCommandLine
-        .newCreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap)
+        .newCreateFileset(context, metalake, catalog, schema, fileset, comment, propertyMap)
         .validate()
         .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteFileset(url, ignore, force, metalake, catalog, schema, fileset)
+        .newDeleteFileset(context, metalake, catalog, schema, fileset)
         .validate()
         .handle();
   }
@@ -160,7 +160,7 @@ public class FilesetCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property, value)
+        .newSetFilesetProperty(context, metalake, catalog, schema, fileset, property, value)
         .validate()
         .handle();
   }
@@ -169,7 +169,7 @@ public class FilesetCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveFilesetProperty(url, ignore, metalake, catalog, schema, fileset, property)
+        .newRemoveFilesetProperty(context, metalake, catalog, schema, fileset, property)
         .validate()
         .handle();
   }
@@ -177,17 +177,14 @@ public class FilesetCommandHandler extends CommandHandler {
   /** Handles the "PROPERTIES" command. */
   private void handlePropertiesCommand() {
     gravitinoCommandLine
-        .newListFilesetProperties(url, ignore, metalake, catalog, schema, fileset)
+        .newListFilesetProperties(context, metalake, catalog, schema, fileset)
         .validate()
         .handle();
   }
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine
-        .newListFilesets(url, ignore, metalake, catalog, schema)
-        .validate()
-        .handle();
+    gravitinoCommandLine.newListFilesets(context, metalake, catalog, schema).validate().handle();
   }
 
   /** Handles the "UPDATE" command. */
@@ -195,14 +192,14 @@ public class FilesetCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment)
+          .newUpdateFilesetComment(context, metalake, catalog, schema, fileset, comment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, newName)
+          .newUpdateFilesetName(context, metalake, catalog, schema, fileset, newName)
           .validate()
           .handle();
     }

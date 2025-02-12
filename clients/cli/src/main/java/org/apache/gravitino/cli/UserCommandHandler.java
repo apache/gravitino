@@ -27,8 +27,7 @@ public class UserCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private String user;
@@ -39,16 +38,18 @@ public class UserCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public UserCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
   }
@@ -110,42 +111,26 @@ public class UserCommandHandler extends CommandHandler {
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    this.gravitinoCommandLine
-        .newListUsers(this.url, this.ignore, this.metalake)
-        .validate()
-        .handle();
+    this.gravitinoCommandLine.newListUsers(context, metalake).validate().handle();
   }
 
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
-      this.gravitinoCommandLine
-          .newUserAudit(this.url, this.ignore, this.metalake, user)
-          .validate()
-          .handle();
+      this.gravitinoCommandLine.newUserAudit(context, metalake, user).validate().handle();
     } else {
-      this.gravitinoCommandLine
-          .newUserDetails(this.url, this.ignore, this.metalake, user)
-          .validate()
-          .handle();
+      this.gravitinoCommandLine.newUserDetails(context, metalake, user).validate().handle();
     }
   }
 
   /** Handles the "CREATE" command. */
   private void handleCreateCommand() {
-    this.gravitinoCommandLine
-        .newCreateUser(this.url, this.ignore, this.metalake, user)
-        .validate()
-        .handle();
+    this.gravitinoCommandLine.newCreateUser(context, metalake, user).validate().handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
-    this.gravitinoCommandLine
-        .newDeleteUser(this.url, this.ignore, force, this.metalake, user)
-        .validate()
-        .handle();
+    this.gravitinoCommandLine.newDeleteUser(context, metalake, user).validate().handle();
   }
 
   /** Handles the "REVOKE" command. */
@@ -153,7 +138,7 @@ public class UserCommandHandler extends CommandHandler {
     boolean removeAll = line.hasOption(GravitinoOptions.ALL);
     if (removeAll) {
       gravitinoCommandLine
-          .newRemoveAllRoles(url, ignore, metalake, user, CommandEntities.USER)
+          .newRemoveAllRoles(context, metalake, user, CommandEntities.USER)
           .validate()
           .handle();
       System.out.printf("Removed all roles from user %s%n", user);
@@ -161,7 +146,7 @@ public class UserCommandHandler extends CommandHandler {
       String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
       for (String role : revokeRoles) {
         this.gravitinoCommandLine
-            .newRemoveRoleFromUser(this.url, this.ignore, this.metalake, user, role)
+            .newRemoveRoleFromUser(context, metalake, user, role)
             .validate()
             .handle();
       }
@@ -173,10 +158,7 @@ public class UserCommandHandler extends CommandHandler {
   private void handleGrantCommand() {
     String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
     for (String role : grantRoles) {
-      this.gravitinoCommandLine
-          .newAddRoleToUser(this.url, this.ignore, this.metalake, user, role)
-          .validate()
-          .handle();
+      this.gravitinoCommandLine.newAddRoleToUser(context, metalake, user, role).validate().handle();
     }
     System.out.printf("Add roles %s to user %s%n", COMMA_JOINER.join(grantRoles), user);
   }

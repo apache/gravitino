@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -33,13 +34,12 @@ public class GroupAudit extends AuditCommand {
   /**
    * Displays the audit information of a group.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    */
-  public GroupAudit(String url, boolean ignoreVersions, String metalake, String group) {
-    super(url, ignoreVersions);
+  public GroupAudit(CommandContext context, String metalake, String group) {
+    super(context);
     this.metalake = metalake;
     this.group = group;
   }
@@ -47,19 +47,16 @@ public class GroupAudit extends AuditCommand {
   /** Displays the audit information of a specified group. */
   @Override
   public void handle() {
-    Group result;
+    Group result = null;
 
     try (GravitinoClient client = buildClient(metalake)) {
       result = client.getGroup(this.group);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchGroupException err) {
-      System.err.println(ErrorMessages.UNKNOWN_GROUP);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_GROUP);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (result != null) {
