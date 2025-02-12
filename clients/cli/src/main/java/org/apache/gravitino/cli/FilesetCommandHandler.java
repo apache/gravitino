@@ -56,7 +56,6 @@ public class FilesetCommandHandler extends CommandHandler {
     this.command = command;
     this.context = context;
 
-    this.context.setUrl(getUrl(line));
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();

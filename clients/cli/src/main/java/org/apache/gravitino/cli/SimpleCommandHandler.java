@@ -25,29 +25,29 @@ import org.apache.commons.cli.CommandLine;
 public class SimpleCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
-  private final boolean ignore;
+  private final CommandContext context;
 
   /**
    * Constructs a {@link SimpleCommandHandler} instance.
    *
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public SimpleCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine, CommandLine line, CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
-    this.ignore = ignore;
+    this.context = context;
   }
 
   /** Handles the command execution logic based on the provided command. */
   @Override
   protected void handle() {
     if (line.hasOption(GravitinoOptions.VERSION)) {
-      gravitinoCommandLine.newClientVersion(getUrl(line), ignore).validate().handle();
+      gravitinoCommandLine.newClientVersion(context).validate().handle();
     } else if (line.hasOption(GravitinoOptions.SERVER)) {
-      gravitinoCommandLine.newServerVersion(getUrl(line), ignore).validate().handle();
+      gravitinoCommandLine.newServerVersion(context).validate().handle();
     }
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.client.GravitinoAdminClient;
 
 /** Displays the Gravitino server version. */
@@ -27,11 +28,10 @@ public class ServerVersion extends Command {
   /**
    * Displays the server version.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context the command context
    */
-  public ServerVersion(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
+  public ServerVersion(CommandContext context) {
+    super(context);
   }
 
   /** Displays the server version. */
@@ -45,6 +45,6 @@ public class ServerVersion extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println("Apache Gravitino " + version);
+    printResults("Apache Gravitino " + version);
   }
 }

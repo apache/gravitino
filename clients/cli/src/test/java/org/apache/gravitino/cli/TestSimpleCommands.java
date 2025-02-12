@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -50,9 +51,7 @@ public class TestSimpleCommands {
     GravitinoCommandLine commandLine =
         spy(new GravitinoCommandLine(mockCommandLine, mockOptions, null, null));
 
-    doReturn(mockServerVersion)
-        .when(commandLine)
-        .newServerVersion(GravitinoCommandLine.DEFAULT_URL, false);
+    doReturn(mockServerVersion).when(commandLine).newServerVersion(any(CommandContext.class));
     doReturn(mockServerVersion).when(mockServerVersion).validate();
     commandLine.handleSimpleLine();
     verify(mockServerVersion).handle();
@@ -65,9 +64,7 @@ public class TestSimpleCommands {
     GravitinoCommandLine commandLine =
         spy(new GravitinoCommandLine(mockCommandLine, mockOptions, null, null));
 
-    doReturn(mockClientVersion)
-        .when(commandLine)
-        .newClientVersion(GravitinoCommandLine.DEFAULT_URL, false);
+    doReturn(mockClientVersion).when(commandLine).newClientVersion(any(CommandContext.class));
     doReturn(mockClientVersion).when(mockClientVersion).validate();
     commandLine.handleSimpleLine();
     verify(mockClientVersion).handle();

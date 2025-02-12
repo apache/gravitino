@@ -19,16 +19,29 @@
 
 package org.apache.gravitino.cli;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestCommandContext {
 
+  private CommandLine mockCommandLine;
+
+  @BeforeEach
+  void setUp() {
+    mockCommandLine = mock(CommandLine.class);
+  }
+
   @Test
   public void testCreateCommandContextWithDefaults() {
-    CommandContext commandContext = new CommandContext("http://localhost:8080", false);
-    Assertions.assertEquals("http://localhost:8080", commandContext.url());
+    CommandContext commandContext = new CommandContext(mockCommandLine);
+
+    Assertions.assertEquals(GravitinoCommandLine.DEFAULT_URL, commandContext.url());
     Assertions.assertFalse(commandContext.ignoreVersions());
     Assertions.assertFalse(commandContext.force());
     Assertions.assertEquals(Command.OUTPUT_FORMAT_PLAIN, commandContext.outputFormat());
@@ -36,11 +49,23 @@ public class TestCommandContext {
 
   @Test
   public void testCreateCommandContextWithCustomValues() {
-    CommandContext commandContext =
-        new CommandContext("http://localhost:8080", true, true, Command.OUTPUT_FORMAT_TABLE);
-    Assertions.assertEquals("http://localhost:8080", commandContext.url());
+    when(mockCommandLine.hasOption(GravitinoOptions.URL)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.URL)).thenReturn("http://localhost:8090");
+    when(mockCommandLine.hasOption(GravitinoOptions.IGNORE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.OUTPUT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.OUTPUT))
+        .thenReturn(Command.OUTPUT_FORMAT_TABLE);
+
+    CommandContext commandContext = new CommandContext(mockCommandLine);
+    Assertions.assertEquals("http://localhost:8090", commandContext.url());
     Assertions.assertTrue(commandContext.ignoreVersions());
     Assertions.assertTrue(commandContext.force());
     Assertions.assertEquals(Command.OUTPUT_FORMAT_TABLE, commandContext.outputFormat());
+  }
+
+  @Test
+  public void testCreateCommandContextWithNull() {
+    Assertions.assertThrows(NullPointerException.class, () -> new CommandContext(null));
   }
 }

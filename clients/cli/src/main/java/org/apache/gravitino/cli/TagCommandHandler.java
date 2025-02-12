@@ -39,7 +39,6 @@ public class TagCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.context = context;
-    this.context.setUrl(getUrl(line));
     this.tags = line.getOptionValues(GravitinoOptions.TAG);
 
     if (tags != null) {

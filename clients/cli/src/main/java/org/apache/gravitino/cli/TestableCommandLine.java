@@ -149,12 +149,12 @@ import org.apache.gravitino.cli.commands.UserDetails;
  */
 public class TestableCommandLine {
 
-  protected ClientVersion newClientVersion(String url, boolean ignore) {
-    return new ClientVersion(url, ignore);
+  protected ClientVersion newClientVersion(CommandContext context) {
+    return new ClientVersion(context);
   }
 
-  protected ServerVersion newServerVersion(String url, boolean ignore) {
-    return new ServerVersion(url, ignore);
+  protected ServerVersion newServerVersion(CommandContext context) {
+    return new ServerVersion(context);
   }
 
   protected MetalakeAudit newMetalakeAudit(CommandContext context, String metalake) {
