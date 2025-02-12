@@ -73,13 +73,7 @@ const schema = yup.object().shape({
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
-      key: yup
-        .string()
-        .required()
-        .matches(
-          /^[a-zA-Z_][a-zA-Z0-9_-]*$/,
-          'Valid key must start with a letter/underscore, followed by alphanumeric characters, underscores, hyphens, or dots.'
-        ),
+      key: yup.string().required(),
       value: yup.string().when('required', {
         is: true,
         then: schema => schema.required()
