@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.utils.FullNameUtil;
@@ -42,15 +43,13 @@ public class UntagEntity extends Command {
   /**
    * Remove existing tags from an entity.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param tags The names of the tags.
    */
-  public UntagEntity(
-      String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
-    super(url, ignoreVersions);
+  public UntagEntity(CommandContext context, String metalake, FullName name, String[] tags) {
+    super(context);
     this.metalake = metalake;
     this.name = name;
     this.tags = tags;
@@ -132,10 +131,10 @@ public class UntagEntity extends Command {
     }
 
     if (tags.length > 1) {
-      System.out.println(
+      printInformation(
           entity + " removed tags " + String.join(",", tags) + " now tagged with " + all);
     } else {
-      System.out.println(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
+      printInformation(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
     }
   }
 

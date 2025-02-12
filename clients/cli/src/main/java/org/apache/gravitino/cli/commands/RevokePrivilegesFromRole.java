@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.Privileges;
@@ -43,21 +44,15 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
   /**
    * Revokes one or more privileges.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    * @param entity The name of the entity.
    * @param privileges The list of privileges.
    */
   public RevokePrivilegesFromRole(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String role,
-      FullName entity,
-      String[] privileges) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String role, FullName entity, String[] privileges) {
+    super(context);
     this.metalake = metalake;
     this.entity = entity;
     this.role = role;
@@ -73,8 +68,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
 
       for (String privilege : privileges) {
         if (!Privileges.isValid(privilege)) {
-          System.err.println(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
-          return;
+          exitWithError(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
         }
         PrivilegeDTO privilegeDTO =
             PrivilegeDTO.builder()
@@ -97,7 +91,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
     }
 
     String all = String.join(",", privileges);
-    System.out.println(role + " revoked " + all + " on " + entity.getName());
+    printInformation(role + " revoked " + all + " on " + entity.getName());
   }
 
   @Override

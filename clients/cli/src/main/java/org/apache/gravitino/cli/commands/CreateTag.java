@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,15 +36,13 @@ public class CreateTag extends Command {
   /**
    * Create tags.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param tags The names of the tags.
    * @param comment The comment of the tag.
    */
-  public CreateTag(
-      String url, boolean ignoreVersions, String metalake, String[] tags, String comment) {
-    super(url, ignoreVersions);
+  public CreateTag(CommandContext context, String metalake, String[] tags, String comment) {
+    super(context);
     this.metalake = metalake;
     this.tags = tags;
     this.comment = comment;
@@ -76,7 +75,7 @@ public class CreateTag extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println("Tag " + tags[0] + " created");
+    printInformation("Tag " + tags[0] + " created");
   }
 
   private void handleMultipleTags() {
@@ -95,12 +94,12 @@ public class CreateTag extends Command {
       exitWithError(exp.getMessage());
     }
     if (!created.isEmpty()) {
-      System.out.println("Tags " + String.join(",", created) + " created");
+      printInformation("Tags " + String.join(",", created) + " created");
     }
     if (created.size() < tags.length) {
       List<String> remaining = Arrays.asList(tags);
       remaining.removeAll(created);
-      System.out.println("Tags " + String.join(",", remaining) + " not created");
+      printInformation("Tags " + String.join(",", remaining) + " not created");
     }
   }
 

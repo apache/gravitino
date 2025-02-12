@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -36,21 +37,15 @@ public class SetTagProperty extends Command {
   /**
    * Set a property of a tag.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param property The name of the property.
    * @param value The value of the property.
    */
   public SetTagProperty(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String tag,
-      String property,
-      String value) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String tag, String property, String value) {
+    super(context);
     this.metalake = metalake;
     this.tag = tag;
     this.property = property;
@@ -72,7 +67,7 @@ public class SetTagProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(tag + " property set.");
+    printInformation(tag + " property set.");
   }
 
   @Override
