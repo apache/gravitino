@@ -227,7 +227,7 @@ class TestMetalakeCommands {
 
   @Test
   void testSetMetalakePropertyCommandWithoutPropertyAndValue() {
-    CommandContext context = new CommandContext(GravitinoCommandLine.DEFAULT_URL, false);
+    CommandContext context = new CommandContext(mockCommandLine);
 
     Main.useExit = false;
     SetMetalakeProperty metalakeProperty =
@@ -240,7 +240,7 @@ class TestMetalakeCommands {
 
   @Test
   void testSetMetalakePropertyCommandWithoutProperty() {
-    CommandContext context = new CommandContext(GravitinoCommandLine.DEFAULT_URL, false);
+    CommandContext context = new CommandContext(mockCommandLine);
 
     Main.useExit = false;
     SetMetalakeProperty metalakeProperty =
@@ -253,7 +253,7 @@ class TestMetalakeCommands {
 
   @Test
   void testSetMetalakePropertyCommandWithoutValue() {
-    CommandContext context = new CommandContext(GravitinoCommandLine.DEFAULT_URL, false);
+    CommandContext context = new CommandContext(mockCommandLine);
 
     Main.useExit = false;
     SetMetalakeProperty metalakeProperty =
@@ -285,7 +285,7 @@ class TestMetalakeCommands {
 
   @Test
   void testRemoveMetalakePropertyCommandWithoutProperty() {
-    CommandContext context = new CommandContext(GravitinoCommandLine.DEFAULT_URL, false);
+    CommandContext context = new CommandContext(mockCommandLine);
 
     Main.useExit = false;
     RemoveMetalakeProperty mockRemoveProperty =

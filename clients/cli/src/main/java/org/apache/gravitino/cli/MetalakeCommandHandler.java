@@ -50,7 +50,6 @@ public class MetalakeCommandHandler extends CommandHandler {
     this.line = line;
     this.command = command;
     this.context = context;
-    this.context.setUrl(getUrl(line));
   }
 
   /** Handles the command execution logic based on the provided command. */

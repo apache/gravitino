@@ -55,7 +55,6 @@ public class OwnerCommandHandler extends CommandHandler {
     this.command = command;
     this.context = context;
 
-    this.context.setUrl(getUrl(line));
     this.owner = line.getOptionValue(GravitinoOptions.USER);
     this.group = line.getOptionValue(GravitinoOptions.GROUP);
     this.name = new FullName(line);
