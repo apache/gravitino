@@ -976,3 +976,10 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
+
+// Temporarily locking in to avoid https://github.com/netplex/json-smart-v2/issues/240
+configurations.all {
+  resolutionStrategy {
+    force("net.minidev:json-smart:2.3")
+  }
+}
