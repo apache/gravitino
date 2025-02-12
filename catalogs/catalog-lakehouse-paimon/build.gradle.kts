@@ -29,6 +29,13 @@ val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
 
+// Temporarily locking in to avoid https://github.com/netplex/json-smart-v2/issues/240
+configurations.all {
+  resolutionStrategy {
+    force("net.minidev:json-smart:2.3")
+  }
+}
+
 dependencies {
   implementation(project(":api")) {
     exclude("*")
