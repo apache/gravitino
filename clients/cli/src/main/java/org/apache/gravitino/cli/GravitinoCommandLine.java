@@ -35,9 +35,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
   private final Options options;
   private final String entity;
   private final String command;
-  private boolean ignore = false;
-  private String ignoreEnv;
-  private boolean ignoreSet = false;
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
@@ -60,29 +57,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
   public void handleCommandLine() {
-    GravitinoConfig config = new GravitinoConfig(null);
-
-    /* Check if you should ignore client/version versions */
-    if (line.hasOption(GravitinoOptions.IGNORE)) {
-      ignore = true;
-    } else {
-      // Cache the ignore environment variable
-      if (ignoreEnv == null && !ignoreSet) {
-        ignoreEnv = System.getenv("GRAVITINO_IGNORE");
-        ignore = ignoreEnv != null && ignoreEnv.equals("true");
-        ignoreSet = true;
-      }
-
-      // Check if the ignore name is specified in the configuration file
-      if (ignoreEnv == null) {
-        if (config.fileExists()) {
-          config.read();
-          ignore = config.getIgnore();
-        }
-      }
-    }
-
-    executeCommand();
+    CommandContext context = new CommandContext(line);
+    executeCommand(context);
   }
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
@@ -91,7 +67,8 @@ public class GravitinoCommandLine extends TestableCommandLine {
     if (line.hasOption(GravitinoOptions.HELP)) {
       displayHelp(options);
     } else {
-      new SimpleCommandHandler(this, line, ignore).handle();
+      CommandContext context = new CommandContext(line);
+      new SimpleCommandHandler(this, line, context).handle();
     }
   }
 
@@ -106,11 +83,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
   }
 
   /** Executes the appropriate command based on the command type. */
-  private void executeCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
-    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
-    CommandContext context = new CommandContext(null, ignore, force, outputFormat);
-
+  private void executeCommand(CommandContext context) {
     if (CommandActions.HELP.equals(command)) {
       handleHelpCommand();
     } else if (line.hasOption(GravitinoOptions.OWNER)) {
