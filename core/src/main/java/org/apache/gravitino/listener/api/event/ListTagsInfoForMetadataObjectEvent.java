@@ -31,6 +31,8 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 @DeveloperApi
 public final class ListTagsInfoForMetadataObjectEvent extends TagEvent {
 
+  private final Tag[] tags;
+
   /**
    * Constructs an instance of {@code ListTagsInfoForMetadataObjectEvent}.
    *
@@ -42,6 +44,7 @@ public final class ListTagsInfoForMetadataObjectEvent extends TagEvent {
   public ListTagsInfoForMetadataObjectEvent(
       String user, String metalake, MetadataObject metadataObject, Tag[] tags) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+    this.tags = tags;
   }
 
   /**
@@ -52,5 +55,9 @@ public final class ListTagsInfoForMetadataObjectEvent extends TagEvent {
   @Override
   public OperationType operationType() {
     return OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT;
+  }
+
+  public Tag[] getTags() {
+    return tags;
   }
 }

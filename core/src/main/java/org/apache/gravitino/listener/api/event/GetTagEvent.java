@@ -26,6 +26,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /** Represents an event that is triggered upon successfully retrieving a tag. */
 @DeveloperApi
 public final class GetTagEvent extends TagEvent {
+  private final TagInfo tagInfo;
 
   /**
    * Constructs an instance of {@code GetTagEvent}.
@@ -37,6 +38,16 @@ public final class GetTagEvent extends TagEvent {
    */
   public GetTagEvent(String user, String metalake, String tagName, TagInfo tagInfo) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagName));
+    this.tagInfo = tagInfo;
+  }
+
+  /**
+   * Returns the {@link TagInfo} object representing the retrieved tag.
+   *
+   * @return The tag information.
+   */
+  public TagInfo tagInfo() {
+    return tagInfo;
   }
 
   /**

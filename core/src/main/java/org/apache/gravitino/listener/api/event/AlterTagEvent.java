@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.TagChange;
@@ -43,7 +44,7 @@ public final class AlterTagEvent extends TagEvent {
   public AlterTagEvent(
       String user, String metalake, TagChange[] tagChanges, TagInfo updatedTagInfo) {
     super(user, NameIdentifierUtil.ofTag(metalake, updatedTagInfo.name()));
-    this.tagChanges = tagChanges != null ? tagChanges.clone() : new TagChange[0];
+    this.tagChanges = tagChanges != null ? tagChanges.clone() : null;
     this.updatedTagInfo = updatedTagInfo;
   }
 
@@ -63,7 +64,8 @@ public final class AlterTagEvent extends TagEvent {
    *
    * @return An array of {@link TagChange} objects detailing each modification applied to the tag.
    */
-  public TagChange[] tagChanges() {
+  @Nullable
+  public TagChange[] changes() {
     return tagChanges;
   }
 

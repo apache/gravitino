@@ -19,13 +19,15 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.tag.Tag;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is triggered upon the successful listing of tags. */
 @DeveloperApi
 public final class ListTagsInfoEvent extends TagEvent {
+
+  private final Tag[] tags;
 
   /**
    * Constructs an instance of {@code ListTagsEvent}.
@@ -35,7 +37,8 @@ public final class ListTagsInfoEvent extends TagEvent {
    * @param tags An array of {@link Tag} objects representing the tags.
    */
   public ListTagsInfoEvent(String user, String metalake, Tag[] tags) {
-    super(user, NameIdentifierUtil.ofTag(metalake, tags[0].name()));
+    super(user, NameIdentifier.of(metalake));
+    this.tags = tags;
   }
 
   /**
@@ -46,5 +49,9 @@ public final class ListTagsInfoEvent extends TagEvent {
   @Override
   public OperationType operationType() {
     return OperationType.LIST_TAGS_INFO;
+  }
+
+  public Tag[] getTags() {
+    return tags;
   }
 }
