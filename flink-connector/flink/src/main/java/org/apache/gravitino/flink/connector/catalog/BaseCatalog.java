@@ -577,7 +577,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .map(
                 fieldNames -> {
                   Preconditions.checkArgument(
-                      fieldNames.length > 1, "The primary key columns should not be nested.");
+                      fieldNames.length == 1, "The primary key columns should not be nested.");
                   return fieldNames[0];
                 })
             .collect(Collectors.toList());
