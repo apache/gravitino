@@ -19,6 +19,7 @@
 
 export const nameRegex = /^\w[\w]{0,63}$/
 
+
 export const nameRegexDesc =
   'This field must begin with a letter or underscore, contain only alphanumeric characters or underscores, and be between 1 and 64 characters in length'
 
