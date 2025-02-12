@@ -17,7 +17,7 @@
  * under the License.
  */
 
-export const nameRegex = /^[a-zA-Z_][a-zA-Z0-9_/=-]{0,63}$/;
+export const nameRegex = /^\w[\w/=-]{0,63}$/
 
 
 export const nameRegexDesc =
