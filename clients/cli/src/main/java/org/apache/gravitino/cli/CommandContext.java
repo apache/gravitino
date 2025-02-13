@@ -29,6 +29,7 @@ public class CommandContext {
   private final boolean ignoreVersions;
   private final String outputFormat;
   private final String url;
+  private final boolean quiet;
   private final CommandLine line;
 
   private String ignoreEnv;
@@ -50,6 +51,7 @@ public class CommandContext {
         line.hasOption(GravitinoOptions.OUTPUT)
             ? line.getOptionValue(GravitinoOptions.OUTPUT)
             : Command.OUTPUT_FORMAT_PLAIN;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
     this.url = getUrl();
     this.ignoreVersions = getIgnore();
@@ -89,6 +91,15 @@ public class CommandContext {
    */
   public String outputFormat() {
     return outputFormat;
+  }
+
+  /**
+   * Returns whether the command information should be suppressed.
+   *
+   * @return True if the command information should be suppressed.
+   */
+  public boolean quiet() {
+    return quiet;
   }
 
   /**
