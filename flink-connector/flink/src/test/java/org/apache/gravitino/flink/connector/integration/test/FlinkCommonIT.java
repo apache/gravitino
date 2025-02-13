@@ -51,6 +51,7 @@ import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,10 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   protected abstract String getProvider();
 
   protected abstract boolean supportDropCascade();
+
+  protected boolean supportsPrimaryKey() {
+    return true;
+  }
 
   @Test
   public void testCreateSchema() {
@@ -275,6 +280,91 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of("A", 1.0),
               Row.of("B", 2.0));
+        },
+        true,
+        supportDropCascade());
+  }
+
+  @Test
+  @EnabledIf("supportsPrimaryKey")
+  public void testCreateTableWithPrimaryKey() {
+    String databaseName = "test_create_table_with_primary_key_db";
+    String tableName = "test_create_primary_key_table";
+    String comment = "test comment";
+    String key = "test key";
+    String value = "test value";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          sql(
+              "CREATE TABLE %s "
+                  + "(aa int, "
+                  + " bb int,"
+                  + " cc int,"
+                  + "  PRIMARY KEY (aa,bb) NOT ENFORCED"
+                  + ")"
+                  + " COMMENT '%s' WITH ("
+                  + "'%s' = '%s')",
+              tableName, comment, key, value);
+          Table table =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(1, table.index().length);
+          Index index = table.index()[0];
+          Assertions.assertEquals("aa", index.fieldNames()[0][0]);
+          Assertions.assertEquals("bb", index.fieldNames()[1][0]);
+
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(1,2,3)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1));
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName), ResultKind.SUCCESS_WITH_CONTENT, Row.of(1, 2, 3));
+
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(1,2,4)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1));
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName), ResultKind.SUCCESS_WITH_CONTENT, Row.of(1, 2, 4));
+
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(1,3,4)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(2));
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1, 2, 4),
+              Row.of(1, 3, 4));
+
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES(2,2,4)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1));
+          TestUtils.assertTableResult(
+              sql("SELECT count(*) num FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(3));
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(1, 2, 4),
+              Row.of(1, 3, 4),
+              Row.of(2, 2, 4));
         },
         true,
         supportDropCascade());

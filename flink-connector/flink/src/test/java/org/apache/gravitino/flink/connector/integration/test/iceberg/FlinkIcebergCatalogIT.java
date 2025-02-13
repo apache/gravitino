@@ -63,6 +63,11 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
 
   private static org.apache.gravitino.Catalog icebergCatalog;
 
+  @Override
+  protected boolean supportsPrimaryKey() {
+    return false;
+  }
+
   @BeforeAll
   public void before() {
     Preconditions.checkNotNull(metalake);
