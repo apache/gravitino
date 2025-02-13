@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.utils.Lists;
@@ -40,6 +41,7 @@ import org.apache.flink.table.catalog.CatalogPartitionSpec;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
+import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -75,7 +77,11 @@ import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -276,8 +282,21 @@ public abstract class BaseCatalog extends AbstractCatalog {
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
     Transform[] partitions =
         partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
+
     try {
-      catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
+
+      Index[] indices = getGrivatinoIndices(resolvedTable);
+      catalog()
+          .asTableCatalog()
+          .createTable(
+              identifier,
+              columns,
+              comment,
+              properties,
+              partitions,
+              Distributions.NONE,
+              new SortOrder[0],
+              indices);
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
     } catch (TableAlreadyExistsException e) {
@@ -287,6 +306,20 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (Exception e) {
       throw new CatalogException(e);
     }
+  }
+
+  private static Index[] getGrivatinoIndices(ResolvedCatalogBaseTable<?> resolvedTable) {
+    Optional<UniqueConstraint> primaryKey = resolvedTable.getResolvedSchema().getPrimaryKey();
+    List<String> primaryColumns = primaryKey.map(UniqueConstraint::getColumns).orElse(null);
+    if (primaryColumns == null) {
+      return new Index[0];
+    }
+    String[][] primaryField =
+        primaryColumns.stream()
+            .map(primaryColumn -> new String[] {primaryColumn})
+            .toArray(String[][]::new);
+    Index primary = Indexes.primary("primary", primaryField);
+    return new Index[] {primary};
   }
 
   /**
@@ -521,10 +554,36 @@ public abstract class BaseCatalog extends AbstractCatalog {
           .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
           .withComment(column.comment());
     }
+    Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
+    flinkPrimaryKey.ifPresent(builder::primaryKey);
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
+  }
+
+  private static Optional<List<String>> getFlinkPrimaryKey(Table table) {
+    List<Index> primaryKeyList =
+        Arrays.stream(table.index())
+            .filter(index -> index.type() == Index.IndexType.PRIMARY_KEY)
+            .collect(Collectors.toList());
+    if (primaryKeyList.isEmpty()) {
+      return Optional.empty();
+    }
+    Preconditions.checkArgument(
+        primaryKeyList.size() == 1, "More than one primary key is not supported.");
+    List<String> primaryKeyFieldList =
+        Arrays.stream(primaryKeyList.get(0).fieldNames())
+            .map(
+                fieldNames -> {
+                  Preconditions.checkArgument(
+                      fieldNames.length == 1, "The primary key columns should not be nested.");
+                  return fieldNames[0];
+                })
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        !primaryKeyFieldList.isEmpty(), "The primary key must contain at least one field.");
+    return Optional.of(primaryKeyFieldList);
   }
 
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {

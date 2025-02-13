@@ -242,7 +242,7 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
 
-#### View support
+### View support
 
 You could access the view interface if using JDBC backend and enable `jdbc.schema-version` property.
 
@@ -250,7 +250,7 @@ You could access the view interface if using JDBC backend and enable `jdbc.schem
 |----------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.jdbc.schema-version` | The schema version of JDBC catalog backend, setting to `V1` if supporting view operations. | (none)        | NO       | 0.7.0-incubating |
 
-#### Multi catalog support
+### Multi catalog support
 
 The Gravitino Iceberg REST server supports multiple catalogs, and you could manage the catalog by different ways.
 
@@ -258,7 +258,7 @@ The Gravitino Iceberg REST server supports multiple catalogs, and you could mana
 |--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|------------------|
 | `gravitino.iceberg-rest.catalog-config-provider` | The className of catalog configuration provider, Gravitino provides build-in `static-config-provider` and `dynamic-config-provider`, you could also develop a custom class that implements `apache.gravitino.iceberg.service.provider.IcebergConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory. | `static-config-provider` | No       | 0.7.0-incubating |
 
-##### Static catalog configuration provider
+#### Static catalog configuration provider
 
 The static catalog configuration provider retrieves the catalog configuration from the configuration file of the Gravitino Iceberg REST server. You could configure the default catalog with `gravitino.iceberg-rest.<param name>=<value>`. For specific catalogs, use the format `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
 
@@ -297,7 +297,7 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 ...
 ```
 
-##### Dynamic catalog configuration provider
+#### Dynamic catalog configuration provider
 
 The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server.
 
