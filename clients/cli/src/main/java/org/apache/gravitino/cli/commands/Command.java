@@ -55,7 +55,7 @@ public abstract class Command {
   private final boolean ignoreVersions;
   private final String outputFormat;
 
-  protected CommandContext context = null; // TODO make final
+  protected final CommandContext context;
 
   /**
    * Command constructor.
@@ -67,31 +67,6 @@ public abstract class Command {
     this.url = context.url();
     this.ignoreVersions = context.ignoreVersions();
     this.outputFormat = context.outputFormat();
-  }
-
-  /**
-   * Command constructor.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   */
-  public Command(String url, boolean ignoreVersions) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.outputFormat = OUTPUT_FORMAT_PLAIN;
-  }
-
-  /**
-   * Command constructor.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param outputFormat output format used in some commands
-   */
-  public Command(String url, boolean ignoreVersions, String outputFormat) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.outputFormat = outputFormat;
   }
 
   /**
