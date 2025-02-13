@@ -85,7 +85,10 @@ public abstract class Command {
    * @param message The message to display.
    */
   public void printInformation(String message) {
-    // so that future outoput could be suppressed
+    if (context.quiet()) {
+      return;
+    }
+
     System.out.print(message);
   }
 
