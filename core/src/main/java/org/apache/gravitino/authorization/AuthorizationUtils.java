@@ -417,7 +417,7 @@ public class AuthorizationUtils {
       if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
         return defaultSchemaLocation;
       } else {
-        LOG.warn("Schema %s location is not found", defaultSchemaIdent);
+        LOG.warn("Schema {} location is not found", defaultSchemaIdent);
       }
     }
 
@@ -480,7 +480,7 @@ public class AuthorizationUtils {
                 if (StringUtils.isNotBlank(schemaLocation)) {
                   locations.add(schemaLocation);
                 } else {
-                  LOG.warn("Schema %s location is not found", ident);
+                  LOG.warn("Schema {} location is not found", ident);
                 }
               }
             }
@@ -501,7 +501,7 @@ public class AuthorizationUtils {
                 if (StringUtils.isNotBlank(tableLocation)) {
                   locations.add(tableLocation);
                 } else {
-                  LOG.warn("Table %s location is not found", ident);
+                  LOG.warn("Table {} location is not found", ident);
                 }
               }
             }
@@ -522,7 +522,7 @@ public class AuthorizationUtils {
               "Failed to get location paths for metadata object %s type %s", ident, type);
       }
     } catch (Exception e) {
-      LOG.warn("Failed to get location paths for metadata object %s type %s", ident, type, e);
+      LOG.warn("Failed to get location paths for metadata object {} type {}", ident, type, e);
     }
 
     return locations;
