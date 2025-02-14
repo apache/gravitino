@@ -106,7 +106,7 @@ function addDirToClasspath(){
 }
 
 if [[ -z "${GRAVITINO_MEM}" ]]; then
-  export GRAVITINO_MEM="-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+  export GRAVITINO_MEM="-Xmx2048m"
 fi
 
 if [[ -n "${JAVA_HOME}" ]]; then
