@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -241,21 +242,27 @@ class TestRoleMetaService extends TestJDBCBackend {
             schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
 
     // insert role
+    ArrayList<SecurableObject> securableObjects =
+        Lists.newArrayList(
+            catalogObject,
+            metalakeObject,
+            schemaObject,
+            filesetObject,
+            topicObject,
+            tableObject,
+            SecurableObjects.ofCatalog(
+                "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow())));
+
+    securableObjects.sort(Comparator.comparing(SecurableObject::fullName));
+
+    // insert role
     RoleEntity role1 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            Lists.newArrayList(
-                catalogObject,
-                metalakeObject,
-                schemaObject,
-                filesetObject,
-                topicObject,
-                tableObject,
-                SecurableObjects.ofCatalog(
-                    "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            securableObjects,
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,

@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.VERSION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -48,6 +49,28 @@ public class FilesetMetaBaseSQLProvider {
         + META_TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND fileset_name = #{filesetName}"
         + " AND deleted_at = 0";
+  }
+
+  public String listFilesetPOsByFilesetIds(@Param("filesetIds") List<Long> filesetIds) {
+    return "<script>"
+        + "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
+        + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.fileset_id as version_fileset_id,"
+        + " vi.version, vi.fileset_comment, vi.properties, vi.storage_location,"
+        + " vi.deleted_at as version_deleted_at"
+        + " FROM "
+        + META_TABLE_NAME
+        + " fm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
+        + " WHERE fm.fileset_id in ("
+        + "<foreach collection='filesetIds' item='filesetId' separator=','>"
+        + "#{filesetId}"
+        + "</foreach>"
+        + ") "
+        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0"
+        + "</script>";
   }
 
   public String selectFilesetMetaBySchemaIdAndName(

@@ -18,13 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -38,12 +42,18 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -54,6 +64,8 @@ import org.slf4j.LoggerFactory;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
 public class RoleMetaService {
+  private static final String DOT = ".";
+  private static final Joiner DOT_JOINER = Joiner.on(DOT);
 
   private static final Logger LOG = LoggerFactory.getLogger(RoleMetaService.class);
   private static final RoleMetaService INSTANCE = new RoleMetaService();
@@ -353,21 +365,58 @@ public class RoleMetaService {
     List<SecurableObjectPO> securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
-    for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
-      String fullName =
-          MetadataObjectService.getMetadataObjectFullName(
-              securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
-      if (fullName != null) {
-        securableObjects.add(
-            POConverters.fromSecurableObjectPO(
-                fullName, securableObjectPO, getType(securableObjectPO.getType())));
-      } else {
-        LOG.warn(
-            "The securable object {} {} may be deleted",
-            securableObjectPO.getMetadataObjectId(),
-            securableObjectPO.getType());
-      }
-    }
+    securableObjectPOs.stream()
+        .collect(Collectors.groupingBy(SecurableObjectPO::getType))
+        .forEach(
+            (type, objects) -> {
+              // If the type is Fileset, use the batch retrieval interface;
+              // otherwise, use the single retrieval interface
+              if (type.equals(MetadataObject.Type.FILESET.name())) {
+                List<Long> filesetIds =
+                    objects.stream()
+                        .map(SecurableObjectPO::getMetadataObjectId)
+                        .collect(Collectors.toList());
+
+                Map<Long, String> filesetIdAndNameMap = getFilesetObjectFullNames(filesetIds);
+
+                for (SecurableObjectPO securableObjectPO : objects) {
+                  String fullName =
+                      filesetIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
+                  if (fullName != null) {
+                    securableObjects.add(
+                        POConverters.fromSecurableObjectPO(
+                            fullName, securableObjectPO, getType(securableObjectPO.getType())));
+                  } else {
+                    LOG.warn(
+                        "The securable object {} {} may be deleted",
+                        securableObjectPO.getMetadataObjectId(),
+                        securableObjectPO.getType());
+                  }
+                }
+              } else {
+                // todo：to get other securable object fullNames using batch retrieving
+                for (SecurableObjectPO securableObjectPO : objects) {
+                  String fullName =
+                      MetadataObjectService.getMetadataObjectFullName(
+                          securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
+                  if (fullName != null) {
+                    securableObjects.add(
+                        POConverters.fromSecurableObjectPO(
+                            fullName, securableObjectPO, getType(securableObjectPO.getType())));
+                  } else {
+                    LOG.warn(
+                        "The securable object {} {} may be deleted",
+                        securableObjectPO.getMetadataObjectId(),
+                        securableObjectPO.getType());
+                  }
+                }
+              }
+            });
+
+    // To ensure that the order of the returned securable objects remains consistent,
+    // the securable objects are sorted by fullName here,
+    // since the order of securable objects after grouping by is different each time.
+    securableObjects.sort(Comparator.comparing(MetadataObject::fullName));
 
     return securableObjects;
   }
@@ -393,5 +442,65 @@ public class RoleMetaService {
 
   private static String getEntityType(SecurableObject securableObject) {
     return securableObject.type().name();
+  }
+
+  public static Map<Long, String> getFilesetObjectFullNames(List<Long> ids) {
+    List<FilesetPO> filesetPOs =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsByFilesetIds(ids));
+
+    if (filesetPOs == null || filesetPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        filesetPOs.stream().map(FilesetPO::getCatalogId).collect(Collectors.toList());
+    List<Long> schemaIds =
+        filesetPOs.stream().map(FilesetPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+
+    HashMap<Long, String> filesetIdAndNameMap = new HashMap<>();
+
+    filesetPOs.forEach(
+        filesetPO -> {
+          // since the catalog or schema can be deleted, we need to check the null value,
+          // and when catalog or schema is deleted, we will set catalogName or schemaName to null
+          String catalogName = catalogIdAndNameMap.getOrDefault(filesetPO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of fileset {} may be deleted", filesetPO.getFilesetId());
+            filesetIdAndNameMap.put(filesetPO.getFilesetId(), null);
+            return;
+          }
+
+          String schemaName = schemaIdAndNameMap.getOrDefault(filesetPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of fileset {} may be deleted", filesetPO.getFilesetId());
+            filesetIdAndNameMap.put(filesetPO.getFilesetId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(catalogName, schemaName, filesetPO.getFilesetName());
+          filesetIdAndNameMap.put(filesetPO.getFilesetId(), fullName);
+        });
+
+    return filesetIdAndNameMap;
+  }
+
+  public static Map<Long, String> getSchemaIdAndNameMap(List<Long> schemaIds) {
+    List<SchemaPO> schemaPOS =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
+    return schemaPOS.stream()
+        .collect(Collectors.toMap(SchemaPO::getSchemaId, SchemaPO::getSchemaName));
+  }
+
+  public static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
+    return catalogPOs.stream()
+        .collect(Collectors.toMap(CatalogPO::getCatalogId, CatalogPO::getCatalogName));
   }
 }

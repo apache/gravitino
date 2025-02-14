@@ -22,6 +22,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -105,14 +108,17 @@ public class TestSecurableObjects extends TestJDBCBackend {
         SecurableObjects.ofTopic(
             schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
 
+    ArrayList<SecurableObject> securableObjects =
+        Lists.newArrayList(catalogObject, schemaObject, tableObject, filesetObject, topicObject);
+    securableObjects.sort(Comparator.comparing(MetadataObject::fullName));
+
     RoleEntity role1 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            Lists.newArrayList(
-                catalogObject, schemaObject, tableObject, filesetObject, topicObject),
+            securableObjects,
             ImmutableMap.of("k1", "v1"));
 
     Assertions.assertDoesNotThrow(() -> roleMetaService.insertRole(role1, false));
