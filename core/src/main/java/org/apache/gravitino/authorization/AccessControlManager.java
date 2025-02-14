@@ -79,7 +79,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
-        AuthorizationUtils.ofGroup(metalake, user),
+        AuthorizationUtils.ofUser(metalake, user),
         LockType.READ,
         () -> userGroupManager.getUser(metalake, user));
   }
