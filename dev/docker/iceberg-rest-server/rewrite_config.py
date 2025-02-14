@@ -30,6 +30,7 @@ env_map = {
   "GRAVITINO_GCS_SERVICE_ACCOUNT_FILE" : "gcs-service-account-file",
   "GRAVITINO_S3_ACCESS_KEY" : "s3-access-key-id",
   "GRAVITINO_S3_SECRET_KEY" : "s3-secret-access-key",
+  "GRAVITINO_S3_ENDPOINT" : "s3-endpoint",
   "GRAVITINO_S3_REGION" : "s3-region",
   "GRAVITINO_S3_ROLE_ARN" : "s3-role-arn",
   "GRAVITINO_S3_EXTERNAL_ID" : "s3-external-id",
