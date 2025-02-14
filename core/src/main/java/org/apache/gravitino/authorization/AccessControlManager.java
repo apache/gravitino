@@ -62,7 +62,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   public User addUser(String metalake, String user)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
         () -> userGroupManager.addUser(metalake, user));
   }
@@ -70,7 +70,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
         () -> userGroupManager.removeUser(metalake, user));
   }
@@ -127,12 +127,18 @@ public class AccessControlManager implements AccessControlDispatcher {
 
   @Override
   public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
-    return userGroupManager.listGroups(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.READ,
+        () -> userGroupManager.listGroups(metalake));
   }
 
   @Override
   public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
-    return userGroupManager.listGroupNames(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.READ,
+        () -> userGroupManager.listGroupNames(metalake));
   }
 
   @Override
@@ -225,7 +231,9 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(metalake), LockType.READ, () -> roleManager.listRoleNames(metalake));
+        NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+        LockType.READ,
+        () -> roleManager.listRoleNames(metalake));
   }
 
   @Override
