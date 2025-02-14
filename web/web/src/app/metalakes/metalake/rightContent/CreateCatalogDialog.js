@@ -306,7 +306,7 @@ const CreateCatalogDialog = props => {
           jdbcUser && (properties['jdbc-user'] = jdbcUser)
           jdbcPwd && (properties['jdbc-password'] = jdbcPwd)
         }
-        authType && (properties['authType'] = authType)
+        authType && (properties['authentication.type'] = authType)
         kerberosPrincipal && (properties['authentication.kerberos.principal'] = kerberosPrincipal)
         kerberosKeytabUri && (properties['authentication.kerberos.keytab-uri'] = kerberosKeytabUri)
 
