@@ -486,53 +486,48 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       Map<String, String> properties) {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
-    TreeLockUtils.doWithTreeLock(
-        metalakeIdent,
-        LockType.READ,
-        () -> {
-          checkMetalake(metalakeIdent, store);
-          try {
-            if (store.exists(ident, EntityType.CATALOG)) {
-              throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
-            }
+    checkMetalake(metalakeIdent, store);
+    try {
+      if (store.exists(ident, EntityType.CATALOG)) {
+        throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+      }
 
-            Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
-            Instant now = Instant.now();
-            String creator = PrincipalUtils.getCurrentPrincipal().getName();
-            CatalogEntity dummyEntity =
-                CatalogEntity.builder()
-                    .withId(DUMMY_ID.id())
-                    .withName(ident.name())
-                    .withNamespace(ident.namespace())
-                    .withType(type)
-                    .withProvider(provider)
-                    .withComment(comment)
-                    .withProperties(StringIdentifier.newPropertiesWithId(DUMMY_ID, mergedConfig))
-                    .withAuditInfo(
-                        AuditInfo.builder()
-                            .withCreator(creator)
-                            .withCreateTime(now)
-                            .withLastModifier(creator)
-                            .withLastModifiedTime(now)
-                            .build())
-                    .build();
+      Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+      Instant now = Instant.now();
+      String creator = PrincipalUtils.getCurrentPrincipal().getName();
+      CatalogEntity dummyEntity =
+          CatalogEntity.builder()
+              .withId(DUMMY_ID.id())
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withType(type)
+              .withProvider(provider)
+              .withComment(comment)
+              .withProperties(StringIdentifier.newPropertiesWithId(DUMMY_ID, mergedConfig))
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(creator)
+                      .withCreateTime(now)
+                      .withLastModifier(creator)
+                      .withLastModifiedTime(now)
+                      .build())
+              .build();
 
-            CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
-            return wrapper.doWithCatalogOps(
-                c -> {
-                  c.testConnection(ident, type, provider, comment, mergedConfig);
-                  return null;
-                });
-          } catch (GravitinoRuntimeException e) {
-            throw e;
-          } catch (Exception e) {
-            LOG.warn("Failed to test catalog creation {}", ident, e);
-            if (e instanceof RuntimeException) {
-              throw (RuntimeException) e;
-            }
-            throw new RuntimeException(e);
-          }
-        });
+      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
+      wrapper.doWithCatalogOps(
+          c -> {
+            c.testConnection(ident, type, provider, comment, mergedConfig);
+            return null;
+          });
+    } catch (GravitinoRuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      LOG.warn("Failed to test catalog creation {}", ident, e);
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      }
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
