@@ -56,7 +56,7 @@ public class MetalakeCommandHandler extends CommandHandler {
   public void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     if (CommandActions.LIST.equals(command)) {
       handleListCommand();
