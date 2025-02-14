@@ -31,11 +31,14 @@ public class CommandContext {
   private final String url;
   private final boolean quiet;
   private final CommandLine line;
+  private final String auth;
 
   private String ignoreEnv;
   private boolean ignoreSet = false;
   private String urlEnv;
   private boolean urlSet = false;
+  private String authEnv;
+  private boolean authSet = false;
   // Can add more "global" command flags here without any major changes e.g. a guiet flag
 
   /**
@@ -55,6 +58,7 @@ public class CommandContext {
 
     this.url = getUrl();
     this.ignoreVersions = getIgnore();
+    this.auth = this.getAuth();
   }
 
   /**
@@ -100,6 +104,15 @@ public class CommandContext {
    */
   public boolean quiet() {
     return quiet;
+  }
+
+  /**
+   * Returns the authentication type.
+   *
+   * @return The authentication type.
+   */
+  public String auth() {
+    return auth;
   }
 
   /**
@@ -165,5 +178,35 @@ public class CommandContext {
     }
 
     return ignore;
+  }
+
+  private String getAuth() {
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.SIMPLE)) {
+      return GravitinoOptions.SIMPLE;
+    }
+
+    // Cache the Gravitino authentication type environment variable
+    if (authEnv == null && !authSet) {
+      authEnv = System.getenv("GRAVITINO_AUTH");
+      authSet = true;
+    }
+
+    // If set return the Gravitino authentication type environment variable
+    if (authEnv != null) {
+      return authEnv;
+    }
+
+    // Check if the authentication type is specified in the configuration file
+    GravitinoConfig config = new GravitinoConfig(null);
+    if (config.fileExists()) {
+      config.read();
+      String configAuthType = config.getGravitinoAuthType();
+      if (configAuthType != null) {
+        return configAuthType;
+      }
+    }
+
+    return null;
   }
 }
