@@ -21,6 +21,7 @@ package org.apache.gravitino.integration.test.web.ui.utils;
 import com.google.common.base.Function;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,12 +83,12 @@ public class BaseWebIT extends BaseIT {
       wait.until(ExpectedConditions.elementToBeClickable(locatorElement(locator)));
 
       locatorElement(locator).click();
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
     } catch (ElementClickInterceptedException e) {
       // if the previous click did not effected then try clicking in another way
       Actions action = new Actions(driver);
       action.moveToElement(locatorElement(locator)).click().build().perform();
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
     }
   }
 
@@ -105,11 +106,7 @@ public class BaseWebIT extends BaseIT {
 
   @BeforeEach
   public void beforeEachTest() {
-    try {
-      Thread.sleep(EACH_TEST_SLEEP_MILLIS);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    }
+    driver.manage().timeouts().implicitlyWait(EACH_TEST_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
   }
 
   @BeforeAll

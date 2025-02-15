@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -683,32 +684,26 @@ public class CatalogsPage extends BaseWebIT {
    */
   public boolean verifyShowPropertiesItemInList(
       String item, String key, String value, Boolean isHighlight) {
-    try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      String xpath;
-      if (isHighlight) {
-        xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
-      } else {
-        xpath = "//div[@data-refer='props-" + item + "-" + key + "']";
-      }
-      WebElement propertyElement = driver.findElement(By.xpath(xpath));
-      boolean match = Objects.equals(propertyElement.getText(), value);
+    driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
+    String xpath;
+    if (isHighlight) {
+      xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
+    } else {
+      xpath = "//div[@data-refer='props-" + item + "-" + key + "']";
+    }
+    WebElement propertyElement = driver.findElement(By.xpath(xpath));
+    boolean match = Objects.equals(propertyElement.getText(), value);
 
-      if (!match) {
-        LOG.error("Prop: does not include itemName: {}", value);
-        return false;
-      }
-
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    if (!match) {
+      LOG.error("Prop: does not include itemName: {}", value);
       return false;
     }
+    return true;
   }
 
   public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
       String xpath =
           "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
       if (isColumnLevel) {
@@ -734,7 +729,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyNoDataItemInList(String itemName, Boolean isColumnLevel) {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
       String xpath =
           "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
       if (isColumnLevel) {
@@ -901,7 +896,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
       List<WebElement> list =
           driver.findElements(
               By.xpath(
