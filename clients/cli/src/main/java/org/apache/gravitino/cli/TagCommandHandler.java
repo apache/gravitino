@@ -50,7 +50,7 @@ public class TagCommandHandler extends CommandHandler {
   public void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
     FullName name = new FullName(line);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     metalake = name.getMetalakeName();
 

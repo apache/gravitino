@@ -58,7 +58,7 @@ public class UserCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     user = line.getOptionValue(GravitinoOptions.USER);
 

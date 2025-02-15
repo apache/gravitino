@@ -33,11 +33,15 @@ public class CommandContext {
   private final CommandLine line;
   // TODO make it final
   private int outputLimit;
+  private final String auth;
+
 
   private String ignoreEnv;
   private boolean ignoreSet = false;
   private String urlEnv;
   private boolean urlSet = false;
+  private String authEnv;
+  private boolean authSet = false;
   // Can add more "global" command flags here without any major changes e.g. a guiet flag
 
   /**
@@ -54,11 +58,12 @@ public class CommandContext {
             ? line.getOptionValue(GravitinoOptions.OUTPUT)
             : Command.OUTPUT_FORMAT_PLAIN;
     this.quiet = line.hasOption(GravitinoOptions.QUIET);
+     // TODO add limit option to CLI
+    this.outputLimit = -1;
 
     this.url = getUrl();
     this.ignoreVersions = getIgnore();
-    // TODO add limit option to CLI
-    this.outputLimit = -1;
+    this.auth = this.getAuth();
   }
 
   /**
@@ -107,12 +112,21 @@ public class CommandContext {
   }
 
   /**
+
    * Returns the output limit.
    *
    * @return The output limit.
    */
   public int outputLimit() {
     return outputLimit;
+  }
+
+   * Returns the authentication type.
+   *
+   * @return The authentication type.
+   */
+  public String auth() {
+    return auth;
   }
 
   /**
@@ -178,5 +192,35 @@ public class CommandContext {
     }
 
     return ignore;
+  }
+
+  private String getAuth() {
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.SIMPLE)) {
+      return GravitinoOptions.SIMPLE;
+    }
+
+    // Cache the Gravitino authentication type environment variable
+    if (authEnv == null && !authSet) {
+      authEnv = System.getenv("GRAVITINO_AUTH");
+      authSet = true;
+    }
+
+    // If set return the Gravitino authentication type environment variable
+    if (authEnv != null) {
+      return authEnv;
+    }
+
+    // Check if the authentication type is specified in the configuration file
+    GravitinoConfig config = new GravitinoConfig(null);
+    if (config.fileExists()) {
+      config.read();
+      String configAuthType = config.getGravitinoAuthType();
+      if (configAuthType != null) {
+        return configAuthType;
+      }
+    }
+
+    return null;
   }
 }
