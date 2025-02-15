@@ -35,7 +35,6 @@ public class CommandContext {
   private int outputLimit;
   private final String auth;
 
-
   private String ignoreEnv;
   private boolean ignoreSet = false;
   private String urlEnv;
@@ -58,7 +57,7 @@ public class CommandContext {
             ? line.getOptionValue(GravitinoOptions.OUTPUT)
             : Command.OUTPUT_FORMAT_PLAIN;
     this.quiet = line.hasOption(GravitinoOptions.QUIET);
-     // TODO add limit option to CLI
+    // TODO add limit option to CLI
     this.outputLimit = -1;
 
     this.url = getUrl();
@@ -112,7 +111,6 @@ public class CommandContext {
   }
 
   /**
-
    * Returns the output limit.
    *
    * @return The output limit.
@@ -121,6 +119,7 @@ public class CommandContext {
     return outputLimit;
   }
 
+  /**
    * Returns the authentication type.
    *
    * @return The authentication type.
