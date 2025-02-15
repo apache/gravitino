@@ -31,6 +31,8 @@ public class CommandContext {
   private final String url;
   private final boolean quiet;
   private final CommandLine line;
+  // TODO make it final
+  private int outputLimit;
 
   private String ignoreEnv;
   private boolean ignoreSet = false;
@@ -55,6 +57,8 @@ public class CommandContext {
 
     this.url = getUrl();
     this.ignoreVersions = getIgnore();
+    // TODO add limit option to CLI
+    this.outputLimit = -1;
   }
 
   /**
@@ -100,6 +104,15 @@ public class CommandContext {
    */
   public boolean quiet() {
     return quiet;
+  }
+
+  /**
+   * Returns the output limit.
+   *
+   * @return The output limit.
+   */
+  public int outputLimit() {
+    return outputLimit;
   }
 
   /**

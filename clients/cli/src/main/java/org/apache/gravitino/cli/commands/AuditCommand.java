@@ -39,17 +39,6 @@ public abstract class AuditCommand extends Command {
    * @param audit from a class that implements the Auditable interface.
    */
   public void displayAuditInfo(Audit audit) {
-    String auditInfo =
-        "creator,create_time,modified,modified_time"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    printResults(auditInfo);
+    printResults(audit);
   }
 }
