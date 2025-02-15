@@ -166,14 +166,14 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
 }
 
 fn main() -> Result<(), i32> {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
     let args = command_args::Arguments::parse();
     match args.command {
         Commands::Mount {
             mount_point,
             fileset_location,
             config,
-            debug: _,
+            debug,
             foreground,
         } => {
             let app_config = AppConfig::from_file(config);
@@ -192,6 +192,8 @@ fn main() -> Result<(), i32> {
                 let path = path.unwrap();
                 path.to_string_lossy().to_string()
             };
+
+            app_config.fuse.fuse_debug = debug > 0;
 
             let result = init_dirs(&mut app_config, &mount_point);
             if let Err(e) = result {
