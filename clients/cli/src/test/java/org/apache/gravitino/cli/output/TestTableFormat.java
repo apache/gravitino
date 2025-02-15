@@ -34,8 +34,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.TableFormat;
-import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -368,40 +366,6 @@ public class TestTableFormat {
   }
 
   @Test
-  void testTableDetailsWithTableFormat() {
-    CommandContext mockContext = getMockContext();
-    Table mockTable = getMockTable();
-    TableFormat.output(mockTable, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+------+---------+------------------------+\n"
-            + "| NAME |  TYPE   |        COMMENT         |\n"
-            + "+------+---------+------------------------+\n"
-            + "| col1 | boolean | This is a column       |\n"
-            + "| col2 | string  | This is another column |\n"
-            + "+------+---------+------------------------+",
-        output);
-  }
-
-  @Test
-  void testListTableWithTableFormat() {
-    CommandContext mockContext = getMockContext();
-    Table mockTable1 = getMockTable("table1", "This is a table");
-    Table mockTable2 = getMockTable("table2", "This is another table");
-
-    TableFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+--------+\n"
-            + "|  NAME  |\n"
-            + "+--------+\n"
-            + "| table1 |\n"
-            + "| table2 |\n"
-            + "+--------+",
-        output);
-  }
-
-  @Test
   void testAuditWithTableFormat() {
     CommandContext mockContext = getMockContext();
     Audit mockAudit = getMockAudit();
@@ -478,32 +442,6 @@ public class TestTableFormat {
     when(mockSchema.comment()).thenReturn(comment);
 
     return mockSchema;
-  }
-
-  private Table getMockTable() {
-    Table mockTable = mock(Table.class);
-    org.apache.gravitino.rel.Column mockColumn1 = mock(org.apache.gravitino.rel.Column.class);
-    when(mockColumn1.name()).thenReturn("col1");
-    when(mockColumn1.dataType()).thenReturn(Types.BooleanType.get());
-    when(mockColumn1.comment()).thenReturn("This is a column");
-
-    org.apache.gravitino.rel.Column mockColumn2 = mock(org.apache.gravitino.rel.Column.class);
-    when(mockColumn2.name()).thenReturn("col2");
-    when(mockColumn2.dataType()).thenReturn(Types.StringType.get());
-    when(mockColumn2.comment()).thenReturn("This is another column");
-
-    when(mockTable.columns())
-        .thenReturn(new org.apache.gravitino.rel.Column[] {mockColumn1, mockColumn2});
-
-    return mockTable;
-  }
-
-  private Table getMockTable(String name, String comment) {
-    Table mockTable = mock(Table.class);
-    when(mockTable.name()).thenReturn(name);
-    when(mockTable.comment()).thenReturn(comment);
-
-    return mockTable;
   }
 
   private Audit getMockAudit() {
