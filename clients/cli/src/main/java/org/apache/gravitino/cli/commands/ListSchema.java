@@ -53,6 +53,7 @@ public class ListSchema extends Command {
   public void handle() {
     List<Schema> schemas = Lists.newArrayList();
     try {
+      // There may be a performance overhead
       GravitinoClient client = buildClient(metalake);
       SupportsSchemas gObject = client.loadCatalog(catalog).asSchemas();
       for (String schemaName : gObject.listSchemas()) {

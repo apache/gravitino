@@ -52,6 +52,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Table;
 
 /**
  * Abstract base class for formatting entity information into ASCII-art tables. Provides
@@ -88,6 +89,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new SchemaTableFormat(context).output((Schema) entity);
     } else if (entity instanceof Schema[]) {
       new SchemasTableFormat(context).output((Schema[]) entity);
+    } else if (entity instanceof Table) {
+      new TableTableFormat(context).output((Table) entity);
+    } else if (entity instanceof Table[]) {
+      new TablesTableFormat(context).output((Table[]) entity);
     } else if (entity instanceof Audit) {
       new AuditTableFormat(context).output((Audit) entity);
     } else {
@@ -653,6 +658,57 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         Arrays.stream(schemas).forEach(schema -> column.addCell(schema.name()));
 
         return getTableFormat(column);
+      }
+    }
+  }
+
+  /**
+   * Formats a single Table instance into a three-column table display. Displays table details
+   * including column-name, column-type, and column-comment information.
+   */
+  static final class TableTableFormat extends TableFormat<Table> {
+    public TableTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Table entity) {
+      Column columnA = new Column(context, "NAME");
+      Column columnB = new Column(context, "TYPE");
+      Column columnC = new Column(context, "COMMENT");
+
+      for (org.apache.gravitino.rel.Column column : entity.columns()) {
+        columnA.addCell(column.name());
+        columnB.addCell(column.dataType().simpleString());
+        columnC.addCell(column.comment());
+      }
+
+      return getTableFormat(columnA, columnB, columnC);
+    }
+  }
+
+  /**
+   * Formats an array of Tables into a single-column table display. Lists all table names in a
+   * vertical format.
+   */
+  static final class TablesTableFormat extends TableFormat<Table[]> {
+    public TablesTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Table[] entities) {
+      if (entities.length == 0) {
+        return null;
+      } else {
+        Column columnName = new Column(context, "NAME");
+        for (Table table : entities) {
+          columnName.addCell(table.name());
+        }
+
+        return getTableFormat(columnName);
       }
     }
   }

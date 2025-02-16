@@ -57,6 +57,6 @@ public class TableDetails extends TableCommand {
       exitWithError(exp.getMessage());
     }
 
-    printInformation(gTable.name() + "," + gTable.comment());
+    printResults(gTable);
   }
 }
