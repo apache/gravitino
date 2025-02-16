@@ -529,13 +529,13 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Metalake metalake) {
-      Column columnA = new Column(context, "METALAKE");
-      Column columnB = new Column(context, "COMMENT");
+      Column columnName = new Column(context, "METALAKE");
+      Column columnComment = new Column(context, "COMMENT");
 
-      columnA.addCell(metalake.name());
-      columnB.addCell(metalake.comment());
+      columnName.addCell(metalake.name());
+      columnComment.addCell(metalake.comment());
 
-      return getTableFormat(columnA, columnB);
+      return getTableFormat(columnName, columnComment);
     }
   }
 
@@ -556,10 +556,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         output("No metalakes exist.", System.err);
         return null;
       } else {
-        Column columnA = new Column(context, "METALAKE");
-        Arrays.stream(metalakes).forEach(metalake -> columnA.addCell(metalake.name()));
+        Column columnName = new Column(context, "METALAKE");
+        Arrays.stream(metalakes).forEach(metalake -> columnName.addCell(metalake.name()));
 
-        return getTableFormat(columnA);
+        return getTableFormat(columnName);
       }
     }
   }
@@ -577,17 +577,17 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Catalog catalog) {
-      Column columnA = new Column(context, "CATALOG");
-      Column columnB = new Column(context, "TYPE");
-      Column columnC = new Column(context, "PROVIDER");
-      Column columnD = new Column(context, "COMMENT");
+      Column columnName = new Column(context, "CATALOG");
+      Column columnType = new Column(context, "TYPE");
+      Column columnProvider = new Column(context, "PROVIDER");
+      Column columnComment = new Column(context, "COMMENT");
 
-      columnA.addCell(catalog.name());
-      columnB.addCell(catalog.type().name());
-      columnC.addCell(catalog.provider());
-      columnD.addCell(catalog.comment());
+      columnName.addCell(catalog.name());
+      columnType.addCell(catalog.type().name());
+      columnProvider.addCell(catalog.provider());
+      columnComment.addCell(catalog.comment());
 
-      return getTableFormat(columnA, columnB, columnC, columnD);
+      return getTableFormat(columnName, columnType, columnProvider, columnComment);
     }
   }
 
@@ -608,10 +608,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         output("No metalakes exist.", System.err);
         return null;
       } else {
-        Column columnA = new Column(context, "CATALOG");
-        Arrays.stream(catalogs).forEach(metalake -> columnA.addCell(metalake.name()));
+        Column columnName = new Column(context, "CATALOG");
+        Arrays.stream(catalogs).forEach(metalake -> columnName.addCell(metalake.name()));
 
-        return getTableFormat(columnA);
+        return getTableFormat(columnName);
       }
     }
   }
@@ -628,13 +628,13 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Schema schema) {
-      Column columnA = new Column(context, "SCHEMA");
-      Column columnB = new Column(context, "COMMENT");
+      Column columnName = new Column(context, "SCHEMA");
+      Column columnComment = new Column(context, "COMMENT");
 
-      columnA.addCell(schema.name());
-      columnB.addCell(schema.comment());
+      columnName.addCell(schema.name());
+      columnComment.addCell(schema.comment());
 
-      return getTableFormat(columnA, columnB);
+      return getTableFormat(columnName, columnComment);
     }
   }
 
@@ -654,10 +654,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         output("No schemas exist.", System.err);
         return null;
       } else {
-        Column column = new Column(context, "SCHEMA");
-        Arrays.stream(schemas).forEach(schema -> column.addCell(schema.name()));
+        Column columnName = new Column(context, "SCHEMA");
+        Arrays.stream(schemas).forEach(schema -> columnName.addCell(schema.name()));
 
-        return getTableFormat(column);
+        return getTableFormat(columnName);
       }
     }
   }
@@ -674,17 +674,17 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Table entity) {
-      Column columnA = new Column(context, "NAME");
-      Column columnB = new Column(context, "TYPE");
-      Column columnC = new Column(context, "COMMENT");
+      Column columnName = new Column(context, "NAME");
+      Column columnType = new Column(context, "TYPE");
+      Column columnComment = new Column(context, "COMMENT");
 
       for (org.apache.gravitino.rel.Column column : entity.columns()) {
-        columnA.addCell(column.name());
-        columnB.addCell(column.dataType().simpleString());
-        columnC.addCell(column.comment());
+        columnName.addCell(column.name());
+        columnType.addCell(column.dataType().simpleString());
+        columnComment.addCell(column.comment());
       }
 
-      return getTableFormat(columnA, columnB, columnC);
+      return getTableFormat(columnName, columnType, columnComment);
     }
   }
 
@@ -721,17 +721,17 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Audit audit) {
-      Column columnA = new Column(context, "creator");
-      Column columnB = new Column(context, "create_time");
-      Column columnC = new Column(context, "modified");
-      Column columnD = new Column(context, "modify_time");
+      Column columnCreator = new Column(context, "creator");
+      Column columnCreateTime = new Column(context, "create_time");
+      Column columnModified = new Column(context, "modified");
+      Column columnModifyTime = new Column(context, "modify_time");
 
-      columnA.addCell(audit.creator());
-      columnB.addCell(audit.createTime());
-      columnC.addCell(audit.lastModifier());
-      columnD.addCell(audit.lastModifiedTime());
+      columnCreator.addCell(audit.creator());
+      columnCreateTime.addCell(audit.createTime());
+      columnModified.addCell(audit.lastModifier());
+      columnModifyTime.addCell(audit.lastModifiedTime());
 
-      return getTableFormat(columnA, columnB, columnC, columnD);
+      return getTableFormat(columnCreator, columnCreateTime, columnModified, columnModifyTime);
     }
   }
 }
