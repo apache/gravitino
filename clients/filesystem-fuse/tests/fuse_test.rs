@@ -472,7 +472,7 @@ fn test_manually() {
 #[test]
 fn fuse_it_test_fuse() {
     test_enable_with!(RUN_TEST_WITH_FUSE);
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
 
     let mount_point = Path::new("target/gvfs");
     let test_dir = mount_point.join("test_dir");
@@ -482,7 +482,7 @@ fn fuse_it_test_fuse() {
 
 #[test]
 fn test_fuse_with_memory_fs() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
 
     let mount_point = "target/gvfs";
     let _ = fs::create_dir_all(mount_point);
