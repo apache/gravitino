@@ -166,7 +166,8 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
 }
 
 fn main() -> Result<(), i32> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt().init();
+
     let args = command_args::Arguments::parse();
     match args.command {
         Commands::Mount {
