@@ -358,7 +358,7 @@ pub(crate) mod tests {
     }
 
     async fn get_fileset_example() {
-        tracing_subscriber::fmt::init();
+        tracing_subscriber::fmt().init();
         let config = GravitinoConfig {
             uri: "http://localhost:8090".to_string(),
             metalake: "test".to_string(),
