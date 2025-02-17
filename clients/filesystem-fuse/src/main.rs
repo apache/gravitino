@@ -32,9 +32,9 @@ use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info};
 use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::{fmt, EnvFilter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, EnvFilter};
 
 fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
@@ -170,8 +170,8 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
 }
 
 fn init_tracing_subscriber(max_level: LevelFilter) {
-   let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(max_level.to_string()));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(max_level.to_string()));
 
     // Initialize the subscriber
     tracing_subscriber::registry()
