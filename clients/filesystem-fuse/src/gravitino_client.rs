@@ -202,6 +202,7 @@ impl GravitinoClient {
 pub(crate) mod tests {
     use super::*;
     use mockito::mock;
+    use tracing_subscriber::EnvFilter;
 
     pub(crate) fn create_test_catalog(
         name: &str,
@@ -358,7 +359,10 @@ pub(crate) mod tests {
     }
 
     async fn get_fileset_example() {
-        tracing_subscriber::fmt::init();
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .init();
+
         let config = GravitinoConfig {
             uri: "http://localhost:8090".to_string(),
             metalake: "test".to_string(),
