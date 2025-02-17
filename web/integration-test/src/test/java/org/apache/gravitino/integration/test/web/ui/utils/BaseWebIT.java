@@ -49,8 +49,8 @@ public class BaseWebIT extends BaseIT {
   // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 30;
   protected static final long MAX_TIMEOUT = 60;
-  protected static final long EACH_TEST_SLEEP_MILLIS = 1_000;
-  protected static final long ACTION_SLEEP_MILLIS = 1_000;
+  protected static final long EACH_TEST_SLEEP_MILLIS = 5_000;
+  protected static final long ACTION_SLEEP_MILLIS = 5_000;
 
   protected boolean waitShowText(final String text, final Object locator) {
     try {
