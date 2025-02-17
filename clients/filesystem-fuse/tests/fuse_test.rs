@@ -482,7 +482,7 @@ fn fuse_it_test_fuse() {
 
 #[test]
 fn test_fuse_with_memory_fs() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt().init();
 
     let mount_point = "target/gvfs";
     let _ = fs::create_dir_all(mount_point);
