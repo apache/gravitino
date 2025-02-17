@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetMetaBaseSQLProvider;
@@ -53,6 +54,10 @@ public class FilesetMetaSQLProviderFactory {
 
   public static String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFilesetPOsBySchemaId(schemaId);
+  }
+
+  public static String listFilesetPOsByFilesetIds(@Param("filesetIds") List<Long> filesetIds) {
+    return getProvider().listFilesetPOsByFilesetIds(filesetIds);
   }
 
   public static String selectFilesetIdBySchemaIdAndName(
