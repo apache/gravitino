@@ -31,8 +31,10 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info};
-use tracing_subscriber::{filter, reload, Registry};
 use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
@@ -167,9 +169,18 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
     ))
 }
 
+fn init_tracing_subscriber(max_level: LevelFilter) {
+   let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(max_level.to_string()));
+
+    // Initialize the subscriber
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(env_filter)
+        .init();
+}
+
 fn main() -> Result<(), i32> {
-
-
     let args = command_args::Arguments::parse();
     match args.command {
         Commands::Mount {
@@ -200,15 +211,15 @@ fn main() -> Result<(), i32> {
             app_config.fuse.fuse_debug = debug > 0;
             match debug {
                 0 => {
-                    tracing_subscriber::fmt().with_max_level(LevelFilter::INFO).init();
-                },
+                    init_tracing_subscriber(LevelFilter::INFO);
+                }
                 1 => {
                     // `DEBUG` level logging.
-                    tracing_subscriber::fmt().with_max_level(LevelFilter::DEBUG).init();
-               },
+                    init_tracing_subscriber(LevelFilter::DEBUG);
+                }
                 _ => {
                     // debug > 1, use `TRACE` level logging.
-                    tracing_subscriber::fmt().with_max_level(LevelFilter::TRACE).init();
+                    init_tracing_subscriber(LevelFilter::TRACE);
                 }
             }
 
@@ -237,7 +248,7 @@ fn main() -> Result<(), i32> {
             Ok(())
         }
         Commands::Umount { mount_point, force } => {
-            tracing_subscriber::fmt().init();
+            init_tracing_subscriber(LevelFilter::INFO);
 
             let result = do_umount(&mount_point, force);
             if let Err(e) = result {
