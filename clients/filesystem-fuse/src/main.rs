@@ -31,6 +31,8 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info};
+use tracing_subscriber::{filter, reload, Registry};
+use tracing_subscriber::filter::LevelFilter;
 
 fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
@@ -166,7 +168,7 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
 }
 
 fn main() -> Result<(), i32> {
-    tracing_subscriber::fmt().init();
+
 
     let args = command_args::Arguments::parse();
     match args.command {
@@ -194,7 +196,21 @@ fn main() -> Result<(), i32> {
                 path.to_string_lossy().to_string()
             };
 
+            // if debug > 0, it means that we need to use `FuseApiHandleDebug`, and `DEBUG` level logging.
             app_config.fuse.fuse_debug = debug > 0;
+            match debug {
+                0 => {
+                    tracing_subscriber::fmt().with_max_level(LevelFilter::INFO).init();
+                },
+                1 => {
+                    // `DEBUG` level logging.
+                    tracing_subscriber::fmt().with_max_level(LevelFilter::DEBUG).init();
+               },
+                _ => {
+                    // debug > 1, use `TRACE` level logging.
+                    tracing_subscriber::fmt().with_max_level(LevelFilter::TRACE).init();
+                }
+            }
 
             let result = init_dirs(&mut app_config, &mount_point);
             if let Err(e) = result {
@@ -206,6 +222,7 @@ fn main() -> Result<(), i32> {
                 mount_fuse(app_config, mount_point, fileset_location)
             } else {
                 let result = make_daemon(&app_config);
+                info!("Making daemon");
                 if let Err(e) = result {
                     error!("Failed to daemonize: {:?}", e);
                     return Err(-1);
@@ -220,6 +237,8 @@ fn main() -> Result<(), i32> {
             Ok(())
         }
         Commands::Umount { mount_point, force } => {
+            tracing_subscriber::fmt().init();
+
             let result = do_umount(&mount_point, force);
             if let Err(e) = result {
                 error!("Failed to unmount gvfs: {:?}", e.to_string());
