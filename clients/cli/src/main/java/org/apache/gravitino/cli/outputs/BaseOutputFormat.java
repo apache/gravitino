@@ -43,7 +43,7 @@ public abstract class BaseOutputFormat<T> implements OutputFormat<T> {
    * @param context the command context, must not be null;
    */
   public BaseOutputFormat(CommandContext context) {
-    Preconditions.checkNotNull(context, "CommandContext cannot be null");
+    Preconditions.checkNotNull(context, "context cannot be null");
     this.context = context;
     this.limit = context.outputLimit();
   }
