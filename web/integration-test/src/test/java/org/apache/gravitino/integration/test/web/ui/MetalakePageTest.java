@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.integration.test.web.ui;
 
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.junit.jupiter.api.Assertions;
@@ -104,7 +103,11 @@ public class MetalakePageTest extends BaseWebIT {
     int twoPagesCount = 11;
 
     for (int i = 0; i < twoPagesCount; i++) {
-      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
+      try {
+        Thread.sleep(ACTION_SLEEP * 1000);
+      } catch (Exception e) {
+        LOG.error(e.getMessage(), e);
+      }
       String name = "metalake_" + (i + 1);
       createMetalakeAction(name);
     }

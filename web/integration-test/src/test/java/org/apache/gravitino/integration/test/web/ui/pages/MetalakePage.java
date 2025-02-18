@@ -22,7 +22,6 @@ package org.apache.gravitino.integration.test.web.ui.pages;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -133,10 +132,11 @@ public class MetalakePage extends BaseWebIT {
   }
 
   public void setQueryParams(String queryParams) {
-    driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebElement queryInputElement =
+        wait.until(ExpectedConditions.elementToBeClickable(queryMetalakeInput));
     clearQueryInput();
-    queryMetalakeInput.sendKeys(queryParams);
-    driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
+    queryInputElement.sendKeys(queryParams);
   }
 
   public void clearQueryInput() {
@@ -184,9 +184,10 @@ public class MetalakePage extends BaseWebIT {
   public void clickMetalakeLink(String name) {
     try {
       setQueryParams(name);
-      driver.manage().timeouts().implicitlyWait(ACTION_SLEEP_MILLIS, TimeUnit.MICROSECONDS);
+      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
       String xpath = "//a[@data-refer='metalake-link-" + name + "']";
-      WebElement metalakeLink = metalakeTableGrid.findElement(By.xpath(xpath));
+      WebElement metalakeLink =
+          wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(metalakeLink);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
