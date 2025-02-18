@@ -18,12 +18,33 @@
  */
 package org.apache.gravitino.utils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestNamespaceUtil {
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+
+  @BeforeEach
+  void setUp() {
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
+  }
 
   @Test
   public void testCheckNamespace() {
@@ -81,5 +102,24 @@ public class TestNamespaceUtil {
             IllegalNamespaceException.class, () -> NamespaceUtil.checkModelVersion(ab));
     Assertions.assertTrue(
         excep5.getMessage().contains("Model version namespace must be non-null and have 4 levels"));
+  }
+
+  @Test
+  void testToFileset() {
+    NameIdentifier ident = NameIdentifier.of("metalake_demo", "catalog", "schema");
+    Namespace filesetNamespace = NamespaceUtil.toFileset(ident);
+    Assertions.assertEquals(3, filesetNamespace.levels().length);
+    Assertions.assertEquals("metalake_demo", filesetNamespace.level(0));
+    Assertions.assertEquals("catalog", filesetNamespace.level(1));
+    Assertions.assertEquals("schema", filesetNamespace.level(2));
+  }
+
+  @Test
+  void testToFilesetWithIncorrectLevel() {
+    NameIdentifier ident1 = NameIdentifier.of("metalake_demo", "catalog", "schema", "table");
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.toFileset(ident1));
+
+    NameIdentifier ident2 = NameIdentifier.of("metalake_demo", "catalog");
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.toFileset(ident2));
   }
 }
