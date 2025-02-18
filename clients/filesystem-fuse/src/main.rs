@@ -32,15 +32,13 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
 
-fn init_work_dirs(config: &AppConfig, mount_point: &str) -> io::Result<()> {
+fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
-    let data_dir_name = data_dir_name.canonicalize()?;
     if !data_dir_name.exists() {
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("Data directory {} not found", &config.fuse.data_dir),
-        ))?
+        create_dir(&data_dir_name)?
     };
+    let data_dir_name = data_dir_name.canonicalize()?;
+    config.fuse.data_dir = data_dir_name.to_string_lossy().to_string();
 
     let mount_point_name = data_dir_name.join(mount_point);
     if !mount_point_name.exists() {
@@ -48,6 +46,7 @@ fn init_work_dirs(config: &AppConfig, mount_point: &str) -> io::Result<()> {
     };
 
     let log_dir_name = data_dir_name.join(&config.fuse.log_dir);
+    config.fuse.log_dir = log_dir_name.to_string_lossy().to_string();
     if !log_dir_name.exists() {
         create_dir(&log_dir_name)?
     };
@@ -182,7 +181,7 @@ fn main() -> Result<(), i32> {
                 error!("Failed to load config: {:?}", e);
                 return Err(-1);
             };
-            let app_config = app_config.unwrap();
+            let mut app_config = app_config.unwrap();
 
             let mount_point = {
                 let path = Path::new(&mount_point).canonicalize();
@@ -194,7 +193,7 @@ fn main() -> Result<(), i32> {
                 path.to_string_lossy().to_string()
             };
 
-            let result = init_work_dirs(&app_config, &mount_point);
+            let result = init_dirs(&mut app_config, &mount_point);
             if let Err(e) = result {
                 error!("Failed to initialize working directories: {:?}", e);
                 return Err(-1);
