@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.KERBEROS_PROPERTY_ENTRIES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -55,9 +56,6 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
 
   static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
-
-  public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
-  public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
