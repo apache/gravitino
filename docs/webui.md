@@ -351,10 +351,6 @@ Creating a catalog requires these fields:
   </TabItem>
 </Tabs>
 
-:::tip
-Due to the current limitation of the web interface, which only allows for viewing, the functionality to create or modify schema, tables, or filesets is not available. Please refer to the [documentation](./manage-fileset-metadata-using-gravitino.md) to use the REST API for these operations.
-:::
-
 ###### 2. Type `fileset`
 
 <Tabs>
