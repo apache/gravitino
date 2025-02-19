@@ -122,4 +122,4 @@ block_size = 8192
 The `gvfs mount` command starts a FUSE program with the given configuration, using a `MemoryFilesystem` for testing.
 You can access the filesystem in the `target/gvfs` directory.
 
-More configration file examples can be found in the `test/conf` directory.
+More configration file examples can be found in the `tests/conf` directory.
