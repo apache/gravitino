@@ -25,6 +25,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent.CreateTableRequestWrapper;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
@@ -79,8 +80,12 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
+    CreateTableRequestWrapper createTableRequestWrapper =
+        new CreateTableRequestWrapper(createTableRequest);
     eventBus.dispatchEvent(
-        new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequest));
+        new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequestWrapper));
+    // Pre Event listener may create a new create table request, use the new one.
+    createTableRequest = createTableRequestWrapper.getCreateTableRequest();
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =

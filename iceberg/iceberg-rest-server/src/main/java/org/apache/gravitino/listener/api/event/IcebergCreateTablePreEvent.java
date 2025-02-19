@@ -26,14 +26,33 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 /** Represent a pre event before creating Iceberg table. */
 @DeveloperApi
 public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
-  private final CreateTableRequest createTableRequest;
+
+  // CreateTableRequest is immutable, you could create a new one based on the original request, the
+  // following dispatcher will use the createTableRequest from CreateTableRequestWrapper.
+  public static class CreateTableRequestWrapper {
+    private CreateTableRequest createTableRequest;
+
+    public CreateTableRequestWrapper(CreateTableRequest createTableRequest) {
+      this.createTableRequest = createTableRequest;
+    }
+
+    public CreateTableRequest getCreateTableRequest() {
+      return createTableRequest;
+    }
+
+    public void setCreateTableRequest(CreateTableRequest createTableRequest) {
+      this.createTableRequest = createTableRequest;
+    }
+  }
+
+  private final CreateTableRequestWrapper createTableRequestWrapper;
 
   public IcebergCreateTablePreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
-      CreateTableRequest createTableRequest) {
+      CreateTableRequestWrapper createTableRequestWrapper) {
     super(icebergRequestContext, resourceIdentifier);
-    this.createTableRequest = createTableRequest;
+    this.createTableRequestWrapper = createTableRequestWrapper;
   }
 
   @Override
@@ -42,6 +61,10 @@ public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
   }
 
   public CreateTableRequest createTableRequest() {
-    return createTableRequest;
+    return createTableRequestWrapper.getCreateTableRequest();
+  }
+
+  public CreateTableRequestWrapper createTableRequestWrapper() {
+    return createTableRequestWrapper;
   }
 }

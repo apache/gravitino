@@ -23,6 +23,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.junit.jupiter.api.Assertions;
 
@@ -49,6 +50,10 @@ public class DummyEventListener implements EventListenerPlugin {
 
   @Override
   public void onPreEvent(PreEvent preEvent) {
+    if (preEvent instanceof IcebergCreateTablePreEvent) {
+      IcebergCreateTablePreEvent createTablePreEvent = (IcebergCreateTablePreEvent) preEvent;
+      createTablePreEvent.createTableRequestWrapper().setCreateTableRequest(null);
+    }
     preEvents.add(preEvent);
   }
 
