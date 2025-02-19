@@ -21,6 +21,9 @@ import os
 env_map = {
   "GRAVITINO_IO_IMPL" : "io-impl",
   "GRAVITINO_URI" : "uri",
+  "GRAVITINO_JDBC_DRIVER": "jdbc-driver",
+  "GRAVITINO_JDBC_USER": "jdbc-user",
+  "GRAVITINO_JDBC_PASSWORD": "jdbc-password",
   "GRAVITINO_WAREHOUSE" : "warehouse",
   "GRAVITINO_CREDENTIAL_PROVIDER_TYPE" : "credential-providers",
   "GRAVITINO_CREDENTIAL_PROVIDERS" : "credential-providers",
@@ -28,6 +31,7 @@ env_map = {
   "GRAVITINO_GCS_SERVICE_ACCOUNT_FILE" : "gcs-service-account-file",
   "GRAVITINO_S3_ACCESS_KEY" : "s3-access-key-id",
   "GRAVITINO_S3_SECRET_KEY" : "s3-secret-access-key",
+  "GRAVITINO_S3_ENDPOINT" : "s3-endpoint",
   "GRAVITINO_S3_REGION" : "s3-region",
   "GRAVITINO_S3_ROLE_ARN" : "s3-role-arn",
   "GRAVITINO_S3_EXTERNAL_ID" : "s3-external-id",
