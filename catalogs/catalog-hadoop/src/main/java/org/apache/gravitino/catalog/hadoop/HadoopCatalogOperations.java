@@ -257,11 +257,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             ? new Path(storageLocation)
             : new Path(schemaPath, ident.name());
 
-    try {
+    try (FileSystem fs = getFileSystem(filesetPath, conf)) {
       // formalize the path to avoid path without scheme, uri, authority, etc.
       filesetPath = formalizePath(filesetPath, conf);
 
-      FileSystem fs = getFileSystem(filesetPath, conf);
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
           throw new RuntimeException(
@@ -357,6 +356,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
+    FileSystem fs = null;
     try {
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
@@ -364,7 +364,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
       // For managed fileset, we should delete the related files.
       if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        FileSystem fs = getFileSystem(filesetPath, conf);
+        fs = getFileSystem(filesetPath, conf);
         if (fs.exists(filesetPath)) {
           if (!fs.delete(filesetPath, true)) {
             LOG.warn("Failed to delete fileset {} location {}", ident, filesetPath);
@@ -382,6 +382,14 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       return false;
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
+    } finally {
+      if (null != fs) {
+        try {
+          fs.close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close the file system", e);
+        }
+      }
     }
   }
 
@@ -470,8 +478,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     Path schemaPath = getSchemaPath(ident.name(), properties);
     if (schemaPath != null) {
-      try {
-        FileSystem fs = getFileSystem(schemaPath, conf);
+      try (FileSystem fs = getFileSystem(schemaPath, conf)) {
         if (!fs.exists(schemaPath)) {
           if (!fs.mkdirs(schemaPath)) {
             // Fail the operation when failed to create the schema path.
@@ -544,13 +551,14 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           .forEach(
               f -> {
                 ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
+                FileSystem fs = null;
                 try {
                   // parallelStream uses forkjoin thread pool, which has a different classloader
                   // than the catalog thread. We need to set the context classloader to the
                   // catalog's classloader to avoid classloading issues.
                   Thread.currentThread().setContextClassLoader(cl);
                   Path filesetPath = new Path(f.storageLocation());
-                  FileSystem fs = getFileSystem(filesetPath, conf);
+                  fs = getFileSystem(filesetPath, conf);
                   if (fs.exists(filesetPath)) {
                     if (!fs.delete(filesetPath, true)) {
                       LOG.warn("Failed to delete fileset {} location {}", f.name(), filesetPath);
@@ -563,23 +571,32 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
                       f.storageLocation(),
                       ioe);
                 } finally {
+                  if (null != fs) {
+                    try {
+                      fs.close();
+                    } catch (IOException e) {
+                      LOG.warn("Failed to close the file system", e);
+                    }
+                  }
+
                   Thread.currentThread().setContextClassLoader(oldCl);
                 }
               });
 
       // Delete the schema path if it exists and is empty.
       if (schemaPath != null) {
-        FileSystem fs = getFileSystem(schemaPath, conf);
-        if (fs.exists(schemaPath)) {
-          FileStatus[] statuses = fs.listStatus(schemaPath);
-          if (statuses.length == 0) {
-            if (fs.delete(schemaPath, true)) {
-              LOG.info("Deleted schema {} location {}", ident, schemaPath);
-            } else {
-              LOG.warn(
-                  "Failed to delete schema {} because it has files/folders under location {}",
-                  ident,
-                  schemaPath);
+        try (FileSystem fs = getFileSystem(schemaPath, conf)) {
+          if (fs.exists(schemaPath)) {
+            FileStatus[] statuses = fs.listStatus(schemaPath);
+            if (statuses.length == 0) {
+              if (fs.delete(schemaPath, true)) {
+                LOG.info("Deleted schema {} location {}", ident, schemaPath);
+              } else {
+                LOG.warn(
+                    "Failed to delete schema {} because it has files/folders under location {}",
+                    ident,
+                    schemaPath);
+              }
             }
           }
         }
@@ -716,8 +733,9 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting
   Path formalizePath(Path path, Map<String, String> configuration) throws IOException {
-    FileSystem defaultFs = getFileSystem(path, configuration);
-    return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
+    try (FileSystem defaultFs = getFileSystem(path, configuration)) {
+      return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
+    }
   }
 
   private boolean hasCallerContext() {
@@ -727,9 +745,9 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   }
 
   private boolean checkSingleFile(Fileset fileset) {
-    try {
-      Path locationPath = new Path(fileset.storageLocation());
-      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
+    Path locationPath = new Path(fileset.storageLocation());
+    try (FileSystem fs = getFileSystem(locationPath, conf)) {
+      return fs.getFileStatus(locationPath).isFile();
     } catch (FileNotFoundException e) {
       // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
       return false;
@@ -769,6 +787,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
       Awaitility.await()
           .atMost(timeoutSeconds, TimeUnit.SECONDS)
+          .pollInterval(2, TimeUnit.MILLISECONDS)
           .until(
               () -> {
                 fileSystem.set(provider.getFileSystem(path, config));
