@@ -42,7 +42,7 @@ public class ListMetalakes extends Command {
     try {
       GravitinoAdminClient client = buildAdminClient();
       metalakes = client.listMetalakes();
-      output(metalakes);
+      printResults(metalakes);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
