@@ -50,10 +50,6 @@ public class DummyEventListener implements EventListenerPlugin {
 
   @Override
   public void onPreEvent(PreEvent preEvent) {
-    if (preEvent instanceof IcebergCreateTablePreEvent) {
-      IcebergCreateTablePreEvent createTablePreEvent = (IcebergCreateTablePreEvent) preEvent;
-      createTablePreEvent.createTableRequestWrapper().setCreateTableRequest(null);
-    }
     preEvents.add(preEvent);
   }
 
