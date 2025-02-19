@@ -169,9 +169,13 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
     ))
 }
 
-fn init_tracing_subscriber(max_level: LevelFilter) {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(max_level.to_string()));
+fn init_tracing_subscriber(max_level: LevelFilter, directives: &str) {
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::builder()
+            .with_default_directive(max_level.into())
+            .parse(directives)
+            .unwrap()
+    });
 
     // Initialize the subscriber
     tracing_subscriber::registry()
@@ -211,15 +215,19 @@ fn main() -> Result<(), i32> {
             app_config.fuse.fuse_debug = debug > 0;
             match debug {
                 0 => {
-                    init_tracing_subscriber(LevelFilter::INFO);
+                    init_tracing_subscriber(LevelFilter::INFO, "");
                 }
                 1 => {
-                    // `DEBUG` level logging.
-                    init_tracing_subscriber(LevelFilter::DEBUG);
+                    // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
+                    init_tracing_subscriber(
+                        LevelFilter::DEBUG,
+                        "info,gvfs_fuse::fuse_api_handle_debug=debug",
+                    );
                 }
                 _ => {
-                    // debug > 1, use `TRACE` level logging.
-                    init_tracing_subscriber(LevelFilter::TRACE);
+                    // debug > 1, use `DEBUG` level logging with all directives
+                    // TODO: log FuseApiHandleDebug and other module like PathFileSystemDebugLog
+                    init_tracing_subscriber(LevelFilter::DEBUG, "");
                 }
             }
 
@@ -248,7 +256,7 @@ fn main() -> Result<(), i32> {
             Ok(())
         }
         Commands::Umount { mount_point, force } => {
-            init_tracing_subscriber(LevelFilter::INFO);
+            init_tracing_subscriber(LevelFilter::INFO, "");
 
             let result = do_umount(&mount_point, force);
             if let Err(e) = result {
