@@ -128,7 +128,7 @@ const DetailsDrawer = props => {
         {drawerData.uri && (
           <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
             <Typography variant='body2' sx={{ mb: 2 }}>
-              Type
+              URI
             </Typography>
             {renderFieldText({ value: drawerData.uri })}
           </Grid>
