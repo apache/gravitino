@@ -65,7 +65,7 @@ public class ListTables extends TableCommand {
     }
 
     if (tablesList.isEmpty()) {
-      printResults("No tables exist.");
+      printInformation("No tables exist.");
     } else {
       printResults(tablesList.toArray(new Table[0]));
     }

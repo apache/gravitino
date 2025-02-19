@@ -62,7 +62,8 @@ public abstract class BaseOutputFormat<T> implements OutputFormat<T> {
    */
   public static void output(String message, OutputStream os) {
     if (message == null || os == null) {
-      throw new IllegalArgumentException("Message and OutputStream cannot be null");
+      throw new IllegalArgumentException(
+          "Message and OutputStream cannot be null, message: " + message + ", os: " + os);
     }
     boolean isSystemStream = (os == System.out || os == System.err);
 

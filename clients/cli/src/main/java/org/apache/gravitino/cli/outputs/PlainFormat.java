@@ -47,19 +47,19 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     if (entity instanceof Metalake) {
       new MetalakePlainFormat(context).output((Metalake) entity);
     } else if (entity instanceof Metalake[]) {
-      new MetalakesPlainFormat(context).output((Metalake[]) entity);
+      new MetalakeListPlainFormat(context).output((Metalake[]) entity);
     } else if (entity instanceof Catalog) {
       new CatalogPlainFormat(context).output((Catalog) entity);
     } else if (entity instanceof Catalog[]) {
-      new CatalogsPlainFormat(context).output((Catalog[]) entity);
+      new CatalogListPlainFormat(context).output((Catalog[]) entity);
     } else if (entity instanceof Schema) {
       new SchemaPlainFormat(context).output((Schema) entity);
     } else if (entity instanceof Schema[]) {
-      new SchemasPlainFormat(context).output((Schema[]) entity);
+      new SchemaListPlainFormat(context).output((Schema[]) entity);
     } else if (entity instanceof Table) {
       new TablePlainFormat(context).output((Table) entity);
     } else if (entity instanceof Table[]) {
-      new TablesPlainFormat(context).output((Table[]) entity);
+      new TableListPlainFormat(context).output((Table[]) entity);
     } else if (entity instanceof Audit) {
       new AuditPlainFormat(context).output((Audit) entity);
     } else {
@@ -97,9 +97,9 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    * Formats an array of Metalakes, outputting one name per line. Returns null if the array is empty
    * or null.
    */
-  static final class MetalakesPlainFormat extends PlainFormat<Metalake[]> {
+  static final class MetalakeListPlainFormat extends PlainFormat<Metalake[]> {
 
-    public MetalakesPlainFormat(CommandContext context) {
+    public MetalakeListPlainFormat(CommandContext context) {
       super(context);
     }
 
@@ -137,8 +137,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    * Formats an array of Catalogs, outputting one name per line. Returns null if the array is empty
    * or null.
    */
-  static final class CatalogsPlainFormat extends PlainFormat<Catalog[]> {
-    public CatalogsPlainFormat(CommandContext context) {
+  static final class CatalogListPlainFormat extends PlainFormat<Catalog[]> {
+    public CatalogListPlainFormat(CommandContext context) {
       super(context);
     }
 
@@ -176,8 +176,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    * Formats an array of Schemas, outputting one name per line. Returns null if the array is empty
    * or null.
    */
-  static final class SchemasPlainFormat extends PlainFormat<Schema[]> {
-    public SchemasPlainFormat(CommandContext context) {
+  static final class SchemaListPlainFormat extends PlainFormat<Schema[]> {
+    public SchemaListPlainFormat(CommandContext context) {
       super(context);
     }
 
@@ -226,8 +226,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    * Formats an array of Tables, outputting one name per line. Returns null if the array is empty or
    * null.
    */
-  static final class TablesPlainFormat extends PlainFormat<Table[]> {
-    public TablesPlainFormat(CommandContext context) {
+  static final class TableListPlainFormat extends PlainFormat<Table[]> {
+    public TableListPlainFormat(CommandContext context) {
       super(context);
     }
 
