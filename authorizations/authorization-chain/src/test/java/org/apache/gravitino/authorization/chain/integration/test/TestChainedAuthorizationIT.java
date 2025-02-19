@@ -65,6 +65,7 @@ import org.junit.platform.commons.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Tag("gravitino-docker-test")
 public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   private static final Logger LOG = LoggerFactory.getLogger(TestChainedAuthorizationIT.class);
   private static String DEFAULT_FS;
