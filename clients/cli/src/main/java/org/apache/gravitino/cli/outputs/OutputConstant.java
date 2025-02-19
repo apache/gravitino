@@ -21,7 +21,7 @@ package org.apache.gravitino.cli.outputs;
 
 import com.google.common.collect.ImmutableList;
 
-public class Constant {
+public class OutputConstant {
   public static final ImmutableList<Character> BASIC_ASCII =
       ImmutableList.of(
           '+', '-', '+', '+', '|', '|', '|', '+', '-', '+', '+', '|', '|', '|', '+', '-', '+', '+',
@@ -56,7 +56,7 @@ public class Constant {
   public static final int HEADER_BOTTOM_BORDER_COLUMN_SEPARATOR_IDX = 20;
   public static final int HEADER_BOTTOM_BORDER_RIGHT_IDX = 21;
 
-  private Constant() {
+  private OutputConstant() {
     // private constructor to prevent instantiation
   }
 }

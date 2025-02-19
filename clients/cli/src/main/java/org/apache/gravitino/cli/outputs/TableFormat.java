@@ -18,25 +18,25 @@
  */
 package org.apache.gravitino.cli.outputs;
 
-import static org.apache.gravitino.cli.outputs.Constant.DATA_LINE_COLUMN_SEPARATOR_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.DATA_LINE_LEFT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.DATA_LINE_RIGHT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.DATA_ROW_BORDER_COLUMN_SEPARATOR_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.DATA_ROW_BORDER_LEFT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.DATA_ROW_BORDER_MIDDLE_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.DATA_ROW_BORDER_RIGHT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.HEADER_BOTTOM_BORDER_COLUMN_SEPARATOR_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.HEADER_BOTTOM_BORDER_LEFT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.HEADER_BOTTOM_BORDER_MIDDLE_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.HEADER_BOTTOM_BORDER_RIGHT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_BOTTOM_BORDER_COLUMN_SEPARATOR_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_BOTTOM_BORDER_LEFT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_BOTTOM_BORDER_MIDDLE_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_BOTTOM_BORDER_RIGHT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_UPPER_BORDER_COLUMN_SEPARATOR_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_UPPER_BORDER_LEFT_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_UPPER_BORDER_MIDDLE_IDX;
-import static org.apache.gravitino.cli.outputs.Constant.TABLE_UPPER_BORDER_RIGHT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_LINE_COLUMN_SEPARATOR_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_LINE_LEFT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_LINE_RIGHT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_ROW_BORDER_COLUMN_SEPARATOR_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_ROW_BORDER_LEFT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_ROW_BORDER_MIDDLE_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.DATA_ROW_BORDER_RIGHT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.HEADER_BOTTOM_BORDER_COLUMN_SEPARATOR_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.HEADER_BOTTOM_BORDER_LEFT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.HEADER_BOTTOM_BORDER_MIDDLE_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.HEADER_BOTTOM_BORDER_RIGHT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_BOTTOM_BORDER_COLUMN_SEPARATOR_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_BOTTOM_BORDER_LEFT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_BOTTOM_BORDER_MIDDLE_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_BOTTOM_BORDER_RIGHT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER_COLUMN_SEPARATOR_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER_LEFT_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER_MIDDLE_IDX;
+import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER_RIGHT_IDX;
 
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
@@ -107,7 +107,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
             .filter(Objects::nonNull)
             .toArray(String[]::new);
 
-    List<Character> borders = Constant.BASIC_ASCII;
+    List<Character> borders = OutputConstant.BASIC_ASCII;
     checkHeaders(headers, columns);
 
     if (headers.length != columns.length) {
