@@ -24,9 +24,9 @@ use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, LOG_FILE_NAME, PID_FILE_NAME};
 use std::fs::{create_dir, OpenOptions};
-use std::io;
 use std::path::Path;
 use std::process::Command;
+use std::{env, io};
 use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
@@ -169,6 +169,8 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
     ))
 }
 
+/// init tracing subscriber with given max_level and directives,
+/// if `RUST_LOG` is set, then the directives in it will be applied.
 fn init_tracing_subscriber(max_level: LevelFilter, directives: &str) {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::builder()
@@ -211,23 +213,27 @@ fn main() -> Result<(), i32> {
                 path.to_string_lossy().to_string()
             };
 
-            // if debug > 0, it means that we need to use `FuseApiHandleDebug`, and `DEBUG` level logging.
-            app_config.fuse.fuse_debug = debug > 0;
-            match debug {
-                0 => {
-                    init_tracing_subscriber(LevelFilter::INFO, "");
-                }
-                1 => {
-                    // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
-                    init_tracing_subscriber(
-                        LevelFilter::DEBUG,
-                        "info,gvfs_fuse::fuse_api_handle_debug=debug",
-                    );
-                }
-                _ => {
-                    // debug > 1, use `DEBUG` level logging with all directives
-                    // TODO: log FuseApiHandleDebug and other module like PathFileSystemDebugLog
-                    init_tracing_subscriber(LevelFilter::DEBUG, "");
+            if env::var("RUST_LOG").is_ok() {
+                init_tracing_subscriber(LevelFilter::INFO, "");
+            } else {
+                // let debug option override fuse_debug
+                app_config.fuse.fuse_debug = debug > 0 || app_config.fuse.fuse_debug;
+                match debug {
+                    0 => {
+                        init_tracing_subscriber(LevelFilter::INFO, "");
+                    }
+                    1 => {
+                        // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
+                        init_tracing_subscriber(
+                            LevelFilter::DEBUG,
+                            "info,gvfs_fuse::fuse_api_handle_debug=debug",
+                        );
+                    }
+                    _ => {
+                        // debug > 1, use `DEBUG` level logging with all directives
+                        // TODO: log FuseApiHandleDebug and other module like PathFileSystemDebugLog
+                        init_tracing_subscriber(LevelFilter::DEBUG, "");
+                    }
                 }
             }
 
