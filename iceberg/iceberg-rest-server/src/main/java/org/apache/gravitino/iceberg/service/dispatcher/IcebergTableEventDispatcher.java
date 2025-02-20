@@ -83,6 +83,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
+
     ObjectWrapper<CreateTableRequest> createTableRequestWrapper =
         new ObjectWrapper<>(originalCreateTableRequest);
     eventBus.dispatchEvent(
@@ -112,6 +113,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier gravitinoNameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
+
     ObjectWrapper<UpdateTableRequest> updateTableRequestWrapper =
         new ObjectWrapper<>(originalUpdateTableRequest);
     eventBus.dispatchEvent(
