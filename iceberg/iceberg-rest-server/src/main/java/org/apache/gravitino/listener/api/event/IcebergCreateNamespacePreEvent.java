@@ -21,23 +21,28 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
 /** Represent a pre event before creating Iceberg namespace. */
 @DeveloperApi
 public class IcebergCreateNamespacePreEvent extends IcebergNamespacePreEvent {
-  private final CreateNamespaceRequest createNamespaceRequest;
+  private final ObjectWrapper<CreateNamespaceRequest> createNamespaceRequestWrapper;
 
   public IcebergCreateNamespacePreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      CreateNamespaceRequest createNamespaceRequest) {
+      ObjectWrapper<CreateNamespaceRequest> createNamespaceRequestWrapper) {
     super(icebergRequestContext, nameIdentifier);
-    this.createNamespaceRequest = createNamespaceRequest;
+    this.createNamespaceRequestWrapper = createNamespaceRequestWrapper;
   }
 
   public CreateNamespaceRequest createNamespaceRequest() {
-    return createNamespaceRequest;
+    return createNamespaceRequestWrapper.get();
+  }
+
+  public ObjectWrapper<CreateNamespaceRequest> getCreateNamespaceRequestWrapper() {
+    return createNamespaceRequestWrapper;
   }
 
   @Override

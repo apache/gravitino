@@ -21,23 +21,30 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /** Represent a pre event before updating Iceberg table. */
 @DeveloperApi
 public class IcebergUpdateTablePreEvent extends IcebergTablePreEvent {
-  private final UpdateTableRequest updateTableRequest;
+  // UpdateTableRequest is immutable, event listener could create a new object for the subsequent
+  // processor.
+  private ObjectWrapper<UpdateTableRequest> updateTableRequestWrapper;
 
   public IcebergUpdateTablePreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
-      UpdateTableRequest updateTableRequest) {
+      ObjectWrapper<UpdateTableRequest> updateTableRequestWrapper) {
     super(icebergRequestContext, resourceIdentifier);
-    this.updateTableRequest = updateTableRequest;
+    this.updateTableRequestWrapper = updateTableRequestWrapper;
   }
 
   public UpdateTableRequest updateTableRequest() {
-    return updateTableRequest;
+    return updateTableRequestWrapper.get();
+  }
+
+  public ObjectWrapper<UpdateTableRequest> getUpdateTableRequestWrapper() {
+    return updateTableRequestWrapper;
   }
 
   @Override

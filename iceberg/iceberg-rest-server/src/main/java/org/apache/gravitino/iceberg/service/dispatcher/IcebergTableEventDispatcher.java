@@ -22,10 +22,10 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
-import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent.CreateTableRequestWrapper;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
@@ -75,17 +75,20 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
 
   @Override
   public LoadTableResponse createTable(
-      IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
-    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, createTableRequest.name());
+      IcebergRequestContext context,
+      Namespace namespace,
+      CreateTableRequest originalCreateTableRequest) {
+    TableIdentifier tableIdentifier =
+        TableIdentifier.of(namespace, originalCreateTableRequest.name());
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
-    CreateTableRequestWrapper createTableRequestWrapper =
-        new CreateTableRequestWrapper(createTableRequest);
+    ObjectWrapper<CreateTableRequest> createTableRequestWrapper =
+        new ObjectWrapper<>(originalCreateTableRequest);
     eventBus.dispatchEvent(
         new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequestWrapper));
-    // Pre Event listener may create a new create table request, use the new one.
-    createTableRequest = createTableRequestWrapper.getCreateTableRequest();
+    CreateTableRequest createTableRequest = createTableRequestWrapper.get();
+
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
@@ -105,12 +108,17 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   public LoadTableResponse updateTable(
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
-      UpdateTableRequest updateTableRequest) {
+      UpdateTableRequest originalUpdateTableRequest) {
     NameIdentifier gravitinoNameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
+    ObjectWrapper<UpdateTableRequest> updateTableRequestWrapper =
+        new ObjectWrapper<>(originalUpdateTableRequest);
     eventBus.dispatchEvent(
-        new IcebergUpdateTablePreEvent(context, gravitinoNameIdentifier, updateTableRequest));
+        new IcebergUpdateTablePreEvent(
+            context, gravitinoNameIdentifier, updateTableRequestWrapper));
+    UpdateTableRequest updateTableRequest = updateTableRequestWrapper.get();
+
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =

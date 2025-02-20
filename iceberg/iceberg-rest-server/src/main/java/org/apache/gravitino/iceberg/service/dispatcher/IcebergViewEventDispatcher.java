@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewPreEvent;
@@ -99,12 +100,18 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
   public LoadViewResponse replaceView(
       IcebergRequestContext context,
       TableIdentifier viewIdentifier,
-      UpdateTableRequest replaceViewRequest) {
+      UpdateTableRequest originalReplaceViewRequest) {
     NameIdentifier gravitinoNameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), viewIdentifier);
+
+    ObjectWrapper<UpdateTableRequest> replaceViewRequestWrapper =
+        new ObjectWrapper<>(originalReplaceViewRequest);
     eventBus.dispatchEvent(
-        new IcebergReplaceViewPreEvent(context, gravitinoNameIdentifier, replaceViewRequest));
+        new IcebergReplaceViewPreEvent(
+            context, gravitinoNameIdentifier, replaceViewRequestWrapper));
+    UpdateTableRequest replaceViewRequest = replaceViewRequestWrapper.get();
+
     LoadViewResponse loadViewResponse;
     try {
       loadViewResponse =

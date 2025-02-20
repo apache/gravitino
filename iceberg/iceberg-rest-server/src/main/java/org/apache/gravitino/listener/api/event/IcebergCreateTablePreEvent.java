@@ -21,36 +21,18 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 
 /** Represent a pre event before creating Iceberg table. */
 @DeveloperApi
 public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
-
-  // CreateTableRequest is immutable, you could create a new one based on the original request, the
-  // following dispatcher will use the createTableRequest from CreateTableRequestWrapper.
-  public static class CreateTableRequestWrapper {
-    private CreateTableRequest createTableRequest;
-
-    public CreateTableRequestWrapper(CreateTableRequest createTableRequest) {
-      this.createTableRequest = createTableRequest;
-    }
-
-    public CreateTableRequest getCreateTableRequest() {
-      return createTableRequest;
-    }
-
-    public void setCreateTableRequest(CreateTableRequest createTableRequest) {
-      this.createTableRequest = createTableRequest;
-    }
-  }
-
-  private final CreateTableRequestWrapper createTableRequestWrapper;
+  private final ObjectWrapper<CreateTableRequest> createTableRequestWrapper;
 
   public IcebergCreateTablePreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
-      CreateTableRequestWrapper createTableRequestWrapper) {
+      ObjectWrapper<CreateTableRequest> createTableRequestWrapper) {
     super(icebergRequestContext, resourceIdentifier);
     this.createTableRequestWrapper = createTableRequestWrapper;
   }
@@ -61,10 +43,10 @@ public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
   }
 
   public CreateTableRequest createTableRequest() {
-    return createTableRequestWrapper.getCreateTableRequest();
+    return createTableRequestWrapper.get();
   }
 
-  public CreateTableRequestWrapper createTableRequestWrapper() {
+  public ObjectWrapper<CreateTableRequest> createTableRequestWrapper() {
     return createTableRequestWrapper;
   }
 }

@@ -21,23 +21,28 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 
 /** Represent a pre event before creating Iceberg view. */
 @DeveloperApi
 public class IcebergCreateViewPreEvent extends IcebergViewPreEvent {
-  private final CreateViewRequest createViewRequest;
+  private final ObjectWrapper<CreateViewRequest> createViewRequestWrapper;
 
   public IcebergCreateViewPreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      CreateViewRequest createViewRequest) {
+      ObjectWrapper<CreateViewRequest> createViewRequestWrapper) {
     super(icebergRequestContext, viewIdentifier);
-    this.createViewRequest = createViewRequest;
+    this.createViewRequestWrapper = createViewRequestWrapper;
   }
 
   public CreateViewRequest createViewRequest() {
-    return createViewRequest;
+    return createViewRequestWrapper.get();
+  }
+
+  public ObjectWrapper<CreateViewRequest> getCreateViewRequestWrapper() {
+    return createViewRequestWrapper;
   }
 
   @Override
