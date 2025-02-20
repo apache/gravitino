@@ -116,7 +116,6 @@ public class TestPlainFormat {
 
   private CommandContext getMockContext() {
     CommandContext mockContext = mock(CommandContext.class);
-    when(mockContext.outputLimit()).thenReturn(-1);
 
     return mockContext;
   }

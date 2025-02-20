@@ -225,40 +225,6 @@ public class TestTableFormat {
   }
 
   @Test
-  void testTableOutputWithLimit() {
-    CommandContext mockContext = mock(CommandContext.class);
-    when(mockContext.outputLimit()).thenReturn(5);
-
-    Column columnA = new Column(mockContext, "metalake");
-    Column columnB = new Column(mockContext, "comment");
-
-    addRepeatedCells(columnA, 10);
-    addRepeatedCells(columnB, 10);
-
-    TableFormat<String> tableFormat =
-        new TableFormat<String>(mockContext) {
-          @Override
-          public String getOutput(String entity) {
-            return null;
-          }
-        };
-
-    String outputString = tableFormat.getTableFormat(columnA, columnB).trim();
-    Assertions.assertEquals(
-        "+------------+-----------+\n"
-            + "|  Metalake  |  Comment  |\n"
-            + "+------------+-----------+\n"
-            + "| Metalake-1 | Comment-1 |\n"
-            + "| Metalake-2 | Comment-2 |\n"
-            + "| Metalake-3 | Comment-3 |\n"
-            + "| Metalake-4 | Comment-4 |\n"
-            + "| Metalake-5 | Comment-5 |\n"
-            + "| …          | …         |\n"
-            + "+------------+-----------+",
-        outputString);
-  }
-
-  @Test
   void testMetalakeDetailsWithTableFormat() {
     CommandContext mockContext = getMockContext();
 
@@ -349,7 +315,6 @@ public class TestTableFormat {
 
   private CommandContext getMockContext() {
     CommandContext mockContext = mock(CommandContext.class);
-    when(mockContext.outputLimit()).thenReturn(-1);
 
     return mockContext;
   }

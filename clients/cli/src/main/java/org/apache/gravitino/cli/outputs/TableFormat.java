@@ -38,7 +38,6 @@ import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER
 import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER_MIDDLE_IDX;
 import static org.apache.gravitino.cli.outputs.OutputConstant.TABLE_UPPER_BORDER_RIGHT_IDX;
 
-import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -98,7 +97,6 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
    * @return the table formatted output string.
    */
   public String getTableFormat(Column... columns) {
-    checkColumns(columns);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
     String[] headers =
@@ -108,14 +106,9 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
             .toArray(String[]::new);
 
     List<Character> borders = OutputConstant.BASIC_ASCII;
-    checkHeaders(headers, columns);
 
     if (headers.length != columns.length) {
       throw new IllegalArgumentException("Headers must be provided for all columns");
-    }
-
-    if (limit != -1) {
-      columns = getLimitedColumns(columns);
     }
 
     try (OutputStreamWriter osw = new OutputStreamWriter(baos, StandardCharsets.UTF_8)) {
@@ -130,46 +123,6 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     }
 
     return new String(baos.toByteArray(), StandardCharsets.UTF_8);
-  }
-
-  private void checkColumns(Column... columns) {
-    Preconditions.checkArgument(columns.length > 0, "At least one column must be provided");
-    int cellCount = columns[0].getCellCount();
-    for (Column column : columns) {
-      Preconditions.checkArgument(
-          column.getCellCount() == cellCount, "All columns must have the same cell count");
-    }
-  }
-
-  private void checkHeaders(String[] headers, Column[] columns) {
-    Preconditions.checkArgument(
-        headers.length == columns.length, "Headers must be provided for all columns");
-    for (String header : headers) {
-      Preconditions.checkArgument(header != null, "Headers must not be null");
-    }
-  }
-
-  /**
-   * Limits the number of rows in the table columns based on a predefined limit. If the current cell
-   * count is below the limit, returns the original columns unchanged. Otherwise, creates new
-   * columns with data truncated to the limit.
-   *
-   * @param columns The array of columns to potentially limit
-   * @return A new array of columns with limited rows, or the original array if no limiting is
-   *     needed
-   * @throws IllegalArgumentException If the columns array is null or empty
-   */
-  private Column[] getLimitedColumns(Column[] columns) {
-    if (columns[0].getCellCount() < limit) {
-      return columns;
-    }
-
-    Column[] limitedColumns = new Column[columns.length];
-    for (int i = 0; i < columns.length; i++) {
-      limitedColumns[i] = columns[i].getLimitedColumn(limit);
-    }
-
-    return limitedColumns;
   }
 
   /**
@@ -533,15 +486,11 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Metalake[] metalakes) {
-      if (metalakes.length == 0) {
-        output("No metalakes exist.", System.err);
-        return null;
-      } else {
-        Column columnName = new Column(context, "metalake");
-        Arrays.stream(metalakes).forEach(metalake -> columnName.addCell(metalake.name()));
 
-        return getTableFormat(columnName);
-      }
+      Column columnName = new Column(context, "metalake");
+      Arrays.stream(metalakes).forEach(metalake -> columnName.addCell(metalake.name()));
+
+      return getTableFormat(columnName);
     }
   }
 
@@ -585,15 +534,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Catalog[] catalogs) {
-      if (catalogs.length == 0) {
-        output("No metalakes exist.", System.err);
-        return null;
-      } else {
-        Column columnName = new Column(context, "catalog");
-        Arrays.stream(catalogs).forEach(metalake -> columnName.addCell(metalake.name()));
+      Column columnName = new Column(context, "catalog");
+      Arrays.stream(catalogs).forEach(metalake -> columnName.addCell(metalake.name()));
 
-        return getTableFormat(columnName);
-      }
+      return getTableFormat(columnName);
     }
   }
 }

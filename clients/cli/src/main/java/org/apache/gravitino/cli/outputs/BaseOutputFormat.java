@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.outputs;
 
-import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -30,11 +29,9 @@ import org.apache.gravitino.cli.CommandContext;
 
 /**
  * Abstract base implementation of {@link OutputFormat} interface providing common functionality for
- * various output format implementations. This class handles basic output operations and provides
- * configurable behavior for quiet mode, output limiting.
+ * various output format implementations.
  */
 public abstract class BaseOutputFormat<T> implements OutputFormat<T> {
-  protected int limit;
   protected CommandContext context;
 
   /**
@@ -43,9 +40,7 @@ public abstract class BaseOutputFormat<T> implements OutputFormat<T> {
    * @param context the command context, must not be null;
    */
   public BaseOutputFormat(CommandContext context) {
-    Preconditions.checkNotNull(context, "CommandContext cannot be null");
     this.context = context;
-    this.limit = context.outputLimit();
   }
 
   /**

@@ -89,13 +89,9 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Metalake[] metalakes) {
-      if (metalakes == null || metalakes.length == 0) {
-        return null;
-      } else {
-        List<String> metalakeNames =
-            Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
-        return NEWLINE_JOINER.join(metalakeNames);
-      }
+      List<String> metalakeNames =
+          Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
+      return NEWLINE_JOINER.join(metalakeNames);
     }
   }
 
@@ -129,7 +125,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     @Override
     public String getOutput(Catalog[] catalogs) {
       if (catalogs == null || catalogs.length == 0) {
-        output("No catalogs exists.", System.err);
+        output("No catalogs exist.", System.out);
         return null;
       } else {
         List<String> catalogNames =
