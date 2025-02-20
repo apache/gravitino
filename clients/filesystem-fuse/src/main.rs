@@ -216,7 +216,7 @@ fn main() -> Result<(), i32> {
             if env::var("RUST_LOG").is_ok() {
                 init_tracing_subscriber(LevelFilter::INFO, "");
             } else {
-                // let debug option override fuse_debug
+                // if debug > 0, it means that we needs fuse_debug.
                 app_config.fuse.fuse_debug = debug > 0 || app_config.fuse.fuse_debug;
                 match debug {
                     0 => {
