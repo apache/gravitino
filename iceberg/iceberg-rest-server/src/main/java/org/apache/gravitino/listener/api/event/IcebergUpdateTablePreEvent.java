@@ -41,7 +41,7 @@ public class IcebergUpdateTablePreEvent extends IcebergTablePreEvent {
     return updateTableRequestWrapper.get();
   }
 
-  public ObjectWrapper<UpdateTableRequest> getUpdateTableRequestWrapper() {
+  public ObjectWrapper<UpdateTableRequest> updateTableRequestWrapper() {
     return updateTableRequestWrapper;
   }
 

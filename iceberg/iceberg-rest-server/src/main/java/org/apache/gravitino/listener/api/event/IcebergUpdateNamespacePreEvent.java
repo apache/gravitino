@@ -42,8 +42,7 @@ public class IcebergUpdateNamespacePreEvent extends IcebergNamespacePreEvent {
     return updateNamespacePropertiesRequestWrapper.get();
   }
 
-  public ObjectWrapper<UpdateNamespacePropertiesRequest>
-      getUpdateNamespacePropertiesRequestWrapper() {
+  public ObjectWrapper<UpdateNamespacePropertiesRequest> updateNamespacePropertiesRequestWrapper() {
     return updateNamespacePropertiesRequestWrapper;
   }
 

@@ -41,7 +41,7 @@ public class IcebergCreateViewPreEvent extends IcebergViewPreEvent {
     return createViewRequestWrapper.get();
   }
 
-  public ObjectWrapper<CreateViewRequest> getCreateViewRequestWrapper() {
+  public ObjectWrapper<CreateViewRequest> createViewRequestWrapper() {
     return createViewRequestWrapper;
   }
 

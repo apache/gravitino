@@ -41,7 +41,7 @@ public class IcebergReplaceViewPreEvent extends IcebergViewPreEvent {
     return replaceViewRequestWrapper.get();
   }
 
-  public ObjectWrapper<UpdateTableRequest> getReplaceViewRequestWrapper() {
+  public ObjectWrapper<UpdateTableRequest> replaceViewRequestWrapper() {
     return replaceViewRequestWrapper;
   }
 
