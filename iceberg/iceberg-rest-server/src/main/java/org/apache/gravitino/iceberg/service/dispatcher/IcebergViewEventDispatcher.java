@@ -75,13 +75,21 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
 
   @Override
   public LoadViewResponse createView(
-      IcebergRequestContext context, Namespace namespace, CreateViewRequest createViewRequest) {
-    TableIdentifier viewIdentifier = TableIdentifier.of(namespace, createViewRequest.name());
+      IcebergRequestContext context,
+      Namespace namespace,
+      CreateViewRequest originalCreateViewRequest) {
+    TableIdentifier viewIdentifier =
+        TableIdentifier.of(namespace, originalCreateViewRequest.name());
+
+    ObjectWrapper<CreateViewRequest> createViewRequestWrapper =
+        new ObjectWrapper<>(originalCreateViewRequest);
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), viewIdentifier);
     eventBus.dispatchEvent(
-        new IcebergCreateViewPreEvent(context, nameIdentifier, createViewRequest));
+        new IcebergCreateViewPreEvent(context, nameIdentifier, createViewRequestWrapper));
+    CreateViewRequest createViewRequest = createViewRequestWrapper.get();
+
     LoadViewResponse loadViewResponse;
     try {
       loadViewResponse =
