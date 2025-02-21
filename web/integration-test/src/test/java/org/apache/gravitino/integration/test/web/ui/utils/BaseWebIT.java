@@ -82,10 +82,12 @@ public class BaseWebIT extends BaseIT {
       wait.until(ExpectedConditions.elementToBeClickable(locatorElement(locator)));
 
       locatorElement(locator).click();
+      Thread.sleep(ACTION_SLEEP * 1000L);
     } catch (ElementClickInterceptedException e) {
       // if the previous click did not effected then try clicking in another way
       Actions action = new Actions(driver);
       action.moveToElement(locatorElement(locator)).click().build().perform();
+      Thread.sleep(ACTION_SLEEP * 1000L);
     }
   }
 
