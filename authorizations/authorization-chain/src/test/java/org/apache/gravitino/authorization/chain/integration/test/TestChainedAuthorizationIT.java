@@ -60,11 +60,13 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Tag("gravitino-docker-test")
 public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   private static final Logger LOG = LoggerFactory.getLogger(TestChainedAuthorizationIT.class);
   private static String DEFAULT_FS;
