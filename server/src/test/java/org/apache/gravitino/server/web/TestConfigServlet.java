@@ -22,8 +22,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Lists;
 import java.io.PrintWriter;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +43,25 @@ public class TestConfigServlet {
     verify(writer)
         .write(
             "{\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
+    configServlet.destroy();
+  }
+
+  @Test
+  public void testConfigServletWithVisibleConfigs() throws Exception {
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.set(
+        Configs.VISIBLE_CONFIGS,
+        Lists.newArrayList(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME.getKey()));
+    serverConfig.set(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME, "test");
+    ConfigServlet configServlet = new ConfigServlet(serverConfig);
+    configServlet.init();
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    PrintWriter writer = mock(PrintWriter.class);
+    when(res.getWriter()).thenReturn(writer);
+    configServlet.doGet(null, res);
+    verify(writer)
+        .write(
+            "{\"gravitino.audit.formatter.className\":\"test\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
     configServlet.destroy();
   }
 }
