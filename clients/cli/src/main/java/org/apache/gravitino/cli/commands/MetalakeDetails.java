@@ -46,7 +46,7 @@ public class MetalakeDetails extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
       Metalake metalakeEntity = client.loadMetalake(metalake);
-      output(metalakeEntity);
+      printResults(metalakeEntity);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
