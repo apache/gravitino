@@ -616,7 +616,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
         columnType.addCell(column.dataType().simpleString());
         columnAutoIncrement.addCell(column.autoIncrement());
         columnNullable.addCell(column.nullable());
-        columnComment.addCell(column.comment().isEmpty() ? "N/A" : column.comment());
+        columnComment.addCell(
+            column.comment() == null || column.comment().isEmpty() ? "N/A" : column.comment());
       }
 
       return getTableFormat(
