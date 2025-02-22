@@ -33,6 +33,9 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +106,57 @@ public class TestPlainFormat {
   }
 
   @Test
+  void testSchemaDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema = getMockSchema();
+    PlainFormat.output(mockSchema, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_schema, This is a demo schema", output);
+  }
+
+  @Test
+  void testListSchemaWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema1 = getMockSchema("schema1", "This is a schema");
+    Schema mockSchema2 = getMockSchema("schema2", "This is another schema");
+
+    PlainFormat.output(new Schema[] {mockSchema1, mockSchema2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("schema1\n" + "schema2", output);
+  }
+
+  @Test
+  void testTableDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable = getMockTable();
+    PlainFormat.output(mockTable, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "id, integer, This is a int column\n" + "name, string, This is a string column", output);
+  }
+
+  @Test
+  void testListTableWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable1 = getMockTable("table1", "This is a table");
+    Table mockTable2 = getMockTable("table2", "This is another table");
+
+    PlainFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("table1\n" + "table2", output);
+  }
+
+  @Test
+  void testTableDetailsWithAuditWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable = getMockTable();
+    PlainFormat.output(mockTable, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "id, integer, This is a int column\n" + "name, string, This is a string column", output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -157,6 +211,38 @@ public class TestPlainFormat {
     when(mockSchema.comment()).thenReturn(comment);
 
     return mockSchema;
+  }
+
+  private Table getMockTable() {
+    return getMockTable("demo_table", "This is a demo table");
+  }
+
+  private Table getMockTable(String name, String comment) {
+    Table mockTable = mock(Table.class);
+    org.apache.gravitino.rel.Column mockColumnInt =
+        getMockColumn("id", Types.IntegerType.get(), "This is a int column", false, true);
+    org.apache.gravitino.rel.Column mockColumnString =
+        getMockColumn("name", Types.StringType.get(), "This is a string column", true, false);
+
+    when(mockTable.name()).thenReturn(name);
+    when(mockTable.comment()).thenReturn(comment);
+    when(mockTable.columns())
+        .thenReturn(new org.apache.gravitino.rel.Column[] {mockColumnInt, mockColumnString});
+
+    return mockTable;
+  }
+
+  private org.apache.gravitino.rel.Column getMockColumn(
+      String name, Type dataType, String comment, boolean nullable, boolean autoIncrement) {
+
+    org.apache.gravitino.rel.Column mockColumn = mock(org.apache.gravitino.rel.Column.class);
+    when(mockColumn.name()).thenReturn(name);
+    when(mockColumn.dataType()).thenReturn(dataType);
+    when(mockColumn.comment()).thenReturn(comment);
+    when(mockColumn.nullable()).thenReturn(nullable);
+    when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
+
+    return mockColumn;
   }
 
   private Audit getMockAudit() {

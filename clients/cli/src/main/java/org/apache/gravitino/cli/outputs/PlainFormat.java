@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Table;
 
 /** Plain format to print a pretty string to standard out. */
 public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
@@ -45,6 +47,14 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       new CatalogPlainFormat(context).output((Catalog) entity);
     } else if (entity instanceof Catalog[]) {
       new CatalogListPlainFormat(context).output((Catalog[]) entity);
+    } else if (entity instanceof Schema) {
+      new SchemaPlainFormat(context).output((Schema) entity);
+    } else if (entity instanceof Schema[]) {
+      new SchemaListPlainFormat(context).output((Schema[]) entity);
+    } else if (entity instanceof Table) {
+      new TablePlainFormat(context).output((Table) entity);
+    } else if (entity instanceof Table[]) {
+      new TableListPlainFormat(context).output((Table[]) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -124,14 +134,88 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Catalog[] catalogs) {
-      if (catalogs == null || catalogs.length == 0) {
-        output("No catalogs exist.", System.out);
-        return null;
-      } else {
-        List<String> catalogNames =
-            Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
-        return NEWLINE_JOINER.join(catalogNames);
-      }
+
+      List<String> catalogNames =
+          Arrays.stream(catalogs).map(Catalog::name).collect(Collectors.toList());
+      return NEWLINE_JOINER.join(catalogNames);
+    }
+  }
+
+  /**
+   * Formats a single {@link Schema} instance as a comma-separated string. Output format: name,
+   * comment
+   */
+  static final class SchemaPlainFormat extends PlainFormat<Schema> {
+    public SchemaPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Schema schema) {
+      return COMMA_JOINER.join(schema.name(), schema.comment());
+    }
+  }
+
+  /**
+   * Formats an array of Schemas, outputting one name per line. Returns null if the array is empty
+   * or null.
+   */
+  static final class SchemaListPlainFormat extends PlainFormat<Schema[]> {
+    public SchemaListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Schema[] schemas) {
+      List<String> schemaNames =
+          Arrays.stream(schemas).map(Schema::name).collect(Collectors.toList());
+      return NEWLINE_JOINER.join(schemaNames);
+    }
+  }
+
+  /**
+   * Formats a single Table instance with detailed column information. Output format: table_name
+   * column1_name, column1_type, column1_comment column2_name, column2_type, column2_comment ...
+   * table_comment
+   */
+  static final class TablePlainFormat extends PlainFormat<Table> {
+    public TablePlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Table table) {
+      StringBuilder output = new StringBuilder();
+      List<String> columnOutput =
+          Arrays.stream(table.columns())
+              .map(
+                  column ->
+                      COMMA_JOINER.join(
+                          column.name(), column.dataType().simpleString(), column.comment()))
+              .collect(Collectors.toList());
+      output.append(NEWLINE_JOINER.join(columnOutput));
+      output.append(System.lineSeparator());
+      return output.toString();
+    }
+  }
+
+  /**
+   * Formats an array of Tables, outputting one name per line. Returns null if the array is empty or
+   * null.
+   */
+  static final class TableListPlainFormat extends PlainFormat<Table[]> {
+    public TableListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Table[] tables) {
+      List<String> tableNames = Arrays.stream(tables).map(Table::name).collect(Collectors.toList());
+      return NEWLINE_JOINER.join(tableNames);
     }
   }
 }
