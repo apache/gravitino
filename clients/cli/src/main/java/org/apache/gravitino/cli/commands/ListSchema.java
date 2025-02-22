@@ -68,7 +68,7 @@ public class ListSchema extends Command {
       printInformation("No schemas found in catalog " + catalog);
       return;
     }
-
+    // PERF load table may cause performance issue
     Schema[] schemaObjects = new Schema[schemas.length];
     for (int i = 0; i < schemas.length; i++) {
       schemaObjects[i] = tableCatalog.asSchemas().loadSchema(schemas[i]);
