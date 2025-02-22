@@ -68,7 +68,7 @@ public class SchemaDetails extends Command {
     }
 
     if (result != null) {
-      printInformation(result.name() + "," + result.comment());
+      printResults(result);
     }
   }
 }

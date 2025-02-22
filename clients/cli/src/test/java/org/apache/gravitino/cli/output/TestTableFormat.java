@@ -28,9 +28,13 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.TableFormat;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -296,6 +300,75 @@ public class TestTableFormat {
   }
 
   @Test
+  void testSchemaDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema = getMockSchema();
+
+    TableFormat.output(mockSchema, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-------------+-----------------------+\n"
+            + "|   Schema    |        Comment        |\n"
+            + "+-------------+-----------------------+\n"
+            + "| demo_schema | This is a demo schema |\n"
+            + "+-------------+-----------------------+",
+        output);
+  }
+
+  @Test
+  void testListSchemaWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema1 = getMockSchema("schema1", "This is a schema");
+    Schema mockSchema2 = getMockSchema("schema2", "This is another schema");
+
+    TableFormat.output(new Schema[] {mockSchema1, mockSchema2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+---------+\n"
+            + "| Schema  |\n"
+            + "+---------+\n"
+            + "| schema1 |\n"
+            + "| schema2 |\n"
+            + "+---------+",
+        output);
+  }
+
+  @Test
+  void testTableDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable = getMockTable();
+
+    TableFormat.output(mockTable, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+---------+---------------+----------+-------------------------+\n"
+            + "| Name |  Type   | AutoIncrement | Nullable |         Comment         |\n"
+            + "+------+---------+---------------+----------+-------------------------+\n"
+            + "| id   | integer | true          | false    | This is a int column    |\n"
+            + "| name | string  | false         | true     | This is a string column |\n"
+            + "+------+---------+---------------+----------+-------------------------+",
+        output);
+  }
+
+  @Test
+  void testListTableWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable1 = getMockTable("table1", "This is a table");
+    Table mockTable2 = getMockTable("table2", "This is another table");
+
+    TableFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+--------+\n"
+            + "|  Name  |\n"
+            + "+--------+\n"
+            + "| table1 |\n"
+            + "| table2 |\n"
+            + "+--------+",
+        output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -305,12 +378,6 @@ public class TestTableFormat {
         () -> {
           TableFormat.output(mockObject, mockContext);
         });
-  }
-
-  private void addRepeatedCells(Column column, int count) {
-    for (int i = 0; i < count; i++) {
-      column.addCell(column.getHeader() + "-" + (i + 1));
-    }
   }
 
   private CommandContext getMockContext() {
@@ -344,5 +411,49 @@ public class TestTableFormat {
     when(mockCatalog.comment()).thenReturn(comment);
 
     return mockCatalog;
+  }
+
+  private Schema getMockSchema() {
+    return getMockSchema("demo_schema", "This is a demo schema");
+  }
+
+  private Schema getMockSchema(String name, String comment) {
+    Schema mockSchema = mock(Schema.class);
+    when(mockSchema.name()).thenReturn(name);
+    when(mockSchema.comment()).thenReturn(comment);
+
+    return mockSchema;
+  }
+
+  private Table getMockTable() {
+    return getMockTable("demo_table", "This is a demo table");
+  }
+
+  private Table getMockTable(String name, String comment) {
+    Table mockTable = mock(Table.class);
+    org.apache.gravitino.rel.Column mockColumnInt =
+        getMockColumn("id", Types.IntegerType.get(), "This is a int column", false, true);
+    org.apache.gravitino.rel.Column mockColumnString =
+        getMockColumn("name", Types.StringType.get(), "This is a string column", true, false);
+
+    when(mockTable.name()).thenReturn(name);
+    when(mockTable.comment()).thenReturn(comment);
+    when(mockTable.columns())
+        .thenReturn(new org.apache.gravitino.rel.Column[] {mockColumnInt, mockColumnString});
+
+    return mockTable;
+  }
+
+  private org.apache.gravitino.rel.Column getMockColumn(
+      String name, Type dataType, String comment, boolean nullable, boolean autoIncrement) {
+
+    org.apache.gravitino.rel.Column mockColumn = mock(org.apache.gravitino.rel.Column.class);
+    when(mockColumn.name()).thenReturn(name);
+    when(mockColumn.dataType()).thenReturn(dataType);
+    when(mockColumn.comment()).thenReturn(comment);
+    when(mockColumn.nullable()).thenReturn(nullable);
+    when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
+
+    return mockColumn;
   }
 }

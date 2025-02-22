@@ -19,12 +19,13 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
@@ -49,22 +50,32 @@ public class ListTables extends TableCommand {
   public void handle() {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
+    TableCatalog tableCatalog = null;
+
     try {
-      tables = tableCatalog().listTables(name);
+      tableCatalog = tableCatalog();
+      tables = tableCatalog.listTables(name);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
     List<String> tableNames = new ArrayList<>();
-    for (int i = 0; i < tables.length; i++) {
-      tableNames.add(tables[i].name());
+    for (NameIdentifier table : tables) {
+      tableNames.add(table.name());
+    }
+    // PERF load table may cause performance issue
+    Table[] tableObjects = new Table[tableNames.size()];
+    int i = 0;
+    for (NameIdentifier tableIdent : tables) {
+      tableObjects[i] = tableCatalog.loadTable(tableIdent);
+      i++;
     }
 
-    String all =
-        tableNames.isEmpty()
-            ? "No tables exist."
-            : Joiner.on(System.lineSeparator()).join(tableNames);
+    if (tableNames.isEmpty()) {
+      printInformation("No tables exist.");
+      return;
+    }
 
-    printResults(all);
+    printResults(tableObjects);
   }
 }

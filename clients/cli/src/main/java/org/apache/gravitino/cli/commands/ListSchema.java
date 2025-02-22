@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -60,8 +59,11 @@ public class ListSchema extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = schemas.length == 0 ? "No schemas exist." : Joiner.on(",").join(schemas);
+    if (schemas.length == 0) {
+      printInformation("No schemas found in catalog " + catalog);
+      return;
+    }
 
-    printInformation(all);
+    printResults(schemas);
   }
 }
