@@ -194,7 +194,11 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
               .map(
                   column ->
                       COMMA_JOINER.join(
-                          column.name(), column.dataType().simpleString(), column.comment()))
+                          column.name(),
+                          column.dataType().simpleString(),
+                          column.autoIncrement(),
+                          column.nullable(),
+                          column.comment() == null ? "N/A" : column.comment()))
               .collect(Collectors.toList());
       output.append(NEWLINE_JOINER.join(columnOutput));
       output.append(System.lineSeparator());

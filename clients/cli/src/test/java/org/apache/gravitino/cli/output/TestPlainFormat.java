@@ -132,7 +132,9 @@ public class TestPlainFormat {
     PlainFormat.output(mockTable, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "id, integer, This is a int column\n" + "name, string, This is a string column", output);
+        "id, integer, true, false, This is a int column\n"
+            + "name, string, false, true, This is a string column",
+        output);
   }
 
   @Test
@@ -144,16 +146,6 @@ public class TestPlainFormat {
     PlainFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals("table1\n" + "table2", output);
-  }
-
-  @Test
-  void testTableDetailsWithAuditWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    Table mockTable = getMockTable();
-    PlainFormat.output(mockTable, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "id, integer, This is a int column\n" + "name, string, This is a string column", output);
   }
 
   @Test
