@@ -64,6 +64,6 @@ public class ListTables extends TableCommand {
       return;
     }
 
-    printResults(tableNames);
+    printResults(tableNames.toArray(new String[0]));
   }
 }
