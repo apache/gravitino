@@ -255,7 +255,7 @@ public class TestTableFormat {
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+-----------+\n"
-            + "| Metalake  |\n"
+            + "|   Name    |\n"
             + "+-----------+\n"
             + "| metalake1 |\n"
             + "| metalake2 |\n"
@@ -282,16 +282,11 @@ public class TestTableFormat {
   @Test
   void testListCatalogWithTableFormat() {
     CommandContext mockContext = getMockContext();
-    Catalog mockCatalog1 =
-        getMockCatalog("catalog1", Catalog.Type.FILESET, "provider1", "This is a catalog");
-    Catalog mockCatalog2 =
-        getMockCatalog("catalog2", Catalog.Type.RELATIONAL, "provider2", "This is another catalog");
-
-    TableFormat.output(new Catalog[] {mockCatalog1, mockCatalog2}, mockContext);
+    TableFormat.output(new String[] {"catalog1", "catalog2"}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+----------+\n"
-            + "| Catalog  |\n"
+            + "|   Name   |\n"
             + "+----------+\n"
             + "| catalog1 |\n"
             + "| catalog2 |\n"
@@ -318,14 +313,11 @@ public class TestTableFormat {
   @Test
   void testListSchemaWithTableFormat() {
     CommandContext mockContext = getMockContext();
-    Schema mockSchema1 = getMockSchema("schema1", "This is a schema");
-    Schema mockSchema2 = getMockSchema("schema2", "This is another schema");
-
-    TableFormat.output(new Schema[] {mockSchema1, mockSchema2}, mockContext);
+    TableFormat.output(new String[] {"schema1", "schema2"}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+---------+\n"
-            + "| Schema  |\n"
+            + "|  Name   |\n"
             + "+---------+\n"
             + "| schema1 |\n"
             + "| schema2 |\n"
@@ -353,10 +345,8 @@ public class TestTableFormat {
   @Test
   void testListTableWithTableFormat() {
     CommandContext mockContext = getMockContext();
-    Table mockTable1 = getMockTable("table1", "This is a table");
-    Table mockTable2 = getMockTable("table2", "This is another table");
 
-    TableFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
+    TableFormat.output(new String[] {"table1", "table2"}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+--------+\n"

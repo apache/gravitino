@@ -24,8 +24,6 @@ import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
-import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.TableCatalog;
 
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
@@ -50,25 +48,15 @@ public class ListTables extends TableCommand {
   public void handle() {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
-    TableCatalog tableCatalog = null;
-
     try {
-      tableCatalog = tableCatalog();
-      tables = tableCatalog.listTables(name);
+      tables = tableCatalog().listTables(name);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
     List<String> tableNames = new ArrayList<>();
-    for (NameIdentifier table : tables) {
-      tableNames.add(table.name());
-    }
-    // PERF load table may cause performance issue
-    Table[] tableObjects = new Table[tableNames.size()];
-    int i = 0;
-    for (NameIdentifier tableIdent : tables) {
-      tableObjects[i] = tableCatalog.loadTable(tableIdent);
-      i++;
+    for (int i = 0; i < tables.length; i++) {
+      tableNames.add(tables[i].name());
     }
 
     if (tableNames.isEmpty()) {
@@ -76,6 +64,6 @@ public class ListTables extends TableCommand {
       return;
     }
 
-    printResults(tableObjects);
+    printResults(tableNames);
   }
 }

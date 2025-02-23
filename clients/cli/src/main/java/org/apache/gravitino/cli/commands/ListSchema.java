@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -50,12 +48,9 @@ public class ListSchema extends Command {
   @Override
   public void handle() {
     String[] schemas = new String[0];
-    Catalog tableCatalog = null;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      tableCatalog = client.loadCatalog(catalog);
-      schemas = tableCatalog.asSchemas().listSchemas();
+      schemas = client.loadCatalog(catalog).asSchemas().listSchemas();
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -65,15 +60,10 @@ public class ListSchema extends Command {
     }
 
     if (schemas.length == 0) {
-      printInformation("No schemas found in catalog " + catalog);
+      printInformation("No schemas exist.");
       return;
     }
-    // PERF load table may cause performance issue
-    Schema[] schemaObjects = new Schema[schemas.length];
-    for (int i = 0; i < schemas.length; i++) {
-      schemaObjects[i] = tableCatalog.asSchemas().loadSchema(schemas[i]);
-    }
 
-    printResults(schemaObjects);
+    printResults(schemas);
   }
 }

@@ -106,7 +106,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+-------------+\n"
-            + "|  Metalake   |\n"
+            + "|    Name     |\n"
             + "+-------------+\n"
             + "| my_metalake |\n"
             + "+-------------+",
@@ -170,7 +170,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+-----------+\n"
-            + "|  Catalog  |\n"
+            + "|   Name    |\n"
             + "+-----------+\n"
             + "| postgres  |\n"
             + "| postgres2 |\n"
