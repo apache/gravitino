@@ -20,16 +20,21 @@
 package org.apache.gravitino.metrics.source;
 
 import com.codahale.metrics.Gauge;
-import com.codahale.metrics.MetricRegistry;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.gravitino.metrics.MetricNames;
 
 public class RelationDatasourceMetricsSource extends MetricsSource {
 
   public RelationDatasourceMetricsSource(BasicDataSource dataSource) {
-    super(MetricsSource.RELATION_DATASOURCE_METRIC_NAME);
-    MetricRegistry metricRegistry = getMetricRegistry();
-    metricRegistry.register("activeConnectionCount", (Gauge<Integer>) dataSource::getNumActive);
-    metricRegistry.register("idleConnectionCount", (Gauge<Integer>) dataSource::getNumIdle);
-    metricRegistry.register("maxConnectionCount", (Gauge<Integer>) dataSource::getMaxTotal);
+    super(MetricsSource.GRAVITINO_SERVER_METRIC_NAME);
+    registerGauge(
+        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
+        (Gauge<Integer>) dataSource::getNumActive);
+    registerGauge(
+        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
+        (Gauge<Integer>) dataSource::getNumIdle);
+    registerGauge(
+        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
+        (Gauge<Integer>) dataSource::getMaxTotal);
   }
 }

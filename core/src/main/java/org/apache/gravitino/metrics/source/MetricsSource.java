@@ -41,7 +41,6 @@ public abstract class MetricsSource {
   public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
   public static final String JVM_METRIC_NAME = "jvm";
-  public static final String RELATION_DATASOURCE_METRIC_NAME = "relation-datasource";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
   private final int timeSlidingWindowSeconds;
