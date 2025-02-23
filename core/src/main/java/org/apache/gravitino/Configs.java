@@ -49,10 +49,10 @@ public class Configs {
       "gravitino.entity.store.relational.jdbcPassword";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION_KEY =
-      "gravitino.entity.store.relational.max.total.connection";
+      "gravitino.entity.store.relational.max_connections";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY =
-      "gravitino.entity.store.relational.max.wait.millis";
+      "gravitino.entity.store.relational.max_wait_millis";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
@@ -92,7 +92,7 @@ public class Configs {
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION = 100;
 
-  public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION = 1000l;
+  public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION = 1000L;
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
@@ -149,14 +149,15 @@ public class Configs {
 
   public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION_KEY)
-          .doc("Max total connect of `JDBCBackend`")
-          .version(ConfigConstants.VERSION_0_5_0)
+          .doc("The maximum number of connections for the JDBC Backend connection pool")
+          .version(ConfigConstants.VERSION_0_9_0)
           .intConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION);
 
   public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY)
-          .doc("Max max wait millis of `JDBCBackend`")
+          .doc(
+              "The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool")
           .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION);
