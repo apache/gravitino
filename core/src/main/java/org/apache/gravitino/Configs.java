@@ -158,7 +158,7 @@ public class Configs {
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY)
           .doc(
               "The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool")
-          .version(ConfigConstants.VERSION_0_5_0)
+          .version(ConfigConstants.VERSION_0_9_0)
           .longConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION);
 
