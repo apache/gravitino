@@ -21,6 +21,8 @@ package org.apache.gravitino.storage;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
@@ -132,6 +134,9 @@ public class TestEntityStorage {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION))
+        .thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     BaseIT baseIT = new BaseIT();
