@@ -665,9 +665,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       Column columnModifyTime = new Column(context, "modify time");
 
       columnCreator.addCell(audit.creator());
-      columnCreateTime.addCell(audit.createTime());
-      columnModified.addCell(audit.lastModifier());
-      columnModifyTime.addCell(audit.lastModifiedTime());
+      columnCreateTime.addCell(audit.createTime() == null ? "N/A" : audit.createTime().toString());
+      columnModified.addCell(audit.lastModifier() == null ? "N/A" : audit.lastModifier());
+      columnModifyTime.addCell(
+          audit.lastModifiedTime() == null ? "N/A" : audit.lastModifiedTime().toString());
 
       return getTableFormat(columnCreator, columnCreateTime, columnModified, columnModifyTime);
     }
