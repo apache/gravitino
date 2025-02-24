@@ -34,50 +34,8 @@ use std::ffi::OsStr;
 use std::fmt::Write;
 use tracing::{debug, error};
 
-/// A macro to log the result of an asynchronous method call in the context of FUSE operations.
-///
-/// This macro provides six variants for logging:
-/// 1. Without logging the reply (logs only the method status).
-/// 2. With default `Debug` formatting for the reply.
-/// 3. With a customizable formatting function for the reply.
-/// 4. With both Debug and custom formatting for the reply.
-/// 5. Special stream handling for `readdir` operations.
-/// 6. Special stream handling for `readdirplus` operations.
-///
-/// # Usage
-///
-/// ```ignore
-/// // No reply printing
-/// log_result!(method_call, "method_name", req);
-///
-/// // With default Debug formatting for the reply
-/// log_result!(method_call, "method_name", req, debug);
-///
-/// // With a custom formatting function for the reply
-/// log_result!(method_call, "method_name", req, custom_format_fn);
-///
-/// // With both Debug and custom formatting
-/// log_result!(method_call, "method_name", req, debug, custom_format_fn);
-///
-/// // Special handling for readdir stream
-/// log_result!(method_call, "readdir", req, stream);
-///
-/// // Special handling for readdirplus stream
-/// log_result!(method_call, "readdirplus", req, stream);
-/// ```
-///
-/// # Arguments
-///
-/// * `$method_call` - The asynchronous method call to execute and log.
-/// * `$method_name` - A string representing the name of the method for logging purposes.
-/// * `$req` - The incoming FUSE request associated with the method call.
-/// * Format Options (Optional):
-///     * No format option - Only logs method status
-///     * `debug` - Uses default Debug formatting for the reply
-///     * (`debug`, custom_format_fn) - Combines Debug output with custom formatted output
-///     * `stream` - Special handling for directory streams (only for "readdir"/"readdirplus")
+/// Log the result without printing the reply
 macro_rules! log_result {
-    // No reply printing
     ($method_call:expr, $method_name:expr, $req:ident) => {
         match $method_call.await {
             Ok(reply) => {
@@ -90,9 +48,11 @@ macro_rules! log_result {
             }
         }
     };
+}
 
-    // Default Debug formatting
-    ($method_call:expr, $method_name:expr, $req:ident, debug) => {
+/// Log the result with default Debug formatting
+macro_rules! log_result_debug {
+    ($method_call:expr, $method_name:expr, $req:ident) => {
         match $method_call.await {
             Ok(reply) => {
                 debug!(
@@ -109,9 +69,32 @@ macro_rules! log_result {
             }
         }
     };
+}
 
-    // Format stream for readdir
-    ($method_call:expr, "readdir", $req:ident, stream) => {{
+/// Log the result with custom formatting
+macro_rules! log_result_custom {
+    ($method_call:expr, $method_name:expr, $req:ident, $format_reply_fn:ident) => {
+        match $method_call.await {
+            Ok(reply) => {
+                debug!(
+                    $req.unique,
+                    reply = $format_reply_fn(&reply),
+                    "{} completed",
+                    $method_name.to_uppercase()
+                );
+                Ok(reply)
+            }
+            Err(e) => {
+                error!($req.unique, ?e, "{} failed", $method_name.to_uppercase());
+                Err(e)
+            }
+        }
+    };
+}
+
+/// Log the result for readdir operations
+macro_rules! log_result_readdir {
+    ($method_call:expr, $req:ident) => {{
         match $method_call.await {
             Ok(mut reply_dir) => {
                 let mut entries = Vec::new();
@@ -148,9 +131,11 @@ macro_rules! log_result {
             }
         }
     }};
+}
 
-    // Format stream for readdirplus
-    ($method_call:expr, "readdirplus", $req:ident, stream) => {{
+/// Log the result for readdirplus operations
+macro_rules! log_result_readdirplus {
+    ($method_call:expr, $req:ident) => {{
         match $method_call.await {
             Ok(mut reply_dir) => {
                 let mut entries = Vec::new();
@@ -187,25 +172,6 @@ macro_rules! log_result {
             }
         }
     }};
-
-    // For debug and custom formatting
-    ($method_call:expr, $method_name:expr, $req:ident, debug, $format_reply_fn:ident) => {
-        match $method_call.await {
-            Ok(reply) => {
-                debug!(
-                    $req.unique,
-                    reply = $format_reply_fn(&reply),
-                    "{} completed",
-                    $method_name.to_uppercase()
-                );
-                Ok(reply)
-            }
-            Err(e) => {
-                error!($req.unique, ?e, "{} failed", $method_name.to_uppercase());
-                Err(e)
-            }
-        }
-    };
 }
 
 /// Convert `ReplyAttr` to descriptive string.
@@ -456,7 +422,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "INIT started"
         );
 
-        log_result!(self.inner.init(req), "init", req, debug)
+        log_result_debug!(self.inner.init(req), "init", req)
     }
 
     async fn destroy(&self, req: Request) {
@@ -484,11 +450,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "LOOKUP started"
         );
 
-        log_result!(
+        log_result_custom!(
             self.inner.lookup(req, parent, name),
             "lookup",
             req,
-            debug,
             reply_entry_to_desc_str
         )
     }
@@ -512,11 +477,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "GETATTR started"
         );
 
-        log_result!(
+        log_result_custom!(
             self.inner.getattr(req, inode, fh, flags),
             "GETATTR",
             req,
-            debug,
             reply_attr_to_desc_str
         )
     }
@@ -540,11 +504,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "SETATTR started"
         );
 
-        log_result!(
+        log_result_custom!(
             self.inner.setattr(req, inode, fh, set_attr),
             "SETATTR",
             req,
-            debug,
             reply_attr_to_desc_str
         )
     }
@@ -571,11 +534,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "MKDIR started"
         );
 
-        log_result!(
+        log_result_custom!(
             self.inner.mkdir(req, parent, name, mode, umask),
             "mkdir",
             req,
-            debug,
             reply_entry_to_desc_str
         )
     }
@@ -624,7 +586,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "OPEN started"
         );
 
-        log_result!(self.inner.open(req, inode, flags), "open", req, debug)
+        log_result_debug!(self.inner.open(req, inode, flags), "open", req)
     }
 
     async fn read(
@@ -695,7 +657,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "STATFS started"
         );
 
-        log_result!(self.inner.statfs(req, inode), "statfs", req, debug)
+        log_result_debug!(self.inner.statfs(req, inode), "statfs", req)
     }
 
     async fn release(
@@ -741,7 +703,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "OPENDIR started"
         );
 
-        log_result!(self.inner.opendir(req, inode, flags), "opendir", req, debug)
+        log_result_debug!(self.inner.opendir(req, inode, flags), "opendir", req)
     }
 
     type DirEntryStream<'a>
@@ -769,12 +731,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READDIR started"
         );
 
-        log_result!(
-            self.inner.readdir(req, parent, fh, offset),
-            "readdir",
-            req,
-            stream
-        )
+        log_result_readdir!(self.inner.readdir(req, parent, fh, offset), req)
     }
 
     async fn releasedir(
@@ -826,11 +783,10 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "CREATE started"
         );
 
-        log_result!(
+        log_result_custom!(
             self.inner.create(req, parent, name, mode, flags),
             "create",
             req,
-            debug,
             reply_created_to_desc_str
         )
     }
@@ -861,11 +817,9 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READDIRPLUS started"
         );
 
-        log_result!(
+        log_result_readdirplus!(
             self.inner.readdirplus(req, parent, fh, offset, lock_owner),
-            "readdirplus",
-            req,
-            stream
+            req
         )
     }
 }
