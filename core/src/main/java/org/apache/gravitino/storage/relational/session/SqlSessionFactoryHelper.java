@@ -106,8 +106,11 @@ public class SqlSessionFactoryHelper {
         BaseObjectPoolConfig.DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME.toMillis());
     dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    metricsSystem.register(new RelationDatasourceMetricsSource(dataSource));
-
+    // Add null check to avoid NPE when metrics system is not initialized in test environments
+    if (metricsSystem != null) {
+      // Register connection pool metrics when metrics system is available
+      metricsSystem.register(new RelationDatasourceMetricsSource(dataSource));
+    }
     // Create the transaction factory and env
     TransactionFactory transactionFactory = new JdbcTransactionFactory();
     Environment environment = new Environment("development", transactionFactory, dataSource);
