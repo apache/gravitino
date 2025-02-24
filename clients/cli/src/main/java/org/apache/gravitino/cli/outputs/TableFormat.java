@@ -660,9 +660,9 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     @Override
     public String getOutput(Audit audit) {
       Column columnCreator = new Column(context, "creator");
-      Column columnCreateTime = new Column(context, "create time");
-      Column columnModified = new Column(context, "modified");
-      Column columnModifyTime = new Column(context, "modify time");
+      Column columnCreateTime = new Column(context, "creation at");
+      Column columnModified = new Column(context, "modifier");
+      Column columnModifyTime = new Column(context, "modified at");
 
       columnCreator.addCell(audit.creator());
       columnCreateTime.addCell(audit.createTime() == null ? "N/A" : audit.createTime().toString());

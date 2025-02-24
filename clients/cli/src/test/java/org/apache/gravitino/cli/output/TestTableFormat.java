@@ -389,7 +389,7 @@ public class TestTableFormat {
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+-----------+--------------------------+-----------+--------------------------+\n"
-            + "|  Creator  |       Create time        | Modified  |       Modify time        |\n"
+            + "|  Creator  |       Creation at        | Modifier  |       Modified at        |\n"
             + "+-----------+--------------------------+-----------+--------------------------+\n"
             + "| demo_user | 2021-01-20T02:51:51.111Z | demo_user | 2021-01-20T02:51:51.111Z |\n"
             + "+-----------+--------------------------+-----------+--------------------------+",
@@ -410,7 +410,7 @@ public class TestTableFormat {
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+-----------+-------------+----------+-------------+\n"
-            + "|  Creator  | Create time | Modified | Modify time |\n"
+            + "|  Creator  | Creation at | Modifier | Modified at |\n"
             + "+-----------+-------------+----------+-------------+\n"
             + "| demo_user | N/A         | N/A      | N/A         |\n"
             + "+-----------+-------------+----------+-------------+",
