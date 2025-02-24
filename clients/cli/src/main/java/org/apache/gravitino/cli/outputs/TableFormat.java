@@ -79,10 +79,12 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new CatalogListTableFormat(context).output((Catalog[]) entity);
     } else if (entity instanceof Schema) {
       new SchemaTableFormat(context).output((Schema) entity);
+    } else if (entity instanceof Schema[]) {
+      new SchemaListTableFormat(context).output((Schema[]) entity);
     } else if (entity instanceof Table) {
       new TableDetailsTableFormat(context).output((Table) entity);
-    } else if (entity instanceof String[]) {
-      new ListTableFormat(context).output((String[]) entity);
+    } else if (entity instanceof Table[]) {
+      new TableListTableFormat(context).output((Table[]) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -495,7 +497,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     @Override
     public String getOutput(Metalake[] metalakes) {
 
-      Column columnName = new Column(context, "Name");
+      Column columnName = new Column(context, "metalake");
       Arrays.stream(metalakes).forEach(metalake -> columnName.addCell(metalake.name()));
 
       return getTableFormat(columnName);
@@ -542,7 +544,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Catalog[] catalogs) {
-      Column columnName = new Column(context, "Name");
+      Column columnName = new Column(context, "catalog");
       Arrays.stream(catalogs).forEach(metalake -> columnName.addCell(metalake.name()));
 
       return getTableFormat(columnName);
@@ -568,6 +570,25 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       columnComment.addCell(schema.comment());
 
       return getTableFormat(columnName, columnComment);
+    }
+  }
+
+  /**
+   * Formats an array of Schemas into a single-column table display. Lists all schema names in a
+   * vertical format.
+   */
+  static final class SchemaListTableFormat extends TableFormat<Schema[]> {
+    public SchemaListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Schema[] schemas) {
+      Column column = new Column(context, "schema");
+      Arrays.stream(schemas).forEach(schema -> column.addCell(schema.name()));
+
+      return getTableFormat(column);
     }
   }
 
@@ -604,21 +625,20 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     }
   }
 
-  static final class ListTableFormat extends TableFormat<String[]> {
-    /**
-     * Creates a new {@link TableFormat} with the specified properties.
-     *
-     * @param context the command context.
-     */
-    public ListTableFormat(CommandContext context) {
+  /**
+   * Formats an array of {@link Table} into a single-column table display. Lists all table names in
+   * a vertical format.
+   */
+  static final class TableListTableFormat extends TableFormat<Table[]> {
+    public TableListTableFormat(CommandContext context) {
       super(context);
     }
 
     /** {@inheritDoc} */
     @Override
-    public String getOutput(String[] entities) {
-      Column column = new Column(context, "name");
-      Arrays.stream(entities).forEach(column::addCell);
+    public String getOutput(Table[] tables) {
+      Column column = new Column(context, "table");
+      Arrays.stream(tables).forEach(table -> column.addCell(table.name()));
 
       return getTableFormat(column);
     }

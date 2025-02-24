@@ -19,11 +19,11 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
@@ -48,22 +48,25 @@ public class ListTables extends TableCommand {
   public void handle() {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
+    TableCatalog gCatalog = null;
+
     try {
-      tables = tableCatalog().listTables(name);
+      gCatalog = tableCatalog();
+      tables = gCatalog.listTables(name);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    List<String> tableNames = new ArrayList<>();
-    for (int i = 0; i < tables.length; i++) {
-      tableNames.add(tables[i].name());
-    }
-
-    if (tableNames.isEmpty()) {
+    if (tables.length == 0) {
       printInformation("No tables exist.");
       return;
     }
 
-    printResults(tableNames.toArray(new String[0]));
+    Table[] gTables = new Table[tables.length];
+    for (int i = 0; i < tables.length; i++) {
+      gTables[i] = gCatalog.loadTable(tables[i]);
+    }
+
+    printResults(gTables);
   }
 }

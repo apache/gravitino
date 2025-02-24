@@ -255,7 +255,7 @@ public class TestTableFormat {
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+-----------+\n"
-            + "|   Name    |\n"
+            + "| Metalake  |\n"
             + "+-----------+\n"
             + "| metalake1 |\n"
             + "| metalake2 |\n"
@@ -282,11 +282,19 @@ public class TestTableFormat {
   @Test
   void testListCatalogWithTableFormat() {
     CommandContext mockContext = getMockContext();
-    TableFormat.output(new String[] {"catalog1", "catalog2"}, mockContext);
+    Catalog mockCatalog1 =
+        getMockCatalog(
+            "catalog1", Catalog.Type.RELATIONAL, "demo_provider", "This is a demo catalog");
+    Catalog mockCatalog2 =
+        getMockCatalog(
+            "catalog2", Catalog.Type.RELATIONAL, "demo_provider", "This is another demo catalog");
+
+    TableFormat.output(new Catalog[] {mockCatalog1, mockCatalog2}, mockContext);
+
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+----------+\n"
-            + "|   Name   |\n"
+            + "| Catalog  |\n"
             + "+----------+\n"
             + "| catalog1 |\n"
             + "| catalog2 |\n"
@@ -313,15 +321,19 @@ public class TestTableFormat {
   @Test
   void testListSchemaWithTableFormat() {
     CommandContext mockContext = getMockContext();
-    TableFormat.output(new String[] {"schema1", "schema2"}, mockContext);
+    Schema mockSchema1 = getMockSchema("demo_schema1", "This is a demo schema");
+    Schema mockSchema2 = getMockSchema("demo_schema2", "This is another demo schema");
+
+    TableFormat.output(new Schema[] {mockSchema1, mockSchema2}, mockContext);
+
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "+---------+\n"
-            + "|  Name   |\n"
-            + "+---------+\n"
-            + "| schema1 |\n"
-            + "| schema2 |\n"
-            + "+---------+",
+        "+--------------+\n"
+            + "|    Schema    |\n"
+            + "+--------------+\n"
+            + "| demo_schema1 |\n"
+            + "| demo_schema2 |\n"
+            + "+--------------+",
         output);
   }
 
@@ -346,11 +358,14 @@ public class TestTableFormat {
   void testListTableWithTableFormat() {
     CommandContext mockContext = getMockContext();
 
-    TableFormat.output(new String[] {"table1", "table2"}, mockContext);
+    Table mockTable1 = getMockTable("table1", "This is a demo table");
+    Table mockTable2 = getMockTable("table2", "This is another demo table");
+    TableFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
+
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "+--------+\n"
-            + "|  Name  |\n"
+            + "| Table  |\n"
             + "+--------+\n"
             + "| table1 |\n"
             + "| table2 |\n"
