@@ -235,7 +235,7 @@ public abstract class Command {
    * @param entity The entity to output.
    * @param <T> The type of entity.
    */
-  protected <T> void output(T entity) {
+  private <T> void output(T entity) {
     if (outputFormat == null) {
       PlainFormat.output(entity, context);
       return;
