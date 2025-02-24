@@ -31,9 +31,8 @@ public final class ListTagsEvent extends TagEvent {
    *
    * @param user The username of the individual who initiated the tag listing.
    * @param metalake The namespace from which tags were listed.
-   * @param tagNames The list of tag names that were retrieved.
    */
-  public ListTagsEvent(String user, String metalake, String[] tagNames) {
+  public ListTagsEvent(String user, String metalake) {
     super(user, NameIdentifier.of(metalake));
   }
 

@@ -26,16 +26,16 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 /** Represents an event that is triggered upon successfully listing tags for a metadata object. */
 @DeveloperApi
 public final class ListTagsForMetadataObjectEvent extends TagEvent {
+
   /**
    * Constructs an instance of {@code ListTagsForMetadataObjectEvent}.
    *
    * @param user The username of the individual who initiated the tag listing.
    * @param metalake The metalake from which tags were listed.
    * @param metadataObject The metadata object for which tags were listed.
-   * @param tags An array of tag names representing the tags listed for the metadata object.
    */
   public ListTagsForMetadataObjectEvent(
-      String user, String metalake, MetadataObject metadataObject, String[] tags) {
+      String user, String metalake, MetadataObject metadataObject) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
   }
 

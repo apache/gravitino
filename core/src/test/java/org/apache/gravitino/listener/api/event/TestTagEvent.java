@@ -83,7 +83,7 @@ public class TestTagEvent {
 
   @Test
   void testListTagsInfo() {
-    Tag[] tags = dispatcher.listTagsInfo("metalake");
+    dispatcher.listTagsInfo("metalake");
     PreEvent preEvent = dummyEventListener.popPreEvent();
 
     Assertions.assertEquals("metalake", Objects.requireNonNull(preEvent.identifier()).toString());
@@ -96,8 +96,6 @@ public class TestTagEvent {
     Assertions.assertEquals(ListTagsInfoEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_TAGS_INFO, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
-    Tag[] postTags = ((ListTagsInfoEvent) postevent).getTags();
-    Assertions.assertArrayEquals(tags, postTags);
   }
 
   @Test
@@ -237,7 +235,7 @@ public class TestTagEvent {
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
             Entity.EntityType.CATALOG);
-    Tag[] tags = dispatcher.listTagsInfoForMetadataObject("metalake", metadataObject);
+    dispatcher.listTagsInfoForMetadataObject("metalake", metadataObject);
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
@@ -254,9 +252,6 @@ public class TestTagEvent {
     Assertions.assertEquals(
         OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
-
-    Tag[] postTags = ((ListTagsInfoForMetadataObjectEvent) postevent).getTags();
-    Assertions.assertArrayEquals(tags, postTags);
   }
 
   @Test

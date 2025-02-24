@@ -80,8 +80,7 @@ public class TagEventDispatcher implements TagDispatcher {
     eventBus.dispatchEvent(new ListTagsPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       String[] tagNames = dispatcher.listTags(metalake);
-      eventBus.dispatchEvent(
-          new ListTagsEvent(PrincipalUtils.getCurrentUserName(), metalake, tagNames));
+      eventBus.dispatchEvent(new ListTagsEvent(PrincipalUtils.getCurrentUserName(), metalake));
       return tagNames;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -95,8 +94,7 @@ public class TagEventDispatcher implements TagDispatcher {
     eventBus.dispatchEvent(new ListTagsInfoPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       Tag[] tags = dispatcher.listTagsInfo(metalake);
-      eventBus.dispatchEvent(
-          new ListTagsInfoEvent(PrincipalUtils.getCurrentUserName(), metalake, tags));
+      eventBus.dispatchEvent(new ListTagsInfoEvent(PrincipalUtils.getCurrentUserName(), metalake));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -190,8 +188,7 @@ public class TagEventDispatcher implements TagDispatcher {
     try {
       MetadataObject[] metadataObjects = dispatcher.listMetadataObjectsForTag(metalake, name);
       eventBus.dispatchEvent(
-          new ListMetadataObjectsForTagEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, name, metadataObjects));
+          new ListMetadataObjectsForTagEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
       return metadataObjects;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -211,7 +208,7 @@ public class TagEventDispatcher implements TagDispatcher {
       String[] tags = dispatcher.listTagsForMetadataObject(metalake, metadataObject);
       eventBus.dispatchEvent(
           new ListTagsForMetadataObjectEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, tags));
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -230,7 +227,7 @@ public class TagEventDispatcher implements TagDispatcher {
       Tag[] tags = dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
       eventBus.dispatchEvent(
           new ListTagsInfoForMetadataObjectEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, tags));
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
