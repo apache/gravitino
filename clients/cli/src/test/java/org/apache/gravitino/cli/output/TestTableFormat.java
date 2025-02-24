@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
@@ -374,6 +376,21 @@ public class TestTableFormat {
   }
 
   @Test
+  void testAuditWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = getMockAudit();
+    TableFormat.output(mockAudit, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----------+--------------------------+-----------+--------------------------+\n"
+            + "|  Creator  |       Create time        | Modified  |       Modify time        |\n"
+            + "+-----------+--------------------------+-----------+--------------------------+\n"
+            + "| demo_user | 2021-01-20T02:51:51.111Z | demo_user | 2021-01-20T02:51:51.111Z |\n"
+            + "+-----------+--------------------------+-----------+--------------------------+",
+        output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -460,5 +477,15 @@ public class TestTableFormat {
     when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
 
     return mockColumn;
+  }
+
+  private Audit getMockAudit() {
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(mockAudit.lastModifier()).thenReturn("demo_user");
+    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+
+    return mockAudit;
   }
 }
