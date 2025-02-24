@@ -65,7 +65,7 @@ public class ModelCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     List<String> missingEntities = Lists.newArrayList();
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);

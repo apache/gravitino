@@ -41,6 +41,9 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsBySchemaIds")
+  List<SchemaPO> listSchemaPOsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "selectSchemaIdByCatalogIdAndName")

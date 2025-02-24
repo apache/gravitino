@@ -46,9 +46,8 @@ public class RoleCommandHandler extends CommandHandler {
 
   /** Handles the command execution logic based on the provided command. */
   public void handle() {
-    String auth = getAuth(line);
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(auth, userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     metalake = new FullName(line).getMetalakeName();
 

@@ -106,7 +106,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+-------------+\n"
-            + "| metalake    |\n"
+            + "|  Metalake   |\n"
             + "+-------------+\n"
             + "| my_metalake |\n"
             + "+-------------+",
@@ -138,7 +138,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+-------------+-------------+\n"
-            + "| metalake    | comment     |\n"
+            + "|  Metalake   |   Comment   |\n"
             + "+-------------+-------------+\n"
             + "| my_metalake | my metalake |\n"
             + "+-------------+-------------+",
@@ -170,7 +170,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+-----------+\n"
-            + "| catalog   |\n"
+            + "|  Catalog  |\n"
             + "+-----------+\n"
             + "| postgres  |\n"
             + "| postgres2 |\n"
@@ -205,7 +205,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+----------+------------+-----------------+---------+\n"
-            + "| catalog  | type       | provider        | comment |\n"
+            + "| Catalog  |    Type    |    Provider     | Comment |\n"
             + "+----------+------------+-----------------+---------+\n"
             + "| postgres | RELATIONAL | jdbc-postgresql | null    |\n"
             + "+----------+------------+-----------------+---------+",
@@ -237,7 +237,7 @@ public class TableFormatOutputIT extends BaseIT {
     String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         "+-----------+------------+-----------------+-------------------+\n"
-            + "| catalog   | type       | provider        | comment           |\n"
+            + "|  Catalog  |    Type    |    Provider     |      Comment      |\n"
             + "+-----------+------------+-----------------+-------------------+\n"
             + "| postgres2 | RELATIONAL | jdbc-postgresql | catalog, 用于测试 |\n"
             + "+-----------+------------+-----------------+-------------------+",
