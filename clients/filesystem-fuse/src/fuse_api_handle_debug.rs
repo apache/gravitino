@@ -174,6 +174,19 @@ macro_rules! log_result_readdirplus {
     }};
 }
 
+/// Log the result of get_file_path and return the value if Ok
+macro_rules! log_get_file_path_result {
+    ($method_call:expr, $req:ident) => {
+        match $method_call.await {
+            Ok(path) => path,
+            Err(e) => {
+                error!($req.unique, ?e, "get_file_path failed");
+                return Err(e.into());
+            }
+        }
+    };
+}
+
 /// Convert `ReplyAttr` to descriptive string.
 ///
 /// Example (pretty-printed for readability):
@@ -438,7 +451,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn lookup(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<ReplyEntry> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -465,7 +478,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: Option<u64>,
         flags: u32,
     ) -> fuse3::Result<ReplyAttr> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -492,7 +505,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: Option<u64>,
         set_attr: SetAttr,
     ) -> fuse3::Result<ReplyAttr> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -520,7 +533,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         mode: u32,
         umask: u32,
     ) -> fuse3::Result<ReplyEntry> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -543,7 +556,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn unlink(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -559,7 +572,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -574,7 +587,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -597,7 +610,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         offset: u64,
         size: u32,
     ) -> fuse3::Result<ReplyData> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             ?req,
@@ -621,7 +634,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         write_flags: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyWrite> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -646,7 +659,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn statfs(&self, req: Request, inode: Inode) -> fuse3::Result<ReplyStatFs> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -669,7 +682,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         lock_owner: u64,
         flush: bool,
     ) -> fuse3::Result<()> {
-        let filename = self.inner.get_file_path(inode).await?;
+        let filename = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -692,7 +705,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
     }
 
     async fn opendir(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -719,7 +732,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: u64,
         offset: i64,
     ) -> fuse3::Result<ReplyDirectory<Self::DirEntryStream<'a>>> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -741,7 +754,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         fh: u64,
         flags: u32,
     ) -> fuse3::Result<()> {
-        let parent_path_name = self.inner.get_file_path(inode).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(inode), req);
         debug!(
             req.unique,
             "uid" = req.uid,
@@ -768,7 +781,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         mode: u32,
         flags: u32,
     ) -> fuse3::Result<ReplyCreated> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
 
         debug!(
             req.unique,
@@ -804,7 +817,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
         offset: u64,
         lock_owner: u64,
     ) -> fuse3::Result<ReplyDirectoryPlus<Self::DirEntryPlusStream<'a>>> {
-        let parent_path_name = self.inner.get_file_path(parent).await?;
+        let parent_path_name = log_get_file_path_result!(self.inner.get_file_path(parent), req);
         debug!(
             req.unique,
             "uid" = req.uid,
