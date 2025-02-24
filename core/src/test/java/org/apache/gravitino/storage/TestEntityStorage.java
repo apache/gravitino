@@ -151,6 +151,10 @@ public class TestEntityStorage {
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION))
+            .thenReturn(100);
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION))
+            .thenReturn(1000L);
 
         FieldUtils.writeStaticField(
             SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
@@ -162,6 +166,10 @@ public class TestEntityStorage {
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("com.mysql.cj.jdbc.Driver");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION))
+            .thenReturn(100);
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION))
+            .thenReturn(1000L);
 
         FieldUtils.writeStaticField(
             SQLExceptionConverterFactory.class, "converter", new MySQLExceptionConverter(), true);
