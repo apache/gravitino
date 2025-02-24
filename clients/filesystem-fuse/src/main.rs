@@ -230,9 +230,12 @@ fn main() -> Result<(), i32> {
                         );
                     }
                     _ => {
-                        // debug > 1, use `DEBUG` level logging with all directives
+                        // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
                         // TODO: log FuseApiHandleDebug and other module like PathFileSystemDebugLog
-                        init_tracing_subscriber(LevelFilter::DEBUG, "");
+                        init_tracing_subscriber(
+                            LevelFilter::DEBUG,
+                            "info,gvfs_fuse::fuse_api_handle_debug=debug",
+                        );
                     }
                 }
             }
