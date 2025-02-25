@@ -67,7 +67,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockMetalake, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("demo_metalake, This is a demo metalake", output);
+    Assertions.assertEquals("demo_metalake,This is a demo metalake", output);
   }
 
   @Test
@@ -88,8 +88,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockCatalog, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "demo_catalog, RELATIONAL, demo_provider, This is a demo catalog", output);
+    Assertions.assertEquals("demo_catalog,RELATIONAL,demo_provider,This is a demo catalog", output);
   }
 
   @Test
@@ -111,7 +110,7 @@ public class TestPlainFormat {
     Schema mockSchema = getMockSchema();
     PlainFormat.output(mockSchema, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("demo_schema, This is a demo schema", output);
+    Assertions.assertEquals("demo_schema,This is a demo schema", output);
   }
 
   @Test
@@ -131,7 +130,7 @@ public class TestPlainFormat {
     Table mockTable = getMockTable();
     PlainFormat.output(mockTable, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("demo_table, This is a demo table", output);
+    Assertions.assertEquals("demo_table,This is a demo table", output);
   }
 
   @Test
@@ -146,7 +145,7 @@ public class TestPlainFormat {
     PlainFormat.output(mockAudit, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "demo_user, 2021-01-20T02:51:51.111Z, demo_user, 2021-01-20T02:51:51.111Z", output);
+        "demo_user,2021-01-20T02:51:51.111Z,demo_user,2021-01-20T02:51:51.111Z", output);
   }
 
   @Test
@@ -160,7 +159,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockAudit, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("demo_user, N/A, N/A, N/A", output);
+    Assertions.assertEquals("demo_user,N/A,N/A,N/A", output);
   }
 
   @Test
