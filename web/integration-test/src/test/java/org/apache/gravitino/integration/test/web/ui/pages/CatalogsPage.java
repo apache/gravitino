@@ -593,7 +593,8 @@ public class CatalogsPage extends BaseWebIT {
           waitShowText(
               "false",
               By.xpath(
-                  ".//*[@data-prev-refer='details-props-key-gravitino.bypass.hive.metastore.client.capability.check']"));
+                  ".//*[@data-prev-refer='details-props-key-gravitino."
+                      + "bypass.hive.metastore.client.capability.check']"));
 
       boolean verifyAll = isVisible && isText && isHiveURIS && isShowCheck;
       if (!verifyAll) {
@@ -705,7 +706,10 @@ public class CatalogsPage extends BaseWebIT {
   public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
     WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     String xpath =
-        "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
+        "//div[@data-refer='table-grid']"
+            + "//div[contains(@class, 'MuiDataGrid-main')]"
+            + "/div[contains(@class, 'MuiDataGrid-virtualScroller')]"
+            + "/div/div[@role='rowgroup']//div[@data-field='name']";
     if (isColumnLevel) {
       xpath = xpath + "//p";
     }
@@ -726,7 +730,10 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyNoDataItemInList(String itemName, Boolean isColumnLevel) {
     String xpath =
-        "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
+        "//div[@data-refer='table-grid']"
+            + "//div[contains(@class, 'MuiDataGrid-main')]"
+            + "/div[contains(@class, 'MuiDataGrid-virtualScroller')]"
+            + "/div/div[@role='rowgroup']//div[@data-field='name']";
     if (isColumnLevel) {
       xpath = xpath + "//p";
     }
@@ -858,7 +865,9 @@ public class CatalogsPage extends BaseWebIT {
     List<WebElement> list =
         tableGrid.findElements(
             By.xpath(
-                "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+                "./div[contains(@class, 'MuiDataGrid-main')]"
+                    + "/div[contains(@class, 'MuiDataGrid-virtualScroller')]"
+                    + "/div/div[@role='rowgroup']//div[@data-field='name']"));
     List<String> texts = new ArrayList<>();
     for (WebElement webElement : list) {
       String rowItemColName = webElement.getText();
@@ -877,7 +886,10 @@ public class CatalogsPage extends BaseWebIT {
         wait.until(
             ExpectedConditions.visibilityOfAllElementsLocatedBy(
                 By.xpath(
-                    "//div[@data-refer='tree-view']//div[@class='ant-tree-list-holder']/div/div[@class='ant-tree-list-holder-inner']/div[contains(@class, 'ant-tree-treenode')]")));
+                    "//div[@data-refer='tree-view']"
+                        + "//div[@class='ant-tree-list-holder']"
+                        + "/div/div[@class='ant-tree-list-holder-inner']"
+                        + "/div[contains(@class, 'ant-tree-treenode')]")));
     List<String> texts = new ArrayList<>();
     for (WebElement webElement : list) {
       String nodeName =
@@ -899,7 +911,9 @@ public class CatalogsPage extends BaseWebIT {
         wait.until(
             ExpectedConditions.visibilityOfElementLocated(
                 By.xpath(
-                    "//div[@data-refer='tree-view']//div[contains(@class, 'ant-tree-treenode-selected')]//span[@class='ant-tree-title']")));
+                    "//div[@data-refer='tree-view']"
+                        + "//div[contains(@class, 'ant-tree-treenode-selected')]"
+                        + "//span[@class='ant-tree-title']")));
     if (!selectedNode.getText().equals(nodeName)) {
       LOG.error(
           "selectedNode: {} does not match with nodeName: {}", selectedNode.getText(), nodeName);
