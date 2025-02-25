@@ -49,10 +49,10 @@ public class Configs {
       "gravitino.entity.store.relational.jdbcPassword";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION_KEY =
-      "gravitino.entity.store.relational.max_connections";
+      "gravitino.entity.store.relational.maxConnections";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY =
-      "gravitino.entity.store.relational.max_wait_millis";
+      "gravitino.entity.store.relational.maxWaitMillis";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
