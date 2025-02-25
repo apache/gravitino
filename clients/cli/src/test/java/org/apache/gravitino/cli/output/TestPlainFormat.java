@@ -131,10 +131,36 @@ public class TestPlainFormat {
     Table mockTable = getMockTable();
     PlainFormat.output(mockTable, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_table, This is a demo table", output);
+  }
+
+  @Test
+  void testAuditWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(mockAudit.lastModifier()).thenReturn("demo_user");
+    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+
+    PlainFormat.output(mockAudit, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "id, integer, true, false, This is a int column\n"
-            + "name, string, false, true, This is a string column",
-        output);
+        "demo_user, 2021-01-20T02:51:51.111Z, demo_user, 2021-01-20T02:51:51.111Z", output);
+  }
+
+  @Test
+  void testAuditWithTableFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(null);
+    when(mockAudit.lastModifier()).thenReturn(null);
+    when(mockAudit.lastModifiedTime()).thenReturn(null);
+
+    PlainFormat.output(mockAudit, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_user, N/A, N/A, N/A", output);
   }
 
   @Test
@@ -235,15 +261,5 @@ public class TestPlainFormat {
     when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
 
     return mockColumn;
-  }
-
-  private Audit getMockAudit() {
-    Audit mockAudit = mock(Audit.class);
-    when(mockAudit.creator()).thenReturn("demo_user");
-    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
-    when(mockAudit.lastModifier()).thenReturn("demo_user");
-    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
-
-    return mockAudit;
   }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.outputs;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
@@ -55,6 +56,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       new TablePlainFormat(context).output((Table) entity);
     } else if (entity instanceof Table[]) {
       new TableListPlainFormat(context).output((Table[]) entity);
+    } else if (entity instanceof Audit) {
+      new AuditPlainFormat(context).output((Audit) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -176,8 +179,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
   }
 
   /**
-   * Formats a single Table instance with detailed column information. Output format: table_name
-   * column1_name, column1_type, column1_comment column2_name, column2_type, column2_comment ...
+   * Formats a single Table instance with detailed column information. Output format: table_name,
    * table_comment
    */
   static final class TablePlainFormat extends PlainFormat<Table> {
@@ -188,21 +190,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Table table) {
-      StringBuilder output = new StringBuilder();
-      List<String> columnOutput =
-          Arrays.stream(table.columns())
-              .map(
-                  column ->
-                      COMMA_JOINER.join(
-                          column.name(),
-                          column.dataType().simpleString(),
-                          column.autoIncrement(),
-                          column.nullable(),
-                          column.comment() == null ? "N/A" : column.comment()))
-              .collect(Collectors.toList());
-      output.append(NEWLINE_JOINER.join(columnOutput));
-      output.append(System.lineSeparator());
-      return output.toString();
+      String comment = table.comment() == null ? "N/A" : table.comment();
+      return COMMA_JOINER.join(new String[] {table.name(), comment});
     }
   }
 
@@ -220,6 +209,26 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     public String getOutput(Table[] tables) {
       List<String> tableNames = Arrays.stream(tables).map(Table::name).collect(Collectors.toList());
       return NEWLINE_JOINER.join(tableNames);
+    }
+  }
+
+  /**
+   * Formats an instance of {@link Audit} , outputting the audit information. Output format:
+   * creator, create_time, modified, modified_time
+   */
+  static final class AuditPlainFormat extends PlainFormat<Audit> {
+    public AuditPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Audit audit) {
+      return COMMA_JOINER.join(
+          audit.creator(),
+          audit.createTime() == null ? "N/A" : audit.createTime(),
+          audit.lastModifier() == null ? "N/A" : audit.lastModifier(),
+          audit.lastModifiedTime() == null ? "N/A" : audit.lastModifiedTime());
     }
   }
 }
