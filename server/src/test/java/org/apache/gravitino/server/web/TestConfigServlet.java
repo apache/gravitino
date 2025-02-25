@@ -26,6 +26,9 @@ import com.google.common.collect.Lists;
 import java.io.PrintWriter;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.config.ConfigBuilder;
+import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.ServerConfig;
 import org.junit.jupiter.api.Test;
 
@@ -49,10 +52,16 @@ public class TestConfigServlet {
   @Test
   public void testConfigServletWithVisibleConfigs() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
-    serverConfig.set(
-        Configs.VISIBLE_CONFIGS,
-        Lists.newArrayList(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME.getKey()));
-    serverConfig.set(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME, "test");
+
+    ConfigEntry<String> customConfig =
+        new ConfigBuilder("gravitino.extended.custom.config")
+            .doc("Gravitino custom config")
+            .version(ConfigConstants.VERSION_0_9_0)
+            .stringConf()
+            .createWithDefault("default");
+
+    serverConfig.set(customConfig, "test");
+    serverConfig.set(Configs.VISIBLE_CONFIGS, Lists.newArrayList(customConfig.getKey()));
     ConfigServlet configServlet = new ConfigServlet(serverConfig);
     configServlet.init();
     HttpServletResponse res = mock(HttpServletResponse.class);
@@ -61,7 +70,7 @@ public class TestConfigServlet {
     configServlet.doGet(null, res);
     verify(writer)
         .write(
-            "{\"gravitino.audit.formatter.className\":\"test\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
+            "{\"gravitino.extended.custom.config\":\"test\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
     configServlet.destroy();
   }
 }
