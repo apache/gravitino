@@ -45,6 +45,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
@@ -85,6 +86,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new TableDetailsTableFormat(context).output((Table) entity);
     } else if (entity instanceof Table[]) {
       new TableListTableFormat(context).output((Table[]) entity);
+    } else if (entity instanceof Audit) {
+      new AuditTableFormat(context).output((Audit) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -641,6 +644,33 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       Arrays.stream(tables).forEach(table -> column.addCell(table.name()));
 
       return getTableFormat(column);
+    }
+  }
+
+  /**
+   * Formats a single {@link Audit} instance into a four-column table display. Displays audit
+   * details, including creator, create time, modified, and modify time.
+   */
+  static final class AuditTableFormat extends TableFormat<Audit> {
+    public AuditTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Audit audit) {
+      Column columnCreator = new Column(context, "creator");
+      Column columnCreateTime = new Column(context, "creation at");
+      Column columnModified = new Column(context, "modifier");
+      Column columnModifyTime = new Column(context, "modified at");
+
+      columnCreator.addCell(audit.creator());
+      columnCreateTime.addCell(audit.createTime() == null ? "N/A" : audit.createTime().toString());
+      columnModified.addCell(audit.lastModifier() == null ? "N/A" : audit.lastModifier());
+      columnModifyTime.addCell(
+          audit.lastModifiedTime() == null ? "N/A" : audit.lastModifiedTime().toString());
+
+      return getTableFormat(columnCreator, columnCreateTime, columnModified, columnModifyTime);
     }
   }
 }

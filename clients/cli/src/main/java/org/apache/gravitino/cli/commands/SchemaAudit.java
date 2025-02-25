@@ -66,8 +66,6 @@ public class SchemaAudit extends AuditCommand {
       exitWithError(exp.getMessage());
     }
 
-    if (result != null) {
-      displayAuditInfo(result.auditInfo());
-    }
+    displayAuditInfo(result.auditInfo());
   }
 }
