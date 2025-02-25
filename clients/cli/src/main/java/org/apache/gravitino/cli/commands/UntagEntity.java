@@ -134,7 +134,7 @@ public class UntagEntity extends Command {
       printInformation(
           entity + " removed tags " + String.join(",", tags) + " now tagged with " + all);
     } else {
-      printInformation(entity + " removed tag " + tags[0].toString() + " now tagged with " + all);
+      printInformation(entity + " removed tag " + tags[0] + " now tagged with " + all);
     }
   }
 
