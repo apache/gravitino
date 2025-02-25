@@ -96,6 +96,7 @@ public final class EntityCombinedTable implements Table {
   public Map<String, String> properties() {
     return table.properties().entrySet().stream()
         .filter(p -> !hiddenProperties.contains(p.getKey()))
+        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
