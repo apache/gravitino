@@ -138,6 +138,9 @@ public class RangerHiveIT {
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
     verifyRoleInRanger(rangerAuthHivePlugin, role);
+
+    // Repeat to create the same to verify the idempotent operation
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
   }
 
   @Test
@@ -266,6 +269,9 @@ public class RangerHiveIT {
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
     // Check if the policy is deleted
     assertFindManagedPolicyItems(role, false);
+
+    // Repeat to delete the same role to verify the idempotent operation
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
   }
 
   @Test
@@ -294,7 +300,7 @@ public class RangerHiveIT {
 
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
-    // Because this metaobject has owner, so the policy should not be deleted
+    // Because this metadata object has owner, so the policy should not be deleted
     assertFindManagedPolicyItems(role, false);
   }
 
