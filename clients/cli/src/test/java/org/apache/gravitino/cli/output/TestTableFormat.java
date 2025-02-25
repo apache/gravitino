@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
@@ -370,6 +372,48 @@ public class TestTableFormat {
             + "| table1 |\n"
             + "| table2 |\n"
             + "+--------+",
+        output);
+  }
+
+  @Test
+  void testAuditWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(mockAudit.lastModifier()).thenReturn("demo_user");
+    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+
+    TableFormat.output(mockAudit, mockContext);
+
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----------+--------------------------+-----------+--------------------------+\n"
+            + "|  Creator  |       Creation at        | Modifier  |       Modified at        |\n"
+            + "+-----------+--------------------------+-----------+--------------------------+\n"
+            + "| demo_user | 2021-01-20T02:51:51.111Z | demo_user | 2021-01-20T02:51:51.111Z |\n"
+            + "+-----------+--------------------------+-----------+--------------------------+",
+        output);
+  }
+
+  @Test
+  void testAuditWithTableFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(null);
+    when(mockAudit.lastModifier()).thenReturn(null);
+    when(mockAudit.lastModifiedTime()).thenReturn(null);
+
+    TableFormat.output(mockAudit, mockContext);
+
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----------+-------------+----------+-------------+\n"
+            + "|  Creator  | Creation at | Modifier | Modified at |\n"
+            + "+-----------+-------------+----------+-------------+\n"
+            + "| demo_user | N/A         | N/A      | N/A         |\n"
+            + "+-----------+-------------+----------+-------------+",
         output);
   }
 
