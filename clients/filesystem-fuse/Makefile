@@ -43,7 +43,7 @@ check-cargo-sort: install-cargo-sort
 	cargo sort -c
 
 install-cargo-machete:
-	cargo install cargo-machete
+	cargo install cargo-machete@0.7.0
 
 cargo-machete: install-cargo-machete
 	cargo machete
