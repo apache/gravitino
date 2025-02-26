@@ -56,6 +56,7 @@ public class FutureGrantManager {
   }
 
   public void grantNewlyCreatedCatalog(String metalake, BaseCatalog catalog) {
+
     try {
       MetadataObject metalakeObject =
           MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
