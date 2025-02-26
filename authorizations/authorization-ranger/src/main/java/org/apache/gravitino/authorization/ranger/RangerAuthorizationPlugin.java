@@ -275,7 +275,7 @@ public abstract class RangerAuthorizationPlugin
     } catch (RangerServiceException e) {
       if (e.getMessage().contains("No RangerRole found for name")) {
         // Ignore exception to support idempotent operation
-        LOG.warn("Ranger delete role: {} failed!", role, e);
+        LOG.info("Ranger delete role: {} failed!", role, e);
       } else {
         throw new AuthorizationPluginException(
             "Fail to delete role %s exception: %s", role, e.getMessage());
