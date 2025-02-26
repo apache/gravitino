@@ -53,6 +53,10 @@ public class CatalogMetaSQLProviderFactory {
 
   static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {}
 
+  public static String listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return getProvider().listCatalogPOsByMetalakeName(metalakeName);
+  }
+
   public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);
   }

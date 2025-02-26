@@ -119,12 +119,10 @@ public class CatalogMetaService {
 
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
     NamespaceUtil.checkCatalog(namespace);
-
-    Long metalakeId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
-
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
+            CatalogMetaMapper.class,
+            mapper -> mapper.listCatalogPOsByMetalakeName(namespace.level(0)));
 
     return POConverters.fromCatalogPOs(catalogPOS, namespace);
   }
