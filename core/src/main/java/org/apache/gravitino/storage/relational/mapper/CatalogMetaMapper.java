@@ -38,6 +38,11 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface CatalogMetaMapper {
   String TABLE_NAME = "catalog_meta";
 
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "listCatalogPOsByMetalakeName")
+  List<CatalogPO> listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName);
+
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
@@ -50,11 +55,17 @@ public interface CatalogMetaMapper {
   Long selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogIdByName")
+  Long selectCatalogIdByName(@Param("catalogName") String name);
+
   @SelectProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "selectCatalogMetaByMetalakeIdAndName")
   CatalogPO selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
+
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaByName")
+  CatalogPO selectCatalogMetaByName(@Param("catalogName") String catalogName);
 
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
