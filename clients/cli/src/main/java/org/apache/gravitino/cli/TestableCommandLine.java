@@ -26,8 +26,6 @@ import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
-import org.apache.gravitino.cli.commands.CatalogDisable;
-import org.apache.gravitino.cli.commands.CatalogEnable;
 import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.ColumnAudit;
 import org.apache.gravitino.cli.commands.CreateCatalog;
@@ -78,6 +76,7 @@ import org.apache.gravitino.cli.commands.ListTagProperties;
 import org.apache.gravitino.cli.commands.ListTopicProperties;
 import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
+import org.apache.gravitino.cli.commands.ManageCatalog;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.MetalakeDisable;
@@ -848,14 +847,9 @@ public class TestableCommandLine {
     return new MetalakeDisable(context, metalake);
   }
 
-  protected CatalogEnable newCatalogEnable(
-      CommandContext context, String metalake, String catalog, boolean enableMetalake) {
-    return new CatalogEnable(context, metalake, catalog, enableMetalake);
-  }
-
-  protected CatalogDisable newCatalogDisable(
+  protected ManageCatalog newManageCatalog(
       CommandContext context, String metalake, String catalog) {
-    return new CatalogDisable(context, metalake, catalog);
+    return new ManageCatalog(context, metalake, catalog);
   }
 
   protected ListModel newListModel(
