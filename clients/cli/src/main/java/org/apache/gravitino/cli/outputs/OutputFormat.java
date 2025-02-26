@@ -26,7 +26,7 @@ import com.google.common.base.Joiner;
  */
 public interface OutputFormat<T> {
   /** Joiner for creating comma-separated output strings, ignoring null values */
-  Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
+  Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
   /** Joiner for creating line-separated output strings, ignoring null values */
   Joiner NEWLINE_JOINER = Joiner.on(System.lineSeparator()).skipNulls();
 
