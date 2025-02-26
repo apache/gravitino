@@ -48,7 +48,7 @@ public class Configs {
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
       "gravitino.entity.store.relational.jdbcPassword";
 
-  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION_KEY =
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS =
       "gravitino.entity.store.relational.maxConnections";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY =
@@ -90,9 +90,9 @@ public class Configs {
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
 
-  public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION = 100;
+  public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
 
-  public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION = 1000L;
+  public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
@@ -147,20 +147,20 @@ public class Configs {
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD);
 
-  public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION =
-      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION_KEY)
+  public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS)
           .doc("The maximum number of connections for the JDBC Backend connection pool")
           .version(ConfigConstants.VERSION_0_9_0)
           .intConf()
-          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_TOTAL_CONNECTION);
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
 
-  public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION =
+  public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY)
           .doc(
               "The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool")
           .version(ConfigConstants.VERSION_0_9_0)
           .longConf()
-          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION);
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PATH =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY)
