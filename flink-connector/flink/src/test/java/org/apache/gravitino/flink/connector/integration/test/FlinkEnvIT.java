@@ -66,13 +66,14 @@ public abstract class FlinkEnvIT extends BaseIT {
   private static String gravitinoUri = "http://127.0.0.1:8090";
 
   @BeforeAll
-  void startUp() {
+  void startUp() throws Exception {
     // Start Gravitino server
     initGravitinoEnv();
     initMetalake();
     initHiveEnv();
     initHdfsEnv();
     initFlinkEnv();
+    initCatalogEnv();
     LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
 
@@ -82,6 +83,8 @@ public abstract class FlinkEnvIT extends BaseIT {
     stopHdfsEnv();
     LOG.info("Stop Flink env successfully.");
   }
+
+  protected void initCatalogEnv() throws Exception {};
 
   protected String flinkByPass(String key) {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
