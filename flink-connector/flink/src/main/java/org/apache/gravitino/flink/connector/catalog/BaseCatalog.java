@@ -101,7 +101,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     this.partitionConverter = partitionConverter;
   }
 
-  protected abstract AbstractCatalog realCatalog();
+  protected abstract org.apache.flink.table.catalog.Catalog realCatalog();
 
   @Override
   public void open() throws CatalogException {}
