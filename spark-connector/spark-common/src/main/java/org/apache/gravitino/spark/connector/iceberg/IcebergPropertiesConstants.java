@@ -76,9 +76,8 @@ public class IcebergPropertiesConstants {
   @VisibleForTesting
   public static final String ICEBERG_FORMAT_VERSION = IcebergConstants.FORMAT_VERSION;
 
-  @VisibleForTesting
   public static final String ICEBERG_CATALOG_CACHE_ENABLED = CatalogProperties.CACHE_ENABLED;
-
+  
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_NAME =
       IcebergConstants.CATALOG_BACKEND_NAME;
 
