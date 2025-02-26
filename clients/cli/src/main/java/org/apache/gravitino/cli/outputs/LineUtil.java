@@ -20,7 +20,11 @@
 package org.apache.gravitino.cli.outputs;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.regex.Pattern;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 
 public class LineUtil {
   // This expression is primarily used to match characters that have a display width of
@@ -99,5 +103,28 @@ public class LineUtil {
         return new String(newCodePoints, 0, outOffset);
       }
     }
+  }
+
+  /**
+   * Get the default value of a column.
+   *
+   * @param defaultValue the default value expression.
+   * @return the default value as a string.
+   */
+  public static String getDefaultValue(Expression defaultValue) {
+    if (defaultValue == null
+        || defaultValue == org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET) {
+      return "N/A";
+    }
+
+    if (defaultValue instanceof Literal && ((Literal<?>) defaultValue).value() != null) {
+      return ((Literal<?>) defaultValue).value().toString();
+    } else if (defaultValue instanceof FunctionExpression) {
+      return defaultValue.toString();
+    } else if (defaultValue.references().length == 0) {
+      return "N/A";
+    }
+
+    return Arrays.toString(defaultValue.references());
   }
 }
