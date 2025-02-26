@@ -698,15 +698,13 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     default:
                       LOG.warn(
                           "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(),
-                          securableObject.type());
+                          gravitinoPrivilege.name(), securableObject.type());
                   }
                   break;
                 default:
                   LOG.warn(
                       "The privilege %s is not supported for the securable object: %s",
-                      gravitinoPrivilege.name(),
-                      securableObject.type());
+                      gravitinoPrivilege.name(), securableObject.type());
               }
             });
 
