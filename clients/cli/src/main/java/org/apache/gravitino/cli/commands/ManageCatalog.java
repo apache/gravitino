@@ -23,7 +23,6 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoOptions;
-import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
@@ -62,21 +61,17 @@ public class ManageCatalog extends Command {
     }
   }
 
-  /**
-   * Validate the command line options.
-   *
-   * @return the command instance.
-   */
+  /** {@inheritDoc} */
   @Override
   public Command validate() {
     if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-      printInformation(ErrorMessages.INVALID_ENABLE_DISABLE);
-      Main.exit(-1);
+      exitWithError(ErrorMessages.INVALID_ENABLE_DISABLE);
     }
 
     return super.validate();
   }
 
+  /** Enable a catalog. */
   private void enableCatalog() {
     try {
       if (enableMetalake) {
@@ -99,6 +94,7 @@ public class ManageCatalog extends Command {
     printInformation(metalake + "." + catalog + " has been enabled.");
   }
 
+  /** Disable a catalog. */
   private void disableCatalog() {
     try {
       GravitinoClient client = buildClient(metalake);

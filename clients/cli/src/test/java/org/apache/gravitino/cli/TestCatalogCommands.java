@@ -49,6 +49,7 @@ import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -495,5 +496,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    String errorOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(ErrorMessages.INVALID_ENABLE_DISABLE, errorOutput);
   }
 }

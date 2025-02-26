@@ -77,10 +77,9 @@ import org.apache.gravitino.cli.commands.ListTopicProperties;
 import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.ManageCatalog;
+import org.apache.gravitino.cli.commands.ManageMetalake;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
-import org.apache.gravitino.cli.commands.MetalakeDisable;
-import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
@@ -838,13 +837,8 @@ public class TestableCommandLine {
     return new RevokeAllPrivileges(context, metalake, role, entity);
   }
 
-  protected MetalakeEnable newMetalakeEnable(
-      CommandContext context, String metalake, boolean enableAllCatalogs) {
-    return new MetalakeEnable(context, metalake, enableAllCatalogs);
-  }
-
-  protected MetalakeDisable newMetalakeDisable(CommandContext context, String metalake) {
-    return new MetalakeDisable(context, metalake);
+  protected ManageMetalake newManageMetalake(CommandContext context, String metalake) {
+    return new ManageMetalake(context, metalake);
   }
 
   protected ManageCatalog newManageCatalog(
