@@ -620,8 +620,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       for (org.apache.gravitino.rel.Column column : columns) {
         columnName.addCell(column.name());
         columnType.addCell(column.dataType().simpleString());
-        columnDefaultValue.addCell(LineUtil.getDefaultValue(column.defaultValue()));
-        columnAutoIncrement.addCell(column.autoIncrement());
+        columnDefaultValue.addCell(LineUtil.getDefaultValue(column));
+        columnAutoIncrement.addCell(LineUtil.getAutoIncrement(column));
         columnNullable.addCell(column.nullable());
         columnComment.addCell(
             column.comment() == null || column.comment().isEmpty() ? "N/A" : column.comment());
@@ -712,11 +712,10 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       for (org.apache.gravitino.rel.Column column : columns) {
         columnName.addCell(column.name());
         columnType.addCell(column.dataType().simpleString());
-        columnDefaultVal.addCell(LineUtil.getDefaultValue(column.defaultValue()));
-        columnAutoIncrement.addCell(column.autoIncrement());
+        columnDefaultVal.addCell(LineUtil.getDefaultValue(column));
+        columnAutoIncrement.addCell(LineUtil.getAutoIncrement(column));
         columnNullable.addCell(column.nullable());
-        columnComment.addCell(
-            column.comment() == null || column.comment().isEmpty() ? "N/A" : column.comment());
+        columnComment.addCell(LineUtil.getComment(column));
       }
 
       return getTableFormat(

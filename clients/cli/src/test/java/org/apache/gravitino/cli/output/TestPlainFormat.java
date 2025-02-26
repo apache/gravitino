@@ -222,7 +222,7 @@ public class TestPlainFormat {
     Assertions.assertEquals(
         "name,datatype,default_value,comment,nullable,auto_increment\n"
             + "column1,integer,4,This is a int column,false,true\n"
-            + "column2,string,default value,This is a string column,true,false",
+            + "column2,string,default value,This is a string column,true,",
         output);
   }
 
@@ -246,8 +246,8 @@ public class TestPlainFormat {
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
         "name,datatype,default_value,comment,nullable,auto_increment\n"
-            + "column1,integer,N/A,,false,true\n"
-            + "column2,string,current_timestamp(),,true,false",
+            + "column1,integer,,,false,true\n"
+            + "column2,string,current_timestamp(),,true,",
         output);
   }
 

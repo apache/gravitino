@@ -261,10 +261,10 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       for (int i = 0; i < columns.length; i++) {
         String name = columns[i].name();
         String dataType = columns[i].dataType().simpleString();
-        String defaultValue = LineUtil.getDefaultValue(columns[i].defaultValue());
-        String comment = columns[i].comment();
+        String defaultValue = LineUtil.getDefaultValue(columns[i]);
+        String comment = LineUtil.getComment(columns[i]);
         String nullable = columns[i].nullable() ? "true" : "false";
-        String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
+        String autoIncrement = LineUtil.getAutoIncrement(columns[i]);
 
         data.append(
             COMMA_JOINER.join(name, dataType, defaultValue, comment, nullable, autoIncrement));
