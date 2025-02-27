@@ -26,6 +26,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 
 /** Plain format to print a pretty string to standard out. */
@@ -58,6 +59,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       new TableListPlainFormat(context).output((Table[]) entity);
     } else if (entity instanceof Audit) {
       new AuditPlainFormat(context).output((Audit) entity);
+    } else if (entity instanceof Column[]) {
+      new ColumnListPlainFormat(context).output((Column[]) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -229,6 +232,45 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
           audit.createTime() == null ? "N/A" : audit.createTime(),
           audit.lastModifier() == null ? "N/A" : audit.lastModifier(),
           audit.lastModifiedTime() == null ? "N/A" : audit.lastModifiedTime());
+    }
+  }
+
+  /**
+   * Formats an array of {@link org.apache.gravitino.rel.Column} into a six-column table display.
+   * Lists all column names, types, default values, auto-increment, nullable, and comments in a
+   * plain format.
+   */
+  static final class ColumnListPlainFormat extends PlainFormat<Column[]> {
+
+    /**
+     * Creates a new {@link ColumnListPlainFormat} with the specified output properties.
+     *
+     * @param context The command context.
+     */
+    public ColumnListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Column[] columns) {
+      String header =
+          COMMA_JOINER.join(
+              "name", "datatype", "default_value", "comment", "nullable", "auto_increment");
+      StringBuilder data = new StringBuilder();
+      for (int i = 0; i < columns.length; i++) {
+        String name = columns[i].name();
+        String dataType = columns[i].dataType().simpleString();
+        String defaultValue = LineUtil.getDefaultValue(columns[i]);
+        String comment = LineUtil.getComment(columns[i]);
+        String nullable = columns[i].nullable() ? "true" : "false";
+        String autoIncrement = LineUtil.getAutoIncrement(columns[i]);
+
+        data.append(
+            COMMA_JOINER.join(name, dataType, defaultValue, comment, nullable, autoIncrement));
+        data.append(System.lineSeparator());
+      }
+      return NEWLINE_JOINER.join(header, data.toString());
     }
   }
 }
