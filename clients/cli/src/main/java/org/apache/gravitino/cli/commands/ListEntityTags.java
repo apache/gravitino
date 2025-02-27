@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.utils.FullNameUtil;
@@ -43,13 +44,12 @@ public class ListEntityTags extends Command {
   /**
    * Lists all tags in a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    */
-  public ListEntityTags(String url, boolean ignoreVersions, String metalake, FullName name) {
-    super(url, ignoreVersions);
+  public ListEntityTags(CommandContext context, String metalake, FullName name) {
+    super(context);
     this.metalake = metalake;
     this.name = name;
   }
@@ -113,6 +113,6 @@ public class ListEntityTags extends Command {
 
     String all = String.join(",", tags);
 
-    System.out.println(all);
+    printResults(all);
   }
 }

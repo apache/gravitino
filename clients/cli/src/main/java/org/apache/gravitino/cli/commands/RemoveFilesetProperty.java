@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -40,8 +41,7 @@ public class RemoveFilesetProperty extends Command {
   /**
    * Remove a property of a fileset.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -49,14 +49,13 @@ public class RemoveFilesetProperty extends Command {
    * @param property The name of the property.
    */
   public RemoveFilesetProperty(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String fileset,
       String property) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -84,7 +83,7 @@ public class RemoveFilesetProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(property + " property removed.");
+    printInformation(property + " property removed.");
   }
 
   @Override

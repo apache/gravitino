@@ -48,6 +48,7 @@ public class GravitinoOptions {
   public static final String PRIVILEGE = "privilege";
   public static final String PROPERTIES = "properties";
   public static final String PROPERTY = "property";
+  public static final String QUIET = "quiet";
   public static final String PROVIDER = "provider";
   public static final String RENAME = "rename";
   public static final String ROLE = "role";
@@ -91,6 +92,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
     options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
     options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
+    options.addOption(createSimpleOption(null, QUIET, "quiet mode"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));

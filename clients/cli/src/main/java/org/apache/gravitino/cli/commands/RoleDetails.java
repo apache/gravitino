@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import java.util.List;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,13 +36,12 @@ public class RoleDetails extends Command {
   /**
    * Displays the securable objects in a role.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    */
-  public RoleDetails(String url, boolean ignoreVersions, String metalake, String role) {
-    super(url, ignoreVersions);
+  public RoleDetails(CommandContext context, String metalake, String role) {
+    super(context);
     this.metalake = metalake;
     this.role = role;
   }
@@ -63,11 +63,11 @@ public class RoleDetails extends Command {
     }
 
     for (SecurableObject object : objects) {
-      System.out.print(object.name() + "," + object.type() + ",");
+      printInformation(object.name() + "," + object.type() + ",");
       for (Privilege privilege : object.privileges()) {
-        System.out.print(privilege.simpleString() + " ");
+        printInformation(privilege.simpleString() + " ");
       }
     }
-    System.out.println("");
+    printInformation("");
   }
 }

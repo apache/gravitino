@@ -29,8 +29,7 @@ public class ColumnCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String catalog;
@@ -44,16 +43,18 @@ public class ColumnCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public ColumnCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -65,7 +66,7 @@ public class ColumnCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     List<String> missingEntities = Lists.newArrayList();
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
@@ -120,7 +121,7 @@ public class ColumnCommandHandler extends CommandHandler {
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine
-          .newColumnAudit(url, ignore, metalake, catalog, schema, table, column)
+          .newColumnAudit(context, metalake, catalog, schema, table, column)
           .validate()
           .handle();
     } else {
@@ -144,8 +145,7 @@ public class ColumnCommandHandler extends CommandHandler {
 
     gravitinoCommandLine
         .newAddColumn(
-            url,
-            ignore,
+            context,
             metalake,
             catalog,
             schema,
@@ -164,7 +164,7 @@ public class ColumnCommandHandler extends CommandHandler {
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
     gravitinoCommandLine
-        .newDeleteColumn(url, ignore, metalake, catalog, schema, table, column)
+        .newDeleteColumn(context, metalake, catalog, schema, table, column)
         .validate()
         .handle();
   }
@@ -174,36 +174,35 @@ public class ColumnCommandHandler extends CommandHandler {
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
-          .newUpdateColumnComment(url, ignore, metalake, catalog, schema, table, column, comment)
+          .newUpdateColumnComment(context, metalake, catalog, schema, table, column, comment)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.RENAME)) {
       String newName = line.getOptionValue(GravitinoOptions.RENAME);
       gravitinoCommandLine
-          .newUpdateColumnName(url, ignore, metalake, catalog, schema, table, column, newName)
+          .newUpdateColumnName(context, metalake, catalog, schema, table, column, newName)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.DATATYPE) && !line.hasOption(GravitinoOptions.DEFAULT)) {
       String datatype = line.getOptionValue(GravitinoOptions.DATATYPE);
       gravitinoCommandLine
-          .newUpdateColumnDatatype(url, ignore, metalake, catalog, schema, table, column, datatype)
+          .newUpdateColumnDatatype(context, metalake, catalog, schema, table, column, datatype)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.POSITION)) {
       String position = line.getOptionValue(GravitinoOptions.POSITION);
       gravitinoCommandLine
-          .newUpdateColumnPosition(url, ignore, metalake, catalog, schema, table, column, position)
+          .newUpdateColumnPosition(context, metalake, catalog, schema, table, column, position)
           .validate()
           .handle();
     }
     if (line.hasOption(GravitinoOptions.NULL)) {
       boolean nullable = line.getOptionValue(GravitinoOptions.NULL).equals("true");
       gravitinoCommandLine
-          .newUpdateColumnNullability(
-              url, ignore, metalake, catalog, schema, table, column, nullable)
+          .newUpdateColumnNullability(context, metalake, catalog, schema, table, column, nullable)
           .validate()
           .handle();
     }
@@ -211,7 +210,7 @@ public class ColumnCommandHandler extends CommandHandler {
       boolean autoIncrement = line.getOptionValue(GravitinoOptions.AUTO).equals("true");
       gravitinoCommandLine
           .newUpdateColumnAutoIncrement(
-              url, ignore, metalake, catalog, schema, table, column, autoIncrement)
+              context, metalake, catalog, schema, table, column, autoIncrement)
           .validate()
           .handle();
     }
@@ -220,7 +219,7 @@ public class ColumnCommandHandler extends CommandHandler {
       String dataType = line.getOptionValue(GravitinoOptions.DATATYPE);
       gravitinoCommandLine
           .newUpdateColumnDefault(
-              url, ignore, metalake, catalog, schema, table, column, defaultValue, dataType)
+              context, metalake, catalog, schema, table, column, defaultValue, dataType)
           .validate()
           .handle();
     }
@@ -229,7 +228,7 @@ public class ColumnCommandHandler extends CommandHandler {
   /** Handles the "LIST" command. */
   private void handleListCommand() {
     gravitinoCommandLine
-        .newListColumns(url, ignore, metalake, catalog, schema, table)
+        .newListColumns(context, metalake, catalog, schema, table)
         .validate()
         .handle();
   }

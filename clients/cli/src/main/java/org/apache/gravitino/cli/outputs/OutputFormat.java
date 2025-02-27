@@ -18,7 +18,32 @@
  */
 package org.apache.gravitino.cli.outputs;
 
-/** Output format interface for the CLI results. */
+import com.google.common.base.Joiner;
+
+/**
+ * Defines formatting behavior for command-line interface output. Implementations of this interface
+ * handle the conversion of entities to their string representation in specific output formats.
+ */
 public interface OutputFormat<T> {
-  void output(T object);
+  /** Joiner for creating comma-separated output strings, ignoring null values */
+  Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
+  /** Joiner for creating line-separated output strings, ignoring null values */
+  Joiner NEWLINE_JOINER = Joiner.on(System.lineSeparator()).skipNulls();
+
+  /**
+   * Displays the entity in the specified output format. This method handles the actual output
+   * operation
+   *
+   * @param entity The entity to be formatted and output
+   */
+  void output(T entity);
+
+  /**
+   * Returns entity's string representation. This method only handles the formatting without
+   * performing any I/O operations.
+   *
+   * @param entity The entity to be formatted
+   * @return The formatted string representation of the entity
+   */
+  String getOutput(T entity);
 }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider;
@@ -49,6 +50,10 @@ public class SchemaMetaSQLProviderFactory {
   static class SchemaMetaMySQLProvider extends SchemaMetaBaseSQLProvider {}
 
   static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {}
+
+  public static String listSchemaPOsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().listSchemaPOsBySchemaIds(schemaIds);
+  }
 
   public static String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().listSchemaPOsByCatalogId(catalogId);

@@ -112,9 +112,9 @@ public class LockManager {
 
     deadLockChecker.scheduleAtFixedRate(
         () -> {
-          LOG.info("Start to check the dead lock...");
+          LOG.debug("Start to check the dead lock...");
           checkDeadLock(treeLockRootNode);
-          LOG.info("Finish to check the dead lock...");
+          LOG.debug("Finish to check the dead lock...");
         },
         0,
         60,
@@ -161,12 +161,12 @@ public class LockManager {
     lockCleaner.scheduleAtFixedRate(
         () -> {
           long nodeCount = totalNodeCount.get();
-          LOG.info("Total tree lock node count: {}", nodeCount);
+          LOG.debug("Total tree lock node count: {}", nodeCount);
           // If the total node count is greater than the maxTreeNodeInMemory * 0.5, we will do the
           // clear up in case of the memory explosion.
           if (nodeCount > maxTreeNodeInMemory * 0.5) {
             StopWatch watch = StopWatch.createStarted();
-            LOG.trace("Start to clean up the stale tree lock nodes...");
+            LOG.info("Start to clean up the stale tree lock nodes...");
             treeLockRootNode
                 .getAllChildren()
                 .forEach(child -> evictStaleNodes(child, treeLockRootNode));

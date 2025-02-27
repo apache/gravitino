@@ -31,16 +31,6 @@ public class MetadataCommand extends Command {
   /**
    * MetadataCommand constructor.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   */
-  public MetadataCommand(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
-  }
-
-  /**
-   * MetadataCommand constructor.
-   *
    * @param context The command context.
    */
   public MetadataCommand(CommandContext context) {

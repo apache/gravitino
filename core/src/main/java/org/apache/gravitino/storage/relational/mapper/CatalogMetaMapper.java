@@ -41,6 +41,9 @@ public interface CatalogMetaMapper {
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByCatalogIds")
+  List<CatalogPO> listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds);
+
   @SelectProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "selectCatalogIdByMetalakeIdAndName")

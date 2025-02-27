@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -39,21 +40,15 @@ public class FilesetDetails extends Command {
   /**
    * Displays the details of a fileset.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    * @param fileset The name of the fileset.
    */
   public FilesetDetails(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String fileset) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -83,7 +78,7 @@ public class FilesetDetails extends Command {
 
     if (result != null) {
       String filesetType = (result.type() == Fileset.Type.MANAGED) ? "managed" : "external";
-      System.out.println(
+      printResults(
           result.name()
               + ","
               + filesetType

@@ -19,42 +19,46 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
 /* Context for a command */
 public class CommandContext {
-  private String url;
-  private boolean ignoreVersions;
-  private boolean force;
-  private String outputFormat;
+  private final boolean force;
+  private final boolean ignoreVersions;
+  private final String outputFormat;
+  private final String url;
+  private final boolean quiet;
+  private final CommandLine line;
+  private final String auth;
+
+  private String ignoreEnv;
+  private boolean ignoreSet = false;
+  private String urlEnv;
+  private boolean urlSet = false;
+  private String authEnv;
+  private boolean authSet = false;
   // Can add more "global" command flags here without any major changes e.g. a guiet flag
 
   /**
    * Command constructor.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param line The command line.
    */
-  public CommandContext(String url, boolean ignoreVersions) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.force = false;
-    this.outputFormat = Command.OUTPUT_FORMAT_PLAIN;
-  }
+  public CommandContext(CommandLine line) {
+    Preconditions.checkNotNull(line);
+    this.line = line;
+    this.force = line.hasOption(GravitinoOptions.FORCE);
+    this.outputFormat =
+        line.hasOption(GravitinoOptions.OUTPUT)
+            ? line.getOptionValue(GravitinoOptions.OUTPUT)
+            : Command.OUTPUT_FORMAT_PLAIN;
+    this.quiet = line.hasOption(GravitinoOptions.QUIET);
 
-  /**
-   * Command constructor.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
-   * @param outputFormat Display output format.
-   */
-  public CommandContext(String url, boolean ignoreVersions, boolean force, String outputFormat) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.force = force;
-    this.outputFormat = outputFormat;
+    this.url = getUrl();
+    this.ignoreVersions = getIgnore();
+    this.auth = this.getAuth();
   }
 
   /**
@@ -64,15 +68,6 @@ public class CommandContext {
    */
   public String url() {
     return url;
-  }
-
-  /**
-   * Sets the URL.
-   *
-   * @param url The URL to be set.
-   */
-  public void setUrl(String url) {
-    this.url = url;
   }
 
   /**
@@ -100,5 +95,118 @@ public class CommandContext {
    */
   public String outputFormat() {
     return outputFormat;
+  }
+
+  /**
+   * Returns whether the command information should be suppressed.
+   *
+   * @return True if the command information should be suppressed.
+   */
+  public boolean quiet() {
+    return quiet;
+  }
+
+  /**
+   * Returns the authentication type.
+   *
+   * @return The authentication type.
+   */
+  public String auth() {
+    return auth;
+  }
+
+  /**
+   * Retrieves the Gravitino URL from the command line options or the GRAVITINO_URL environment
+   * variable or the Gravitino config file.
+   *
+   * @return The Gravitino URL, or null if not found.
+   */
+  private String getUrl() {
+    GravitinoConfig config = new GravitinoConfig(null);
+
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.URL)) {
+      return line.getOptionValue(GravitinoOptions.URL);
+    }
+
+    // Cache the Gravitino URL environment variable
+    if (urlEnv == null && !urlSet) {
+      urlEnv = System.getenv("GRAVITINO_URL");
+      urlSet = true;
+    }
+
+    // If set return the Gravitino URL environment variable
+    if (urlEnv != null) {
+      return urlEnv;
+    }
+
+    // Check if the Gravitino URL is specified in the configuration file
+    if (config.fileExists()) {
+      config.read();
+      String configURL = config.getGravitinoURL();
+      if (configURL != null) {
+        return configURL;
+      }
+    }
+
+    // Return the default localhost URL
+    return GravitinoCommandLine.DEFAULT_URL;
+  }
+
+  private boolean getIgnore() {
+    GravitinoConfig config = new GravitinoConfig(null);
+    boolean ignore = false;
+
+    /* Check if you should ignore client/version versions */
+    if (line.hasOption(GravitinoOptions.IGNORE)) {
+      ignore = true;
+    } else {
+      // Cache the ignore environment variable
+      if (ignoreEnv == null && !ignoreSet) {
+        ignoreEnv = System.getenv("GRAVITINO_IGNORE");
+        ignore = ignoreEnv != null && ignoreEnv.equals("true");
+        ignoreSet = true;
+      }
+
+      // Check if the ignore name is specified in the configuration file
+      if (ignoreEnv == null) {
+        if (config.fileExists()) {
+          config.read();
+          ignore = config.getIgnore();
+        }
+      }
+    }
+
+    return ignore;
+  }
+
+  private String getAuth() {
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.SIMPLE)) {
+      return GravitinoOptions.SIMPLE;
+    }
+
+    // Cache the Gravitino authentication type environment variable
+    if (authEnv == null && !authSet) {
+      authEnv = System.getenv("GRAVITINO_AUTH");
+      authSet = true;
+    }
+
+    // If set return the Gravitino authentication type environment variable
+    if (authEnv != null) {
+      return authEnv;
+    }
+
+    // Check if the authentication type is specified in the configuration file
+    GravitinoConfig config = new GravitinoConfig(null);
+    if (config.fileExists()) {
+      config.read();
+      String configAuthType = config.getGravitinoAuthType();
+      if (configAuthType != null) {
+        return configAuthType;
+      }
+    }
+
+    return null;
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -33,16 +34,8 @@ public class TableCommand extends AuditCommand {
   protected final String metalake;
   protected final String catalog;
 
-  /**
-   * Common code for all table commands.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
-   */
-  public TableCommand(String url, boolean ignoreVersions, String metalake, String catalog) {
-    super(url, ignoreVersions);
+  public TableCommand(CommandContext context, String metalake, String catalog) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
   }

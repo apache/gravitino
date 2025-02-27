@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -39,21 +40,15 @@ public class ListFilesetProperties extends ListProperties {
   /**
    * List the properties of a catalog.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param fileset The name of the fileset.
    */
   public ListFilesetProperties(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String fileset) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String catalog, String schema, String fileset) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

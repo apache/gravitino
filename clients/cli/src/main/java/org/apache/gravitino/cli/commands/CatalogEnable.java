@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
@@ -34,15 +35,14 @@ public class CatalogEnable extends Command {
   /**
    * Enable catalog
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param enableMetalake Whether to enable it's metalake
    */
   public CatalogEnable(
-      String url, boolean ignoreVersions, String metalake, String catalog, boolean enableMetalake) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String catalog, boolean enableMetalake) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.enableMetalake = enableMetalake;
@@ -69,6 +69,6 @@ public class CatalogEnable extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(metalake + "." + catalog + " has been enabled.");
+    printInformation(metalake + "." + catalog + " has been enabled.");
   }
 }

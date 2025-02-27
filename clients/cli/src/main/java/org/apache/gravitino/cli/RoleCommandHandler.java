@@ -28,26 +28,26 @@ public class RoleCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private String metalake;
   private String[] roles;
   private String[] privileges;
 
   public RoleCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
-    this.url = getUrl(line);
+    this.context = context;
   }
 
   /** Handles the command execution logic based on the provided command. */
   public void handle() {
-    String auth = getAuth(line);
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(auth, userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     metalake = new FullName(line).getMetalakeName();
 
@@ -106,32 +106,27 @@ public class RoleCommandHandler extends CommandHandler {
 
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
-      gravitinoCommandLine.newRoleAudit(url, ignore, metalake, getOneRole()).validate().handle();
+      gravitinoCommandLine.newRoleAudit(context, metalake, getOneRole()).validate().handle();
     } else {
-      gravitinoCommandLine.newRoleDetails(url, ignore, metalake, getOneRole()).validate().handle();
+      gravitinoCommandLine.newRoleDetails(context, metalake, getOneRole()).validate().handle();
     }
   }
 
   private void handleListCommand() {
-    gravitinoCommandLine.newListRoles(url, ignore, metalake).validate().handle();
+    gravitinoCommandLine.newListRoles(context, metalake).validate().handle();
   }
 
   private void handleCreateCommand() {
-    gravitinoCommandLine.newCreateRole(url, ignore, metalake, roles).validate().handle();
+    gravitinoCommandLine.newCreateRole(context, metalake, roles).validate().handle();
   }
 
   private void handleDeleteCommand() {
-    boolean forceDelete = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine
-        .newDeleteRole(url, ignore, forceDelete, metalake, roles)
-        .validate()
-        .handle();
+    gravitinoCommandLine.newDeleteRole(context, metalake, roles).validate().handle();
   }
 
   private void handleGrantCommand() {
     gravitinoCommandLine
-        .newGrantPrivilegesToRole(
-            url, ignore, metalake, getOneRole(), new FullName(line), privileges)
+        .newGrantPrivilegesToRole(context, metalake, getOneRole(), new FullName(line), privileges)
         .validate()
         .handle();
   }
@@ -140,13 +135,13 @@ public class RoleCommandHandler extends CommandHandler {
     boolean removeAll = line.hasOption(GravitinoOptions.ALL);
     if (removeAll) {
       gravitinoCommandLine
-          .newRevokeAllPrivileges(url, ignore, metalake, getOneRole(), new FullName(line))
+          .newRevokeAllPrivileges(context, metalake, getOneRole(), new FullName(line))
           .validate()
           .handle();
     } else {
       gravitinoCommandLine
           .newRevokePrivilegesFromRole(
-              url, ignore, metalake, getOneRole(), new FullName(line), privileges)
+              context, metalake, getOneRole(), new FullName(line), privileges)
           .validate()
           .handle();
     }
