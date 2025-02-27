@@ -27,6 +27,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 
@@ -44,6 +45,21 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   protected static final String CATALOG_NAME = "test_flink_jdbc_catalog";
 
   @Override
+  protected boolean supportTablePropertiesOperation() {
+    return false;
+  }
+
+  @Override
+  protected String defaultDatabaseName() {
+    return MYSQL_CATALOG_MYSQL_IT.name();
+  }
+
+  @Override
+  protected boolean supportSchemaOperationWithCommentAndOptions() {
+    return false;
+  }
+
+  @Override
   protected Catalog currentCatalog() {
     return catalog;
   }
@@ -56,6 +72,12 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   @BeforeAll
   void setup() {
     init();
+  }
+
+  @AfterAll
+  static void stop() {
+    Preconditions.checkNotNull(metalake);
+    metalake.dropCatalog(CATALOG_NAME, true);
   }
 
   @Override

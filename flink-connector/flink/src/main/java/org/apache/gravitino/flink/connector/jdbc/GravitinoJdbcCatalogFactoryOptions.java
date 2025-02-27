@@ -19,7 +19,15 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
+import org.apache.iceberg.flink.FlinkCatalogFactory;
+
 public class GravitinoJdbcCatalogFactoryOptions {
 
+  /** Identifier for the {@link GravitinoJdbcCatalog}. */
   public static final String IDENTIFIER = "gravitino-jdbc";
+
+  public static final ConfigOption<String> DEFAULT_DATABASE =
+      ConfigOptions.key(FlinkCatalogFactory.DEFAULT_DATABASE).stringType().noDefaultValue();
 }

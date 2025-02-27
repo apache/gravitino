@@ -19,16 +19,31 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.Map;
+import java.util.Optional;
+import org.apache.flink.connector.jdbc.catalog.JdbcCatalog;
 import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
-import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
+import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 
+/**
+ * The GravitinoJdbcCatalog class is an implementation of the BaseCatalog class that is used to
+ * proxy the JdbcCatalog class.
+ */
 public class GravitinoJdbcCatalog extends BaseCatalog {
 
-  Catalog jdbcCatalog;
+  private final JdbcCatalog jdbcCatalog;
+
+  private final CatalogFactory.Context context;
 
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
@@ -36,12 +51,36 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter) {
     super(context.getName(), defaultDatabase, propertiesConverter, partitionConverter);
+    this.context = context;
     JdbcCatalogFactory jdbcCatalogFactory = new JdbcCatalogFactory();
-    this.jdbcCatalog = jdbcCatalogFactory.createCatalog(context);
+    this.jdbcCatalog = (JdbcCatalog) jdbcCatalogFactory.createCatalog(context);
   }
 
   @Override
-  protected Catalog realCatalog() {
+  protected AbstractCatalog realCatalog() {
     return jdbcCatalog;
+  }
+
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new JdbcDynamicTableFactory());
+  }
+
+  @Override
+  public CatalogBaseTable getTable(ObjectPath tablePath)
+      throws TableNotExistException, CatalogException {
+    CatalogBaseTable table = super.getTable(tablePath);
+    Map<String, String> contextOptions = context.getOptions();
+    Map<String, String> tableOptions = table.getOptions();
+    tableOptions.remove("engine");
+    tableOptions.put(
+        "url",
+        contextOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL)
+            + "/"
+            + tablePath.getDatabaseName());
+    tableOptions.put("table-name", tablePath.getObjectName());
+    tableOptions.put("username", contextOptions.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
+    tableOptions.put("password", contextOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+    return table;
   }
 }

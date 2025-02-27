@@ -19,18 +19,41 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.Collections;
+import java.util.Set;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
-import org.apache.gravitino.flink.connector.paimon.GravitinoPaimonCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
+/**
+ * Factory for creating instances of {@link GravitinoJdbcCatalog}. It will be created by SPI
+ * discovery in Flink.
+ */
 public class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
 
   @Override
+  public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
+    final FactoryUtil.CatalogFactoryHelper helper =
+        FactoryUtils.createCatalogFactoryHelper(this, context);
+    String defaultDatabase =
+        helper.getOptions().get(GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE);
+    return new GravitinoJdbcCatalog(
+        context, defaultDatabase, propertiesConverter(), partitionConverter());
+  }
+
+  @Override
   public String gravitinoCatalogProvider() {
-    return GravitinoPaimonCatalogFactoryOptions.IDENTIFIER;
+    return "jdbc";
+  }
+
+  @Override
+  public String factoryIdentifier() {
+    return GravitinoJdbcCatalogFactoryOptions.IDENTIFIER;
   }
 
   @Override
@@ -46,5 +69,15 @@ public class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
   @Override
   public PartitionConverter partitionConverter() {
     return DefaultPartitionConverter.INSTANCE;
+  }
+
+  @Override
+  public Set<ConfigOption<?>> requiredOptions() {
+    return Collections.emptySet();
+  }
+
+  @Override
+  public Set<ConfigOption<?>> optionalOptions() {
+    return Collections.emptySet();
   }
 }

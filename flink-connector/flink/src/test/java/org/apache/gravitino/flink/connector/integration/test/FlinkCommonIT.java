@@ -85,6 +85,14 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
+  protected boolean supportTablePropertiesOperation() {
+    return true;
+  }
+
+  protected String defaultDatabaseName() {
+    return "default";
+  }
+
   @Test
   public void testCreateSchema() {
     doWithCatalog(
@@ -177,7 +185,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             TestUtils.assertTableResult(
                 sql("SHOW DATABASES"),
                 ResultKind.SUCCESS_WITH_CONTENT,
-                Row.of("default"),
+                Row.of(defaultDatabaseName()),
                 Row.of(schema),
                 Row.of(schema2),
                 Row.of(schema3));
@@ -185,7 +193,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             String[] schemas = catalog.asSchemas().listSchemas();
             Arrays.sort(schemas);
             Assertions.assertEquals(4, schemas.length);
-            Assertions.assertEquals("default", schemas[0]);
+            Assertions.assertEquals(defaultDatabaseName(), schemas[0]);
             Assertions.assertEquals(schema, schemas[1]);
             Assertions.assertEquals(schema2, schemas[2]);
             Assertions.assertEquals(schema3, schemas[3]);
@@ -262,7 +270,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
           Assertions.assertEquals(comment, table.comment());
-          Assertions.assertEquals(value, table.properties().get(key));
+          if (supportTablePropertiesOperation()) {
+            Assertions.assertEquals(value, table.properties().get(key));
+          }
           Column[] columns =
               new Column[] {
                 Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
@@ -721,7 +731,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportTableOperation")
+  @EnabledIf("supportTablePropertiesOperation")
   public void testAlterTableProperties() {
     String databaseName = "test_alter_table_properties_db";
     String tableName = "test_alter_table_properties";
