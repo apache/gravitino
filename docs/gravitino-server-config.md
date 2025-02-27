@@ -64,12 +64,11 @@ The following table lists the storage configuration items:
 | `gravitino.entity.store.relational.jdbcPassword`  | The password that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                   | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
 | `gravitino.entity.store.relational.storagePath`   | The storage path for embedded JDBC storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/jdbc`     | `${GRAVITINO_HOME}/data/jdbc` | No                                              | 0.6.0-incubating |
 
-
 :::caution
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
 
-#### Create JDBC backend schema and table 
+#### Create JDBC backend schema and table
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
@@ -94,7 +93,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
-| `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
+| `gravitino.auxService.names` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
 Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
 
@@ -107,8 +106,8 @@ To leverage the event listener, you must implement the `EventListenerPlugin` int
 | Property name                          | Description                                                                                            | Default value | Required | Since Version |
 |----------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.eventListener.names`        | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
-| `gravitino.eventListener.{name}.class` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
-| `gravitino.eventListener.{name}.{key}` | Custom properties that will be passed to the event listener plugin.                                    | (none)        | Yes      | 0.5.0         | 
+| `gravitino.eventListener.{name}.class` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         |
+| `gravitino.eventListener.{name}.{key}` | Custom properties that will be passed to the event listener plugin.                                    | (none)        | Yes      | 0.5.0         |
 
 #### Event
 
@@ -148,7 +147,7 @@ The plugin provides several operational modes for how to process event, supporti
 - **SYNC**: Events are processed synchronously, immediately following the associated operation. This mode ensures events are processed before the operation's result is returned to the client, but it may delay the main process if event processing takes too long.
 
 - **ASYNC_SHARED**: This mode employs a shared queue and dispatcher for asynchronous event processing. It prevents the main process from being blocked, though there's a risk events might be dropped if not promptly consumed. Sharing a dispatcher can lead to poor isolation in case of slow listeners.
- 
+
 - **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation but at the expense of multiple queues and dispatchers.
 
 When processing pre-event, you could throw a `ForbiddenException` to skip the following executions. For more details, please refer to the definition of the plugin.
@@ -162,8 +161,8 @@ Gravitino provides a default implement to log basic audit information to a file,
 | Property name                         | Description                            | Default value                               | Required | Since Version              |
 |---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
 | `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
-| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | NO       | 0.7.0-incubating           | 
+| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           |
+| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | NO       | 0.7.0-incubating           |
 
 #### Audit log formatter
 
@@ -220,7 +219,6 @@ Below is a list of catalog properties that will be used by all Gravitino catalog
 | `cloud.name`        | The property to specify the cloud that the catalog is running on. The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`.                                                                                                                    | (none)        | No       | 0.6.0-incubating |
 | `cloud.region-code` | The property to specify the region code of the cloud that the catalog is running on.                                                                                                                                                                       | (none)        | No       | 0.6.0-incubating |
 
-
 The following table lists the catalog specific properties and their default paths:
 
 | catalog provider    | catalog properties                                                                      | catalog properties configuration file path               |
@@ -254,5 +252,5 @@ Currently, due to the absence of a comprehensive user permission system, Graviti
 Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
 permissions; otherwise, you may encounter a `Permission denied` error. There are two ways to resolve this error:
 
-* Grant Gravitino startup user permissions in Hadoop
-* Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.
+- Grant Gravitino startup user permissions in Hadoop
+- Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.

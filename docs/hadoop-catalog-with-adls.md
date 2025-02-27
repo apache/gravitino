@@ -17,7 +17,7 @@ To set up a Hadoop catalog with ADLS, follow these steps:
 3. Start the Gravitino server by running the following command:
 
 ```bash
-$ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
+${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
 Once the server is up and running, you can proceed to configure the Hadoop catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
@@ -32,10 +32,9 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
 | `filesystem-providers`        | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.8.0-incubating |
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                                         | `builtin-local` | No       | 0.8.0-incubating |
-| `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | (none)          | Yes      | 0.8.0-incubating |
+| `azure-storage-account-name` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | (none)          | Yes      | 0.8.0-incubating |
 | `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | (none)          | Yes      | 0.8.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, please see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
-
 
 ### Configurations for a schema
 
@@ -316,6 +315,7 @@ Before running the following code, you need to install required packages:
 pip install pyspark==3.1.3
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
+
 Then you can run the following code:
 
 ```python
@@ -366,7 +366,6 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gra
 - [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure` jar.
 - `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
 
-
 Please choose the correct jar according to your environment.
 
 :::note
@@ -412,7 +411,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-azure-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath. 
+For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-azure-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath.
 
 3. Run the following command to access the fileset:
 
@@ -452,7 +451,6 @@ options = {
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 fs.ls("gvfs://fileset/{adls_catalog}/{adls_schema}/{adls_fileset}/")
 ```
-
 
 ### Using fileset with pandas
 
@@ -539,4 +537,3 @@ spark = SparkSession.builder
 ```
 
 Python client and Hadoop command are similar to the above examples.
-
