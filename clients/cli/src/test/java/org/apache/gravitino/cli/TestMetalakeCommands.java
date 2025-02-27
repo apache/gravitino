@@ -21,13 +21,11 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,16 +39,15 @@ import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
+import org.apache.gravitino.cli.commands.ManageMetalake;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
-import org.apache.gravitino.cli.commands.MetalakeDisable;
-import org.apache.gravitino.cli.commands.MetalakeEnable;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -374,7 +371,7 @@ class TestMetalakeCommands {
 
   @Test
   void testEnableMetalakeCommand() {
-    MetalakeEnable mockEnable = mock(MetalakeEnable.class);
+    ManageMetalake mockEnable = mock(ManageMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.ENABLE)).thenReturn(true);
@@ -384,7 +381,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
     doReturn(mockEnable)
         .when(commandLine)
-        .newMetalakeEnable(any(CommandContext.class), eq("metalake_demo"), eq(false));
+        .newManageMetalake(any(CommandContext.class), eq("metalake_demo"));
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -392,7 +389,7 @@ class TestMetalakeCommands {
 
   @Test
   void testEnableMetalakeCommandWithRecursive() {
-    MetalakeEnable mockEnable = mock(MetalakeEnable.class);
+    ManageMetalake mockEnable = mock(ManageMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.ALL)).thenReturn(true);
@@ -403,7 +400,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
     doReturn(mockEnable)
         .when(commandLine)
-        .newMetalakeEnable(any(CommandContext.class), eq("metalake_demo"), eq(true));
+        .newManageMetalake(any(CommandContext.class), eq("metalake_demo"));
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -411,7 +408,7 @@ class TestMetalakeCommands {
 
   @Test
   void testDisableMetalakeCommand() {
-    MetalakeDisable mockDisable = mock(MetalakeDisable.class);
+    ManageMetalake mockDisable = mock(ManageMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.DISABLE)).thenReturn(true);
@@ -422,7 +419,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
     doReturn(mockDisable)
         .when(commandLine)
-        .newMetalakeDisable(any(CommandContext.class), eq("metalake_demo"));
+        .newManageMetalake(any(CommandContext.class), eq("metalake_demo"));
     doReturn(mockDisable).when(mockDisable).validate();
     commandLine.handleCommandLine();
     verify(mockDisable).handle();
@@ -442,11 +439,8 @@ class TestMetalakeCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.UPDATE));
 
-    Assert.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
-    verify(commandLine, never())
-        .newMetalakeEnable(any(CommandContext.class), eq("metalake_demo"), eq(false));
-    verify(commandLine, never())
-        .newMetalakeEnable(any(CommandContext.class), eq("metalake_demo"), eq(false));
-    assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
+    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    String errorOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(ErrorMessages.INVALID_ENABLE_DISABLE, errorOutput);
   }
 }
