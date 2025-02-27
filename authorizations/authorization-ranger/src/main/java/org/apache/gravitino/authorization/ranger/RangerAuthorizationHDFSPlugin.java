@@ -280,8 +280,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         authzMetadataObject.type() == SCHEMA, "The metadata object type must be a schema");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1,
-        "The metadata object's size must be 1.");
+        authzMetadataObject.names().size() == 1, "The metadata object's size must be 1.");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Remove all schema in this catalog
       String catalogName = authzMetadataObject.names().get(0);
