@@ -21,9 +21,7 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -41,17 +39,17 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
-import org.apache.gravitino.cli.commands.CatalogDisable;
-import org.apache.gravitino.cli.commands.CatalogEnable;
 import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
+import org.apache.gravitino.cli.commands.ManageCatalog;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -419,7 +417,7 @@ class TestCatalogCommands {
 
   @Test
   void testEnableCatalogCommand() {
-    CatalogEnable mockEnable = mock(CatalogEnable.class);
+    ManageCatalog mockEnable = mock(ManageCatalog.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -432,8 +430,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
     doReturn(mockEnable)
         .when(commandLine)
-        .newCatalogEnable(
-            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), anyBoolean());
+        .newManageCatalog(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -441,7 +438,7 @@ class TestCatalogCommands {
 
   @Test
   void testEnableCatalogCommandWithRecursive() {
-    CatalogEnable mockEnable = mock(CatalogEnable.class);
+    ManageCatalog mockEnable = mock(ManageCatalog.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -455,8 +452,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
     doReturn(mockEnable)
         .when(commandLine)
-        .newCatalogEnable(
-            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), anyBoolean());
+        .newManageCatalog(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockEnable).when(mockEnable).validate();
     commandLine.handleCommandLine();
     verify(mockEnable).handle();
@@ -464,7 +460,7 @@ class TestCatalogCommands {
 
   @Test
   void testDisableCatalogCommand() {
-    CatalogDisable mockDisable = mock(CatalogDisable.class);
+    ManageCatalog mockDisable = mock(ManageCatalog.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
@@ -477,7 +473,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
     doReturn(mockDisable)
         .when(commandLine)
-        .newCatalogDisable(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
+        .newManageCatalog(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
     doReturn(mockDisable).when(mockDisable).validate();
     commandLine.handleCommandLine();
     verify(mockDisable).handle();
@@ -500,11 +496,7 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.UPDATE));
 
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
-    verify(commandLine, never())
-        .newCatalogEnable(
-            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), anyBoolean());
-    verify(commandLine, never())
-        .newCatalogDisable(any(CommandContext.class), eq("metalake_demo"), eq("catalog"));
-    assertTrue(errContent.toString().contains(ErrorMessages.INVALID_ENABLE_DISABLE));
+    String errorOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(ErrorMessages.INVALID_ENABLE_DISABLE, errorOutput);
   }
 }
