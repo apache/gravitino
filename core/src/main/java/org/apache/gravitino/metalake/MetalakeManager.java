@@ -235,7 +235,7 @@ public class MetalakeManager implements MetalakeDispatcher {
 
     try {
       store.put(metalake, false /* overwritten */);
-      METALAKE_CACHE.put(ident, metalake);
+      METALAKE_CACHE.put(ident, newMetalakeWithResolvedProperties(metalake));
       return metalake;
     } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
       LOG.warn("Metalake {} already exists", ident, e);
