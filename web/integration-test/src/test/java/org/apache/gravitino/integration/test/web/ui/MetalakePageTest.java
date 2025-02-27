@@ -104,7 +104,7 @@ public class MetalakePageTest extends BaseWebIT {
 
     for (int i = 0; i < twoPagesCount; i++) {
       try {
-        Thread.sleep(ACTION_SLEEP_MILLIS);
+        Thread.sleep(ACTION_SLEEP * 1000);
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
       }
