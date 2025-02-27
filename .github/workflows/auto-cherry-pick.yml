@@ -13,7 +13,7 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-0.7') && github.event.pull_request.merged == true }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Cherry pick into branch-0.7
@@ -31,7 +31,7 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-0.8') && github.event.pull_request.merged == true }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Cherry pick into branch-0.8
