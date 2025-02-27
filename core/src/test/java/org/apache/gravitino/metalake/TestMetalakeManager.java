@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.metalake;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -193,6 +194,61 @@ public class TestMetalakeManager {
     NameIdentifier ident1 = NameIdentifier.of("test42");
     boolean dropped1 = metalakeManager.dropMetalake(ident1);
     Assertions.assertFalse(dropped1, "metalake should be non-existent");
+  }
+
+  @Test
+  public void testMetalakeCache() {
+    NameIdentifier ident = NameIdentifier.of("test51");
+    Map<String, String> props = ImmutableMap.of("key1", "value1");
+    BaseMetalake metalake = metalakeManager.createMetalake(ident, "comment", props);
+    Assertions.assertEquals("test51", metalake.name());
+    Assertions.assertEquals("comment", metalake.comment());
+
+    Cache<NameIdentifier, BaseMetalake> cache = MetalakeManager.METALAKE_CACHE;
+
+    BaseMetalake baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNotNull(baseMetalake);
+    Assertions.assertEquals("test51", baseMetalake.name());
+    Assertions.assertEquals("comment", baseMetalake.comment());
+
+    metalakeManager.disableMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
+    metalakeManager.dropMetalake(ident);
+
+    metalakeManager.createMetalake(ident, "comment", props);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNotNull(baseMetalake);
+
+    metalakeManager.disableMetalake(ident);
+    metalakeManager.dropMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
+
+    metalakeManager.createMetalake(ident, "comment", props);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNotNull(baseMetalake);
+    metalakeManager.disableMetalake(ident);
+    metalakeManager.dropMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
+
+    metalakeManager.createMetalake(ident, "comment", props);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNotNull(baseMetalake);
+    metalakeManager.disableMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
+    metalakeManager.enableMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
+
+    metalakeManager.loadMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNotNull(baseMetalake);
+    metalakeManager.disableMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

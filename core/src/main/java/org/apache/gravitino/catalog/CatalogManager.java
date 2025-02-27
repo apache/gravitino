@@ -260,7 +260,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final Config config;
 
-  @VisibleForTesting final Cache<NameIdentifier, CatalogWrapper> catalogCache;
+  @VisibleForTesting static Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
   private final EntityStore store;
 
@@ -279,7 +279,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.idGenerator = idGenerator;
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
-    this.catalogCache =
+    catalogCache =
         Caffeine.newBuilder()
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
@@ -791,12 +791,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
     try {
-      CatalogEntity catalogEntity =
-          store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);
+      CatalogWrapper wrapper = catalogCache.getIfPresent(catalogIdent);
+      CatalogEntity catalogEntity;
+      if (wrapper != null) {
+        catalogEntity = wrapper.catalog.entity();
+      } else {
+        catalogEntity = store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);
+      }
+
       return (boolean)
           BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
               catalogEntity.getProperties(), PROPERTY_IN_USE);
-
     } catch (NoSuchEntityException e) {
       LOG.warn("Catalog {} does not exist", catalogIdent, e);
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, catalogIdent);
