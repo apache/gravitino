@@ -149,7 +149,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("Whether to use path style access for S3")
           .version(ConfigConstants.VERSION_0_9_0)
           .booleanConf()
-          .createWithDefault(true);
+          .createWithDefault(false);
 
   public static final ConfigEntry<String> OSS_ENDPOINT =
       new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ENDPOINT)
