@@ -27,7 +27,7 @@
     "@mui/x-data-grid": "^6.20.3",
     "@mui/x-tree-view": "^6.17.0",
     "@reduxjs/toolkit": "^1.9.7",
-    "antd": "^5.19.0",
+    "antd": "^5.24.2",
     "axios": "^1.7.4",
     "chroma-js": "^2.4.2",
     "clsx": "^2.1.1",
