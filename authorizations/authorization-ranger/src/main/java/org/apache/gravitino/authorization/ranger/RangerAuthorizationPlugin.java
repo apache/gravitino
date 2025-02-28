@@ -273,7 +273,7 @@ public abstract class RangerAuthorizationPlugin
       rangerClient.deleteRole(
           rangerHelper.generateGravitinoRoleName(role.name()), rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
-      if (e.getMessage().contains("No RangerRole found for name")) {
+      if (rangerHelper.getRangerRole(role.name()) == null) {
         // Ignore exception to support idempotent operation
         LOG.info("Ranger delete role: {} failed!", role, e);
       } else {

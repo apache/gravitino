@@ -275,6 +275,22 @@ public class RangerHelper {
     }
 
     RangerRole rangerRole = null;
+    rangerRole = getRangerRole(roleName, rangerRole);
+
+    try {
+      if (rangerRole == null) {
+        rangerRole = new RangerRole(roleName, RangerHelper.MANAGED_BY_GRAVITINO, null, null, null);
+        rangerClient.createRole(rangerServiceName, rangerRole);
+      }
+    } catch (RangerServiceException e) {
+      throw new AuthorizationPluginException(
+          e, "Failed to create the role(%s) in the Ranger", roleName);
+    }
+    return rangerRole;
+  }
+
+  public RangerRole getRangerRole(String roleName) {
+    RangerRole rangerRole;
     try {
       rangerRole = rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
@@ -288,16 +304,6 @@ public class RangerHelper {
             "Failed to check role(%s) whether exists in the Ranger! e: %s",
             roleName, e.getMessage());
       }
-    }
-
-    try {
-      if (rangerRole == null) {
-        rangerRole = new RangerRole(roleName, RangerHelper.MANAGED_BY_GRAVITINO, null, null, null);
-        rangerClient.createRole(rangerServiceName, rangerRole);
-      }
-    } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(
-          e, "Failed to create the role(%s) in the Ranger", roleName);
     }
     return rangerRole;
   }
