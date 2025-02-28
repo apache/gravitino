@@ -84,6 +84,7 @@ public class EntityCombinedTopic implements Topic {
   public Map<String, String> properties() {
     return topic.properties().entrySet().stream()
         .filter(p -> !hiddenProperties.contains(p.getKey()))
+        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
