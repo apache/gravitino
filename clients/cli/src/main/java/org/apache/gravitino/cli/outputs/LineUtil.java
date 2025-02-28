@@ -20,7 +20,12 @@
 package org.apache.gravitino.cli.outputs;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.regex.Pattern;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.types.Type;
 
 public class LineUtil {
   // This expression is primarily used to match characters that have a display width of
@@ -28,6 +33,8 @@ public class LineUtil {
   private static final Pattern FULL_WIDTH_PATTERN =
       Pattern.compile(
           "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
+  public static final String EMPTY_DEFAULT_VALUE = "";
+  public static final String EMPTY_STRING_TYPE_DEFAULT_VALUE = "''";
 
   /**
    * Get the display width of a string.
@@ -99,5 +106,89 @@ public class LineUtil {
         return new String(newCodePoints, 0, outOffset);
       }
     }
+  }
+
+  /**
+   * Get the default value of a column. if the column has a default value, return it as a string. if
+   * the column does not set a default value, return {@link #EMPTY_DEFAULT_VALUE}. if the column is
+   * of string type and the default value is an empty string, return {@link
+   * #EMPTY_STRING_TYPE_DEFAULT_VALUE}
+   *
+   * @param column the column to get.
+   * @return the default value as a string.
+   */
+  public static String getDefaultValue(org.apache.gravitino.rel.Column column) {
+    Expression defaultValue = column.defaultValue();
+    if (defaultValue == null
+        || defaultValue == org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET) {
+      return EMPTY_DEFAULT_VALUE;
+    }
+
+    if (defaultValue instanceof Literal && ((Literal<?>) defaultValue).value() != null) {
+      String defaultValueStr = ((Literal<?>) defaultValue).value().toString().trim();
+      if ("".equalsIgnoreCase(defaultValueStr) && isStringType(column)) {
+        return EMPTY_STRING_TYPE_DEFAULT_VALUE;
+      }
+      return defaultValueStr;
+    } else if (defaultValue instanceof FunctionExpression) {
+      return defaultValue.toString();
+    } else if (defaultValue.references().length == 0) {
+      return EMPTY_DEFAULT_VALUE;
+    }
+
+    return Arrays.toString(defaultValue.references());
+  }
+
+  /**
+   * If the column is of integer type, return whether it is auto-incremented, otherwise return an
+   * empty string.
+   *
+   * @param column the column to check.
+   * @return if the column is of integer type and auto-incremented, return "true", otherwise return
+   *     an empty string.
+   */
+  public static String getAutoIncrement(org.apache.gravitino.rel.Column column) {
+    if (isIntegerType(column)) {
+      return column.autoIncrement() ? "true" : "false";
+    }
+
+    return "";
+  }
+
+  /**
+   * Check if a column is of integer type.
+   *
+   * @param column the column to check.
+   * @return true if the column is of integer type, false otherwise.
+   */
+  public static boolean isIntegerType(org.apache.gravitino.rel.Column column) {
+    Type.Name columnTypeName = column.dataType().name();
+    return columnTypeName == Type.Name.LONG
+        || columnTypeName == Type.Name.INTEGER
+        || columnTypeName == Type.Name.SHORT
+        || columnTypeName == Type.Name.BYTE;
+  }
+
+  /**
+   * Check if a column is of string type.
+   *
+   * @param column the column to check.
+   * @return true if the column is of string type, false otherwise.
+   */
+  public static boolean isStringType(org.apache.gravitino.rel.Column column) {
+    Type.Name columnTypeName = column.dataType().name();
+    return columnTypeName == Type.Name.STRING
+        || columnTypeName == Type.Name.VARCHAR
+        || columnTypeName == Type.Name.FIXEDCHAR;
+  }
+
+  /**
+   * Get the comment of a column. If the column does not have a comment, return "N/A".
+   *
+   * @param column the column to get.
+   * @return the comment of the column.
+   */
+  public static String getComment(org.apache.gravitino.rel.Column column) {
+    return column.comment() == null ? "N/A" : column.comment();
   }
 }

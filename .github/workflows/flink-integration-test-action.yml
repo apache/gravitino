@@ -21,7 +21,7 @@ jobs:
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
@@ -30,7 +30,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Check required command
         run: |
