@@ -17,17 +17,24 @@
  * under the License.
  */
 
-package org.apache.gravitino.metrics;
+package org.apache.gravitino.metrics.source;
 
-public class MetricNames {
-  public static final String HTTP_PROCESS_DURATION = "http-request-duration-seconds";
-  public static final String SERVER_IDLE_THREAD_NUM = "http-server.idle-thread.num";
-  public static final String ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS =
-      "entity-store.relation-datasource.active-connections";
-  public static final String ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS =
-      "entity-store.relation-datasource.idle-connections";
-  public static final String ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS =
-      "entity-store.relation-datasource.max-connections";
+import com.codahale.metrics.Gauge;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.gravitino.metrics.MetricNames;
 
-  private MetricNames() {}
+public class RelationDatasourceMetricsSource extends MetricsSource {
+
+  public RelationDatasourceMetricsSource(BasicDataSource dataSource) {
+    super(MetricsSource.GRAVITINO_SERVER_METRIC_NAME);
+    registerGauge(
+        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
+        (Gauge<Integer>) dataSource::getNumActive);
+    registerGauge(
+        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
+        (Gauge<Integer>) dataSource::getNumIdle);
+    registerGauge(
+        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
+        (Gauge<Integer>) dataSource::getMaxTotal);
+  }
 }
