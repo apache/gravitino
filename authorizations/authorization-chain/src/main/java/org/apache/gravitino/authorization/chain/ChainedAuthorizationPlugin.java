@@ -63,6 +63,16 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
               Map<String, String> pluginConfig =
                   chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
 
+              for (Map.Entry<String, String> entry : properties.entrySet()) {
+                if (!entry
+                    .getKey()
+                    .startsWith(ChainedAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY)) {
+                  pluginConfig.put(entry.getKey(), entry.getValue());
+                }
+              }
+              pluginConfig.put(
+                  BaseAuthorization.UUID, pluginConfig.get(BaseAuthorization.UUID) + pluginName);
+
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
               BaseAuthorization.buildAuthorizationPkgPath(
                       ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, authzProvider))

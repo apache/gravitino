@@ -52,6 +52,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.ranger.RangerServiceException;
@@ -678,5 +679,58 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       }
     }
     return Boolean.TRUE;
+  }
+
+  @Override
+  protected String getServiceType() {
+    return "hdfs";
+  }
+
+  @Override
+  protected Map<String, String> getServiceConfigs(Map<String, String> config) {
+    String usernameKey = "username";
+    String usernameVal = "admin";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey)) {
+      usernameVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey);
+    }
+
+    String passwordKey = "password";
+    String passwordVal = "admin";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordKey)) {
+      passwordVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordKey);
+    }
+
+    String authenticationKey = "hadoop.security.authentication";
+    String authenticationVal = "simple";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey)) {
+      authenticationVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey);
+    }
+
+    String protectionKey = "hadoop.rpc.protection";
+    String protectionVal = "authentication";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + protectionKey)) {
+      protectionVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + protectionKey);
+    }
+
+    String authorizationKey = "hadoop.security.authorization";
+    String authorizationVal = "false";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey)) {
+      authorizationVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey);
+    }
+
+    String fsDefaultNameKey = "fs.default.name";
+    String fsDefaultNameVal = "hdfs://127.0.0.1:8090";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + fsDefaultNameKey)) {
+      fsDefaultNameVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + fsDefaultNameKey);
+    }
+
+    return ImmutableMap.<String, String>builder()
+        .put(usernameKey, usernameVal)
+        .put(passwordKey, passwordVal)
+        .put(authenticationKey, authenticationVal)
+        .put(protectionKey, protectionVal)
+        .put(authorizationKey, authorizationVal)
+        .put(fsDefaultNameKey, fsDefaultNameVal)
+        .build();
   }
 }

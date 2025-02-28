@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -49,6 +50,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -56,6 +58,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.ranger.plugin.util.GrantRevokeRoleRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,9 +94,42 @@ public abstract class RangerAuthorizationPlugin
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
-    rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
+
+    String serviceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
+    if (Boolean.parseBoolean(
+        config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))) {
+      if (serviceName == null) {
+        serviceName = config.get(BaseAuthorization.UUID);
+      }
+
+      try {
+        rangerClient.getService(serviceName);
+      } catch (RangerServiceException rse) {
+        if (rse.getStatus().equals(ClientResponse.Status.NOT_FOUND)) {
+          try {
+            RangerService rangerService = new RangerService();
+            rangerService.setType(getServiceType());
+            rangerService.setName(serviceName);
+            rangerService.setConfigs(getServiceConfigs(config));
+            rangerClient.createService(rangerService);
+            List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
+            for (RangerPolicy policy : policies) {
+              rangerClient.deletePolicy(policy.getId());
+            }
+          } catch (RangerServiceException crse) {
+            throw new AuthorizationPluginException(
+                "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
+          }
+        } else {
+          throw new AuthorizationPluginException(
+              "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
+        }
+      }
+    }
+
+    rangerServiceName = serviceName;
     rangerHelper =
         new RangerHelper(
             rangerClient,
@@ -935,8 +971,19 @@ public abstract class RangerAuthorizationPlugin
     }
   }
 
+  protected abstract String getServiceType();
+
+  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
+
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    try {
+      rangerClient.deleteService(rangerServiceName);
+    } catch (RangerServiceException rse) {
+      throw new AuthorizationPluginException(
+          "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());
+    }
+  }
 
   /** Generate authorization securable object */
   public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(

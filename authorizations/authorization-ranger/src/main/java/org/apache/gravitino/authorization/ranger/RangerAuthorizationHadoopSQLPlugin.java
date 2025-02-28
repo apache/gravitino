@@ -47,6 +47,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -799,5 +800,44 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
       }
     }
     return Boolean.TRUE;
+  }
+
+  @Override
+  protected String getServiceType() {
+    return "hive";
+  }
+
+  @Override
+  protected Map<String, String> getServiceConfigs(Map<String, String> config) {
+    String usernameKey = "username";
+    String usernameVal = "admin";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey)) {
+      usernameVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey);
+    }
+
+    String passwordKey = "password";
+    String passwordVal = "admin";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordKey)) {
+      passwordVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordVal);
+    }
+
+    String jdbcKey = "jdbc.driverClassName";
+    String jdbcVal = "org.apache.hive.jdbc.HiveDriver";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcKey)) {
+      jdbcVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcKey);
+    }
+
+    String jdbcUrlKey = "jdbc.url";
+    String jdbcUrlVal = "jdbc:hive2://127.0.0.1:8081";
+    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcUrlKey)) {
+      jdbcUrlVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcUrlKey);
+    }
+
+    return ImmutableMap.<String, String>builder()
+        .put(usernameKey, usernameVal)
+        .put(passwordKey, passwordVal)
+        .put(jdbcKey, jdbcVal)
+        .put(jdbcUrlKey, jdbcUrlVal)
+        .build();
   }
 }

@@ -45,6 +45,9 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 public abstract class BaseAuthorization<T extends BaseAuthorization>
     implements AuthorizationProvider, Closeable {
 
+  /** UUID represents */
+  public static final String UUID = "authorization.plugin.uuid";
+
   /**
    * Creates a new instance of AuthorizationPlugin. <br>
    * The child class should implement this method to provide a specific AuthorizationPlugin instance
