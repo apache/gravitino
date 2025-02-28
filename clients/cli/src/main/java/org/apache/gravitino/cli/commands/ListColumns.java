@@ -72,23 +72,31 @@ public class ListColumns extends TableCommand {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
+StringBuilder all = new StringBuilder();
+all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
 
-    for (Column column : columns) {
-      if (column == null) continue; // Skip any unexpected null columns
+for (Column column : columns) {
+  if (column == null) continue; // Skip any unexpected null columns
 
-      String name = column.name();
-        String dataType = column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN";
-        String comment = column.comment() != null ? column.comment() : "N/A";
-        String nullable = column.nullable() ? "true" : "false";
-        String autoIncrement = column.autoIncrement() ? "true" : "false";
+  String name = column.name();
+  String dataType = column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN";
+  String comment = column.comment() != null ? column.comment() : "N/A";
+  String nullable = column.nullable() ? "true" : "false";
+  String autoIncrement = column.autoIncrement() ? "true" : "false";
 
-        all.append(
-            name + "," + dataType + "," + comment + "," + nullable + "," + autoIncrement
-        ).append(System.lineSeparator());
-    }
+  all.append(name)
+      .append(",")
+      .append(dataType)
+      .append(",")
+      .append(comment)
+      .append(",")
+      .append(nullable)
+      .append(",")
+      .append(autoIncrement)
+      .append(System.lineSeparator());
+  }
 
-    printResults(all.toString());
+  printResults(all.toString());
+
   }
 }

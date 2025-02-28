@@ -159,19 +159,8 @@ public class MetalakeCommandHandler extends CommandHandler {
 
   /** Handles the "UPDATE" command. */
   private void handleUpdateCommand() {
-    if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
-      System.err.println(ErrorMessages.INVALID_ENABLE_DISABLE);
-      Main.exit(-1);
-    }
-    if (line.hasOption(GravitinoOptions.ENABLE)) {
-      boolean enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
-      gravitinoCommandLine
-          .newMetalakeEnable(context, metalake, enableAllCatalogs)
-          .validate()
-          .handle();
-    }
-    if (line.hasOption(GravitinoOptions.DISABLE)) {
-      gravitinoCommandLine.newMetalakeDisable(context, metalake).validate().handle();
+    if (line.hasOption(GravitinoOptions.ENABLE) || line.hasOption(GravitinoOptions.DISABLE)) {
+      gravitinoCommandLine.newManageMetalake(context, metalake).validate().handle();
     }
 
     if (line.hasOption(GravitinoOptions.COMMENT)) {

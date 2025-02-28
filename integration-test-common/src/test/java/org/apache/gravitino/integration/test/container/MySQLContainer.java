@@ -119,6 +119,14 @@ public class MySQLContainer extends BaseContainer {
         StringUtils.substring(
             getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
 
+    // Fix https://github.com/apache/gravitino/issues/6392, MYSQL JDBC driver may not load
+    // automatically.
+    try {
+      Class.forName("com.mysql.jdbc.Driver");
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to load MySQL JDBC driver", e);
+    }
+
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
             DriverManager.getConnection(mySQLJdbcUrl, USER_NAME, getPassword());
