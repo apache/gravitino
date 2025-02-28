@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
+import org.apache.gravitino.storage.relational.helper.SchemaIds;
 
 /** The service class for common metadata operations. */
 public class CommonMetaService {
@@ -36,22 +38,27 @@ public class CommonMetaService {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
+
     Long parentEntityId = null;
-    if (namespace.levels().length >= 1) {
+    if (namespace.levels().length == 1) {
       parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
     }
 
-    if (namespace.levels().length >= 2) {
+    if (namespace.levels().length == 2) {
       parentEntityId =
           CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeIdAndName(parentEntityId, namespace.level(1));
+              .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1))
+              .getCatalogId();
     }
 
-    if (namespace.levels().length >= 3) {
+    if (namespace.levels().length == 3) {
       parentEntityId =
           SchemaMetaService.getInstance()
-              .getSchemaIdByCatalogIdAndName(parentEntityId, namespace.level(2));
+              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                  namespace.level(0), namespace.level(1), namespace.level(2))
+              .getSchemaId();
     }
+
     Preconditions.checkState(
         parentEntityId != null && parentEntityId > 0,
         "Parent entity id should not be null and should be greater than 0.");
@@ -63,21 +70,24 @@ public class CommonMetaService {
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
     Long[] parentEntityIds = new Long[namespace.levels().length];
-    if (namespace.levels().length >= 1) {
+
+    if (namespace.levels().length == 1) {
       parentEntityIds[0] =
           MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
-    }
-
-    if (namespace.levels().length >= 2) {
-      parentEntityIds[1] =
+    } else if (namespace.levels().length == 2) {
+      CatalogIds catalogIds =
           CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeIdAndName(parentEntityIds[0], namespace.level(1));
-    }
-
-    if (namespace.levels().length >= 3) {
-      parentEntityIds[2] =
+              .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
+      parentEntityIds[0] = catalogIds.getMetalakeId();
+      parentEntityIds[1] = catalogIds.getCatalogId();
+    } else if (namespace.levels().length == 3) {
+      SchemaIds schemaIds =
           SchemaMetaService.getInstance()
-              .getSchemaIdByCatalogIdAndName(parentEntityIds[1], namespace.level(2));
+              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                  namespace.level(0), namespace.level(1), namespace.level(2));
+      parentEntityIds[0] = schemaIds.getMetalakeId();
+      parentEntityIds[1] = schemaIds.getCatalogId();
+      parentEntityIds[2] = schemaIds.getSchemaId();
     }
 
     return parentEntityIds;
