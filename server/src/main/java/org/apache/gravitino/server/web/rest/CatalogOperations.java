@@ -51,8 +51,6 @@ import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -93,23 +91,17 @@ public class CatalogOperations {
           () -> {
             Namespace catalogNS = NamespaceUtil.ofCatalog(metalake);
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
-            return TreeLockUtils.doWithTreeLock(
-                NameIdentifier.of(metalake),
-                LockType.READ,
-                () -> {
-                  if (verbose) {
-                    Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
-                    Response response =
-                        Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
-                    LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
-                    return response;
-                  } else {
-                    NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
-                    Response response = Utils.ok(new EntityListResponse(idents));
-                    LOG.info("List {} catalogs under metalake: {}", idents.length, metalake);
-                    return response;
-                  }
-                });
+            if (verbose) {
+              Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
+              Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
+              LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
+              return response;
+            } else {
+              NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
+              Response response = Utils.ok(new EntityListResponse(idents));
+              LOG.info("List {} catalogs under metalake: {}", idents.length, metalake);
+              return response;
+            }
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(OperationType.LIST, "", metalake, e);
@@ -130,16 +122,12 @@ public class CatalogOperations {
             request.validate();
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, request.getName());
             Catalog catalog =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofMetalake(metalake),
-                    LockType.WRITE,
-                    () ->
-                        catalogDispatcher.createCatalog(
-                            ident,
-                            request.getType(),
-                            request.getProvider(),
-                            request.getComment(),
-                            request.getProperties()));
+                catalogDispatcher.createCatalog(
+                    ident,
+                    request.getType(),
+                    request.getProvider(),
+                    request.getComment(),
+                    request.getProperties());
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;
@@ -165,18 +153,12 @@ public class CatalogOperations {
           () -> {
             request.validate();
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, request.getName());
-            TreeLockUtils.doWithTreeLock(
-                NameIdentifierUtil.ofMetalake(metalake),
-                LockType.READ,
-                () -> {
-                  catalogDispatcher.testConnection(
-                      ident,
-                      request.getType(),
-                      request.getProvider(),
-                      request.getComment(),
-                      request.getProperties());
-                  return null;
-                });
+            catalogDispatcher.testConnection(
+                ident,
+                request.getType(),
+                request.getProvider(),
+                request.getComment(),
+                request.getProperties());
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully test connection for catalog: {}.{}", metalake, request.getName());
@@ -204,17 +186,12 @@ public class CatalogOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
-            TreeLockUtils.doWithTreeLock(
-                NameIdentifierUtil.ofMetalake(metalake),
-                LockType.WRITE,
-                () -> {
-                  if (request.isInUse()) {
-                    catalogDispatcher.enableCatalog(ident);
-                  } else {
-                    catalogDispatcher.disableCatalog(ident);
-                  }
-                  return null;
-                });
+            if (request.isInUse()) {
+              catalogDispatcher.enableCatalog(ident);
+            } else {
+              catalogDispatcher.disableCatalog(ident);
+            }
+
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} catalog: {}.{}",
@@ -245,9 +222,7 @@ public class CatalogOperations {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-      Catalog catalog =
-          TreeLockUtils.doWithTreeLock(
-              ident, LockType.READ, () -> catalogDispatcher.loadCatalog(ident));
+      Catalog catalog = catalogDispatcher.loadCatalog(ident);
       Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
       LOG.info("Catalog loaded: {}.{}", metalakeName, catalogName);
       return response;
@@ -278,11 +253,7 @@ public class CatalogOperations {
                 request.getUpdates().stream()
                     .map(CatalogUpdateRequest::catalogChange)
                     .toArray(CatalogChange[]::new);
-            Catalog catalog =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofMetalake(metalakeName),
-                    LockType.WRITE,
-                    () -> catalogDispatcher.alterCatalog(ident, changes));
+            Catalog catalog = catalogDispatcher.alterCatalog(ident, changes);
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog altered: {}.{}", metalakeName, catalog.name());
             return response;
@@ -309,11 +280,7 @@ public class CatalogOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-            boolean dropped =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofMetalake(metalakeName),
-                    LockType.WRITE,
-                    () -> catalogDispatcher.dropCatalog(ident, force));
+            boolean dropped = catalogDispatcher.dropCatalog(ident, force);
             if (!dropped) {
               LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
             }

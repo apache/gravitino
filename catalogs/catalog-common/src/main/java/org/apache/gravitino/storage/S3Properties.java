@@ -40,5 +40,8 @@ public class S3Properties {
   // The S3 credentials provider class name.
   public static final String GRAVITINO_S3_CREDS_PROVIDER = "s3-creds-provider";
 
+  // The S3 path style access flag.
+  public static final String GRAVITINO_S3_PATH_STYLE_ACCESS = "s3-path-style-access";
+
   private S3Properties() {}
 }

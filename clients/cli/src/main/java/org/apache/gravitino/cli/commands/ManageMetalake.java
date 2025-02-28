@@ -20,34 +20,56 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Arrays;
+import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Enable metalake. */
-public class MetalakeEnable extends Command {
-
+/** Disable or enable metalake. */
+public class ManageMetalake extends Command {
   private final String metalake;
+  private final CommandLine line;
   private Boolean enableAllCatalogs;
 
   /**
-   * Enable a metalake
+   * Construct a new instance of the {@code ManageMetalake}.
    *
-   * @param context The command context.
-   * @param metalake The name of the metalake.
-   * @param enableAllCatalogs Whether to enable all catalogs.
+   * @param context the command context.
+   * @param metalake the name of the metalake.
    */
-  public MetalakeEnable(CommandContext context, String metalake, boolean enableAllCatalogs) {
+  public ManageMetalake(CommandContext context, String metalake) {
     super(context);
     this.metalake = metalake;
-    this.enableAllCatalogs = enableAllCatalogs;
+    this.line = context.line();
+
+    this.enableAllCatalogs = line.hasOption(GravitinoOptions.ALL);
   }
 
-  /** Enable metalake. */
+  /** Disable or enable the metalake. */
   @Override
   public void handle() {
+    if (line.hasOption(GravitinoOptions.ENABLE)) {
+      enableMetalake();
+    } else if (line.hasOption(GravitinoOptions.DISABLE)) {
+      disableMetalake();
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Command validate() {
+    if (line.hasOption(GravitinoOptions.ENABLE) && line.hasOption(GravitinoOptions.DISABLE)) {
+      exitWithError(ErrorMessages.INVALID_ENABLE_DISABLE);
+    }
+
+    return super.validate();
+  }
+
+  /** Enable the metalake. */
+  private void enableMetalake() {
     StringBuilder msgBuilder = new StringBuilder(metalake);
     try {
       GravitinoAdminClient client = buildAdminClient();
@@ -67,5 +89,19 @@ public class MetalakeEnable extends Command {
     }
 
     printInformation(msgBuilder.toString());
+  }
+
+  /** Disable the metalake. */
+  private void disableMetalake() {
+    try {
+      GravitinoAdminClient client = buildAdminClient();
+      client.disableMetalake(metalake);
+    } catch (NoSuchMetalakeException err) {
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (Exception exp) {
+      exitWithError(exp.getMessage());
+    }
+
+    printInformation(metalake + " has been disabled.");
   }
 }
