@@ -60,12 +60,12 @@ public class OwnerManager {
 
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
+
+    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     try {
       Optional<Owner> originOwner = getOwner(metalake, metadataObject);
 
-      NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       OwnerImpl newOwner = new OwnerImpl();
-
       if (ownerType == Owner.Type.USER) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
@@ -129,16 +129,20 @@ public class OwnerManager {
   }
 
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    OwnerImpl owner = new OwnerImpl();
     try {
-      OwnerImpl owner = new OwnerImpl();
-      NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       List<? extends Entity> entities =
-          store
-              .relationOperations()
-              .listEntitiesByRelation(
-                  SupportsRelationOperations.Type.OWNER_REL,
-                  ident,
-                  MetadataObjectUtil.toEntityType(metadataObject));
+          TreeLockUtils.doWithTreeLock(
+              ident,
+              LockType.READ,
+              () ->
+                  store
+                      .relationOperations()
+                      .listEntitiesByRelation(
+                          SupportsRelationOperations.Type.OWNER_REL,
+                          ident,
+                          MetadataObjectUtil.toEntityType(metadataObject)));
 
       if (entities.isEmpty()) {
         return Optional.empty();
