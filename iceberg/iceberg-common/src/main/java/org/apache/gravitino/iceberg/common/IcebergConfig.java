@@ -144,6 +144,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<Boolean> S3_PATH_STYLE_ACCESS =
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS)
+          .doc("Whether to use path style access for S3")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .booleanConf()
+          .createWithDefault(false);
+
   public static final ConfigEntry<String> OSS_ENDPOINT =
       new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ENDPOINT)
           .doc("The endpoint of Aliyun OSS service")
