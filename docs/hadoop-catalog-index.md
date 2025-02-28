@@ -18,9 +18,9 @@ Gravitino Hadoop catalog index includes the following chapters:
 
 Apart from the above, you can also refer to the following topics to manage and access cloud storage like S3, GCS, ADLS, and OSS:
 
-- [Using Hadoop catalog to manage S3](./hadoop-catalog-with-s3.md). 
-- [Using Hadoop catalog to manage GCS](./hadoop-catalog-with-gcs.md). 
-- [Using Hadoop catalog to manage ADLS](./hadoop-catalog-with-adls.md). 
-- [Using Hadoop catalog to manage OSS](./hadoop-catalog-with-oss.md). 
+- [Using Hadoop catalog to manage S3](./hadoop-catalog-with-s3.md).
+- [Using Hadoop catalog to manage GCS](./hadoop-catalog-with-gcs.md).
+- [Using Hadoop catalog to manage ADLS](./hadoop-catalog-with-adls.md).
+- [Using Hadoop catalog to manage OSS](./hadoop-catalog-with-oss.md).
 
 More storage options will be added soon. Stay tuned!

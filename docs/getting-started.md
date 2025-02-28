@@ -8,19 +8,19 @@ There are several options for getting started with Apache Gravitino. Installing 
 
 If you want to download and install Gravitino:
 
-  - on AWS, see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services)
-  - Google Cloud Platform, see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform)
-  - locally, see [Getting started locally](#getting-started-locally)
+- on AWS, see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services)
+- Google Cloud Platform, see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform)
+- locally, see [Getting started locally](#getting-started-locally)
 
-If you have your own Apache Gravitino setup and want to use Apache Hive: 
+If you have your own Apache Gravitino setup and want to use Apache Hive:
 
-  - on AWS or Google Cloud Platform, see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform)
-  - locally, see [Installing Apache Hive locally](#installing-apache-hive-locally)
+- on AWS or Google Cloud Platform, see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform)
+- locally, see [Installing Apache Hive locally](#installing-apache-hive-locally)
 
 If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino, and others:
 
-  - on AWS or Google Cloud Platform, see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-apache-gravitino-playground-on-aws-or-google-cloud-platform)
-  - locally, see [Installing Gravitino playground locally](#installing-apache-gravitino-playground-locally)
+- on AWS or Google Cloud Platform, see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-apache-gravitino-playground-on-aws-or-google-cloud-platform)
+- locally, see [Installing Gravitino playground locally](#installing-apache-gravitino-playground-locally)
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-apache-gravitino-on-aws-externally)
 
@@ -55,7 +55,6 @@ If you are using AWS and want to access the instance remotely, be sure to read [
 
 10. **Next steps**
     - Concluding thoughts and suggested next steps for users who have completed the setup.
-
 
 ## Getting started on Amazon Web Services
 
@@ -214,7 +213,7 @@ Gravitino provides a bundle of Docker images to launch a Gravitino playground, w
 includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino. You can use
 Docker Compose to start them all.
 
-Installing Docker and Docker Compose is a requirement for using the playground. 
+Installing Docker and Docker Compose is a requirement for using the playground.
 
 ```shell
 sudo apt install docker docker-compose
@@ -317,23 +316,21 @@ After completing these steps, you should be able to access the Gravitino REST in
 
 1. **Explore documentation:**
    - Delve deeper into the Gravitino documentation for advanced features and configuration options.
-   - Check out https://gravitino.apache.org/docs/latest
+   - Check out <https://gravitino.apache.org/docs/latest>
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
-   - Check out our GitHub repository: https://github.com/apache/gravitino
-   - Check out our Slack channel in ASF Slack: https://the-asf.slack.com
-   
+   - Check out our GitHub repository: <https://github.com/apache/gravitino>
+   - Check out our Slack channel in ASF Slack: <https://the-asf.slack.com>
+
 3. **Read our blogs:**
-   - Check out: https://gravitino.apache.org/blog
+   - Check out: <https://gravitino.apache.org/blog>
 
 4. **Continuous updates:**
-   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security       
+   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security
      enhancements.
-   - Check out our Website: https://gravitino.apache.org
+   - Check out our Website: <https://gravitino.apache.org>
   
-
 This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=GettingStarted" alt="" />
-
