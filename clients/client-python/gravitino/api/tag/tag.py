@@ -104,16 +104,15 @@ class Tag(Auditable):
         """
         pass
 
-    @abstractmethod
-    def associatedObjects(self) -> AssociatedObjects:
+    def associated_objects(self) -> AssociatedObjects:
         """The associated objects of the tag.
 
         Raises:
-            UnsupportedOperationException: The associatedObjects method is not supported.
+            UnsupportedOperationException: The associated_objects method is not supported.
 
         Returns:
             AssociatedObjects: The associated objects of the tag.
         """
         raise UnsupportedOperationException(
-            "The associatedObjects method is not supported."
+            "The associated_objects method is not supported."
         )
