@@ -704,6 +704,11 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
+    try {
+      Thread.sleep(ACTION_SLEEP * 1000);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
     WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     String xpath =
         "//div[@data-refer='table-grid']"
@@ -729,6 +734,11 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyNoDataItemInList(String itemName, Boolean isColumnLevel) {
+    try {
+      Thread.sleep(ACTION_SLEEP * 1000);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
     String xpath =
         "//div[@data-refer='table-grid']"
             + "//div[contains(@class, 'MuiDataGrid-main')]"
