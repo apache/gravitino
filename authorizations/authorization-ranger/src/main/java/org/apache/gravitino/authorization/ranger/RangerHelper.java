@@ -274,8 +274,7 @@ public class RangerHelper {
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     }
 
-    RangerRole rangerRole = null;
-    rangerRole = getRangerRole(roleName);
+    RangerRole rangerRole = getRangerRole(roleName);
 
     try {
       if (rangerRole == null) {
