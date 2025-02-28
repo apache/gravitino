@@ -21,7 +21,6 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.List;
 import java.util.Map;
-
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;

@@ -74,7 +74,6 @@ public class ListTables extends TableCommand {
    * @param tableName The name of the table.
    * @return A minimal Table instance.
    */
-
   private Table createTableStub(String tableName) {
     return new Table() {
       @Override

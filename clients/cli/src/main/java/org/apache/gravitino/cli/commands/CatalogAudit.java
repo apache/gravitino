@@ -62,10 +62,10 @@ public class CatalogAudit extends AuditCommand {
       return; // Stop execution after handling error
     }
 
-     // **Null check before accessing auditInfo()**
-     if (result != null && result.auditInfo() != null) {
+    // **Null check before accessing auditInfo()**
+    if (result != null && result.auditInfo() != null) {
       displayAuditInfo(result.auditInfo());
-  } else {
+    } else {
       exitWithError("Audit information is not available for this catalog.");
     }
   }

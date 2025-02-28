@@ -21,7 +21,6 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.Collections;
 import java.util.Map;
-
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -69,9 +68,7 @@ public class ListFilesetProperties extends ListProperties {
       return;
     }
     try (GravitinoClient client = buildClient(metalake)) {
-      gFileset = client.loadCatalog(catalog)
-                        .asFilesetCatalog()
-                        .loadFileset(name);
+      gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
       return;

@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Arrays;
-
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -94,7 +93,8 @@ public class ModelDetails extends Command {
     }
 
     String basicInfo =
-        String.format("Model Name: %s, Latest Version: %s%n", gModel.name(), gModel.latestVersion());
+        String.format(
+            "Model Name: %s, Latest Version: %s%n", gModel.name(), gModel.latestVersion());
     String versionInfo = "Versions: " + Arrays.toString(versions);
     printResults(basicInfo + "versions: " + versionInfo);
   }
