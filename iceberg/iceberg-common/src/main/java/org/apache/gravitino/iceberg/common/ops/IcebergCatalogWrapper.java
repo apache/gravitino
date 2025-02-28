@@ -40,6 +40,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -215,6 +216,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadViewResponse loadView(TableIdentifier viewIdentifier) {
+    // Trino Analyzer try to get view from Iceberg catalog, return NoSuchViewException to keep
+    // the compatibility with Trino.
+    if (!(catalog instanceof ViewCatalog)) {
+      throw new NoSuchViewException("Catalog %s doesn't support view", catalog.name());
+    }
     return CatalogHandlers.loadView(getViewCatalog(), viewIdentifier);
   }
 
@@ -228,10 +234,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public boolean viewExists(TableIdentifier viewIdentifier) {
+    if (!(catalog instanceof ViewCatalog)) {
+      return false;
+    }
     return getViewCatalog().viewExists(viewIdentifier);
   }
 
   public ListTablesResponse listView(Namespace namespace) {
+    // Trino try to list Iceberg view when listing tables in some version, return empty list to
+    // avoid the unexpected exception.
+    if (!(catalog instanceof ViewCatalog)) {
+      return ListTablesResponse.builder().build();
+    }
     return CatalogHandlers.listViews(getViewCatalog(), namespace);
   }
 
