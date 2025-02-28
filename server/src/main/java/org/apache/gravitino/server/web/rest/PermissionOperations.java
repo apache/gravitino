@@ -33,7 +33,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
@@ -45,8 +44,6 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
@@ -79,22 +76,14 @@ public class PermissionOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              TreeLockUtils.doWithTreeLock(
-                  AuthorizationUtils.ofUser(metalake, user),
-                  LockType.WRITE,
-                  () ->
-                      TreeLockUtils.doWithTreeLock(
-                          NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                          LockType.READ,
-                          () -> {
-                            request.validate();
-                            return Utils.ok(
-                                new UserResponse(
-                                    DTOConverters.toDTO(
-                                        accessControlManager.grantRolesToUser(
-                                            metalake, request.getRoleNames(), user))));
-                          })));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new UserResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.grantRolesToUser(
+                            metalake, request.getRoleNames(), user))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
@@ -113,22 +102,14 @@ public class PermissionOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              TreeLockUtils.doWithTreeLock(
-                  AuthorizationUtils.ofGroup(metalake, group),
-                  LockType.WRITE,
-                  () ->
-                      TreeLockUtils.doWithTreeLock(
-                          NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                          LockType.READ,
-                          () -> {
-                            request.validate();
-                            return Utils.ok(
-                                new GroupResponse(
-                                    DTOConverters.toDTO(
-                                        accessControlManager.grantRolesToGroup(
-                                            metalake, request.getRoleNames(), group))));
-                          })));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new GroupResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.grantRolesToGroup(
+                            metalake, request.getRoleNames(), group))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), group, e);
@@ -147,22 +128,14 @@ public class PermissionOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              TreeLockUtils.doWithTreeLock(
-                  AuthorizationUtils.ofUser(metalake, user),
-                  LockType.WRITE,
-                  () ->
-                      TreeLockUtils.doWithTreeLock(
-                          NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                          LockType.READ,
-                          () -> {
-                            request.validate();
-                            return Utils.ok(
-                                new UserResponse(
-                                    DTOConverters.toDTO(
-                                        accessControlManager.revokeRolesFromUser(
-                                            metalake, request.getRoleNames(), user))));
-                          })));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new UserResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.revokeRolesFromUser(
+                            metalake, request.getRoleNames(), user))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), user, e);
@@ -181,22 +154,14 @@ public class PermissionOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              TreeLockUtils.doWithTreeLock(
-                  AuthorizationUtils.ofGroup(metalake, group),
-                  LockType.WRITE,
-                  () ->
-                      TreeLockUtils.doWithTreeLock(
-                          NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                          LockType.READ,
-                          () -> {
-                            request.validate();
-                            return Utils.ok(
-                                new GroupResponse(
-                                    DTOConverters.toDTO(
-                                        accessControlManager.revokeRolesFromGroup(
-                                            metalake, request.getRoleNames(), group))));
-                          })));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new GroupResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.revokeRolesFromGroup(
+                            metalake, request.getRoleNames(), group))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames()), group, e);
@@ -229,20 +194,16 @@ public class PermissionOperations {
             }
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            return TreeLockUtils.doWithTreeLock(
-                AuthorizationUtils.ofRole(metalake, role),
-                LockType.WRITE,
-                () ->
-                    Utils.ok(
-                        new RoleResponse(
-                            DTOConverters.toDTO(
-                                accessControlManager.grantPrivilegeToRole(
-                                    metalake,
-                                    role,
-                                    object,
-                                    privilegeGrantRequest.getPrivileges().stream()
-                                        .map(DTOConverters::fromPrivilegeDTO)
-                                        .collect(Collectors.toSet()))))));
+            return Utils.ok(
+                new RoleResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.grantPrivilegeToRole(
+                            metalake,
+                            role,
+                            object,
+                            privilegeGrantRequest.getPrivileges().stream()
+                                .map(DTOConverters::fromPrivilegeDTO)
+                                .collect(Collectors.toSet())))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
@@ -276,20 +237,16 @@ public class PermissionOperations {
             }
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            return TreeLockUtils.doWithTreeLock(
-                AuthorizationUtils.ofRole(metalake, role),
-                LockType.WRITE,
-                () ->
-                    Utils.ok(
-                        new RoleResponse(
-                            DTOConverters.toDTO(
-                                accessControlManager.revokePrivilegesFromRole(
-                                    metalake,
-                                    role,
-                                    object,
-                                    privilegeRevokeRequest.getPrivileges().stream()
-                                        .map(DTOConverters::fromPrivilegeDTO)
-                                        .collect(Collectors.toSet()))))));
+            return Utils.ok(
+                new RoleResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.revokePrivilegesFromRole(
+                            metalake,
+                            role,
+                            object,
+                            privilegeRevokeRequest.getPrivileges().stream()
+                                .map(DTOConverters::fromPrivilegeDTO)
+                                .collect(Collectors.toSet())))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
