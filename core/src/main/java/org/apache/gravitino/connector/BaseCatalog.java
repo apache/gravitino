@@ -211,11 +211,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
             // Load the authorization plugin with the class loader of the catalog.
             // Because the JDBC authorization plugin may load JDBC driver using the class loader.
+            Map<String, String> authzPluginConf = Maps.newHashMap();
+            authzPluginConf.putAll(this.conf);
+            authzPluginConf.put(BaseAuthorization.UUID, String.valueOf(entity.id()));
+
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
                         authorization.newPlugin(
-                            entity.namespace().level(0), provider(), this.conf));
+                            entity.namespace().level(0), provider(), authzPluginConf));
 
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);

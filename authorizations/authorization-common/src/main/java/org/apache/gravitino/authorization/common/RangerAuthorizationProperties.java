@@ -46,6 +46,9 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
    */
   public static final String RANGER_PASSWORD = "authorization.ranger.password";
 
+  public static final String RANGER_SERVICE_CREATE_IF_ABSENT =
+      "authorization.ranger.service.create-if-absent";
+
   public RangerAuthorizationProperties(Map<String, String> properties) {
     super(properties);
   }
@@ -64,9 +67,6 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
         properties.containsKey(RANGER_SERVICE_TYPE),
         String.format("%s is required", RANGER_SERVICE_TYPE));
     Preconditions.checkArgument(
-        properties.containsKey(RANGER_SERVICE_NAME),
-        String.format("%s is required", RANGER_SERVICE_NAME));
-    Preconditions.checkArgument(
         properties.containsKey(RANGER_AUTH_TYPE),
         String.format("%s is required", RANGER_AUTH_TYPE));
     Preconditions.checkArgument(
@@ -77,14 +77,18 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
         properties.get(RANGER_ADMIN_URL) != null,
         String.format("%s is required", RANGER_ADMIN_URL));
     Preconditions.checkArgument(
-        properties.get(RANGER_SERVICE_NAME) != null,
-        String.format("%s is required", RANGER_SERVICE_NAME));
-    Preconditions.checkArgument(
         properties.get(RANGER_AUTH_TYPE) != null,
         String.format("%s is required", RANGER_AUTH_TYPE));
     Preconditions.checkArgument(
         properties.get(RANGER_USERNAME) != null, String.format("%s is required", RANGER_USERNAME));
     Preconditions.checkArgument(
         properties.get(RANGER_PASSWORD) != null, String.format("%s is required", RANGER_PASSWORD));
+
+    if (!Boolean.parseBoolean(properties.get(RANGER_SERVICE_CREATE_IF_ABSENT))) {
+      Preconditions.checkArgument(
+          properties.get(RANGER_SERVICE_NAME) != null,
+          String.format(
+              "%s is required if you don't create the absent ranger service", RANGER_SERVICE_NAME));
+    }
   }
 }

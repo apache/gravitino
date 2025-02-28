@@ -196,6 +196,30 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
+
+    Map<String, String> uuidProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+
+    metalake.createCatalog("test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
+    metalake.dropCatalog("test", true);
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {
