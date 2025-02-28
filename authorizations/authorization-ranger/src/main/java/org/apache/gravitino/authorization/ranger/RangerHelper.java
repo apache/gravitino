@@ -275,7 +275,7 @@ public class RangerHelper {
     }
 
     RangerRole rangerRole = null;
-    rangerRole = getRangerRole(roleName, rangerRole);
+    rangerRole = getRangerRole(roleName);
 
     try {
       if (rangerRole == null) {
@@ -290,7 +290,7 @@ public class RangerHelper {
   }
 
   public RangerRole getRangerRole(String roleName) {
-    RangerRole rangerRole;
+    RangerRole rangerRole = null;
     try {
       rangerRole = rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
