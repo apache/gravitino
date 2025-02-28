@@ -147,11 +147,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUser(metalake, user),
         LockType.WRITE,
-        () ->
-            TreeLockUtils.doWithTreeLock(
-                NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                LockType.READ,
-                () -> permissionManager.grantRolesToUser(metalake, roles, user)));
+        () -> permissionManager.grantRolesToUser(metalake, roles, user));
   }
 
   @Override
@@ -160,11 +156,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofGroup(metalake, group),
         LockType.WRITE,
-        () ->
-            TreeLockUtils.doWithTreeLock(
-                NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                LockType.READ,
-                () -> permissionManager.grantRolesToGroup(metalake, roles, group)));
+        () -> permissionManager.grantRolesToGroup(metalake, roles, group));
   }
 
   @Override
@@ -173,11 +165,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofGroup(metalake, group),
         LockType.WRITE,
-        () ->
-            TreeLockUtils.doWithTreeLock(
-                NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                LockType.READ,
-                () -> permissionManager.revokeRolesFromGroup(metalake, roles, group)));
+        () -> permissionManager.revokeRolesFromGroup(metalake, roles, group));
   }
 
   @Override
@@ -186,11 +174,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUser(metalake, user),
         LockType.WRITE,
-        () ->
-            TreeLockUtils.doWithTreeLock(
-                NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
-                LockType.READ,
-                () -> permissionManager.revokeRolesFromUser(metalake, roles, user)));
+        () -> permissionManager.revokeRolesFromUser(metalake, roles, user));
   }
 
   @Override

@@ -198,9 +198,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
+
+    // Check if there exist TableChange.RenameTable in the changes, if so, we need to TreeLock of
+    // write on the new table name, or use the read lock on the table instead.
+    boolean containsRenameTable =
+        Arrays.stream(changes).anyMatch(c -> c instanceof TableChange.RenameTable);
+    LockType lockType = containsRenameTable ? LockType.WRITE : LockType.READ;
+
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
+        lockType,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           Table alteredTable =

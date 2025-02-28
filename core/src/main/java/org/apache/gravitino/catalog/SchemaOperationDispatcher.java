@@ -215,8 +215,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       throws NoSuchSchemaException {
 
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    // Gravitino does not support alter schema currently, so we do not need to check whether there
+    // exists SchemaChange.renameSchema in the changes and can lock schema directly.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
+        ident,
         LockType.WRITE,
         () -> {
           validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);

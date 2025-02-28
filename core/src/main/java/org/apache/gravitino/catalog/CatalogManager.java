@@ -622,9 +622,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().level(0)),
-        LockType.WRITE,
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
         () -> {
           checkCatalogInUse(store, ident);
 
@@ -653,7 +653,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             LOG.error("Failed to alter catalog {}", ident, e);
             throw new RuntimeException(e);
           }
+          return null;
+        });
 
+    boolean containsRenameCatalog =
+        Arrays.stream(changes).anyMatch(c -> c instanceof CatalogChange.RenameCatalog);
+    NameIdentifier nameIdentifierForLock =
+        containsRenameCatalog ? NameIdentifier.of(ident.namespace().level(0)) : ident;
+
+    return TreeLockUtils.doWithTreeLock(
+        nameIdentifierForLock,
+        LockType.WRITE,
+        () -> {
           catalogCache.invalidate(ident);
           try {
             CatalogEntity updatedCatalog =

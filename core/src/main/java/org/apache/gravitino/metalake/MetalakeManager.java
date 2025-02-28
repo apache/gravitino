@@ -23,6 +23,7 @@ import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -244,8 +246,7 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    return TreeLockUtils.doWithRootTreeLock(
-        LockType.WRITE,
+    Executable<BaseMetalake, RuntimeException> exceptionExecutable =
         () -> {
           try {
             if (!metalakeInUse(store, ident)) {
@@ -280,7 +281,15 @@ public class MetalakeManager implements MetalakeDispatcher {
             LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
             throw new RuntimeException(ioe);
           }
-        });
+        };
+
+    boolean containsRenameMetalake =
+        Arrays.stream(changes).anyMatch(c -> c instanceof MetalakeChange.RenameMetalake);
+    if (containsRenameMetalake) {
+      return TreeLockUtils.doWithRootTreeLock(LockType.WRITE, exceptionExecutable);
+    }
+
+    return TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, exceptionExecutable);
   }
 
   @Override

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -180,9 +181,14 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
+    boolean containsRenameFileset =
+        Arrays.stream(changes).anyMatch(c -> c instanceof FilesetChange.RenameFileset);
+    NameIdentifier nameIdentifierForLock =
+        containsRenameFileset ? NameIdentifier.of(ident.namespace().levels()) : ident;
+
     Fileset alteredFileset =
         TreeLockUtils.doWithTreeLock(
-            NameIdentifier.of(ident.namespace().levels()),
+            nameIdentifierForLock,
             LockType.WRITE,
             () ->
                 doWithCatalog(

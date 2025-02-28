@@ -159,8 +159,9 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     validateAlterProperties(ident, HasPropertyMetadata::topicPropertiesMetadata, changes);
 
+    // As Gravitino does not support TopicChange.renameTopic, we can directly lock the topic.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
+        ident,
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
