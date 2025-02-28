@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.metalake;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.mockito.Mockito.doReturn;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -26,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
@@ -33,6 +39,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
@@ -41,6 +48,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.testcontainers.shaded.org.apache.commons.lang3.reflect.FieldUtils;
 
 public class TestMetalakeManager {
 
@@ -51,12 +60,17 @@ public class TestMetalakeManager {
   private static Config config;
 
   @BeforeAll
-  public static void setUp() {
-    config = new Config(false) {};
+  public static void setUp() throws IllegalAccessException {
+    config = Mockito.mock(Config.class);
+
+    doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
 
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     metalakeManager = new MetalakeManager(entityStore, new RandomIdGenerator());
   }
 
@@ -241,7 +255,7 @@ public class TestMetalakeManager {
     Assertions.assertNull(baseMetalake);
     metalakeManager.enableMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
-    Assertions.assertNull(baseMetalake);
+    Assertions.assertNotNull(baseMetalake);
 
     metalakeManager.loadMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
