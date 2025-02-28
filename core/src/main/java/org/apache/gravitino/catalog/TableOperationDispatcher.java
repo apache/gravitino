@@ -203,11 +203,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // write on the new table name, or use the read lock on the table instead.
     boolean containsRenameTable =
         Arrays.stream(changes).anyMatch(c -> c instanceof TableChange.RenameTable);
-    LockType lockType = containsRenameTable ? LockType.WRITE : LockType.READ;
+    NameIdentifier nameIdentifierForLock =
+        containsRenameTable ? NameIdentifier.of(ident.namespace().levels()) : ident;
 
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        lockType,
+        nameIdentifierForLock,
+        LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           Table alteredTable =
