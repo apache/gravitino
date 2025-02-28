@@ -20,7 +20,11 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
+import org.apache.gravitino.storage.relational.helper.SchemaIds;
 
 /** The service class for common metadata operations. */
 public class CommonMetaService {
@@ -36,25 +40,47 @@ public class CommonMetaService {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
+
     Long parentEntityId = null;
-    if (namespace.levels().length >= 1) {
+    if (namespace.levels().length == 1) {
       parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+      if (parentEntityId == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            namespace);
+      }
     }
 
-    if (namespace.levels().length >= 2) {
-      parentEntityId =
+    if (namespace.levels().length == 2) {
+      CatalogIds catalogIds =
           CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeIdAndName(parentEntityId, namespace.level(1));
+              .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
+      parentEntityId = catalogIds == null ? null : catalogIds.getCatalogId();
+
+      if (parentEntityId == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.CATALOG.name().toLowerCase(),
+            namespace);
+      }
     }
 
-    if (namespace.levels().length >= 3) {
-      parentEntityId =
+    if (namespace.levels().length == 3) {
+      SchemaIds schemaIds =
           SchemaMetaService.getInstance()
-              .getSchemaIdByCatalogIdAndName(parentEntityId, namespace.level(2));
+              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                  namespace.level(0), namespace.level(1), namespace.level(2));
+      parentEntityId = schemaIds == null ? null : schemaIds.getSchemaId();
+
+      if (parentEntityId == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.SCHEMA.name().toLowerCase(),
+            namespace);
+      }
     }
-    Preconditions.checkState(
-        parentEntityId != null && parentEntityId > 0,
-        "Parent entity id should not be null and should be greater than 0.");
+
     return parentEntityId;
   }
 
@@ -63,21 +89,46 @@ public class CommonMetaService {
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
     Long[] parentEntityIds = new Long[namespace.levels().length];
-    if (namespace.levels().length >= 1) {
+
+    if (namespace.levels().length == 1) {
       parentEntityIds[0] =
           MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
-    }
+      if (parentEntityIds[0] == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            namespace);
+      }
 
-    if (namespace.levels().length >= 2) {
-      parentEntityIds[1] =
+    } else if (namespace.levels().length == 2) {
+      CatalogIds catalogIds =
           CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeIdAndName(parentEntityIds[0], namespace.level(1));
-    }
+              .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
+      parentEntityIds[0] = catalogIds == null ? null : catalogIds.getMetalakeId();
+      parentEntityIds[1] = catalogIds == null ? null : catalogIds.getCatalogId();
 
-    if (namespace.levels().length >= 3) {
-      parentEntityIds[2] =
+      if (parentEntityIds[1] == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.CATALOG.name().toLowerCase(),
+            namespace);
+      }
+
+    } else if (namespace.levels().length == 3) {
+      SchemaIds schemaIds =
           SchemaMetaService.getInstance()
-              .getSchemaIdByCatalogIdAndName(parentEntityIds[1], namespace.level(2));
+              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                  namespace.level(0), namespace.level(1), namespace.level(2));
+      parentEntityIds[0] = schemaIds == null ? null : schemaIds.getMetalakeId();
+      parentEntityIds[1] = schemaIds == null ? null : schemaIds.getCatalogId();
+      parentEntityIds[2] = schemaIds == null ? null : schemaIds.getSchemaId();
+
+      if (parentEntityIds[2] == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.SCHEMA.name().toLowerCase(),
+            namespace);
+      }
     }
 
     return parentEntityIds;
