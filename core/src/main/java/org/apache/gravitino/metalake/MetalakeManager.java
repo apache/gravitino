@@ -91,6 +91,13 @@ public class MetalakeManager implements MetalakeDispatcher {
   public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
+
+    // pre-load all metalakes and put them into cache, this is useful when user load schema/table
+    // directly without list/get metalake first.
+    BaseMetalake[] metalakes = listMetalakes();
+    for (BaseMetalake metalake : metalakes) {
+      METALAKE_CACHE.put(metalake.nameIdentifier(), metalake);
+    }
   }
 
   /**
