@@ -25,11 +25,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fuse3::FileType::{Directory, RegularFile};
 use fuse3::{Errno, FileType, Timestamp};
-use log::error;
 use opendal::{Buffer, EntryMode, ErrorKind, Metadata, Operator};
 use std::mem::swap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use tracing::error;
 
 pub(crate) struct OpenDalFileSystem {
     op: Operator,
