@@ -77,8 +77,8 @@ public abstract class RangerAuthorizationPlugin
 
   protected String metalake;
   protected final String rangerServiceName;
-  protected final RangerClientExtension rangerClient;
-  protected final RangerHelper rangerHelper;
+  protected RangerClientExtension rangerClient;
+  protected RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
@@ -106,6 +106,26 @@ public abstract class RangerAuthorizationPlugin
   @VisibleForTesting
   public String getMetalake() {
     return metalake;
+  }
+
+  @VisibleForTesting
+  public RangerHelper getRangerHelper() {
+    return rangerHelper;
+  }
+
+  @VisibleForTesting
+  public void setRangerHelper(RangerHelper rangerHelper) {
+    this.rangerHelper = rangerHelper;
+  }
+
+  @VisibleForTesting
+  public RangerClientExtension getRangerClient() {
+    return rangerClient;
+  }
+
+  @VisibleForTesting
+  public void setRangerClient(RangerClientExtension rangerClient) {
+    this.rangerClient = rangerClient;
   }
 
   /**
