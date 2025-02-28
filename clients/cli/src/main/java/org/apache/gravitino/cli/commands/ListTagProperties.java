@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
+
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -53,12 +54,22 @@ public class ListTagProperties extends ListProperties {
     try {
       GravitinoClient client = buildClient(metalake);
       gTag = client.getTag(tag);
+
+      // Ensure tag exists before accessing properties
+      if (gTag == null) {
+        exitWithError(ErrorMessages.UNKNOWN_TAG);
+        return;
+      }
+
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (NoSuchTagException err) {
       exitWithError(ErrorMessages.UNKNOWN_TAG);
+      return;
     } catch (Exception exp) {
-      exitWithError(exp.getMessage());
+      exitWithError("An unexpected error occurred: " + exp.getMessage());
+      return;
     }
 
     Map<String, String> properties = gTag.properties();

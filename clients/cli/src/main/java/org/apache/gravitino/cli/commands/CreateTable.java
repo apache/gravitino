@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import java.util.List;
 import java.util.Map;
+
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -82,27 +83,47 @@ public class CreateTable extends Command {
       client = buildClient(metalake);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+      return; // Stop execution
     } catch (Exception exp) {
       exitWithError("Error initializing client or table name: " + exp.getMessage());
+      return;
+    }
+
+    if (client == null) {
+      exitWithError("Client initialization failed.");
+      return;
     }
 
     try {
       tableData = readTableCSV.parse(columnFile);
       columns = readTableCSV.columns(tableData);
+      if (columns == null || columns.length == 0) {
+        exitWithError("No valid columns found in the provided file.");
+        return;
+      }
     } catch (Exception exp) {
       exitWithError("Error reading or parsing column file: " + exp.getMessage());
+      return;
     }
 
     try {
+      if (tableName == null) {
+        exitWithError("Table name could not be determined.");
+        return;
+      }
       client.loadCatalog(catalog).asTableCatalog().createTable(tableName, columns, comment, null);
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (TableAlreadyExistsException err) {
       exitWithError(ErrorMessages.TABLE_EXISTS);
+      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+      return;
     }
 
     printInformation(table + " created");

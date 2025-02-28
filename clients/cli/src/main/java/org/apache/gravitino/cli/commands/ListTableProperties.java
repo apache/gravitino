@@ -59,11 +59,17 @@ public class ListTableProperties extends ListProperties {
   /** List the properties of a table. */
   @Override
   public void handle() {
-    Table gTable = null;
-    try {
+    try (GravitinoClient client = buildClient(metalake)) { // Ensures resource cleanup
       NameIdentifier name = NameIdentifier.of(schema, table);
-      GravitinoClient client = buildClient(metalake);
-      gTable = client.loadCatalog(catalog).asTableCatalog().loadTable(name);
+      Table gTable = client.loadCatalog(catalog).asTableCatalog().loadTable(name);
+
+      if (gTable == null) {
+        exitWithError("Table not found: " + table);
+        return;
+      }
+
+      Map<String, String> properties = gTable.properties();
+      printProperties(properties);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -75,8 +81,5 @@ public class ListTableProperties extends ListProperties {
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
-
-    Map<String, String> properties = gTable.properties();
-    printProperties(properties);
   }
 }

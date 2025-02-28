@@ -21,6 +21,11 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 /** Displays the audit information of a table. */
@@ -48,15 +53,26 @@ public class TableAudit extends TableCommand {
   /** Displays the audit information of a table. */
   @Override
   public void handle() {
-    Table gTable = null;
-
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
-      gTable = tableCatalog().loadTable(name);
-    } catch (Exception exp) {
-      exitWithError(exp.getMessage());
-    }
+      Table gTable = tableCatalog().loadTable(name);
 
-    displayAuditInfo(gTable.auditInfo());
+      if (gTable == null) {
+        exitWithError("Failed to retrieve table details.");
+        return;
+      }
+
+      displayAuditInfo(gTable.auditInfo());
+    } catch (NoSuchMetalakeException err) {
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException err) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchSchemaException err) {
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+    } catch (NoSuchTableException err) {
+      exitWithError(ErrorMessages.UNKNOWN_TABLE);
+    } catch (Exception exp) {
+      exitWithError("An unexpected error occurred: " + exp.getMessage());
+    }
   }
 }

@@ -19,12 +19,13 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
+
+import com.google.common.base.Joiner;
 
 /** Displays the details of a table's columns. */
 public class ListColumns extends TableCommand {
@@ -59,33 +60,33 @@ public class ListColumns extends TableCommand {
     } catch (NoSuchTableException noSuchTableException) {
       exitWithError(
           ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
+      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+      return;
+    }
+
+    // Null / empty check before processing columns
+    if (columns == null || columns.length == 0) {
+      exitWithError("No columns found for table: " + table);
+      return;
     }
 
     StringBuilder all = new StringBuilder();
-    for (int i = 0; i < columns.length; i++) {
-      String name = columns[i].name();
-      String dataType = columns[i].dataType().simpleString();
-      String comment = columns[i].comment();
-      String nullable = columns[i].nullable() ? "true" : "false";
-      String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
+    all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
 
-      if (i == 0) {
-        all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
-      }
-      // TODO default values
-      all.append(
-          name
-              + ","
-              + dataType
-              + ","
-              + comment
-              + ","
-              + nullable
-              + ","
-              + autoIncrement
-              + System.lineSeparator());
+    for (Column column : columns) {
+      if (column == null) continue; // Skip any unexpected null columns
+
+      String name = column.name();
+        String dataType = column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN";
+        String comment = column.comment() != null ? column.comment() : "N/A";
+        String nullable = column.nullable() ? "true" : "false";
+        String autoIncrement = column.autoIncrement() ? "true" : "false";
+
+        all.append(
+            name + "," + dataType + "," + comment + "," + nullable + "," + autoIncrement
+        ).append(System.lineSeparator());
     }
 
     printResults(all.toString());

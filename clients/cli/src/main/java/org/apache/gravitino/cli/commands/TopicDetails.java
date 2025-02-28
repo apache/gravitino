@@ -58,24 +58,27 @@ public class TopicDetails extends Command {
   /** Displays the details of a topic. */
   @Override
   public void handle() {
-    Topic gTopic = null;
-
-    try {
+    try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, topic);
-      GravitinoClient client = buildClient(metalake);
-      gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
-    } catch (NoSuchMetalakeException err) {
-      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException err) {
-      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (NoSuchSchemaException err) {
-      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchTopicException err) {
-      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
-    } catch (Exception exp) {
-      exitWithError(exp.getMessage());
-    }
+      Topic gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
 
-    printResults(gTopic.name() + "," + gTopic.comment());
+      if (gTopic == null) {
+        exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+        return;
+      }
+
+      printResults("Topic Name: " + gTopic.name() + ", Comment: " + gTopic.comment());
+
+    } catch (NoSuchMetalakeException e) {
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException e) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchSchemaException e) {
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+    } catch (NoSuchTopicException e) {
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+    } catch (Exception e) {
+      exitWithError("Error retrieving topic details: " + e.getMessage());
+    }
   }
 }
