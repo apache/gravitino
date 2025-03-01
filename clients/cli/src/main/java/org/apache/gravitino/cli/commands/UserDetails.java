@@ -47,23 +47,21 @@ public class UserDetails extends Command {
   /** Displays the roles of a specified user. */
   @Override
   public void handle() {
-    List<String> roles = null;
+    try (GravitinoClient client = buildClient(metalake)) {
+      List<String> roles = client.getUser(user).roles();
 
-    try {
-      GravitinoClient client = buildClient(metalake);
-      roles = client.getUser(user).roles();
-    } catch (NoSuchMetalakeException err) {
+      if (roles == null || roles.isEmpty()) {
+        printInformation("The user has no assigned roles.");
+      } else {
+        printResults("User Roles: " + String.join(", ", roles));
+      }
+
+    } catch (NoSuchMetalakeException e) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchUserException err) {
+    } catch (NoSuchUserException e) {
       exitWithError(ErrorMessages.UNKNOWN_USER);
-    } catch (Exception exp) {
-      exitWithError(exp.getMessage());
-    }
-
-    if (roles.isEmpty()) {
-      printInformation("The user has no roles.");
-    } else {
-      printResults(String.join(",", roles));
+    } catch (Exception e) {
+      exitWithError("Error retrieving user details: " + e.getMessage());
     }
   }
 }

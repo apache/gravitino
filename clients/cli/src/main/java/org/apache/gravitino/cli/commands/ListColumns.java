@@ -59,10 +59,42 @@ public class ListColumns extends TableCommand {
     } catch (NoSuchTableException noSuchTableException) {
       exitWithError(
           ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
+      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+      return;
     }
 
-    printResults(columns);
+    // Null / empty check before processing columns
+    if (columns == null || columns.length == 0) {
+      exitWithError("No columns found for table: " + table);
+      return;
+    }
+
+    StringBuilder all = new StringBuilder();
+    all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
+
+    for (Column column : columns) {
+      if (column == null) continue; // Skip any unexpected null columns
+
+      String name = column.name();
+      String dataType = column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN";
+      String comment = column.comment() != null ? column.comment() : "N/A";
+      String nullable = column.nullable() ? "true" : "false";
+      String autoIncrement = column.autoIncrement() ? "true" : "false";
+
+      all.append(name)
+          .append(",")
+          .append(dataType)
+          .append(",")
+          .append(comment)
+          .append(",")
+          .append(nullable)
+          .append(",")
+          .append(autoIncrement)
+          .append(System.lineSeparator());
+    }
+
+    printResults(all.toString());
   }
 }

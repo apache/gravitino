@@ -45,18 +45,20 @@ public class ListMetalakeProperties extends ListProperties {
   /** List the properties of a metalake. */
   @Override
   public void handle() {
-    Metalake gMetalake = null;
-    try {
-      GravitinoAdminClient client = buildAdminClient();
-      gMetalake = client.loadMetalake(metalake);
+    try (GravitinoAdminClient client = buildAdminClient()) { // Ensure resource cleanup
+      Metalake gMetalake = client.loadMetalake(metalake);
+
+      if (gMetalake == null) {
+        exitWithError("Metalake not found: " + metalake);
+        return;
+      }
+
+      Map<String, String> properties = gMetalake.properties();
+      printProperties(properties);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
-
-    Map<String, String> properties = gMetalake.properties();
-
-    printProperties(properties);
   }
 }
