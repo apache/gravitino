@@ -37,7 +37,7 @@ public class ListTables extends TableCommand {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    */
   public ListTables(CommandContext context, String metalake, String catalog, String schema) {
     super(context, metalake, catalog);

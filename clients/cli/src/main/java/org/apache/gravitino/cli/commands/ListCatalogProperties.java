@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -49,31 +48,19 @@ public class ListCatalogProperties extends ListProperties {
   /** List the properties of a catalog. */
   @Override
   public void handle() {
-    Catalog gCatalog = null;
+    try {
+      GravitinoClient client = buildClient(metalake);
+      Catalog gCatalog = client.loadCatalog(catalog);
 
-    try (GravitinoClient client = buildClient(metalake)) { // Ensures client is closed
-      gCatalog = client.loadCatalog(catalog);
+      if (gCatalog != null) {
+          printProperties(gCatalog.properties());
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return;
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
-      return;
     }
-
-    if (gCatalog == null) { // Null check before accessing properties
-      exitWithError("Failed to load catalog.");
-      return;
-    }
-
-    Map<String, String> properties = gCatalog.properties();
-    if (properties == null || properties.isEmpty()) {
-      exitWithError("No properties found for the catalog.");
-      return;
-    }
-    printProperties(properties);
   }
 }

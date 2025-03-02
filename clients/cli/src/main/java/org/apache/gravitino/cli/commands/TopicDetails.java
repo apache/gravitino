@@ -43,7 +43,7 @@ public class TopicDetails extends Command {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param topic The name of the topic.
    */
   public TopicDetails(
@@ -69,16 +69,16 @@ public class TopicDetails extends Command {
 
       printResults("Topic Name: " + gTopic.name() + ", Comment: " + gTopic.comment());
 
-    } catch (NoSuchMetalakeException e) {
+    } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException e) {
+    } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (NoSuchSchemaException e) {
+    } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchTopicException e) {
+    } catch (NoSuchTopicException err) {
       exitWithError(ErrorMessages.UNKNOWN_TOPIC);
-    } catch (Exception e) {
-      exitWithError("Error retrieving topic details: " + e.getMessage());
+    } catch (Exception exp) {
+      exitWithError(exp.getMessage());
     }
   }
 }

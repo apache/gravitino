@@ -20,7 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Collections;
-import java.util.Map;
+
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -60,27 +60,28 @@ public class ListFilesetProperties extends ListProperties {
   @Override
   public void handle() {
     Fileset gFileset = null;
-    NameIdentifier name = null;
+    
     try {
-      name = NameIdentifier.of(schema, fileset);
-    } catch (Exception exp) {
-      exitWithError("Invalid schema or fileset name: " + exp.getMessage());
-      return;
-    }
-    try (GravitinoClient client = buildClient(metalake)) {
-      gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
+        NameIdentifier name = NameIdentifier.of(schema, fileset);
+
+        try (GravitinoClient client = buildClient(metalake)) {
+            gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
+        }
+    } catch (IllegalArgumentException exp) {
+        exitWithError("Invalid schema or fileset name: " + exp.getMessage());
+        return;
     } catch (NoSuchMetalakeException err) {
-      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+        exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+        return;
     } catch (NoSuchCatalogException err) {
-      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return;
+        exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+        return;
     } catch (NoSuchSchemaException err) {
-      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
+        exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+        return;
     } catch (Exception exp) {
-      exitWithError(exp.getMessage());
-      return;
+        exitWithError(exp.getMessage());
+        return;
     }
 
     // Null check for gFileset before accessing its properties
@@ -89,11 +90,6 @@ public class ListFilesetProperties extends ListProperties {
       return;
     }
 
-    Map<String, String> properties = gFileset.properties();
-    // Use an empty map if properties is null to avoid NPE later on
-    if (properties == null) {
-      properties = Collections.emptyMap();
-    }
-    printProperties(properties);
+    printProperties(gFileset.properties() != null ? gFileset.properties() : Collections.emptyMap());
   }
 }

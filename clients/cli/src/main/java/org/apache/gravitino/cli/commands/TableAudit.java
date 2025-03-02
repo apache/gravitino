@@ -25,7 +25,6 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 /** Displays the audit information of a table. */
@@ -40,7 +39,7 @@ public class TableAudit extends TableCommand {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param table The name of the table.
    */
   public TableAudit(
@@ -69,8 +68,6 @@ public class TableAudit extends TableCommand {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchTableException err) {
-      exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (Exception exp) {
       exitWithError("An unexpected error occurred: " + exp.getMessage());
     }

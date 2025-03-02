@@ -74,19 +74,14 @@ public class ListTopicProperties extends ListProperties {
 
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return;
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return;
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
     } catch (NoSuchTopicException err) {
       exitWithError(ErrorMessages.UNKNOWN_TOPIC);
-      return;
     } catch (Exception exp) {
-      exitWithError("An unexpected error occurred: " + exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     Map<String, String> properties = gTopic.properties();

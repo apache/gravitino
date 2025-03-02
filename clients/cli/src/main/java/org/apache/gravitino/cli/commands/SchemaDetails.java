@@ -40,7 +40,7 @@ public class SchemaDetails extends Command {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    */
   public SchemaDetails(CommandContext context, String metalake, String catalog, String schema) {
     super(context);

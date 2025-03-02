@@ -53,20 +53,15 @@ public class CatalogAudit extends AuditCommand {
       result = client.loadCatalog(this.catalog);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return; // Stop execution after handling error
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return; // Stop execution after handling error
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
-      return; // Stop execution after handling error
     }
 
-    // **Null check before accessing auditInfo()**
-    if (result != null && result.auditInfo() != null) {
+    // Only check if result is null
+    if (result != null) {
       displayAuditInfo(result.auditInfo());
-    } else {
-      exitWithError("Audit information is not available for this catalog.");
     }
   }
 }
