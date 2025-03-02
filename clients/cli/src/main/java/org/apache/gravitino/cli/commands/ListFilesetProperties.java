@@ -59,12 +59,9 @@ public class ListFilesetProperties extends ListProperties {
   @Override
   public void handle() {
     Fileset gFileset = null;
-    GravitinoClient client = null;
 
-    try {
+    try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, fileset);
-      client = buildClient(metalake);
-
       gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
     } catch (IllegalArgumentException exp) {
       exitWithError("Invalid schema or fileset name: " + exp.getMessage());
@@ -78,7 +75,6 @@ public class ListFilesetProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    // Null check for gFileset before accessing its properties
     if (gFileset == null) {
       exitWithError("Failed to load fileset: " + fileset);
       return;

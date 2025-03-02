@@ -70,7 +70,6 @@ public class TableAudit extends TableCommand {
 
     if (gTable == null) {
       exitWithError("Failed to retrieve table details.");
-      return;
     }
 
     displayAuditInfo(gTable.auditInfo());
