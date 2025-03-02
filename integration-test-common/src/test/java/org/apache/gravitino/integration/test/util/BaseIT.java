@@ -382,7 +382,6 @@ public class BaseIT {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       String gitFolder = gravitinoHome + File.separator + ".git" + File.separator;
       String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
-      LOG.error("\n\n\noooooooooooooooooooooooooooooooooooooooooooooooooooooo" + headFileContent);
       String[] refAndBranch = headFileContent.split(":");
       if (refAndBranch.length == 1) {
         return refAndBranch[0].trim();
