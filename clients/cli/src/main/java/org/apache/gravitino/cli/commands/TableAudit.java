@@ -52,16 +52,12 @@ public class TableAudit extends TableCommand {
   /** Displays the audit information of a table. */
   @Override
   public void handle() {
+    Table gTable = null;
+
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
-      Table gTable = tableCatalog().loadTable(name);
+      gTable = tableCatalog().loadTable(name);
 
-      if (gTable == null) {
-        exitWithError("Failed to retrieve table details.");
-        return;
-      }
-
-      displayAuditInfo(gTable.auditInfo());
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -69,7 +65,14 @@ public class TableAudit extends TableCommand {
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
-      exitWithError("An unexpected error occurred: " + exp.getMessage());
+      exitWithError(exp.getMessage());
     }
+
+    if (gTable == null) {
+      exitWithError("Failed to retrieve table details.");
+      return;
+    }
+
+    displayAuditInfo(gTable.auditInfo());
   }
 }

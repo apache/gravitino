@@ -65,13 +65,6 @@ public class ListTopicProperties extends ListProperties {
     try {
       GravitinoClient client = buildClient(metalake);
       gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
-
-      // Ensure topic exists before accessing properties
-      if (gTopic == null) {
-        exitWithError(ErrorMessages.UNKNOWN_TOPIC);
-        return;
-      }
-
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -82,6 +75,11 @@ public class ListTopicProperties extends ListProperties {
       exitWithError(ErrorMessages.UNKNOWN_TOPIC);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+    }
+
+    if (gTopic == null) {
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+      return;
     }
 
     Map<String, String> properties = gTopic.properties();

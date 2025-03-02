@@ -69,26 +69,20 @@ public class ModelDetails extends Command {
       gModel = modelCatalog.getModel(name);
       versions = modelCatalog.listModelVersions(name);
 
-      // Ensure model exists before proceeding
-      if (gModel == null) {
-        exitWithError(ErrorMessages.UNKNOWN_MODEL);
-        return;
-      }
-
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return;
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return;
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
     } catch (NoSuchModelException err) {
       exitWithError(ErrorMessages.UNKNOWN_MODEL);
-      return;
     } catch (Exception err) {
       exitWithError("An unexpected error occurred: " + err.getMessage());
+    }
+
+    if (gModel == null) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
       return;
     }
 

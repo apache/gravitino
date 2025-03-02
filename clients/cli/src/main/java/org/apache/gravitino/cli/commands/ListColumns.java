@@ -54,31 +54,30 @@ public class ListColumns extends TableCommand {
       NameIdentifier name = NameIdentifier.of(schema, table);
       Column[] columns = tableCatalog().loadTable(name).columns();
 
-      if (columns != null && columns.length > 0) {
-        StringBuilder all = new StringBuilder();
-        all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
+      if (columns == null || columns.length == 0) {
+        exitWithError("No columns found for the specified table.");
+        return;
+      }
 
-        for (Column column : columns) {
-          if (column == null) {
-            continue;
-          }
+      StringBuilder all = new StringBuilder();
+      all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
 
-          StringBuilder columnDetails = new StringBuilder();
-          columnDetails.append(column.name()).append(",");
-          columnDetails
-              .append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN")
-              .append(",");
-          columnDetails.append(column.comment() != null ? column.comment() : "N/A").append(",");
-          columnDetails.append(column.nullable() ? "true" : "false").append(",");
-          columnDetails.append(column.autoIncrement() ? "true" : "false");
-
-          all.append(columnDetails).append(System.lineSeparator());
+      for (Column column : columns) {
+        if (column == null) {
+          continue;
         }
 
-        printResults(all.toString());
-      } else {
-        exitWithError("No columns found for the specified table.");
+        all.append(column.name()).append(",");
+        all.append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN")
+            .append(",");
+        all.append(column.comment() != null ? column.comment() : "N/A").append(",");
+        all.append(column.nullable() ? "true" : "false").append(",");
+        all.append(column.autoIncrement() ? "true" : "false");
+        all.append(System.lineSeparator());
       }
+
+      printResults(all.toString());
+
     } catch (NoSuchTableException noSuchTableException) {
       exitWithError(
           ErrorMessages.UNKNOWN_TABLE

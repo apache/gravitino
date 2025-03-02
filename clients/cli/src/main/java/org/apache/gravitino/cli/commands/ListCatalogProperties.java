@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -49,12 +50,13 @@ public class ListCatalogProperties extends ListProperties {
   @Override
   public void handle() {
     GravitinoClient client = buildClient(metalake);
+
+    if (gCatalog != null) {
+      printProperties(gCatalog.properties());
+    }
+
     try {
       Catalog gCatalog = client.loadCatalog(catalog);
-
-      if (gCatalog != null) {
-        printProperties(gCatalog.properties());
-      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -62,5 +64,8 @@ public class ListCatalogProperties extends ListProperties {
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
+
+    Map<String, String> properties = gCatalog.properties();
+    printProperties(properties);
   }
 }

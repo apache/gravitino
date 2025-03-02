@@ -68,23 +68,14 @@ public class ListFilesetProperties extends ListProperties {
       gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
     } catch (IllegalArgumentException exp) {
       exitWithError("Invalid schema or fileset name: " + exp.getMessage());
-      return;
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return;
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return;
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
-      return;
-    } finally {
-      if (client != null) {
-        client.close();
-      }
     }
 
     // Null check for gFileset before accessing its properties

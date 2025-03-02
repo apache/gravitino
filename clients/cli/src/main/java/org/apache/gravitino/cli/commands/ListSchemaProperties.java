@@ -55,8 +55,10 @@ public class ListSchemaProperties extends ListProperties {
   @Override
   public void handle() {
     Schema gSchema = null;
+    GravitinoClient client = null;
 
-    try (GravitinoClient client = buildClient(metalake)) { // Ensure resource cleanup
+    try {
+      client = buildClient(metalake);
       gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);

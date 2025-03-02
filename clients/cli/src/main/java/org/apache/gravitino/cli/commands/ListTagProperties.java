@@ -54,20 +54,16 @@ public class ListTagProperties extends ListProperties {
       GravitinoClient client = buildClient(metalake);
       gTag = client.getTag(tag);
 
-      // Ensure tag exists before accessing properties
-      if (gTag == null) {
-        exitWithError(ErrorMessages.UNKNOWN_TAG);
-        return;
-      }
-
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return;
     } catch (NoSuchTagException err) {
       exitWithError(ErrorMessages.UNKNOWN_TAG);
-      return;
     } catch (Exception exp) {
       exitWithError("An unexpected error occurred: " + exp.getMessage());
+    }
+
+    if (gTag == null) {
+      exitWithError(ErrorMessages.UNKNOWN_TAG);
       return;
     }
 

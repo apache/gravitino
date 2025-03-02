@@ -82,14 +82,16 @@ public class CreateTable extends Command {
       client = buildClient(metalake);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-      return; // Stop execution
     } catch (Exception exp) {
       exitWithError("Error initializing client or table name: " + exp.getMessage());
-      return;
     }
 
     if (client == null) {
       exitWithError("Client initialization failed.");
+      return;
+    }
+    if (tableName == null) {
+      exitWithError("Table name could not be determined.");
       return;
     }
 
@@ -102,27 +104,18 @@ public class CreateTable extends Command {
       }
     } catch (Exception exp) {
       exitWithError("Error reading or parsing column file: " + exp.getMessage());
-      return;
     }
 
     try {
-      if (tableName == null) {
-        exitWithError("Table name could not be determined.");
-        return;
-      }
       client.loadCatalog(catalog).asTableCatalog().createTable(tableName, columns, comment, null);
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-      return;
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-      return;
     } catch (TableAlreadyExistsException err) {
       exitWithError(ErrorMessages.TABLE_EXISTS);
-      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
-      return;
     }
 
     printInformation(table + " created");

@@ -58,17 +58,11 @@ public class TopicDetails extends Command {
   /** Displays the details of a topic. */
   @Override
   public void handle() {
+    Topic gTopic = null;
+
     try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, topic);
-      Topic gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
-
-      if (gTopic == null) {
-        exitWithError(ErrorMessages.UNKNOWN_TOPIC);
-        return;
-      }
-
-      printResults("Topic Name: " + gTopic.name() + ", Comment: " + gTopic.comment());
-
+      gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -80,5 +74,12 @@ public class TopicDetails extends Command {
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
+
+    if (gTopic == null) {
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+      return;
+    }
+
+    printResults("Topic Name: " + gTopic.name() + ", Comment: " + gTopic.comment());
   }
 }
