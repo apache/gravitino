@@ -18,12 +18,12 @@
  */
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
-import com.google.common.base.Joiner;
 
 /** Displays the details of a table's columns. */
 public class ListColumns extends TableCommand {
@@ -47,57 +47,45 @@ public class ListColumns extends TableCommand {
     this.table = table;
   }
 
-    /** Displays the details of a table's columns. */  
-    @Override
-    public void handle() {
-        try {
-            NameIdentifier name = NameIdentifier.of(schema, table);
-            Column[] columns = tableCatalog().loadTable(name).columns();
+  /** Displays the details of a table's columns. */
+  @Override
+  public void handle() {
+    try {
+      NameIdentifier name = NameIdentifier.of(schema, table);
+      Column[] columns = tableCatalog().loadTable(name).columns();
 
-            if (columns != null && columns.length > 0) {
-                StringBuilder all = new StringBuilder();
-                boolean hasAutoIncrement = false;
+      if (columns != null && columns.length > 0) {
+        StringBuilder all = new StringBuilder();
+        all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
 
-                // Check if any column supports auto-increment
-                for (Column column : columns) {
-                    if (column != null && column.autoIncrement()) {
-                        hasAutoIncrement = true;
-                        break;
-                    }
-                }
+        for (Column column : columns) {
+          if (column == null) {
+            continue;
+          }
 
-                all.append("name,datatype,comment,nullable");
-                if (hasAutoIncrement) {
-                    all.append(",auto_increment");
-                }
-                all.append(System.lineSeparator());
+          StringBuilder columnDetails = new StringBuilder();
+          columnDetails.append(column.name()).append(",");
+          columnDetails
+              .append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN")
+              .append(",");
+          columnDetails.append(column.comment() != null ? column.comment() : "N/A").append(",");
+          columnDetails.append(column.nullable() ? "true" : "false").append(",");
+          columnDetails.append(column.autoIncrement() ? "true" : "false");
 
-                for (Column column : columns) {
-                    if (column == null) {
-                        continue;
-                    }
-
-                    StringBuilder columnDetails = new StringBuilder();
-                    columnDetails.append(column.name()).append(",");
-                    columnDetails.append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN").append(",");
-                    columnDetails.append(column.comment() != null ? column.comment() : "N/A").append(",");
-                    columnDetails.append(column.nullable() ? "true" : "false");
-
-                    if (hasAutoIncrement) {
-                        columnDetails.append(",").append(column.autoIncrement() ? "true" : "");
-                    }
-
-                    all.append(columnDetails).append(System.lineSeparator());
-                }
-
-                printResults(all.toString());
-            } else {
-                exitWithError("No columns found for the specified table.");
-            }
-        } catch (NoSuchTableException noSuchTableException) {
-            exitWithError(ErrorMessages.UNKNOWN_TABLE + " " + Joiner.on(".").join(metalake, catalog, schema, table));
-        } catch (Exception exp) {
-            exitWithError("An error occurred while retrieving column details: " + exp.getMessage());
+          all.append(columnDetails).append(System.lineSeparator());
         }
+
+        printResults(all.toString());
+      } else {
+        exitWithError("No columns found for the specified table.");
+      }
+    } catch (NoSuchTableException noSuchTableException) {
+      exitWithError(
+          ErrorMessages.UNKNOWN_TABLE
+              + " "
+              + Joiner.on(".").join(metalake, catalog, schema, table));
+    } catch (Exception exp) {
+      exitWithError("An error occurred while retrieving column details: " + exp.getMessage());
     }
+  }
 }

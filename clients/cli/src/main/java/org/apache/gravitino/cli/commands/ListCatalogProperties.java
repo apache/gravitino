@@ -48,12 +48,12 @@ public class ListCatalogProperties extends ListProperties {
   /** List the properties of a catalog. */
   @Override
   public void handle() {
+    GravitinoClient client = buildClient(metalake);
     try {
-      GravitinoClient client = buildClient(metalake);
       Catalog gCatalog = client.loadCatalog(catalog);
 
       if (gCatalog != null) {
-          printProperties(gCatalog.properties());
+        printProperties(gCatalog.properties());
       }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);

@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Collections;
-
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -60,28 +59,32 @@ public class ListFilesetProperties extends ListProperties {
   @Override
   public void handle() {
     Fileset gFileset = null;
-    
-    try {
-        NameIdentifier name = NameIdentifier.of(schema, fileset);
+    GravitinoClient client = null;
 
-        try (GravitinoClient client = buildClient(metalake)) {
-            gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
-        }
+    try {
+      NameIdentifier name = NameIdentifier.of(schema, fileset);
+      client = buildClient(metalake);
+
+      gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
     } catch (IllegalArgumentException exp) {
-        exitWithError("Invalid schema or fileset name: " + exp.getMessage());
-        return;
+      exitWithError("Invalid schema or fileset name: " + exp.getMessage());
+      return;
     } catch (NoSuchMetalakeException err) {
-        exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-        return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (NoSuchCatalogException err) {
-        exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-        return;
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (NoSuchSchemaException err) {
-        exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-        return;
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (Exception exp) {
-        exitWithError(exp.getMessage());
-        return;
+      exitWithError(exp.getMessage());
+      return;
+    } finally {
+      if (client != null) {
+        client.close();
+      }
     }
 
     // Null check for gFileset before accessing its properties

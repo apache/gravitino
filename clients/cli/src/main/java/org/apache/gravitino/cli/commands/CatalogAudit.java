@@ -59,7 +59,6 @@ public class CatalogAudit extends AuditCommand {
       exitWithError(exp.getMessage());
     }
 
-    // Only check if result is null
     if (result != null) {
       displayAuditInfo(result.auditInfo());
     }

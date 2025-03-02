@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
-
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
