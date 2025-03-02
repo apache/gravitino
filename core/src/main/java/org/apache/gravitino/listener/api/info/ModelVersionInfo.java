@@ -19,9 +19,10 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
-import lombok.Getter;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.model.ModelVersion;
 
@@ -30,11 +31,12 @@ import org.apache.gravitino.model.ModelVersion;
  * be read only. Most of the fields are shallow copied internally not deep copies for performance.
  */
 public class ModelVersionInfo {
-  @Getter private final String uri;
-  @Getter @Nullable private final String[] aliases;
-  @Nullable private final String comment;
-  @Getter private final Map<String, String> properties;
-  @Nullable private final Audit auditInfo;
+  private final String uri;
+  private final Map<String, String> properties;
+
+  private final Optional<String[]> aliases;
+  private final Optional<String> comment;
+  private final Optional<Audit> auditInfo;
 
   /**
    * Constructs model version information based on a given {@link ModelVersion}.
@@ -42,11 +44,17 @@ public class ModelVersionInfo {
    * @param modelVersion the model version to expose information for.
    */
   public ModelVersionInfo(ModelVersion modelVersion) {
-    this.uri = modelVersion.uri();
-    this.aliases = modelVersion.aliases();
-    this.comment = modelVersion.comment();
-    this.properties = modelVersion.properties();
-    this.auditInfo = modelVersion.auditInfo();
+    this(
+        modelVersion.uri(),
+        modelVersion.comment(),
+        modelVersion.properties(),
+        modelVersion.aliases(),
+        modelVersion.auditInfo());
+  }
+
+  public ModelVersionInfo(
+      String uri, String comment, Map<String, String> properties, String[] aliases) {
+    this(uri, comment, properties, aliases, null);
   }
 
   /**
@@ -58,12 +66,45 @@ public class ModelVersionInfo {
    * @param properties
    */
   public ModelVersionInfo(
-      String uri, String[] aliases, String comment, Map<String, String> properties) {
+      String uri,
+      String comment,
+      Map<String, String> properties,
+      String[] aliases,
+      Audit auditInfo) {
     this.uri = uri;
-    this.aliases = aliases;
-    this.comment = comment;
-    this.properties = properties;
-    this.auditInfo = null;
+
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.comment = Optional.ofNullable(comment);
+    this.auditInfo = Optional.ofNullable(auditInfo);
+    this.aliases = Optional.ofNullable(aliases);
+  }
+
+  /**
+   * Returns the URI of the model version.
+   *
+   * @return the URI of the model version.
+   */
+  public String uri() {
+    return uri;
+  }
+
+  /**
+   * Returns the properties associated with the model version.
+   *
+   * @return Map of table properties.
+   */
+  public Map<String, String> properties() {
+    return properties;
+  }
+
+  /**
+   * Returns the aliases of the model version.
+   *
+   * @return the aliases of the model version (a {@code Optional<String[]>} instance) or null if not
+   *     set.
+   */
+  public Optional<String[]> aliases() {
+    return aliases;
   }
 
   /**
@@ -71,8 +112,7 @@ public class ModelVersionInfo {
    *
    * @return the comment of the model version or null if not set.
    */
-  @Nullable
-  public String getComment() {
+  public Optional<String> comment() {
     return comment;
   }
 
@@ -81,8 +121,7 @@ public class ModelVersionInfo {
    *
    * @return the audit information of the model version or null if not set.
    */
-  @Nullable
-  public Audit getAudit() {
+  public Optional<Audit> audit() {
     return auditInfo;
   }
 }

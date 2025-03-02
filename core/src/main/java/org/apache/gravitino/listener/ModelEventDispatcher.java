@@ -83,7 +83,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException {
-    ModelInfo registerRequest = new ModelInfo(ident.name(), properties, comment, null);
+    ModelInfo registerRequest = new ModelInfo(ident.name(), properties, comment);
     eventBus.dispatchEvent(
         new RegisterModelPreEvent(PrincipalUtils.getCurrentUserName(), ident, registerRequest));
     try {
@@ -125,7 +125,22 @@ public class ModelEventDispatcher implements ModelDispatcher {
       Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException,
           ModelVersionAliasesAlreadyExistException {
-    return dispatcher.registerModel(ident, uri, aliases, comment, properties);
+    ModelInfo modelInfo = new ModelInfo(ident.name(), properties, comment);
+    ModelVersionInfo registerRequest = new ModelVersionInfo(uri, comment, properties, aliases);
+
+    RegisterModelPreEvent registerModelRequest =
+        new RegisterModelPreEvent(PrincipalUtils.getCurrentUserName(), ident, modelInfo);
+    LinkModelVersionPreEvent linkModelVersionPreEvent =
+        new LinkModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, registerRequest);
+
+    eventBus.dispatchEvent(registerModelRequest);
+    eventBus.dispatchEvent(linkModelVersionPreEvent);
+    try {
+      // TODO: ModelEvent
+      return dispatcher.registerModel(ident, uri, aliases, comment, properties);
+    } catch (Exception e) {
+      throw e;
+    }
   }
 
   /**
@@ -159,9 +174,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
   public boolean deleteModel(NameIdentifier ident) {
     eventBus.dispatchEvent(new DeleteModelPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
-      boolean isExists = dispatcher.deleteModel(ident);
       // TODO: ModelEvent
-      return isExists;
+      return dispatcher.deleteModel(ident);
     } catch (Exception e) {
       // TODO: failureEvent
       throw e;
@@ -213,11 +227,9 @@ public class ModelEventDispatcher implements ModelDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    Model model = dispatcher.getModel(ident);
-    ModelVersionInfo modelVersionInfo = new ModelVersionInfo(uri, aliases, comment, properties);
-    ModelInfo linkRequest = new ModelInfo(model, new ModelVersionInfo[] {modelVersionInfo});
+    ModelVersionInfo linkModelRequest = new ModelVersionInfo(uri, comment, properties, aliases);
     eventBus.dispatchEvent(
-        new LinkModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, linkRequest));
+        new LinkModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, linkModelRequest));
     try {
       dispatcher.linkModelVersion(ident, uri, aliases, comment, properties);
       // TODO: ModelEvent
@@ -240,9 +252,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
       throws NoSuchModelVersionException {
     eventBus.dispatchEvent(new GetModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
-      ModelVersion modelVersion = dispatcher.getModelVersion(ident, version);
       // TODO: ModelEvent
-      return modelVersion;
+      return dispatcher.getModelVersion(ident, version);
     } catch (Exception e) {
       // TODO: failureEvent
       throw e;
@@ -282,7 +293,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, int version) {
     eventBus.dispatchEvent(
-        new DeleteModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+        new DeleteModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, null, version));
     try {
       boolean isExists = dispatcher.deleteModelVersion(ident, version);
       // TODO: ModelEvent
@@ -304,7 +315,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, String alias) {
     eventBus.dispatchEvent(
-        new DeleteModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+        new DeleteModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, alias, null));
     try {
       boolean isExists = dispatcher.deleteModelVersion(ident, alias);
       // TODO: ModelEvent
@@ -324,10 +335,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
    */
   @Override
   public int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException {
-    Model model = dispatcher.getModel(ident);
-    ModelInfo modelInfo = new ModelInfo(model);
     eventBus.dispatchEvent(
-        new ListModelVersionsPreEvent(PrincipalUtils.getCurrentUserName(), ident, modelInfo));
+        new ListModelVersionsPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       int[] versions = dispatcher.listModelVersions(ident);
       // TODO: ModelEvent

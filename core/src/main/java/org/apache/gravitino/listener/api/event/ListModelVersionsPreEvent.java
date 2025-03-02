@@ -21,25 +21,12 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /** Represents an event triggered before listing model versions. */
 @DeveloperApi
 public class ListModelVersionsPreEvent extends ModelPreEvent {
-  private final ModelInfo modelInfo;
-
-  public ListModelVersionsPreEvent(String user, NameIdentifier identifier, ModelInfo modelInfo) {
+  public ListModelVersionsPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
-    this.modelInfo = modelInfo;
-  }
-
-  /**
-   * Retrieves the model information containing the list of model versions.
-   *
-   * @return A {@link ModelInfo} instance containing the list of model versions.
-   */
-  public ModelInfo listModelVersionInfo() {
-    return modelInfo;
   }
 
   /**

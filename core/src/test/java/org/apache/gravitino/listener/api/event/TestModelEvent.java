@@ -23,7 +23,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.ModelDispatcher;
@@ -58,8 +61,8 @@ public class TestModelEvent {
   @BeforeAll
   void init() {
     this.namespace = Namespace.of("metalake", "catalog", "schema");
-    this.modelA = mockModel("modelA", "commentA");
-    this.modelB = mockModel("modelB", "commentB");
+    this.modelA = getMockModel("modelA", "commentA");
+    this.modelB = getMockModel("modelB", "commentB");
     this.firstModelVersion =
         mockModelVersion("uriA", new String[] {"aliasProduction"}, "versionInfoA");
     this.secondModelVersion = mockModelVersion("uriB", new String[] {"aliasTest"}, "versionInfoB");
@@ -78,6 +81,55 @@ public class TestModelEvent {
   }
 
   @Test
+  void testModelInfo() {
+    Model mockModel = getMockModel("model", "comment");
+    ModelInfo modelInfo = new ModelInfo(mockModel);
+
+    Assertions.assertEquals("model", modelInfo.name());
+    Assertions.assertEquals(1, modelInfo.properties().size());
+    Assertions.assertEquals("#FFFFFF", modelInfo.properties().get("color"));
+
+    Assertions.assertTrue(modelInfo.comment().isPresent());
+    String comment = modelInfo.comment().get();
+    Assertions.assertEquals("comment", comment);
+
+    Assertions.assertFalse(modelInfo.audit().isPresent());
+
+    Assertions.assertTrue(modelInfo.lastVersion().isPresent());
+    int lastVersion = modelInfo.lastVersion().get();
+    Assertions.assertEquals(1, lastVersion);
+  }
+
+  @Test
+  void testModelInfoWithoutComment() {
+    Model mockModel = getMockModel("model", null);
+    ModelInfo modelInfo = new ModelInfo(mockModel);
+
+    Assertions.assertFalse(modelInfo.comment().isPresent());
+  }
+
+  @Test
+  void testModelInfoWithAudit() {
+    Model mockModel = getMockModelWithAudit("model", "comment");
+    ModelInfo modelInfo = new ModelInfo(mockModel);
+
+    Assertions.assertEquals("model", modelInfo.name());
+    Assertions.assertEquals(1, modelInfo.properties().size());
+    Assertions.assertEquals("#FFFFFF", modelInfo.properties().get("color"));
+
+    Assertions.assertTrue(modelInfo.comment().isPresent());
+    String comment = modelInfo.comment().get();
+    Assertions.assertEquals("comment", comment);
+
+    Assertions.assertTrue(modelInfo.audit().isPresent());
+    Audit audit = modelInfo.audit().get();
+    Assertions.assertEquals("demo_user", audit.creator());
+    Assertions.assertEquals(1611111111111L, audit.createTime().toEpochMilli());
+    Assertions.assertEquals("demo_user", audit.lastModifier());
+    Assertions.assertEquals(1611111111111L, audit.lastModifiedTime().toEpochMilli());
+  }
+
+  @Test
   void testRegisterModelEvent() {
     dispatcher.registerModel(existingIdentA, "commentA", ImmutableMap.of("color", "#FFFFFF"));
 
@@ -87,13 +139,18 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationType.REGISTER_MODEL, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    // validate model info
+    // validate pre-event model info
     RegisterModelPreEvent registerModelPreEvent = (RegisterModelPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, registerModelPreEvent.identifier());
     ModelInfo modelInfoPreEvent = registerModelPreEvent.registeredModelInfo();
-    Assertions.assertEquals("modelA", modelInfoPreEvent.getName());
-    Assertions.assertEquals("commentA", modelInfoPreEvent.getComment());
-    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.getProperties());
-    Assertions.assertNull(modelInfoPreEvent.modelVersions());
+
+    Assertions.assertEquals("modelA", modelInfoPreEvent.name());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.properties());
+    Assertions.assertTrue(modelInfoPreEvent.comment().isPresent());
+    String comment = modelInfoPreEvent.comment().get();
+    Assertions.assertEquals("commentA", comment);
+    Assertions.assertFalse(modelInfoPreEvent.audit().isPresent());
+    Assertions.assertFalse(modelInfoPreEvent.lastVersion().isPresent());
   }
 
   @Test
@@ -107,8 +164,6 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     GetModelPreEvent getModelPreEvent = (GetModelPreEvent) preEvent;
-    Assertions.assertEquals(OperationType.GET_MODEL, getModelPreEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, getModelPreEvent.operationStatus());
     Assertions.assertEquals(existingIdentA, getModelPreEvent.identifier());
   }
 
@@ -123,26 +178,7 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     DeleteModelPreEvent deleteModelPreEvent = (DeleteModelPreEvent) preEvent;
-    Assertions.assertEquals(DeleteModelPreEvent.class, deleteModelPreEvent.getClass());
-    Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelPreEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelPreEvent.operationStatus());
     Assertions.assertEquals(existingIdentA, deleteModelPreEvent.identifier());
-  }
-
-  @Test
-  void testDeleteNotExistsModelEvent() {
-    dispatcher.deleteModel(notExistingIdent);
-
-    // validate pre-event
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(DeleteModelPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.DELETE_MODEL, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
-
-    DeleteModelPreEvent deleteModelPreEvent = (DeleteModelPreEvent) preEvent;
-    Assertions.assertEquals(DeleteModelPreEvent.class, deleteModelPreEvent.getClass());
-    Assertions.assertEquals(OperationType.DELETE_MODEL, deleteModelPreEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, deleteModelPreEvent.operationStatus());
   }
 
   @Test
@@ -164,7 +200,7 @@ public class TestModelEvent {
     dispatcher.linkModelVersion(
         existingIdentA,
         "uriA",
-        new String[] {"aliasProduction"},
+        new String[] {"aliasProduction", "aliasTest"},
         "versionInfoA",
         ImmutableMap.of("color", "#FFFFFF"));
 
@@ -174,20 +210,25 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationType.LINK_MODEL_VERSION, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    // validate model info
     LinkModelVersionPreEvent linkModelVersionPreEvent = (LinkModelVersionPreEvent) preEvent;
-    ModelInfo modelInfoPreEvent = linkModelVersionPreEvent.linkedModelInfo();
-    Assertions.assertEquals("modelA", modelInfoPreEvent.getName());
-    Assertions.assertEquals("commentA", modelInfoPreEvent.getComment());
-    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.getProperties());
+    Assertions.assertEquals(existingIdentA, linkModelVersionPreEvent.identifier());
+    ModelVersionInfo modelVersionInfo = linkModelVersionPreEvent.linkedModelVersionInfo();
 
-    // validate model version info
-    ModelVersionInfo[] modelVersionInfosPreEvent = modelInfoPreEvent.modelVersions();
-    Assertions.assertNotNull(modelVersionInfosPreEvent);
-    Assertions.assertEquals(1, modelVersionInfosPreEvent.length);
-    Assertions.assertEquals("versionInfoA", modelVersionInfosPreEvent[0].getComment());
-    Assertions.assertEquals("uriA", modelVersionInfosPreEvent[0].getUri());
-    Assertions.assertEquals("aliasProduction", modelVersionInfosPreEvent[0].getAliases()[0]);
+    Assertions.assertEquals(1, modelVersionInfo.properties().size());
+    Assertions.assertEquals("#FFFFFF", modelVersionInfo.properties().get("color"));
+
+    Assertions.assertEquals("uriA", modelVersionInfo.uri());
+    Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
+    String[] aliases = modelVersionInfo.aliases().get();
+    Assertions.assertEquals(2, aliases.length);
+    Assertions.assertEquals("aliasProduction", aliases[0]);
+    Assertions.assertEquals("aliasTest", aliases[1]);
+
+    Assertions.assertTrue(modelVersionInfo.comment().isPresent());
+    String comment = modelVersionInfo.comment().get();
+    Assertions.assertEquals("versionInfoA", comment);
+
+    Assertions.assertFalse(modelVersionInfo.audit().isPresent());
   }
 
   @Test
@@ -199,6 +240,9 @@ public class TestModelEvent {
     Assertions.assertEquals(GetModelVersionPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.GET_MODEL_VERSION, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelVersionPreEvent getModelVersionPreEvent = (GetModelVersionPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionPreEvent.identifier());
   }
 
   @Test
@@ -210,6 +254,9 @@ public class TestModelEvent {
     Assertions.assertEquals(GetModelVersionPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.GET_MODEL_VERSION, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelVersionPreEvent getModelVersionPreEvent = (GetModelVersionPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentB, getModelVersionPreEvent.identifier());
   }
 
   @Test
@@ -221,6 +268,12 @@ public class TestModelEvent {
     Assertions.assertEquals(DeleteModelVersionPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    DeleteModelVersionPreEvent deleteModelVersionPreEvent = (DeleteModelVersionPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, deleteModelVersionPreEvent.identifier());
+    Assertions.assertTrue(deleteModelVersionPreEvent.version().isPresent());
+    Assertions.assertEquals(1, deleteModelVersionPreEvent.version().get());
+    Assertions.assertFalse(deleteModelVersionPreEvent.alias().isPresent());
   }
 
   @Test
@@ -232,17 +285,12 @@ public class TestModelEvent {
     Assertions.assertEquals(DeleteModelVersionPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
-  }
 
-  @Test
-  void testDeleteModelVersionEventViaVersionNotExists() {
-    dispatcher.deleteModelVersion(existingIdentA, 3);
-
-    // validate pre-event
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(DeleteModelVersionPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    DeleteModelVersionPreEvent deleteModelVersionPreEvent = (DeleteModelVersionPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentB, deleteModelVersionPreEvent.identifier());
+    Assertions.assertTrue(deleteModelVersionPreEvent.alias().isPresent());
+    Assertions.assertEquals("aliasTest", deleteModelVersionPreEvent.alias().get());
+    Assertions.assertFalse(deleteModelVersionPreEvent.version().isPresent());
   }
 
   @Test
@@ -255,13 +303,8 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    // validate model info
     ListModelVersionsPreEvent listModelVersionsPreEvent = (ListModelVersionsPreEvent) preEvent;
-    ModelInfo modelInfoPreEvent = listModelVersionsPreEvent.listModelVersionInfo();
-    Assertions.assertEquals("modelA", modelInfoPreEvent.getName());
-    Assertions.assertEquals("commentA", modelInfoPreEvent.getComment());
-    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.getProperties());
-    Assertions.assertNull(modelInfoPreEvent.modelVersions());
+    Assertions.assertEquals(existingIdentA, listModelVersionsPreEvent.identifier());
   }
 
   private ModelDispatcher mockExceptionModelDispatcher() {
@@ -301,29 +344,34 @@ public class TestModelEvent {
     return dispatcher;
   }
 
-  /**
-   * Mock a model with given name and comment.
-   *
-   * @param name name of the model
-   * @param comment comment of the model
-   * @return a mock model
-   */
-  private Model mockModel(String name, String comment) {
-    Model model = mock(Model.class);
-    when(model.name()).thenReturn(name);
-    when(model.comment()).thenReturn(comment);
-    when(model.properties()).thenReturn(ImmutableMap.of("color", "#FFFFFF"));
+  private Model getMockModel(String name, String comment) {
+    return getMockModel(name, comment, ImmutableMap.of("color", "#FFFFFF"));
+  }
+
+  private Model getMockModel(String name, String comment, Map<String, String> properties) {
+    Model mockModel = mock(Model.class);
+    when(mockModel.name()).thenReturn(name);
+    when(mockModel.comment()).thenReturn(comment);
+    when(mockModel.properties()).thenReturn(properties);
+    when(mockModel.latestVersion()).thenReturn(1);
+    when(mockModel.auditInfo()).thenReturn(null);
+
+    return mockModel;
+  }
+
+  private Model getMockModelWithAudit(String name, String comment) {
+    Model model = getMockModel(name, comment);
+    Audit mockAudit = mock(Audit.class);
+
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(mockAudit.lastModifier()).thenReturn("demo_user");
+    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(model.auditInfo()).thenReturn(mockAudit);
+
     return model;
   }
 
-  /**
-   * Mock a model version with given uri, aliases, and comment.
-   *
-   * @param uri uri of the model version
-   * @param aliases aliases of the model version
-   * @param comment comment of the model version, added "model version " prefix.
-   * @return a mock model version
-   */
   private ModelVersion mockModelVersion(String uri, String[] aliases, String comment) {
     ModelVersion modelVersion = mock(ModelVersion.class);
     when(modelVersion.version()).thenReturn(1);

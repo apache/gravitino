@@ -21,23 +21,24 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.ModelInfo;
+import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 
 /** Represents an event triggered before the linking of a model version. */
 @DeveloperApi
 public class LinkModelVersionPreEvent extends ModelPreEvent {
-  private final ModelInfo modelInfo;
+  private final ModelVersionInfo modelVersionInfo;
 
   /**
    * Create a new {@link LinkModelVersionPreEvent} instance.
    *
    * @param user The username of the individual who initiated the model version linking.
    * @param identifier The unique identifier of the model that was linked.
-   * @param modelInfo The final state of the model after linking.
+   * @param modelVersionInfo The version information of the model that was linked.
    */
-  public LinkModelVersionPreEvent(String user, NameIdentifier identifier, ModelInfo modelInfo) {
+  public LinkModelVersionPreEvent(
+      String user, NameIdentifier identifier, ModelVersionInfo modelVersionInfo) {
     super(user, identifier);
-    this.modelInfo = modelInfo;
+    this.modelVersionInfo = modelVersionInfo;
   }
 
   /**
@@ -45,8 +46,8 @@ public class LinkModelVersionPreEvent extends ModelPreEvent {
    *
    * @return the model information.
    */
-  public ModelInfo linkedModelInfo() {
-    return modelInfo;
+  public ModelVersionInfo linkedModelVersionInfo() {
+    return modelVersionInfo;
   }
 
   /**

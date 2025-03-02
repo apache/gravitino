@@ -19,12 +19,15 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered before deleting a model version. */
 @DeveloperApi
 public class DeleteModelVersionPreEvent extends ModelPreEvent {
+  private final Optional<String> alias;
+  private final Optional<Integer> version;
 
   /**
    * Create a new {@link DeleteModelVersionPreEvent} instance.
@@ -33,7 +36,42 @@ public class DeleteModelVersionPreEvent extends ModelPreEvent {
    * @param identifier The unique identifier of the model that was linked.
    */
   public DeleteModelVersionPreEvent(String user, NameIdentifier identifier) {
+    this(user, identifier, null, null);
+  }
+
+  /**
+   * Create a new {@link DeleteModelVersionPreEvent} instance.
+   *
+   * @param user The username of the individual who initiated the model version linking.
+   * @param identifier The unique identifier of the model that was linked.
+   * @param alias The alias of the model version to be deleted.
+   */
+  public DeleteModelVersionPreEvent(
+      String user, NameIdentifier identifier, String alias, Integer version) {
     super(user, identifier);
+
+    this.alias = Optional.ofNullable(alias);
+    this.version = Optional.ofNullable(version);
+  }
+
+  /**
+   * Returns the alias of the model version to be deleted.
+   *
+   * @return A {@link Optional} instance containing the alias if it was provided, or an empty {@link
+   *     Optional} otherwise.
+   */
+  public Optional<String> alias() {
+    return alias;
+  }
+
+  /**
+   * Returns the version of the model version to be deleted.
+   *
+   * @return A {@link Optional} instance containing the version if it was provided, or an empty
+   *     {@link Optional} otherwise.
+   */
+  public Optional<Integer> version() {
+    return version;
   }
 
   /**

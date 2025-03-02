@@ -19,10 +19,9 @@
 
 package org.apache.gravitino.listener.api.info;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import javax.annotation.Nullable;
-import lombok.Getter;
+import java.util.Optional;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.model.Model;
@@ -33,12 +32,11 @@ import org.apache.gravitino.model.Model;
  */
 @DeveloperApi
 public class ModelInfo {
-  @Getter private final String name;
-  @Nullable private final String comment;
-  @Getter private final Map<String, String> properties;
-  @Nullable private final Audit audit;
-  @Getter private final int lastVersion;
-  private final ModelVersionInfo[] versions;
+  private final String name;
+  private final Map<String, String> properties;
+  private final Optional<String> comment;
+  private final Optional<Audit> audit;
+  private final Optional<Integer> lastVersion;
 
   /**
    * Constructs model information based on a given model.
@@ -46,32 +44,49 @@ public class ModelInfo {
    * @param model the model to expose information for.
    */
   public ModelInfo(Model model) {
-    this(model, null);
+    this.name = model.name();
+    this.properties =
+        model.properties() == null ? ImmutableMap.of() : ImmutableMap.copyOf(model.properties());
+
+    this.comment = Optional.ofNullable(model.comment());
+    this.audit = Optional.ofNullable(model.auditInfo());
+    this.lastVersion = Optional.ofNullable(model.latestVersion());
   }
 
-  /**
-   * Constructs model information based on a given model and model versions.
-   *
-   * @param model the model to expose information for.
-   * @param modelVersions the versions of the model.
-   */
-  public ModelInfo(Model model, ModelVersionInfo[] modelVersions) {
-    this.name = model.name();
-    this.properties = model.properties();
-    this.comment = model.comment();
-    this.audit = model.auditInfo();
-    this.lastVersion = model.latestVersion();
-    this.versions = modelVersions;
+  public ModelInfo(String name, Map<String, String> properties, String comment) {
+    this(name, properties, comment, null, null);
   }
 
   public ModelInfo(
-      String name, Map<String, String> properties, String comment, ModelVersionInfo[] versions) {
+      String name,
+      Map<String, String> properties,
+      String comment,
+      Audit audit,
+      Integer lastVersion) {
     this.name = name;
-    this.properties = properties == null ? Collections.emptyMap() : properties;
-    this.comment = comment == null ? "" : comment;
-    this.audit = null;
-    this.lastVersion = 0;
-    this.versions = versions;
+
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.comment = Optional.ofNullable(comment);
+    this.audit = Optional.ofNullable(audit);
+    this.lastVersion = Optional.ofNullable(lastVersion);
+  }
+
+  /**
+   * Returns the name of the model.
+   *
+   * @return the name of the model.
+   */
+  public String name() {
+    return name;
+  }
+
+  /**
+   * Returns the properties of the model.
+   *
+   * @return the properties of the model.
+   */
+  public Map<String, String> properties() {
+    return properties;
   }
 
   /**
@@ -79,8 +94,7 @@ public class ModelInfo {
    *
    * @return the comment of the model or null if not set.
    */
-  @Nullable
-  public String getComment() {
+  public Optional<String> comment() {
     return comment;
   }
 
@@ -89,18 +103,16 @@ public class ModelInfo {
    *
    * @return the audit information of the model or null if not set.
    */
-  @Nullable
-  public Audit getAudit() {
+  public Optional<Audit> audit() {
     return audit;
   }
 
   /**
-   * Returns the versions of the model.
+   * returns the last version of the model.
    *
-   * @return the versions of the model or null if not set.
+   * @return the last version of the model, or empty if not set.
    */
-  @Nullable
-  public ModelVersionInfo[] modelVersions() {
-    return versions;
+  public Optional<Integer> lastVersion() {
+    return lastVersion;
   }
 }
