@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.cli.commands;
 
 import com.google.common.base.Joiner;
@@ -51,18 +50,41 @@ public class ListColumns extends TableCommand {
   /** Displays the details of a table's columns. */
   @Override
   public void handle() {
-    Column[] columns = null;
-
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
-      columns = tableCatalog().loadTable(name).columns();
+      Column[] columns = tableCatalog().loadTable(name).columns();
+
+      if (columns == null || columns.length == 0) {
+        exitWithError("No columns found for the specified table.");
+        return;
+      }
+
+      StringBuilder all = new StringBuilder();
+      all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
+
+      for (Column column : columns) {
+        if (column == null) {
+          continue;
+        }
+
+        all.append(column.name()).append(",");
+        all.append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN")
+            .append(",");
+        all.append(column.comment() != null ? column.comment() : "N/A").append(",");
+        all.append(column.nullable() ? "true" : "false").append(",");
+        all.append(column.autoIncrement() ? "true" : "false");
+        all.append(System.lineSeparator());
+      }
+
+      printResults(all.toString());
+
     } catch (NoSuchTableException noSuchTableException) {
       exitWithError(
-          ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
+          ErrorMessages.UNKNOWN_TABLE
+              + " "
+              + Joiner.on(".").join(metalake, catalog, schema, table));
     } catch (Exception exp) {
-      exitWithError(exp.getMessage());
+      exitWithError("An error occurred while retrieving column details: " + exp.getMessage());
     }
-
-    printResults(columns);
   }
 }

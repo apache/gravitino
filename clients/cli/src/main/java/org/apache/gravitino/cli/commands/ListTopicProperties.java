@@ -77,6 +77,11 @@ public class ListTopicProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
+    if (gTopic == null) {
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+      return;
+    }
+
     Map<String, String> properties = gTopic.properties();
     printProperties(properties);
   }
