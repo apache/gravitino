@@ -22,10 +22,26 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaBaseSQLProvider {
+  public String listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
+        + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
+        + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
+        + " cm.current_version as currentVersion, cm.last_version as lastVersion,"
+        + " cm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " cm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND mm.deleted_at = 0 AND cm.deleted_at = 0";
+  }
+
   public String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
