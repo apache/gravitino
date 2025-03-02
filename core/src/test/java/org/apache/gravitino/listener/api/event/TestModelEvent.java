@@ -299,11 +299,11 @@ public class TestModelEvent {
 
     // validate pre-event
     PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(ListModelVersionsPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(ListModelVersionPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    ListModelVersionsPreEvent listModelVersionsPreEvent = (ListModelVersionsPreEvent) preEvent;
+    ListModelVersionPreEvent listModelVersionsPreEvent = (ListModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, listModelVersionsPreEvent.identifier());
   }
 

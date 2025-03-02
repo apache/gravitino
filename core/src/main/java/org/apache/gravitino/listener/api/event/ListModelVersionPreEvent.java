@@ -24,8 +24,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered before listing model versions. */
 @DeveloperApi
-public class ListModelVersionsPreEvent extends ModelPreEvent {
-  public ListModelVersionsPreEvent(String user, NameIdentifier identifier) {
+public class ListModelVersionPreEvent extends ModelPreEvent {
+  public ListModelVersionPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
 

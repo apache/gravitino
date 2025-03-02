@@ -22,7 +22,6 @@ package org.apache.gravitino.listener.api.info;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Optional;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.model.ModelVersion;
 

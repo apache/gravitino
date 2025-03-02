@@ -34,7 +34,7 @@ import org.apache.gravitino.listener.api.event.GetModelPreEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelPreEvent;
-import org.apache.gravitino.listener.api.event.ListModelVersionsPreEvent;
+import org.apache.gravitino.listener.api.event.ListModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelPreEvent;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
@@ -336,7 +336,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException {
     eventBus.dispatchEvent(
-        new ListModelVersionsPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+        new ListModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       int[] versions = dispatcher.listModelVersions(ident);
       // TODO: ModelEvent
