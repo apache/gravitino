@@ -54,7 +54,6 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
   @Override
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
-    Configuration configuration = new Configuration();
 
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, ImmutableMap.of());
@@ -69,11 +68,10 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
     }
 
     if (!hadoopConfMap.containsKey(ABFS_IMPL_KEY)) {
-      configuration.set(ABFS_IMPL_KEY, ABFS_IMPL);
+      hadoopConfMap.put(ABFS_IMPL_KEY, ABFS_IMPL);
     }
 
-    hadoopConfMap.forEach(configuration::set);
-
+    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 

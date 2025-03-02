@@ -31,12 +31,8 @@ public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration = new Configuration();
-    config.forEach(
-        (k, v) -> {
-          configuration.set(k.replace(BUILTIN_HDFS_FS_PROVIDER, ""), v);
-        });
-
+    Configuration configuration =
+        FileSystemUtils.createConfiguration(BUILTIN_HDFS_FS_PROVIDER, config);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
