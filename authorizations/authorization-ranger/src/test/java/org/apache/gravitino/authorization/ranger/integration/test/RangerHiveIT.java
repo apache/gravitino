@@ -1159,7 +1159,8 @@ public class RangerHiveIT {
     RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
     rangerAuthHivePlugin.setRangerClient(client);
     when(client.searchUser(any())).thenReturn(Mockito.mock(VXUserList.class));
-    when(client.grantRole(any(), any())).thenThrow(new AuthorizationPluginException("test"));
+    when(client.grantRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
     Assertions.assertThrows(
         AuthorizationPluginException.class,
         () -> rangerAuthHivePlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
@@ -1216,7 +1217,8 @@ public class RangerHiveIT {
     RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
     rangerAuthHivePlugin.setRangerClient(client);
     when(client.searchUser(any())).thenReturn(Mockito.mock(VXUserList.class));
-    when(client.revokeRole(any(), any())).thenThrow(new AuthorizationPluginException("test"));
+    when(client.revokeRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
     Assertions.assertThrows(
         AuthorizationPluginException.class,
         () -> rangerAuthHivePlugin.onRevokedRolesFromUser(Lists.newArrayList(role), userEntity1));
@@ -1253,7 +1255,8 @@ public class RangerHiveIT {
     RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
     rangerAuthHivePlugin.setRangerClient(client);
     when(client.createGroup(any())).thenReturn(true);
-    when(client.grantRole(any(), any())).thenThrow(new AuthorizationPluginException("test"));
+    when(client.grantRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
     Assertions.assertThrows(
         AuthorizationPluginException.class,
         () -> rangerAuthHivePlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
@@ -1313,7 +1316,8 @@ public class RangerHiveIT {
     RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
     rangerAuthHivePlugin.setRangerClient(client);
     when(client.createGroup(any())).thenReturn(true);
-    when(client.revokeRole(any(), any())).thenThrow(new AuthorizationPluginException("test"));
+    when(client.revokeRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
     Assertions.assertThrows(
         AuthorizationPluginException.class,
         () -> rangerAuthHivePlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));

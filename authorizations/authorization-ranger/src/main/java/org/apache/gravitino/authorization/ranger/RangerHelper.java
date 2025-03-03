@@ -296,7 +296,8 @@ public class RangerHelper {
 
       // The client will return a error message contains `doesn't have permission` if the role does
       // not exist, then create it.
-      if (e.getMessage().contains("User doesn't have permissions to get details")) {
+      if (e.getMessage() != null
+          && e.getMessage().contains("User doesn't have permissions to get details")) {
         LOG.warn("The role({}) does not exist in the Ranger!, e: {}", roleName, e);
       } else {
         throw new AuthorizationPluginException(
