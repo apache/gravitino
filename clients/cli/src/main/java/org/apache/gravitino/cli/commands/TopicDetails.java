@@ -77,7 +77,6 @@ public class TopicDetails extends Command {
 
     if (gTopic == null) {
       exitWithError(ErrorMessages.UNKNOWN_TOPIC);
-      return;
     }
 
     printResults("Topic Name: " + gTopic.name() + ", Comment: " + gTopic.comment());

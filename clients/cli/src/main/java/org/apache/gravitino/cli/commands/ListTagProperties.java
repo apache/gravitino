@@ -64,7 +64,6 @@ public class ListTagProperties extends ListProperties {
 
     if (gTag == null) {
       exitWithError(ErrorMessages.UNKNOWN_TAG);
-      return;
     }
 
     Map<String, String> properties = gTag.properties();

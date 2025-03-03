@@ -57,7 +57,6 @@ public class ListMetalakeProperties extends ListProperties {
 
     if (gMetalake == null) {
       exitWithError("Metalake not found: " + metalake);
-      return;
     }
 
     Map<String, String> properties = gMetalake.properties();

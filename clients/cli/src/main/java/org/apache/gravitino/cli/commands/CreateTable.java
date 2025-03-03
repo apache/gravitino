@@ -88,11 +88,9 @@ public class CreateTable extends Command {
 
     if (client == null) {
       exitWithError("Client initialization failed.");
-      return;
     }
     if (tableName == null) {
       exitWithError("Table name could not be determined.");
-      return;
     }
 
     try {
@@ -100,7 +98,6 @@ public class CreateTable extends Command {
       columns = readTableCSV.columns(tableData);
       if (columns == null || columns.length == 0) {
         exitWithError("No valid columns found in the provided file.");
-        return;
       }
     } catch (Exception exp) {
       exitWithError("Error reading or parsing column file: " + exp.getMessage());

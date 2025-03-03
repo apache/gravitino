@@ -80,7 +80,6 @@ public class ListTableProperties extends ListProperties {
 
     if (gTable == null) {
       exitWithError("Table not found: " + table);
-      return;
     }
 
     Map<String, String> properties = gTable.properties();

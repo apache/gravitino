@@ -56,7 +56,6 @@ public class ListColumns extends TableCommand {
 
       if (columns == null || columns.length == 0) {
         exitWithError("No columns found for the specified table.");
-        return;
       }
 
       StringBuilder all = new StringBuilder();

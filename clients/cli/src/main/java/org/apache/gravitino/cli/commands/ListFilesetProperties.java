@@ -77,7 +77,6 @@ public class ListFilesetProperties extends ListProperties {
 
     if (gFileset == null) {
       exitWithError("Failed to load fileset: " + fileset);
-      return;
     }
 
     printProperties(gFileset.properties() != null ? gFileset.properties() : Collections.emptyMap());

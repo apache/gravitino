@@ -83,7 +83,6 @@ public class ModelDetails extends Command {
 
     if (gModel == null) {
       exitWithError(ErrorMessages.UNKNOWN_MODEL);
-      return;
     }
 
     String basicInfo =

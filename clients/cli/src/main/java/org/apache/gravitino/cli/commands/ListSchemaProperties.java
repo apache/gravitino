@@ -72,7 +72,6 @@ public class ListSchemaProperties extends ListProperties {
 
     if (gSchema == null) {
       exitWithError("Schema not found: " + schema);
-      return;
     }
 
     Map<String, String> properties = gSchema.properties();

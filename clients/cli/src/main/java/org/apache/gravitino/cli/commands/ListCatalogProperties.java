@@ -25,7 +25,6 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /** List the properties of a catalog. */
 public class ListCatalogProperties extends ListProperties {
@@ -53,8 +52,6 @@ public class ListCatalogProperties extends ListProperties {
 
     try (GravitinoClient client = buildClient(metalake)) {
       gCatalog = client.loadCatalog(catalog);
-    } catch (NoSuchMetalakeException err) {
-      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
