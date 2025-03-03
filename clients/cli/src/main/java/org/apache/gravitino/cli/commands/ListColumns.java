@@ -59,18 +59,17 @@ public class ListColumns extends TableCommand {
       }
 
       StringBuilder all = new StringBuilder();
-      all.append("name,datatype,comment,nullable,auto_increment").append(System.lineSeparator());
+      all.append("name\tdatatype\tcomment\tnullable\tauto_increment").append(System.lineSeparator());
 
       for (Column column : columns) {
         if (column == null) {
           continue;
         }
 
-        all.append(column.name()).append(",");
-        all.append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN")
-            .append(",");
-        all.append(column.comment() != null ? column.comment() : "N/A").append(",");
-        all.append(column.nullable() ? "true" : "false").append(",");
+        all.append(column.name()).append("\t");
+        all.append(column.dataType() != null ? column.dataType().simpleString() : "UNKNOWN").append("\t");
+        all.append(column.comment() != null ? column.comment() : "N/A").append("\t");
+        all.append(column.nullable() ? "true" : "false").append("\t");
         all.append(column.autoIncrement() ? "true" : "false");
         all.append(System.lineSeparator());
       }

@@ -52,6 +52,8 @@ public class ListCatalogProperties extends ListProperties {
 
     try (GravitinoClient client = buildClient(metalake)) {
       gCatalog = client.loadCatalog(catalog);
+    } catch (NoSuchMetalakeException err) {
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (Exception exp) {
