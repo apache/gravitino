@@ -54,6 +54,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -102,12 +103,43 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException {
+    create(
+        databaseName,
+        tableName,
+        columns,
+        comment,
+        properties,
+        partitioning,
+        distribution,
+        indexes,
+        null);
+  }
+
+  @Override
+  public void create(
+      String databaseName,
+      String tableName,
+      JdbcColumn[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      Index[] indexes,
+      SortOrder[] sortOrders)
+      throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
           connection,
           generateCreateTableSql(
-              tableName, columns, comment, properties, partitioning, distribution, indexes));
+              tableName,
+              columns,
+              comment,
+              properties,
+              partitioning,
+              distribution,
+              indexes,
+              sortOrders));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -461,6 +493,24 @@ public abstract class JdbcTableOperations implements TableOperation {
       Transform[] partitioning,
       Distribution distribution,
       Index[] indexes);
+
+  protected String generateCreateTableSql(
+      String tableName,
+      JdbcColumn[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      Index[] indexes,
+      SortOrder[] sortOrders) {
+    if (sortOrders == null || sortOrders.length == 0) {
+      return generateCreateTableSql(
+          tableName, columns, comment, properties, partitioning, distribution, indexes);
+    }
+
+    throw new UnsupportedOperationException(
+        "generateCreateTableSql with sortOrders defined is not supported");
+  }
 
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
