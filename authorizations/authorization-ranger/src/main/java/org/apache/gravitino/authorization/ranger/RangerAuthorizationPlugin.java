@@ -83,6 +83,7 @@ public abstract class RangerAuthorizationPlugin
   protected final RangerClientExtension rangerClient;
   protected final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
+  private boolean isCreatedByPlugin = false;
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
@@ -118,6 +119,7 @@ public abstract class RangerAuthorizationPlugin
             for (RangerPolicy policy : policies) {
               rangerClient.deletePolicy(policy.getId());
             }
+            isCreatedByPlugin = true;
           } catch (RangerServiceException crse) {
             throw new AuthorizationPluginException(
                 "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
@@ -978,7 +980,9 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public void close() throws IOException {
     try {
-      rangerClient.deleteService(rangerServiceName);
+      if (isCreatedByPlugin) {
+        rangerClient.deleteService(rangerServiceName);
+      }
     } catch (RangerServiceException rse) {
       throw new AuthorizationPluginException(
           "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());
