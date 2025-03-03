@@ -142,7 +142,7 @@ public class TestModelEvent {
     // validate pre-event model info
     RegisterModelPreEvent registerModelPreEvent = (RegisterModelPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, registerModelPreEvent.identifier());
-    ModelInfo modelInfoPreEvent = registerModelPreEvent.registeredModelInfo();
+    ModelInfo modelInfoPreEvent = registerModelPreEvent.registerModelRequest();
 
     Assertions.assertEquals("modelA", modelInfoPreEvent.name());
     Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.properties());
@@ -151,6 +151,45 @@ public class TestModelEvent {
     Assertions.assertEquals("commentA", comment);
     Assertions.assertFalse(modelInfoPreEvent.audit().isPresent());
     Assertions.assertFalse(modelInfoPreEvent.lastVersion().isPresent());
+  }
+
+  @Test
+  void testRegisterAndLinkModelEvent() {
+    dispatcher.registerModel(
+        existingIdentA,
+        "uriA",
+        new String[] {"aliasProduction", "aliasTest"},
+        "commentA",
+        ImmutableMap.of("color", "#FFFFFF"));
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(RegisterAndLinkModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(
+        OperationType.REGISTER_AND_LINK_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    // validate pre-event model info
+    RegisterAndLinkModelPreEvent registerAndLinkModelPreEvent =
+        (RegisterAndLinkModelPreEvent) preEvent;
+    ModelInfo registerModelRequest = registerAndLinkModelPreEvent.registerModelRequest();
+
+    Assertions.assertEquals("modelA", registerModelRequest.name());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), registerModelRequest.properties());
+    Assertions.assertTrue(registerModelRequest.comment().isPresent());
+    String comment = registerModelRequest.comment().get();
+    Assertions.assertEquals("commentA", comment);
+    Assertions.assertFalse(registerModelRequest.audit().isPresent());
+    Assertions.assertFalse(registerModelRequest.lastVersion().isPresent());
+
+    // validate pre-event model version info
+    ModelVersionInfo modelVersionInfoPreEvent =
+        registerAndLinkModelPreEvent.linkModelVersionRequest();
+    Assertions.assertEquals("uriA", modelVersionInfoPreEvent.uri());
+    Assertions.assertTrue(modelVersionInfoPreEvent.aliases().isPresent());
+    String[] aliases = modelVersionInfoPreEvent.aliases().get();
+    Assertions.assertEquals(2, aliases.length);
+    Assertions.assertEquals("aliasProduction", aliases[0]);
+    Assertions.assertEquals("aliasTest", aliases[1]);
   }
 
   @Test
@@ -212,7 +251,7 @@ public class TestModelEvent {
 
     LinkModelVersionPreEvent linkModelVersionPreEvent = (LinkModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, linkModelVersionPreEvent.identifier());
-    ModelVersionInfo modelVersionInfo = linkModelVersionPreEvent.linkedModelVersionInfo();
+    ModelVersionInfo modelVersionInfo = linkModelVersionPreEvent.linkModelVersionRequest();
 
     Assertions.assertEquals(1, modelVersionInfo.properties().size());
     Assertions.assertEquals("#FFFFFF", modelVersionInfo.properties().get("color"));

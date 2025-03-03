@@ -26,18 +26,19 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
 /** Represents an event triggered before registering a model. */
 @DeveloperApi
 public class RegisterModelPreEvent extends ModelPreEvent {
-  private ModelInfo modelInfo;
+  private final ModelInfo registerModelRequest;
 
   /**
    * Create a new {@link RegisterModelPreEvent} instance.
    *
    * @param user the user who triggered the event.
    * @param identifier the identifier of the model being operated on.
-   * @param modelInfo the model information.
+   * @param registerModelRequest the model information that was requested to be registered.
    */
-  public RegisterModelPreEvent(String user, NameIdentifier identifier, ModelInfo modelInfo) {
+  public RegisterModelPreEvent(
+      String user, NameIdentifier identifier, ModelInfo registerModelRequest) {
     super(user, identifier);
-    this.modelInfo = modelInfo;
+    this.registerModelRequest = registerModelRequest;
   }
 
   /**
@@ -45,8 +46,8 @@ public class RegisterModelPreEvent extends ModelPreEvent {
    *
    * @return the model information.
    */
-  public ModelInfo registeredModelInfo() {
-    return modelInfo;
+  public ModelInfo registerModelRequest() {
+    return registerModelRequest;
   }
 
   /**

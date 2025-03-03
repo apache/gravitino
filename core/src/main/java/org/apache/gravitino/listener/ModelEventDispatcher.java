@@ -35,11 +35,11 @@ import org.apache.gravitino.listener.api.event.GetModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionPreEvent;
+import org.apache.gravitino.listener.api.event.RegisterAndLinkModelPreEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelPreEvent;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 import org.apache.gravitino.model.Model;
-import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -66,20 +66,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     this.dispatcher = dispatcher;
   }
 
-  /**
-   * Register a model in the catalog if the model is not existed, otherwise the {@link
-   * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created when the
-   * model is registered, users can call {@link ModelCatalog#linkModelVersion(NameIdentifier,
-   * String, String[], String, Map)} to link the model version to the registered {@link Model}.
-   *
-   * @param ident The name identifier of the model.
-   * @param comment The comment of the model. The comment is optional and can be null.
-   * @param properties The properties of the model. The properties are optional and can be null or
-   *     empty.
-   * @return The registered model object.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws ModelAlreadyExistsException If the model already registered.
-   */
+  /** {@inheritDoc} */
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException {
@@ -96,26 +83,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Register a model in the catalog if the model is not existed, otherwise the {@link
-   * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created when the
-   * model is registered, in the meantime, the model version (version 0) will also be created and
-   * linked to the registered model.
-   *
-   * @param ident The name identifier of the model.
-   * @param uri The model artifact URI.
-   * @param aliases The aliases of the model version. The aliases should be unique in this model,
-   *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
-   *     are optional and can be empty. Also, be aware that the alias cannot be a number or a number
-   *     string.
-   * @param comment The comment of the model. The comment is optional and can be null.
-   * @param properties The properties of the model. The properties are optional and can be null or
-   *     empty.
-   * @return The registered model object.
-   * @throws NoSuchSchemaException If the schema does not exist when register a model.
-   * @throws ModelAlreadyExistsException If the model already registered.
-   * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
-   */
+  /** {@inheritDoc} */
   @Override
   public Model registerModel(
       NameIdentifier ident,
@@ -125,16 +93,17 @@ public class ModelEventDispatcher implements ModelDispatcher {
       Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException,
           ModelVersionAliasesAlreadyExistException {
-    ModelInfo modelInfo = new ModelInfo(ident.name(), properties, comment);
-    ModelVersionInfo registerRequest = new ModelVersionInfo(uri, comment, properties, aliases);
+    ModelInfo registerModelRequest = new ModelInfo(ident.name(), properties, comment);
+    ModelVersionInfo linkModelVersionRequest =
+        new ModelVersionInfo(uri, comment, properties, aliases);
 
-    RegisterModelPreEvent registerModelRequest =
-        new RegisterModelPreEvent(PrincipalUtils.getCurrentUserName(), ident, modelInfo);
-    LinkModelVersionPreEvent linkModelVersionPreEvent =
-        new LinkModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, registerRequest);
-
-    eventBus.dispatchEvent(registerModelRequest);
-    eventBus.dispatchEvent(linkModelVersionPreEvent);
+    RegisterAndLinkModelPreEvent registerAndLinkModelPreEvent =
+        new RegisterAndLinkModelPreEvent(
+            PrincipalUtils.getCurrentUserName(),
+            ident,
+            registerModelRequest,
+            linkModelVersionRequest);
+    eventBus.dispatchEvent(registerAndLinkModelPreEvent);
     try {
       // TODO: ModelEvent
       return dispatcher.registerModel(ident, uri, aliases, comment, properties);
@@ -143,13 +112,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Get a model metadata by {@link NameIdentifier} from the catalog.
-   *
-   * @param ident A model identifier.
-   * @return The model metadata.
-   * @throws NoSuchModelException If the model does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public Model getModel(NameIdentifier ident) throws NoSuchModelException {
     eventBus.dispatchEvent(new GetModelPreEvent(PrincipalUtils.getCurrentUserName(), ident));
@@ -163,13 +126,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Delete the model from the catalog. If the model does not exist, return false. Otherwise, return
-   * true. The deletion of the model will also delete all the model versions linked to this model.
-   *
-   * @param ident The name identifier of the model.
-   * @return True if the model is deleted, false if the model does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public boolean deleteModel(NameIdentifier ident) {
     eventBus.dispatchEvent(new DeleteModelPreEvent(PrincipalUtils.getCurrentUserName(), ident));
@@ -182,13 +139,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * List the models in a schema namespace from the catalog.
-   *
-   * @param namespace A schema namespace.
-   * @return An array of model identifiers in the namespace.
-   * @throws NoSuchModelException If the model does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public NameIdentifier[] listModels(Namespace namespace) throws NoSuchSchemaException {
     eventBus.dispatchEvent(new ListModelPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
@@ -202,23 +153,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Link a new model version to the registered model object. The new model version will be added to
-   * the model object. If the model object does not exist, it will throw an exception. If the
-   * version alias already exists in the model, it will throw an exception.
-   *
-   * @param ident The name identifier of the model.
-   * @param uri The URI of the model version artifact.
-   * @param aliases The aliases of the model version. The aliases should be unique in this model,
-   *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
-   *     are optional and can be empty. Also, be aware that the alias cannot be a number or a number
-   *     string.
-   * @param comment The comment of the model version. The comment is optional and can be null.
-   * @param properties The properties of the model version. The properties are optional and can be
-   *     null or empty.
-   * @throws NoSuchModelException If the model does not exist.
-   * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
-   */
+  /** {@inheritDoc} */
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
@@ -239,14 +174,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Get a model version by the {@link NameIdentifier} and version number from the catalog.
-   *
-   * @param ident The name identifier of the model.
-   * @param version The version number of the model.
-   * @return The model version object.
-   * @throws NoSuchModelVersionException If the model version does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
@@ -260,14 +188,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Get a model version by the {@link NameIdentifier} and version alias from the catalog.
-   *
-   * @param ident The name identifier of the model.
-   * @param alias The version alias of the model.
-   * @return The model version object.
-   * @throws NoSuchModelVersionException If the model version does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public ModelVersion getModelVersion(NameIdentifier ident, String alias)
       throws NoSuchModelVersionException {
@@ -282,14 +203,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Delete the model version by the {@link NameIdentifier} and version number. If the model version
-   * does not exist, return false. If the model version is deleted, return true.
-   *
-   * @param ident The name identifier of the model.
-   * @param version The version number of the model.
-   * @return True if the model version is deleted, false if the model version does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, int version) {
     eventBus.dispatchEvent(
@@ -304,14 +218,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Delete the model version by the {@link NameIdentifier} and version alias. If the model version
-   * does not exist, return false. If the model version is deleted, return true.
-   *
-   * @param ident The name identifier of the model.
-   * @param alias The version alias of the model.
-   * @return True if the model version is deleted, false if the model version does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, String alias) {
     eventBus.dispatchEvent(
@@ -326,13 +233,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * List all the versions of the register model by {@link NameIdentifier} in the catalog.
-   *
-   * @param ident The name identifier of the model.
-   * @return An array of version numbers of the model.
-   * @throws NoSuchModelException If the model does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException {
     eventBus.dispatchEvent(
@@ -347,38 +248,19 @@ public class ModelEventDispatcher implements ModelDispatcher {
     }
   }
 
-  /**
-   * Check if a model exists using an {@link NameIdentifier} from the catalog.
-   *
-   * @param ident A model identifier.
-   * @return true If the model exists, false if the model does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public boolean modelExists(NameIdentifier ident) {
     return dispatcher.modelExists(ident);
   }
 
-  /**
-   * Check if the model version exists by the {@link NameIdentifier} and version number. If the
-   * model version exists, return true, otherwise return false.
-   *
-   * @param ident The name identifier of the model.
-   * @param version The version number of the model.
-   * @return True if the model version exists, false if the model version does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public boolean modelVersionExists(NameIdentifier ident, int version) {
     return dispatcher.modelVersionExists(ident, version);
   }
 
-  /**
-   * Check if the model version exists by the {@link NameIdentifier} and version alias. If the model
-   * version exists, return true, otherwise return false.
-   *
-   * @param ident The name identifier of the model.
-   * @param alias The version alias of the model.
-   * @return True if the model version exists, false if the model version does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public boolean modelVersionExists(NameIdentifier ident, String alias) {
     return dispatcher.modelVersionExists(ident, alias);

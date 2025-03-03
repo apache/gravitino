@@ -20,26 +20,40 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 
-/** Represents an event triggered before the linking of a model version. */
-@DeveloperApi
-public class LinkModelVersionPreEvent extends ModelPreEvent {
+/** Represents an event triggered before registering a model and linking a model version. */
+public class RegisterAndLinkModelPreEvent extends ModelPreEvent {
+  private final ModelInfo registerModelRequest;
   private final ModelVersionInfo linkModelVersionRequest;
 
   /**
-   * Create a new {@link LinkModelVersionPreEvent} instance.
+   * Create a new {@code RegisterAndLinkModelEvent} instance.
    *
-   * @param user The username of the individual who initiated the model version linking.
-   * @param identifier The unique identifier of the model that was linked.
+   * @param user the user who triggered the event.
+   * @param identifier the identifier of the model being operated on.
+   * @param registerModelRequest the model information that was requested to be registered.
    * @param linkModelVersionRequest The version information of the model that was requested to be
    *     linked.
    */
-  public LinkModelVersionPreEvent(
-      String user, NameIdentifier identifier, ModelVersionInfo linkModelVersionRequest) {
+  public RegisterAndLinkModelPreEvent(
+      String user,
+      NameIdentifier identifier,
+      ModelInfo registerModelRequest,
+      ModelVersionInfo linkModelVersionRequest) {
     super(user, identifier);
+    this.registerModelRequest = registerModelRequest;
     this.linkModelVersionRequest = linkModelVersionRequest;
+  }
+
+  /**
+   * Retrieves the registered model information.
+   *
+   * @return the model information.
+   */
+  public ModelInfo registerModelRequest() {
+    return registerModelRequest;
   }
 
   /**
@@ -58,6 +72,6 @@ public class LinkModelVersionPreEvent extends ModelPreEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LINK_MODEL_VERSION;
+    return OperationType.REGISTER_AND_LINK_MODEL_VERSION;
   }
 }
