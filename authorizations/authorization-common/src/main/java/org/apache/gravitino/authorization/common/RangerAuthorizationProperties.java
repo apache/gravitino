@@ -88,7 +88,8 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
       Preconditions.checkArgument(
           properties.get(RANGER_SERVICE_NAME) != null,
           String.format(
-              "%s is required if you don't create the absent ranger service", RANGER_SERVICE_NAME));
+              "%s is required unless %s is specified",
+              RANGER_SERVICE_NAME, RANGER_SERVICE_CREATE_IF_ABSENT));
     }
   }
 }

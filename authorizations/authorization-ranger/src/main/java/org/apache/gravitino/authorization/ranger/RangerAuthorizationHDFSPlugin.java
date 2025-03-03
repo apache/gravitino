@@ -52,7 +52,6 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.ranger.RangerServiceException;
@@ -64,6 +63,17 @@ import org.slf4j.LoggerFactory;
 public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHDFSPlugin.class);
   private static final Pattern HDFS_PATTERN = Pattern.compile("^hdfs://[^/]*");
+  public static final String USERNAME = "username";
+  public static final String DEFAULT_USERNAME = "admin";
+  public static final String PASSWORD = "password";
+  public static final String DEFAULT_PASSWORD = "admin";
+  public static final String HADOOP_SECURITY_AUTHENTICATION = "hadoop.security.authentication";
+  public static final String DEFAULT_HADOOP_SECURITY_AUTHENTICATION = "simple";
+  public static final String HADOOP_RPC_PROTECTION = "hadoop.rpc.protection";
+  public static final String DEFAULT_HADOOP_RPC_PROTECTION = "authentication";
+  public static final String HADOOP_SECURITY_AUTHORIZATION = "hadoop.security.authorization";
+  public static final String FS_DEFAULT_NAME = "fs.default.name";
+  public static final String FS_DEFAULT_VALUE = "hdfs://127.0.0.1:8090";
 
   public RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
@@ -683,54 +693,25 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   @Override
   protected String getServiceType() {
-    return "hdfs";
+    return HDFS_SERVICE_TYPE;
   }
 
   @Override
   protected Map<String, String> getServiceConfigs(Map<String, String> config) {
-    String usernameKey = "username";
-    String usernameVal = "admin";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey)) {
-      usernameVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey);
-    }
-
-    String passwordKey = "password";
-    String passwordVal = "admin";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordKey)) {
-      passwordVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordKey);
-    }
-
-    String authenticationKey = "hadoop.security.authentication";
-    String authenticationVal = "simple";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey)) {
-      authenticationVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey);
-    }
-
-    String protectionKey = "hadoop.rpc.protection";
-    String protectionVal = "authentication";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + protectionKey)) {
-      protectionVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + protectionKey);
-    }
-
-    String authorizationKey = "hadoop.security.authorization";
-    String authorizationVal = "false";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey)) {
-      authorizationVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + authenticationKey);
-    }
-
-    String fsDefaultNameKey = "fs.default.name";
-    String fsDefaultNameVal = "hdfs://127.0.0.1:8090";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + fsDefaultNameKey)) {
-      fsDefaultNameVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + fsDefaultNameKey);
-    }
-
     return ImmutableMap.<String, String>builder()
-        .put(usernameKey, usernameVal)
-        .put(passwordKey, passwordVal)
-        .put(authenticationKey, authenticationVal)
-        .put(protectionKey, protectionVal)
-        .put(authorizationKey, authorizationVal)
-        .put(fsDefaultNameKey, fsDefaultNameVal)
+        .put(USERNAME, getConfValue(config, USERNAME, DEFAULT_USERNAME))
+        .put(PASSWORD, getConfValue(config, PASSWORD, DEFAULT_PASSWORD))
+        .put(
+            HADOOP_SECURITY_AUTHENTICATION,
+            getConfValue(
+                config, HADOOP_SECURITY_AUTHENTICATION, DEFAULT_HADOOP_SECURITY_AUTHENTICATION))
+        .put(
+            HADOOP_RPC_PROTECTION,
+            getConfValue(config, HADOOP_RPC_PROTECTION, DEFAULT_HADOOP_RPC_PROTECTION))
+        .put(
+            HADOOP_SECURITY_AUTHORIZATION,
+            getConfValue(config, HADOOP_SECURITY_AUTHORIZATION, "false"))
+        .put(FS_DEFAULT_NAME, getConfValue(config, FS_DEFAULT_NAME, FS_DEFAULT_VALUE))
         .build();
   }
 }

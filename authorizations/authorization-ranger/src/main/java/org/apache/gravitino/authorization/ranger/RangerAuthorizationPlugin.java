@@ -49,6 +49,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
@@ -77,6 +78,8 @@ import org.slf4j.LoggerFactory;
 public abstract class RangerAuthorizationPlugin
     implements AuthorizationPlugin, AuthorizationPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
+  protected static final String HDFS_SERVICE_TYPE = "hdfs";
+  protected static final String HADOOP_SQL_SERVICE_TYPE = "hive";
 
   protected String metalake;
   protected final String rangerServiceName;
@@ -105,30 +108,7 @@ public abstract class RangerAuthorizationPlugin
         serviceName = config.get(BaseAuthorization.UUID);
       }
 
-      try {
-        rangerClient.getService(serviceName);
-      } catch (RangerServiceException rse) {
-        if (rse.getStatus().equals(ClientResponse.Status.NOT_FOUND)) {
-          try {
-            RangerService rangerService = new RangerService();
-            rangerService.setType(getServiceType());
-            rangerService.setName(serviceName);
-            rangerService.setConfigs(getServiceConfigs(config));
-            rangerClient.createService(rangerService);
-            List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
-            for (RangerPolicy policy : policies) {
-              rangerClient.deletePolicy(policy.getId());
-            }
-            isCreatedByPlugin = true;
-          } catch (RangerServiceException crse) {
-            throw new AuthorizationPluginException(
-                "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
-          }
-        } else {
-          throw new AuthorizationPluginException(
-              "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
-        }
-      }
+      createRangerServiceIfNecessary(config, serviceName);
     }
 
     rangerServiceName = serviceName;
@@ -783,6 +763,108 @@ public abstract class RangerAuthorizationPlugin
     return Boolean.TRUE;
   }
 
+  @Override
+  public void close() throws IOException {
+    try {
+      if (isCreatedByPlugin) {
+        rangerClient.deleteService(rangerServiceName);
+      }
+    } catch (RangerServiceException rse) {
+      throw new AuthorizationPluginException(
+          "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());
+    }
+  }
+
+  /** Generate authorization securable object */
+  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
+      List<String> names,
+      String path,
+      AuthorizationMetadataObject.Type type,
+      Set<AuthorizationPrivilege> privileges);
+
+  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
+    return securableObjects.stream()
+        .allMatch(
+            securableObject -> {
+              AtomicBoolean match = new AtomicBoolean(true);
+              securableObject.privileges().stream()
+                  .forEach(
+                      privilege -> {
+                        if (!privilege.canBindTo(securableObject.type())) {
+                          LOG.error(
+                              "The privilege({}) is not supported for the metadata object({})!",
+                              privilege.name(),
+                              securableObject.fullName());
+                          match.set(false);
+                        }
+                      });
+              return match.get();
+            });
+  }
+
+  /**
+   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * `{schema}.*.*` <br>
+   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * <br>
+   * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
+   */
+  protected abstract void renameMetadataObject(
+      AuthorizationMetadataObject authzMetadataObject,
+      AuthorizationMetadataObject newAuthzMetadataObject);
+
+  protected abstract void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject);
+
+  /**
+   * Remove the policy by the metadata object names. <br>
+   *
+   * @param authzMetadataObject The authorization metadata object.
+   */
+  protected void removePolicyByMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+    RangerPolicy policy = findManagedPolicy(authzMetadataObject);
+    if (policy != null) {
+      rangerHelper.removeAllGravitinoManagedPolicyItem(policy);
+    }
+  }
+
+  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
+    if (conf.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + key)) {
+      return conf.get(BaseCatalog.CATALOG_BYPASS_PREFIX + key);
+    }
+    return defaultValue;
+  }
+
+  protected abstract String getServiceType();
+
+  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
+
+  private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {
+    try {
+      rangerClient.getService(serviceName);
+    } catch (RangerServiceException rse) {
+      if (rse.getStatus().equals(ClientResponse.Status.NOT_FOUND)) {
+        try {
+          RangerService rangerService = new RangerService();
+          rangerService.setType(getServiceType());
+          rangerService.setName(serviceName);
+          rangerService.setConfigs(getServiceConfigs(config));
+          rangerClient.createService(rangerService);
+          List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
+          for (RangerPolicy policy : policies) {
+            rangerClient.deletePolicy(policy.getId());
+          }
+          isCreatedByPlugin = true;
+        } catch (RangerServiceException crse) {
+          throw new AuthorizationPluginException(
+              "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
+        }
+      } else {
+        throw new AuthorizationPluginException(
+            "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
+      }
+    }
+  }
+
   /**
    * Add the securable object's privilege to the Ranger policy. <br>
    * 1. Find the policy base the metadata object. <br>
@@ -946,73 +1028,5 @@ public abstract class RangerAuthorizationPlugin
     if (match) {
       policyItem.getRoles().removeIf(roleName::equals);
     }
-  }
-
-  /**
-   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
-   * `{schema}.*.*` <br>
-   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
-   * <br>
-   * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
-   */
-  protected abstract void renameMetadataObject(
-      AuthorizationMetadataObject authzMetadataObject,
-      AuthorizationMetadataObject newAuthzMetadataObject);
-
-  protected abstract void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject);
-
-  /**
-   * Remove the policy by the metadata object names. <br>
-   *
-   * @param authzMetadataObject The authorization metadata object.
-   */
-  protected void removePolicyByMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    RangerPolicy policy = findManagedPolicy(authzMetadataObject);
-    if (policy != null) {
-      rangerHelper.removeAllGravitinoManagedPolicyItem(policy);
-    }
-  }
-
-  protected abstract String getServiceType();
-
-  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
-
-  @Override
-  public void close() throws IOException {
-    try {
-      if (isCreatedByPlugin) {
-        rangerClient.deleteService(rangerServiceName);
-      }
-    } catch (RangerServiceException rse) {
-      throw new AuthorizationPluginException(
-          "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());
-    }
-  }
-
-  /** Generate authorization securable object */
-  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges);
-
-  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
-    return securableObjects.stream()
-        .allMatch(
-            securableObject -> {
-              AtomicBoolean match = new AtomicBoolean(true);
-              securableObject.privileges().stream()
-                  .forEach(
-                      privilege -> {
-                        if (!privilege.canBindTo(securableObject.type())) {
-                          LOG.error(
-                              "The privilege({}) is not supported for the metadata object({})!",
-                              privilege.name(),
-                              securableObject.fullName());
-                          match.set(false);
-                        }
-                      });
-              return match.get();
-            });
   }
 }

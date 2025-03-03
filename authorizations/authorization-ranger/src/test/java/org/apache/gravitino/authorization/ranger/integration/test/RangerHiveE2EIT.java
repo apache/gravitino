@@ -197,7 +197,6 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
 
-
     // Test to create catalog with uuid ranger plugin
     Map<String, String> uuidProperties =
         ImmutableMap.of(

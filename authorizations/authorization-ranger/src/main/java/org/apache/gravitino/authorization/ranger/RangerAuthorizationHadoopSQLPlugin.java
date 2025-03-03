@@ -47,7 +47,6 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -56,8 +55,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugin {
+  public static final String JDBC_URL = "jdbc.url";
   private static final Logger LOG =
       LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
+  public static final String USERNAME = "username";
+  public static final String DEFAULT_USERNAME = "admin";
+  public static final String PASSWORD = "password";
+  public static final String DEFAULT_PASSWORD = "admin";
+  public static final String JDBC_DRIVER_CLASS_NAME = "jdbc.driverClassName";
+  public static final String DEFAULT_JDBC_DRIVER_CLASS_NAME = "org.apache.hive.jdbc.HiveDriver";
+  public static final String DEFAULT_JDBC_URL = "jdbc:hive2://127.0.0.1:8081";
 
   public RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
@@ -804,40 +811,18 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
 
   @Override
   protected String getServiceType() {
-    return "hive";
+    return HADOOP_SQL_SERVICE_TYPE;
   }
 
   @Override
   protected Map<String, String> getServiceConfigs(Map<String, String> config) {
-    String usernameKey = "username";
-    String usernameVal = "admin";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey)) {
-      usernameVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + usernameKey);
-    }
-
-    String passwordKey = "password";
-    String passwordVal = "admin";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordKey)) {
-      passwordVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + passwordVal);
-    }
-
-    String jdbcKey = "jdbc.driverClassName";
-    String jdbcVal = "org.apache.hive.jdbc.HiveDriver";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcKey)) {
-      jdbcVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcKey);
-    }
-
-    String jdbcUrlKey = "jdbc.url";
-    String jdbcUrlVal = "jdbc:hive2://127.0.0.1:8081";
-    if (config.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcUrlKey)) {
-      jdbcUrlVal = config.get(BaseCatalog.CATALOG_BYPASS_PREFIX + jdbcUrlKey);
-    }
-
     return ImmutableMap.<String, String>builder()
-        .put(usernameKey, usernameVal)
-        .put(passwordKey, passwordVal)
-        .put(jdbcKey, jdbcVal)
-        .put(jdbcUrlKey, jdbcUrlVal)
+        .put(USERNAME, getConfValue(config, USERNAME, DEFAULT_USERNAME))
+        .put(PASSWORD, getConfValue(config, PASSWORD, DEFAULT_PASSWORD))
+        .put(
+            JDBC_DRIVER_CLASS_NAME,
+            getConfValue(config, JDBC_DRIVER_CLASS_NAME, DEFAULT_JDBC_DRIVER_CLASS_NAME))
+        .put(JDBC_URL, DEFAULT_JDBC_URL)
         .build();
   }
 }
