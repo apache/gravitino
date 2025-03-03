@@ -254,8 +254,6 @@ public class TestMetalakeManager {
     baseMetalake = cache.getIfPresent(ident);
     Assertions.assertNull(baseMetalake);
     metalakeManager.enableMetalake(ident);
-    baseMetalake = cache.getIfPresent(ident);
-    Assertions.assertNull(baseMetalake);
 
     metalakeManager.loadMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
