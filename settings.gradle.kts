@@ -37,7 +37,8 @@ include(
   "catalogs:catalog-jdbc-doris",
   "catalogs:catalog-jdbc-mysql",
   "catalogs:catalog-jdbc-postgresql",
-  "catalogs:catalog-jdbc-oceanbase"
+  "catalogs:catalog-jdbc-oceanbase",
+  "catalogs:catalog-jdbc-maxcompute"
 )
 include("catalogs:catalog-hadoop")
 include("catalogs:catalog-kafka")
