@@ -121,22 +121,14 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   }
 
   private BaseCatalogFactory getCatalogFactory(String provider) {
-    String convertedProvider = getConvertedProvider(provider);
     return discoverFactories(
         catalogFactory ->
             ((BaseCatalogFactory) catalogFactory)
                 .gravitinoCatalogProvider()
-                .equalsIgnoreCase(convertedProvider),
+                .equalsIgnoreCase(provider),
         String.format(
             "Gravitino catalog provider [%s] matched multiple flink catalog factories, it should only match one.",
             provider));
-  }
-
-  private String getConvertedProvider(String provider) {
-    if (provider.startsWith("jdbc")) {
-      return "jdbc";
-    }
-    return provider;
   }
 
   private BaseCatalogFactory discoverFactories(Predicate<Factory> predicate, String errorMessage) {

@@ -23,13 +23,17 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
+import org.apache.gravitino.flink.connector.jdbc.MysqlPropertiesConverter;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
@@ -56,6 +60,11 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
 
   @Override
   protected boolean supportSchemaOperationWithCommentAndOptions() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportModifyColumnsMultipleByOneSql() {
     return false;
   }
 
@@ -114,5 +123,45 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
     mysqlUsername = containerSuite.getMySQLContainer().getUsername();
     mysqlPassword = containerSuite.getMySQLContainer().getPassword();
     mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
+  }
+
+  @Override
+  protected void stopCatalogEnv() throws Exception {
+    if (null != containerSuite) {
+      containerSuite.close();
+    }
+  }
+
+  @Test
+  public void testCreateGravitinoJdbcCatalogUsingSQL() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    int numCatalogs = tableEnv.listCatalogs().length;
+    String catalogName = "gravitino_mysql_jdbc_catalog";
+    tableEnv.executeSql(
+        String.format(
+            "create catalog %s with ("
+                + "'type'='gravitino-jdbc-mysql', "
+                + "'base-url'='%s',"
+                + "'username'='%s',"
+                + "'password'='%s',"
+                + "'default-database'='%s'"
+                + ")",
+            catalogName, mysqlUrl, mysqlUsername, mysqlPassword, mysqlDefaultDatabase));
+    String[] catalogs = tableEnv.listCatalogs();
+    Assertions.assertEquals(numCatalogs + 1, catalogs.length, "Should create a new catalog");
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    Map<String, String> properties = gravitinoCatalog.properties();
+    Assertions.assertEquals(mysqlUrl, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
+    Assertions.assertEquals(
+        mysqlUsername, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
+    Assertions.assertEquals(
+        mysqlPassword, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
+    Assertions.assertEquals(
+        mysqlDefaultDatabase,
+        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
+    Assertions.assertEquals(
+        MysqlPropertiesConverter.INSTANCE.driverName(),
+        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
 }

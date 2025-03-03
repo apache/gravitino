@@ -19,18 +19,19 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
-import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
+public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
 
-public class GravitinoJdbcCatalogFactoryOptions {
+  public static final MysqlPropertiesConverter INSTANCE = new MysqlPropertiesConverter();
 
-  /** Identifier for the {@link GravitinoJdbcCatalog}. */
-  public static final String MYSQL_IDENTIFIER = "gravitino-jdbc-mysql";
+  private MysqlPropertiesConverter() {}
 
-  /** Identifier for the {@link GravitinoJdbcCatalog}. */
-  public static final String POSTGRESQL_IDENTIFIER = "gravitino-jdbc-postgresql";
+  @Override
+  public String driverName() {
+    return "com.mysql.jdbc.Driver";
+  }
 
-  public static final ConfigOption<String> DEFAULT_DATABASE =
-      ConfigOptions.key(FlinkCatalogFactory.DEFAULT_DATABASE).stringType().noDefaultValue();
+  @Override
+  public String getFlinkCatalogType() {
+    return GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER;
+  }
 }

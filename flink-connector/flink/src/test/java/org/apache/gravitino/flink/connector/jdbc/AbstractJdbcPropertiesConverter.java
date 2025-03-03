@@ -26,14 +26,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Test for {@link JdbcPropertiesConverter} */
-public class TestJdbcPropertiesConverter {
+public abstract class AbstractJdbcPropertiesConverter {
 
   String username = "testUser";
   String password = "testPassword";
   String url = "testUrl";
   String defaultDatabase = "test";
 
-  private static final JdbcPropertiesConverter CONVERTER = JdbcPropertiesConverter.INSTANCE;
+  protected abstract JdbcPropertiesConverter getConverter();
 
   @Test
   public void testToPaimonFileSystemCatalog() {
@@ -47,7 +47,7 @@ public class TestJdbcPropertiesConverter {
             url,
             JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE,
             defaultDatabase);
-    Map<String, String> properties = CONVERTER.toFlinkCatalogProperties(catalogProperties);
+    Map<String, String> properties = getConverter().toFlinkCatalogProperties(catalogProperties);
     Assertions.assertEquals(username, properties.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
     Assertions.assertEquals(password, properties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
     Assertions.assertEquals(url, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
@@ -68,7 +68,7 @@ public class TestJdbcPropertiesConverter {
                 url,
                 JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE,
                 defaultDatabase));
-    Map<String, String> properties = CONVERTER.toGravitinoCatalogProperties(configuration);
+    Map<String, String> properties = getConverter().toGravitinoCatalogProperties(configuration);
 
     Assertions.assertEquals(username, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
     Assertions.assertEquals(
@@ -76,5 +76,7 @@ public class TestJdbcPropertiesConverter {
     Assertions.assertEquals(url, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
     Assertions.assertEquals(
         defaultDatabase, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
+    Assertions.assertEquals(
+        getConverter().driverName(), properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
 }

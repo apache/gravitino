@@ -26,7 +26,6 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
@@ -34,7 +33,7 @@ import org.apache.gravitino.flink.connector.utils.FactoryUtils;
  * Factory for creating instances of {@link GravitinoJdbcCatalog}. It will be created by SPI
  * discovery in Flink.
  */
-public class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
+public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
@@ -47,23 +46,8 @@ public class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
   }
 
   @Override
-  public String gravitinoCatalogProvider() {
-    return "jdbc";
-  }
-
-  @Override
-  public String factoryIdentifier() {
-    return GravitinoJdbcCatalogFactoryOptions.IDENTIFIER;
-  }
-
-  @Override
   public Catalog.Type gravitinoCatalogType() {
     return Catalog.Type.RELATIONAL;
-  }
-
-  @Override
-  public PropertiesConverter propertiesConverter() {
-    return JdbcPropertiesConverter.INSTANCE;
   }
 
   @Override

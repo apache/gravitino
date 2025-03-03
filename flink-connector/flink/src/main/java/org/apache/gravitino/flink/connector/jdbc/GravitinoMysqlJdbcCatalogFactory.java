@@ -19,31 +19,22 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
-import java.util.Map;
-import org.apache.flink.configuration.Configuration;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 
-public abstract class JdbcPropertiesConverter implements PropertiesConverter {
-
-  protected JdbcPropertiesConverter() {}
+public class GravitinoMysqlJdbcCatalogFactory extends GravitinoJdbcCatalogFactory {
 
   @Override
-  public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
-    Map<String, String> gravitinoCatalogProperties =
-        PropertiesConverter.super.toGravitinoCatalogProperties(flinkConf);
-    gravitinoCatalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, driverName());
-    return gravitinoCatalogProperties;
+  public String gravitinoCatalogProvider() {
+    return "jdbc-mysql";
   }
 
   @Override
-  public String transformPropertyToGravitinoCatalog(String configKey) {
-    return JdbcPropertiesConstants.flinkToGravitinoMap.get(configKey);
+  public PropertiesConverter propertiesConverter() {
+    return MysqlPropertiesConverter.INSTANCE;
   }
 
   @Override
-  public String transformPropertyToFlinkCatalog(String configKey) {
-    return JdbcPropertiesConstants.gravitinoToFlinkMap.get(configKey);
+  public String factoryIdentifier() {
+    return GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER;
   }
-
-  protected abstract String driverName();
 }

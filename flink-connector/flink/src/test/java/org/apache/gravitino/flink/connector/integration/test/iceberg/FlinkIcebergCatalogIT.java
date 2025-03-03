@@ -265,7 +265,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
                 Column.of("id", Types.LongType.get(), "unique id", true, false, null),
                 Column.of("data", Types.StringType.get(), null, false, false, null)
               };
-          assertColumns(columns, table.columns());
+          assertColumns(columns, table.columns(), getProvider());
           Transform[] partitions = new Transform[] {Transforms.identity("data")};
           Assertions.assertArrayEquals(partitions, table.partitioning());
 
@@ -364,7 +364,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
                         Types.StructType.Field.nullableField("k2", Types.StringType.get())),
                     null)
               };
-          assertColumns(columns, table.columns());
+          assertColumns(columns, table.columns(), getProvider());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
         true,
