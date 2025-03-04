@@ -765,10 +765,12 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public void close() throws IOException {
+    if (isCreatedByPlugin) {
+      return;
+    }
+
     try {
-      if (isCreatedByPlugin) {
-        rangerClient.deleteService(rangerServiceName);
-      }
+      rangerClient.deleteService(rangerServiceName);
     } catch (RangerServiceException rse) {
       throw new AuthorizationPluginException(
           "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());

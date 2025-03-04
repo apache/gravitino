@@ -140,8 +140,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
     }
 
     // We should call the authorization plugin before dropping the catalog, because the dropping
-    // catalog
-    // will close the authorization plugin.
+    // catalog will close the authorization plugin.
     return dispatcher.dropCatalog(ident, force);
   }
 
