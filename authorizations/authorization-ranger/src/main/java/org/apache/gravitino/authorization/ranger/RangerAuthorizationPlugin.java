@@ -763,83 +763,6 @@ public abstract class RangerAuthorizationPlugin
     return Boolean.TRUE;
   }
 
-  @Override
-  public void close() throws IOException {
-    if (!isCreatedByPlugin) {
-      return;
-    }
-
-    try {
-      rangerClient.deleteService(rangerServiceName);
-    } catch (RangerServiceException rse) {
-      throw new AuthorizationPluginException(
-          "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());
-    }
-  }
-
-  /** Generate authorization securable object */
-  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges);
-
-  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
-    return securableObjects.stream()
-        .allMatch(
-            securableObject -> {
-              AtomicBoolean match = new AtomicBoolean(true);
-              securableObject.privileges().stream()
-                  .forEach(
-                      privilege -> {
-                        if (!privilege.canBindTo(securableObject.type())) {
-                          LOG.error(
-                              "The privilege({}) is not supported for the metadata object({})!",
-                              privilege.name(),
-                              securableObject.fullName());
-                          match.set(false);
-                        }
-                      });
-              return match.get();
-            });
-  }
-
-  /**
-   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
-   * `{schema}.*.*` <br>
-   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
-   * <br>
-   * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
-   */
-  protected abstract void renameMetadataObject(
-      AuthorizationMetadataObject authzMetadataObject,
-      AuthorizationMetadataObject newAuthzMetadataObject);
-
-  protected abstract void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject);
-
-  /**
-   * Remove the policy by the metadata object names. <br>
-   *
-   * @param authzMetadataObject The authorization metadata object.
-   */
-  protected void removePolicyByMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    RangerPolicy policy = findManagedPolicy(authzMetadataObject);
-    if (policy != null) {
-      rangerHelper.removeAllGravitinoManagedPolicyItem(policy);
-    }
-  }
-
-  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
-    if (conf.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + key)) {
-      return conf.get(BaseCatalog.CATALOG_BYPASS_PREFIX + key);
-    }
-    return defaultValue;
-  }
-
-  protected abstract String getServiceType();
-
-  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
-
   private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {
     try {
       rangerClient.getService(serviceName);
@@ -851,6 +774,8 @@ public abstract class RangerAuthorizationPlugin
           rangerService.setName(serviceName);
           rangerService.setConfigs(getServiceConfigs(config));
           rangerClient.createService(rangerService);
+          // We should remove some default policies, they will cause users to get more policies
+          // than they should do.
           List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
           for (RangerPolicy policy : policies) {
             rangerClient.deletePolicy(policy.getId());
@@ -1030,5 +955,82 @@ public abstract class RangerAuthorizationPlugin
     if (match) {
       policyItem.getRoles().removeIf(roleName::equals);
     }
+  }
+
+  /**
+   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * `{schema}.*.*` <br>
+   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * <br>
+   * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
+   */
+  protected abstract void renameMetadataObject(
+      AuthorizationMetadataObject authzMetadataObject,
+      AuthorizationMetadataObject newAuthzMetadataObject);
+
+  protected abstract void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject);
+
+  /**
+   * Remove the policy by the metadata object names. <br>
+   *
+   * @param authzMetadataObject The authorization metadata object.
+   */
+  protected void removePolicyByMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+    RangerPolicy policy = findManagedPolicy(authzMetadataObject);
+    if (policy != null) {
+      rangerHelper.removeAllGravitinoManagedPolicyItem(policy);
+    }
+  }
+
+  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
+    if (conf.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + key)) {
+      return conf.get(BaseCatalog.CATALOG_BYPASS_PREFIX + key);
+    }
+    return defaultValue;
+  }
+
+  protected abstract String getServiceType();
+
+  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
+
+  @Override
+  public void close() throws IOException {
+    if (!isCreatedByPlugin) {
+      return;
+    }
+
+    try {
+      rangerClient.deleteService(rangerServiceName);
+    } catch (RangerServiceException rse) {
+      throw new AuthorizationPluginException(
+          "Fail to delete Ranger service %s, exception: %s", rangerServiceName, rse.getMessage());
+    }
+  }
+
+  /** Generate authorization securable object */
+  public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
+      List<String> names,
+      String path,
+      AuthorizationMetadataObject.Type type,
+      Set<AuthorizationPrivilege> privileges);
+
+  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
+    return securableObjects.stream()
+        .allMatch(
+            securableObject -> {
+              AtomicBoolean match = new AtomicBoolean(true);
+              securableObject.privileges().stream()
+                  .forEach(
+                      privilege -> {
+                        if (!privilege.canBindTo(securableObject.type())) {
+                          LOG.error(
+                              "The privilege({}) is not supported for the metadata object({})!",
+                              privilege.name(),
+                              securableObject.fullName());
+                          match.set(false);
+                        }
+                      });
+              return match.get();
+            });
   }
 }
