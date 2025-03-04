@@ -52,8 +52,12 @@ public class TestSecurableObjects extends TestJDBCBackend {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName + "2", auditInfo);
     backend.insert(metalake, false);
+
+    BaseMetalake metalake2 =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake2, false);
 
     CatalogEntity catalog =
         createCatalog(
@@ -90,6 +94,14 @@ public class TestSecurableObjects extends TestJDBCBackend {
             auditInfo);
     backend.insert(topic, false);
 
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalake.name(), Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    SecurableObject metalakeObject2 =
+        SecurableObjects.ofMetalake(
+            metalake2.name(), Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
@@ -109,7 +121,14 @@ public class TestSecurableObjects extends TestJDBCBackend {
             schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
 
     ArrayList<SecurableObject> securableObjects =
-        Lists.newArrayList(catalogObject, schemaObject, tableObject, filesetObject, topicObject);
+        Lists.newArrayList(
+            metalakeObject,
+            metalakeObject2,
+            catalogObject,
+            schemaObject,
+            tableObject,
+            filesetObject,
+            topicObject);
     securableObjects.sort(Comparator.comparing(MetadataObject::fullName));
 
     RoleEntity role1 =
