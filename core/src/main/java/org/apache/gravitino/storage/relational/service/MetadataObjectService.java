@@ -228,7 +228,6 @@ public class MetadataObjectService {
   }
 
   public static Map<Long, String> getMetalakeObjectFullNames(List<Long> ids) {
-
     List<MetalakePO> metalakePOs =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.listMetalakePOsByMetalakeIds(ids));
