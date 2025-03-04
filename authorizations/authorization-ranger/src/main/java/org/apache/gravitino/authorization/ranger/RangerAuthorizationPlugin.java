@@ -765,7 +765,7 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public void close() throws IOException {
-    if (isCreatedByPlugin) {
+    if (!isCreatedByPlugin) {
       return;
     }
 
