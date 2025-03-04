@@ -35,7 +35,7 @@ use std::fmt::Write;
 use tracing::{debug, error};
 
 /// Log the result without printing the reply
-macro_rules! log_result {
+macro_rules! log_status {
     ($method_call:expr, $method_name:expr, $req:ident) => {
         match $method_call.await {
             Ok(reply) => {
@@ -51,7 +51,7 @@ macro_rules! log_result {
 }
 
 /// Log the result with default Debug formatting
-macro_rules! log_result_debug {
+macro_rules! log_value {
     ($method_call:expr, $method_name:expr, $req:ident) => {
         match $method_call.await {
             Ok(reply) => {
@@ -72,7 +72,7 @@ macro_rules! log_result_debug {
 }
 
 /// Log the result with custom formatting
-macro_rules! log_result_custom {
+macro_rules! log_value_custom {
     ($method_call:expr, $method_name:expr, $req:ident, $format_reply_fn:ident) => {
         match $method_call.await {
             Ok(reply) => {
@@ -93,7 +93,7 @@ macro_rules! log_result_custom {
 }
 
 /// Log the result for readdir operations
-macro_rules! log_result_readdir {
+macro_rules! log_readdir {
     ($method_call:expr, $req:ident) => {{
         match $method_call.await {
             Ok(mut reply_dir) => {
@@ -134,7 +134,7 @@ macro_rules! log_result_readdir {
 }
 
 /// Log the result for readdirplus operations
-macro_rules! log_result_readdirplus {
+macro_rules! log_readdirplus {
     ($method_call:expr, $req:ident) => {{
         match $method_call.await {
             Ok(mut reply_dir) => {
@@ -435,7 +435,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "INIT started"
         );
 
-        log_result_debug!(self.inner.init(req), "init", req)
+        log_value!(self.inner.init(req), "init", req)
     }
 
     async fn destroy(&self, req: Request) {
@@ -463,7 +463,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "LOOKUP started"
         );
 
-        log_result_custom!(
+        log_value_custom!(
             self.inner.lookup(req, parent, name),
             "lookup",
             req,
@@ -490,7 +490,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "GETATTR started"
         );
 
-        log_result_custom!(
+        log_value_custom!(
             self.inner.getattr(req, inode, fh, flags),
             "GETATTR",
             req,
@@ -517,7 +517,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "SETATTR started"
         );
 
-        log_result_custom!(
+        log_value_custom!(
             self.inner.setattr(req, inode, fh, set_attr),
             "SETATTR",
             req,
@@ -547,7 +547,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "MKDIR started"
         );
 
-        log_result_custom!(
+        log_value_custom!(
             self.inner.mkdir(req, parent, name, mode, umask),
             "mkdir",
             req,
@@ -568,7 +568,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "UNLINK started"
         );
 
-        log_result!(self.inner.unlink(req, parent, name), "unlink", req)
+        log_status!(self.inner.unlink(req, parent, name), "unlink", req)
     }
 
     async fn rmdir(&self, req: Request, parent: Inode, name: &OsStr) -> fuse3::Result<()> {
@@ -583,7 +583,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "RMDIR started"
         );
 
-        log_result!(self.inner.rmdir(req, parent, name), "rmdir", req)
+        log_status!(self.inner.rmdir(req, parent, name), "rmdir", req)
     }
 
     async fn open(&self, req: Request, inode: Inode, flags: u32) -> fuse3::Result<ReplyOpen> {
@@ -599,7 +599,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "OPEN started"
         );
 
-        log_result_debug!(self.inner.open(req, inode, flags), "open", req)
+        log_value!(self.inner.open(req, inode, flags), "open", req)
     }
 
     async fn read(
@@ -621,7 +621,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READ started"
         );
 
-        log_result!(self.inner.read(req, inode, fh, offset, size), "read", req)
+        log_status!(self.inner.read(req, inode, fh, offset, size), "read", req)
     }
 
     async fn write(
@@ -650,7 +650,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "WRITE started"
         );
 
-        log_result!(
+        log_status!(
             self.inner
                 .write(req, inode, fh, offset, data, write_flags, flags),
             "write",
@@ -670,7 +670,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "STATFS started"
         );
 
-        log_result_debug!(self.inner.statfs(req, inode), "statfs", req)
+        log_value!(self.inner.statfs(req, inode), "statfs", req)
     }
 
     async fn release(
@@ -697,7 +697,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "RELEASE started"
         );
 
-        log_result!(
+        log_status!(
             self.inner.release(req, inode, fh, flags, lock_owner, flush),
             "release",
             req
@@ -716,7 +716,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "OPENDIR started"
         );
 
-        log_result_debug!(self.inner.opendir(req, inode, flags), "opendir", req)
+        log_value!(self.inner.opendir(req, inode, flags), "opendir", req)
     }
 
     type DirEntryStream<'a>
@@ -744,7 +744,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READDIR started"
         );
 
-        log_result_readdir!(self.inner.readdir(req, parent, fh, offset), req)
+        log_readdir!(self.inner.readdir(req, parent, fh, offset), req)
     }
 
     async fn releasedir(
@@ -766,7 +766,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "RELEASEDIR started"
         );
 
-        log_result!(
+        log_status!(
             self.inner.releasedir(req, inode, fh, flags),
             "releasedir",
             req
@@ -796,7 +796,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "CREATE started"
         );
 
-        log_result_custom!(
+        log_value_custom!(
             self.inner.create(req, parent, name, mode, flags),
             "create",
             req,
@@ -830,7 +830,7 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READDIRPLUS started"
         );
 
-        log_result_readdirplus!(
+        log_readdirplus!(
             self.inner.readdirplus(req, parent, fh, offset, lock_owner),
             req
         )
