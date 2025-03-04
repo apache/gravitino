@@ -23,7 +23,7 @@ alias gcli='java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.j
 Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run the CLI.
 
 ## Usage
-f
+
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash

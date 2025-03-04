@@ -111,6 +111,11 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onRoleDeleted(Role role) throws AuthorizationPluginException {
+    onRoleUpdated(
+        role,
+        role.securableObjects().stream()
+            .map(securableObject -> RoleChange.removeSecurableObject(role.name(), securableObject))
+            .toArray(RoleChange[]::new));
     return chainedAction(plugin -> plugin.onRoleDeleted(role));
   }
 

@@ -88,6 +88,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new TableListTableFormat(context).output((Table[]) entity);
     } else if (entity instanceof Audit) {
       new AuditTableFormat(context).output((Audit) entity);
+    } else if (entity instanceof org.apache.gravitino.rel.Column[]) {
+      new ColumnListTableFormat(context).output((org.apache.gravitino.rel.Column[]) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -609,6 +611,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     public String getOutput(Table table) {
       Column columnName = new Column(context, "name");
       Column columnType = new Column(context, "type");
+      Column columnDefaultValue = new Column(context, "default");
       Column columnAutoIncrement = new Column(context, "AutoIncrement");
       Column columnNullable = new Column(context, "nullable");
       Column columnComment = new Column(context, "comment");
@@ -617,14 +620,20 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       for (org.apache.gravitino.rel.Column column : columns) {
         columnName.addCell(column.name());
         columnType.addCell(column.dataType().simpleString());
-        columnAutoIncrement.addCell(column.autoIncrement());
+        columnDefaultValue.addCell(LineUtil.getDefaultValue(column));
+        columnAutoIncrement.addCell(LineUtil.getAutoIncrement(column));
         columnNullable.addCell(column.nullable());
         columnComment.addCell(
             column.comment() == null || column.comment().isEmpty() ? "N/A" : column.comment());
       }
 
       return getTableFormat(
-          columnName, columnType, columnAutoIncrement, columnNullable, columnComment);
+          columnName,
+          columnType,
+          columnDefaultValue,
+          columnAutoIncrement,
+          columnNullable,
+          columnComment);
     }
   }
 
@@ -671,6 +680,51 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
           audit.lastModifiedTime() == null ? "N/A" : audit.lastModifiedTime().toString());
 
       return getTableFormat(columnCreator, columnCreateTime, columnModified, columnModifyTime);
+    }
+  }
+
+  /**
+   * Formats an array of {@link org.apache.gravitino.rel.Column} into a six-column table display.
+   * Lists all column names, types, default values, auto-increment, nullable, and comments in a
+   * vertical format.
+   */
+  static final class ColumnListTableFormat extends TableFormat<org.apache.gravitino.rel.Column[]> {
+
+    /**
+     * Creates a new {@link TableFormat} with the specified properties.
+     *
+     * @param context the command context.
+     */
+    public ColumnListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(org.apache.gravitino.rel.Column[] columns) {
+      Column columnName = new Column(context, "name");
+      Column columnType = new Column(context, "type");
+      Column columnDefaultVal = new Column(context, "default");
+      Column columnAutoIncrement = new Column(context, "AutoIncrement");
+      Column columnNullable = new Column(context, "nullable");
+      Column columnComment = new Column(context, "comment");
+
+      for (org.apache.gravitino.rel.Column column : columns) {
+        columnName.addCell(column.name());
+        columnType.addCell(column.dataType().simpleString());
+        columnDefaultVal.addCell(LineUtil.getDefaultValue(column));
+        columnAutoIncrement.addCell(LineUtil.getAutoIncrement(column));
+        columnNullable.addCell(column.nullable());
+        columnComment.addCell(LineUtil.getComment(column));
+      }
+
+      return getTableFormat(
+          columnName,
+          columnType,
+          columnDefaultVal,
+          columnAutoIncrement,
+          columnNullable,
+          columnComment);
     }
   }
 }
