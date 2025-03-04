@@ -185,16 +185,15 @@ public class MetalakeManager implements MetalakeDispatcher {
    */
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    return METALAKE_CACHE.get(
+    return TreeLockUtils.doWithTreeLock(
         ident,
-        k -> {
+        LockType.READ,
+        () -> {
           try {
-            BaseMetalake baseMetalake =
-                TreeLockUtils.doWithTreeLock(
-                    ident,
-                    LockType.READ,
-                    () -> store.get(ident, EntityType.METALAKE, BaseMetalake.class));
-            return newMetalakeWithResolvedProperties(baseMetalake);
+            BaseMetalake baseMetalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+            baseMetalake = newMetalakeWithResolvedProperties(baseMetalake);
+            METALAKE_CACHE.put(ident, baseMetalake);
+            return baseMetalake;
           } catch (NoSuchEntityException e) {
             LOG.warn("Metalake {} does not exist", ident, e);
             throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
