@@ -855,7 +855,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       } else {
         catalogEntity = store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);
       }
-
       return (boolean)
           BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
               catalogEntity.getProperties(), PROPERTY_IN_USE);

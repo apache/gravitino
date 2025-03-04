@@ -86,6 +86,11 @@ public class MetalakeManager implements MetalakeDispatcher {
                           .build())))
           .build();
 
+  @VisibleForTesting
+  public static void clearCache() {
+    METALAKE_CACHE.invalidateAll();
+  }
+
   /**
    * Constructs a MetalakeManager instance.
    *
