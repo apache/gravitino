@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gravitino-mysql-init
+  namespace: {{ include "gravitino.namespace" . }}
+  labels:
+    {{- include "gravitino.labels" . | nindent 4 }}
+data:
+  {{- $sqlFiles := .Files.Glob "resources/files/*.sql" }}
+  {{- range $path, $content := $sqlFiles }}
+  {{ base $path }}: |-
+    {{- tpl ($content | toString) $ | nindent 4 }}
+  {{- end }}

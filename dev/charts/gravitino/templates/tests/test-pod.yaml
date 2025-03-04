@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-pod"
+  annotations:
+    "helm.sh/hook": test
+spec:
+  serviceAccountName: {{ .Release.Name }}-pod-reader
+  containers:
+      - name: test-container
+        image: bitnami/kubectl:latest
+        command:
+          - "sh"
+          - "-c"
+          - |
+            echo "Checking for running pods in namespace {{ .Release.Namespace }}..."
+            running_pods=$(kubectl get pods -n {{ .Release.Namespace }} --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}')
+            if [ -z "$running_pods" ]; then
+              echo "No running pods found in namespace {{ .Release.Namespace }}."
+              exit 1
+            else
+              echo "Running pods: $running_pods"
+              exit 0
+            fi
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+  restartPolicy: Never

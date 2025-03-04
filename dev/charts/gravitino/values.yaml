@@ -1,0 +1,195 @@
+image:
+  repository: apache/gravitino
+  tag: latest
+  pullPolicy: IfNotPresent
+  ## Optionally specify an array of imagePullSecrets (secrets must be manually created in the namespace)
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ## Example:
+  ## pullSecrets:
+  ##   - myRegistryKeySecretName
+  ##
+  pullSecrets: []
+
+# Deploy mysql on K8S cluster as gravitino storage backend.
+mysql:
+  enabled: false
+  image:
+    pullSecrets: []    
+  initdbScriptsConfigMap: gravitino-mysql-init
+  auth:
+    rootPassword: "admin"
+    createDatabase: true
+    database: "gravitino"
+    username: "gravitino"
+    password: "gravitino"
+
+# Use H2 as the default embedded database, or set up an external database for enhanced scalability and performance.
+# schema-0.8.0-mysql.sql is the data init script that should be executed in the external database manually.
+entity:
+  store: "relational"
+  maxTransactionSkewTimeMs: 2000
+  deleteAfterTimeMs: 604800000
+  versionRetentionCount: 1
+  relationalBackend: "JDBCBackend"
+  jdbcUrl: jdbc:h2
+  jdbcDriver: org.h2.Driver
+  jdbcUser: gravitino
+  jdbcPassword: gravitino
+  storagePath: /root/gravitino/data      
+
+server:
+  shutdownTimeout: 3000
+  rest:
+    extensionPackages: ""
+
+webserver:
+  host: "0.0.0.0"
+  httpPort: 8090
+  minThreads: 24
+  maxThreads: 200
+  stopTimeout: 30000
+  idleTimeout: 30000
+  threadPoolWorkQueueSize: 100
+  requestHeaderSize: 131072
+  responseHeaderSize: 131072
+  customFilters: ""
+
+catalog:
+  cacheEvictionIntervalMs: 3600000
+  classloader:
+    isolated: true
+
+authorization:
+  enable: false
+  serviceAdmins: "anonymous"
+
+auxService:
+  names: "iceberg-rest"
+
+icebergRest:
+  classpath: "iceberg-rest-server/libs, iceberg-rest-server/conf"
+  host: "0.0.0.0"
+  httpPort: 9001
+  catalogBackend: "memory"
+  warehouse: "/tmp/"
+
+authenticators: simple
+
+authenticator:
+  oauth:
+    serviceAudience: test
+    defaultSignKey: MIIAIjBNBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqmmqfSy8vH9BMKZLIjPHNTClH7yyykV/J/dfNwwicoYCBQgLOLRq59nAiJ9/WOkIq7zIXQ8iZU5XmI0bRSo3Ah7G4uF6CUbpny+n4zxwTfEEJ3dVC1Aa1g3DZbf8mN76B2ykf6z4FEbTWVBp0xMZ14YBOIuOUkN4F/x8bQNYRPl0yepLBZf6uY26f2o5+yKBcpAk7K/pGoD4v+DKpt/A8bvf4fy3JpZERsMPS/veeyIqR6f+455KLjRabBpxl5xIo8iUer5O0Ci8xbQMci4ErRRemm5n1e74Kqpz5u/TcLIPdMLXJ57fLl9t7V9BtLyRTjyooJpnl/lz+kJ+VIt1kQICNPMB
+    serverUri:  http://57.185.211.74:8080
+    tokenPath: /realms/myrealm/protocol/openid-connect/token
+
+audit:
+  enabled: false
+  writer:
+    className: "org.apache.gravitino.audit.FileAuditWriter"
+    file:
+      fileName: "gravitino_audit.log"
+      flushIntervalSecs: 10
+      append: true
+  formatter:
+    className: "org.apache.gravitino.audit.SimpleFormatter"
+
+metrics:
+  timeSlidingWindowSecs: 60
+
+## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+## If you set enabled as "True", you need :
+## - create a pv which above 10Gi
+## - keep storageClassName same with below setting
+persistence:
+  enabled: false
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  labels: {}
+  annotations: {}
+  # existingClaim:
+  # storageClassName:
+
+## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
+## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
+## ref: http://kubernetes.io/docs/user-guide/services/
+##
+service:
+  name: gravitino
+  type: ClusterIP
+  port: 8090
+  targetPort: 8090
+  ## Service annotations. Can be templated.
+  annotations: {}
+  labels: {}
+  portName: service
+
+extraPorts: []
+## Additional ports to the gravitino services. Useful to expose extra container ports.
+# - port: 9001
+#   protocol: TCP
+#   name: http
+#   targetPort: http
+
+## Deployment annotations
+# annotations: {}
+
+# Deployment replicas currently only support 1
+replicas: 1
+
+## Pod Annotations
+# podAnnotations: {}
+
+## Pod Labels
+# podLabels: {}
+
+## Define command to be executed at startup by gravitino container
+command:
+- "/bin/bash"
+- "/root/gravitino/tmp/conf/init.sh"
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 8090
+  initialDelaySeconds: 10
+  timeoutSeconds: 5
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8090
+  initialDelaySeconds: 10
+  timeoutSeconds: 5
+
+containerSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+
+# Extra env variables to pass to the gravitino container
+env:
+  - name: HADOOP_USER_NAME
+    value: "hdfs"
+
+resources: {}
+#  limits:
+#    cpu: 100m
+#    memory: 128Mi
+#  requests:
+#    cpu: 100m
+#    memory: 128Mi
+
+## Node labels for pod assignment
+## ref: https://kubernetes.io/docs/user-guide/node-selection/
+#
+nodeSelector: {}
+
+## Tolerations for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+
+## Affinity for pod assignment (evaluated as template)
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+##
+affinity: {}

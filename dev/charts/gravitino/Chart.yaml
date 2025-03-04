@@ -1,0 +1,19 @@
+apiVersion: v2
+appVersion: "0.8.0-incubating"
+description: Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the 
+  metadata directly in different sources, types, and regions. It also provides users with unified metadata access
+  for data and AI assets.
+home: https://gravitino.apache.org
+dependencies:
+  - condition: mysql.enabled
+    name: mysql
+    repository: https://charts.bitnami.com/bitnami
+    version: 11.1.15
+kubeVersion: '>=1.23.0-0'
+maintainers:
+- email: danhua@datastrato.com
+  name: danhua
+name: gravitino
+sources:
+- https://github.com/apache/gravitino
+version: 0.1.0
