@@ -21,7 +21,6 @@ package org.apache.gravitino.flink.connector.jdbc;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
 
 public class GravitinoJdbcCatalogFactoryOptions {
 
@@ -32,5 +31,5 @@ public class GravitinoJdbcCatalogFactoryOptions {
   public static final String POSTGRESQL_IDENTIFIER = "gravitino-jdbc-postgresql";
 
   public static final ConfigOption<String> DEFAULT_DATABASE =
-      ConfigOptions.key(FlinkCatalogFactory.DEFAULT_DATABASE).stringType().noDefaultValue();
+      ConfigOptions.key("default-database").stringType().noDefaultValue();
 }
