@@ -20,9 +20,15 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
@@ -31,6 +37,9 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MetadataObjectService is used for converting full name to entity id and converting entity id to
@@ -41,6 +50,8 @@ public class MetadataObjectService {
   private static final String DOT = ".";
   private static final Joiner DOT_JOINER = Joiner.on(DOT);
   private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
+
+  private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
 
   private MetadataObjectService() {}
 
@@ -213,5 +224,65 @@ public class MetadataObjectService {
     } while (metadataType != null);
 
     return fullName;
+  }
+
+  public static Map<Long, String> getFilesetObjectFullNames(List<Long> ids) {
+    List<FilesetPO> filesetPOs =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsByFilesetIds(ids));
+
+    if (filesetPOs == null || filesetPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        filesetPOs.stream().map(FilesetPO::getCatalogId).collect(Collectors.toList());
+    List<Long> schemaIds =
+        filesetPOs.stream().map(FilesetPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+
+    HashMap<Long, String> filesetIdAndNameMap = new HashMap<>();
+
+    filesetPOs.forEach(
+        filesetPO -> {
+          // since the catalog or schema can be deleted, we need to check the null value,
+          // and when catalog or schema is deleted, we will set catalogName or schemaName to null
+          String catalogName = catalogIdAndNameMap.getOrDefault(filesetPO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of fileset {} may be deleted", filesetPO.getFilesetId());
+            filesetIdAndNameMap.put(filesetPO.getFilesetId(), null);
+            return;
+          }
+
+          String schemaName = schemaIdAndNameMap.getOrDefault(filesetPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of fileset {} may be deleted", filesetPO.getFilesetId());
+            filesetIdAndNameMap.put(filesetPO.getFilesetId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(catalogName, schemaName, filesetPO.getFilesetName());
+          filesetIdAndNameMap.put(filesetPO.getFilesetId(), fullName);
+        });
+
+    return filesetIdAndNameMap;
+  }
+
+  public static Map<Long, String> getSchemaIdAndNameMap(List<Long> schemaIds) {
+    List<SchemaPO> schemaPOS =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
+    return schemaPOS.stream()
+        .collect(Collectors.toMap(SchemaPO::getSchemaId, SchemaPO::getSchemaName));
+  }
+
+  public static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
+    return catalogPOs.stream()
+        .collect(Collectors.toMap(CatalogPO::getCatalogId, CatalogPO::getCatalogName));
   }
 }
