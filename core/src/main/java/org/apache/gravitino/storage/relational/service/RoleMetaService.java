@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -360,70 +362,65 @@ public class RoleMetaService {
             (type, objects) -> {
               // If the type is Fileset, use the batch retrieval interface;
               // otherwise, use the single retrieval interface
-              if (type.equals(MetadataObject.Type.FILESET.name())) {
-                List<Long> filesetIds =
-                    objects.stream()
-                        .map(SecurableObjectPO::getMetadataObjectId)
-                        .collect(Collectors.toList());
+              switch (MetadataObject.Type.valueOf(type)) {
+                case FILESET:
+                case METALAKE:
+                  List<Long> objectIds =
+                      objects.stream()
+                          .map(SecurableObjectPO::getMetadataObjectId)
+                          .collect(Collectors.toList());
 
-                Map<Long, String> filesetIdAndNameMap =
-                    MetadataObjectService.getFilesetObjectFullNames(filesetIds);
+                  Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
+                      objectFullNameGetterFnMap =
+                          ImmutableMap.of(
+                              MetadataObject.Type.FILESET,
+                                  MetadataObjectService::getFilesetObjectFullNames,
+                              MetadataObject.Type.METALAKE,
+                                  MetadataObjectService::getMetalakeObjectFullNames);
 
-                for (SecurableObjectPO securableObjectPO : objects) {
-                  String fullName =
-                      filesetIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
-                  if (fullName != null) {
-                    securableObjects.add(
-                        POConverters.fromSecurableObjectPO(
-                            fullName, securableObjectPO, getType(securableObjectPO.getType())));
-                  } else {
-                    LOG.warn(
-                        "The securable object {} {} may be deleted",
-                        securableObjectPO.getMetadataObjectId(),
-                        securableObjectPO.getType());
+                  // dynamically calling getter function based on type
+                  Map<Long, String> objectIdAndNameMap =
+                      Optional.of(MetadataObject.Type.valueOf(type))
+                          .map(objectFullNameGetterFnMap::get)
+                          .map(getter -> getter.apply(objectIds))
+                          .orElseThrow(
+                              () ->
+                                  new IllegalArgumentException(
+                                      "Unsupported metadata object type: " + type));
+
+                  for (SecurableObjectPO securableObjectPO : objects) {
+                    String fullName =
+                        objectIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
+                    if (fullName != null) {
+                      securableObjects.add(
+                          POConverters.fromSecurableObjectPO(
+                              fullName, securableObjectPO, getType(securableObjectPO.getType())));
+                    } else {
+                      LOG.warn(
+                          "The securable object {} {} may be deleted",
+                          securableObjectPO.getMetadataObjectId(),
+                          securableObjectPO.getType());
+                    }
                   }
-                }
-              } else if (type.equals(MetadataObject.Type.METALAKE.name())) {
-                //              } else if (false) {
-                List<Long> metalakeIds =
-                    objects.stream()
-                        .map(SecurableObjectPO::getMetadataObjectId)
-                        .collect(Collectors.toList());
+                  break;
+                default:
 
-                Map<Long, String> metalakeIdAndNameMap =
-                    MetadataObjectService.getMetalakeObjectFullNames(metalakeIds);
-
-                for (SecurableObjectPO securableObjectPO : objects) {
-                  String fullName =
-                      metalakeIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
-                  if (fullName != null) {
-                    securableObjects.add(
-                        POConverters.fromSecurableObjectPO(
-                            fullName, securableObjectPO, getType(securableObjectPO.getType())));
-                  } else {
-                    LOG.warn(
-                        "The securable object {} {} may be deleted",
-                        securableObjectPO.getMetadataObjectId(),
-                        securableObjectPO.getType());
+                  // todo：to get other securable object fullNames using batch retrieving
+                  for (SecurableObjectPO securableObjectPO : objects) {
+                    String fullName =
+                        MetadataObjectService.getMetadataObjectFullName(
+                            securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
+                    if (fullName != null) {
+                      securableObjects.add(
+                          POConverters.fromSecurableObjectPO(
+                              fullName, securableObjectPO, getType(securableObjectPO.getType())));
+                    } else {
+                      LOG.warn(
+                          "The securable object {} {} may be deleted",
+                          securableObjectPO.getMetadataObjectId(),
+                          securableObjectPO.getType());
+                    }
                   }
-                }
-              } else {
-                // todo：to get other securable object fullNames using batch retrieving
-                for (SecurableObjectPO securableObjectPO : objects) {
-                  String fullName =
-                      MetadataObjectService.getMetadataObjectFullName(
-                          securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
-                  if (fullName != null) {
-                    securableObjects.add(
-                        POConverters.fromSecurableObjectPO(
-                            fullName, securableObjectPO, getType(securableObjectPO.getType())));
-                  } else {
-                    LOG.warn(
-                        "The securable object {} {} may be deleted",
-                        securableObjectPO.getMetadataObjectId(),
-                        securableObjectPO.getType());
-                  }
-                }
               }
             });
 
