@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
@@ -224,6 +225,30 @@ public class MetadataObjectService {
     } while (metadataType != null);
 
     return fullName;
+  }
+
+  public static Map<Long, String> getMetalakeObjectFullNames(List<Long> ids) {
+
+    List<MetalakePO> metalakePOs =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.listMetalakePOsByMetalakeIds(ids));
+
+    if (metalakePOs == null || metalakePOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    HashMap<Long, String> metalakeIdAndNameMap = new HashMap<>();
+
+    metalakePOs.forEach(
+        metalakePO -> {
+          if (metalakePO.getMetalakeId() == null) {
+            metalakeIdAndNameMap.put(metalakePO.getMetalakeId(), null);
+            return;
+          }
+          metalakeIdAndNameMap.put(metalakePO.getMetalakeId(), metalakePO.getMetalakeName());
+        });
+
+    return metalakeIdAndNameMap;
   }
 
   public static Map<Long, String> getFilesetObjectFullNames(List<Long> ids) {

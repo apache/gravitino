@@ -383,6 +383,30 @@ public class RoleMetaService {
                         securableObjectPO.getType());
                   }
                 }
+              } else if (type.equals(MetadataObject.Type.METALAKE.name())) {
+                //              } else if (false) {
+                List<Long> metalakeIds =
+                    objects.stream()
+                        .map(SecurableObjectPO::getMetadataObjectId)
+                        .collect(Collectors.toList());
+
+                Map<Long, String> metalakeIdAndNameMap =
+                    MetadataObjectService.getMetalakeObjectFullNames(metalakeIds);
+
+                for (SecurableObjectPO securableObjectPO : objects) {
+                  String fullName =
+                      metalakeIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
+                  if (fullName != null) {
+                    securableObjects.add(
+                        POConverters.fromSecurableObjectPO(
+                            fullName, securableObjectPO, getType(securableObjectPO.getType())));
+                  } else {
+                    LOG.warn(
+                        "The securable object {} {} may be deleted",
+                        securableObjectPO.getMetadataObjectId(),
+                        securableObjectPO.getType());
+                  }
+                }
               } else {
                 // todo：to get other securable object fullNames using batch retrieving
                 for (SecurableObjectPO securableObjectPO : objects) {

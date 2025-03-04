@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -63,6 +64,24 @@ public class MetalakeMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE metalake_name = #{metalakeName} and deleted_at = 0";
+  }
+
+  public String listMetalakePOsByMetalakeIds(@Param("metalakeIds") List<Long> metalakeIds) {
+    return "<script>"
+        + " SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
+        + " metalake_comment as metalakeComment, properties,"
+        + " audit_info as auditInfo, schema_version as schemaVersion,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND metalake_id in ("
+        + "<foreach collection='metalakeIds' item='metalakeId' separator=','>"
+        + "#{metalakeId}"
+        + "</foreach>"
+        + ") "
+        + "</script>";
   }
 
   public String insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO) {
