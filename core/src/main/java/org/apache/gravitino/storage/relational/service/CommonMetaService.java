@@ -41,47 +41,51 @@ public class CommonMetaService {
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
 
-    Long parentEntityId = null;
-    if (namespace.levels().length == 1) {
-      parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
-      if (parentEntityId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            namespace);
-      }
+    int length = namespace.levels().length;
+    Long parentEntityId;
+    switch (length) {
+      case 1:
+        // Parent is a metalake
+        parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+        if (parentEntityId == null) {
+          throw new NoSuchEntityException(
+              NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+              Entity.EntityType.METALAKE.name().toLowerCase(),
+              namespace);
+        }
+
+        return parentEntityId;
+      case 2:
+        // Parent is a catalog
+        CatalogIds catalogIds =
+            CatalogMetaService.getInstance()
+                .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
+        parentEntityId = catalogIds == null ? null : catalogIds.getCatalogId();
+        if (parentEntityId == null) {
+          throw new NoSuchEntityException(
+              NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+              Entity.EntityType.CATALOG.name().toLowerCase(),
+              namespace);
+        }
+
+        return parentEntityId;
+      case 3:
+        // Parent is a schema
+        SchemaIds schemaIds =
+            SchemaMetaService.getInstance()
+                .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                    namespace.level(0), namespace.level(1), namespace.level(2));
+        parentEntityId = schemaIds == null ? null : schemaIds.getSchemaId();
+        if (parentEntityId == null) {
+          throw new NoSuchEntityException(
+              NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+              Entity.EntityType.SCHEMA.name().toLowerCase(),
+              namespace);
+        }
+        return parentEntityId;
+      default:
+        throw new IllegalArgumentException("Namespace length should be less than or equal to 3.");
     }
-
-    if (namespace.levels().length == 2) {
-      CatalogIds catalogIds =
-          CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
-      parentEntityId = catalogIds == null ? null : catalogIds.getCatalogId();
-
-      if (parentEntityId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.CATALOG.name().toLowerCase(),
-            namespace);
-      }
-    }
-
-    if (namespace.levels().length == 3) {
-      SchemaIds schemaIds =
-          SchemaMetaService.getInstance()
-              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                  namespace.level(0), namespace.level(1), namespace.level(2));
-      parentEntityId = schemaIds == null ? null : schemaIds.getSchemaId();
-
-      if (parentEntityId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(),
-            namespace);
-      }
-    }
-
-    return parentEntityId;
   }
 
   public Long[] getParentEntityIdsByNamespace(Namespace namespace) {
@@ -90,47 +94,55 @@ public class CommonMetaService {
         "Namespace should not be empty and length should be less than or equal to 3.");
     Long[] parentEntityIds = new Long[namespace.levels().length];
 
-    if (namespace.levels().length == 1) {
-      parentEntityIds[0] =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
-      if (parentEntityIds[0] == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            namespace);
-      }
+    int length = namespace.levels().length;
+    switch (length) {
+      case 1:
+        // Parent is a metalake
+        parentEntityIds[0] =
+            MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+        if (parentEntityIds[0] == null) {
+          throw new NoSuchEntityException(
+              NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+              Entity.EntityType.METALAKE.name().toLowerCase(),
+              namespace);
+        }
 
-    } else if (namespace.levels().length == 2) {
-      CatalogIds catalogIds =
-          CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
-      parentEntityIds[0] = catalogIds == null ? null : catalogIds.getMetalakeId();
-      parentEntityIds[1] = catalogIds == null ? null : catalogIds.getCatalogId();
+        return parentEntityIds;
+      case 2:
+        // Parent is a catalog
+        CatalogIds catalogIds =
+            CatalogMetaService.getInstance()
+                .getCatalogIdByMetalakeAndCatalogName(namespace.level(0), namespace.level(1));
+        parentEntityIds[0] = catalogIds == null ? null : catalogIds.getMetalakeId();
+        parentEntityIds[1] = catalogIds == null ? null : catalogIds.getCatalogId();
 
-      if (parentEntityIds[1] == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.CATALOG.name().toLowerCase(),
-            namespace);
-      }
+        if (parentEntityIds[1] == null) {
+          throw new NoSuchEntityException(
+              NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+              Entity.EntityType.CATALOG.name().toLowerCase(),
+              namespace);
+        }
+        return parentEntityIds;
+      case 3:
+        // Parent is a schema
+        SchemaIds schemaIds =
+            SchemaMetaService.getInstance()
+                .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                    namespace.level(0), namespace.level(1), namespace.level(2));
+        parentEntityIds[0] = schemaIds == null ? null : schemaIds.getMetalakeId();
+        parentEntityIds[1] = schemaIds == null ? null : schemaIds.getCatalogId();
+        parentEntityIds[2] = schemaIds == null ? null : schemaIds.getSchemaId();
 
-    } else if (namespace.levels().length == 3) {
-      SchemaIds schemaIds =
-          SchemaMetaService.getInstance()
-              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                  namespace.level(0), namespace.level(1), namespace.level(2));
-      parentEntityIds[0] = schemaIds == null ? null : schemaIds.getMetalakeId();
-      parentEntityIds[1] = schemaIds == null ? null : schemaIds.getCatalogId();
-      parentEntityIds[2] = schemaIds == null ? null : schemaIds.getSchemaId();
+        if (parentEntityIds[2] == null) {
+          throw new NoSuchEntityException(
+              NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+              Entity.EntityType.SCHEMA.name().toLowerCase(),
+              namespace);
+        }
 
-      if (parentEntityIds[2] == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(),
-            namespace);
-      }
+        return parentEntityIds;
+      default:
+        throw new IllegalArgumentException("Namespace length should be less than or equal to 3.");
     }
-
-    return parentEntityIds;
   }
 }
