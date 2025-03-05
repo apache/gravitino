@@ -66,9 +66,8 @@ const schema = yup.object().shape({
       yup.object().shape({
         name: yup
           .string()
-          .required('The alias is required')
           .test('not-number', 'Alias cannot be a number or a numeric string', value => {
-            return value === undefined || isNaN(Number(value))
+            return value && isNaN(Number(value)) || !value
           })
       })
     )
@@ -214,7 +213,7 @@ const LinkVersionDialog = props => {
 
         const schemaData = {
           uri: data.uri,
-          aliases: data.aliases.map(alias => alias.name),
+          aliases: data.aliases.map(alias => alias.name).filter(aliasName => aliasName),
           comment: data.comment,
           properties
         }
