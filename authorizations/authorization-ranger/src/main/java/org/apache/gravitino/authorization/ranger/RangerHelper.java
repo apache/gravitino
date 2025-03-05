@@ -236,7 +236,7 @@ public class RangerHelper {
     Set<String> groups =
         StringUtils.isEmpty(groupName) ? Sets.newHashSet() : Sets.newHashSet(groupName);
 
-    if (users.size() == 0 && groups.size() == 0) {
+    if (users.isEmpty() && groups.isEmpty()) {
       throw new AuthorizationPluginException("The user and group cannot be empty!");
     }
 
@@ -274,13 +274,8 @@ public class RangerHelper {
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     }
 
-    RangerRole rangerRole = null;
-    try {
-      rangerRole = rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
-    } catch (RangerServiceException e) {
-      // ignore exception, If the role does not exist, then create it.
-      LOG.warn("The role({}) does not exist in the Ranger!", roleName);
-    }
+    RangerRole rangerRole = getRangerRole(roleName);
+
     try {
       if (rangerRole == null) {
         rangerRole = new RangerRole(roleName, RangerHelper.MANAGED_BY_GRAVITINO, null, null, null);
@@ -289,6 +284,26 @@ public class RangerHelper {
     } catch (RangerServiceException e) {
       throw new AuthorizationPluginException(
           e, "Failed to create the role(%s) in the Ranger", roleName);
+    }
+    return rangerRole;
+  }
+
+  public RangerRole getRangerRole(String roleName) {
+    RangerRole rangerRole = null;
+    try {
+      rangerRole = rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
+    } catch (RangerServiceException e) {
+
+      // The client will return a error message contains `doesn't have permission` if the role does
+      // not exist, then create it.
+      if (e.getMessage() != null
+          && e.getMessage().contains("User doesn't have permissions to get details")) {
+        LOG.warn("The role({}) does not exist in the Ranger!, e: {}", roleName, e);
+      } else {
+        throw new AuthorizationPluginException(
+            "Failed to check role(%s) whether exists in the Ranger! e: %s",
+            roleName, e.getMessage());
+      }
     }
     return rangerRole;
   }

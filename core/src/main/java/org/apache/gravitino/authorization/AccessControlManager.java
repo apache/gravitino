@@ -25,6 +25,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -34,7 +35,10 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /**
  * AccessControlManager is used for manage users, roles, grant information, this class is an
@@ -57,78 +61,120 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public User addUser(String metalake, String user)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
-    return userGroupManager.addUser(metalake, user);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.addUser(metalake, user));
   }
 
   @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
-    return userGroupManager.removeUser(metalake, user);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.removeUser(metalake, user));
   }
 
   @Override
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return userGroupManager.getUser(metalake, user);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUser(metalake, user),
+        LockType.READ,
+        () -> userGroupManager.getUser(metalake, user));
   }
 
   @Override
   public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
-    return userGroupManager.listUserNames(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.READ,
+        () -> userGroupManager.listUserNames(metalake));
   }
 
   @Override
   public User[] listUsers(String metalake) throws NoSuchMetalakeException {
-    return userGroupManager.listUsers(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.READ,
+        () -> userGroupManager.listUsers(metalake));
   }
 
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    return userGroupManager.addGroup(metalake, group);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.addGroup(metalake, group));
   }
 
   @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
-    return userGroupManager.removeGroup(metalake, group);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.removeGroup(metalake, group));
   }
 
   @Override
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
-    return userGroupManager.getGroup(metalake, group);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofGroup(metalake, group),
+        LockType.READ,
+        () -> userGroupManager.getGroup(metalake, group));
   }
 
   @Override
   public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
-    return userGroupManager.listGroups(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.READ,
+        () -> userGroupManager.listGroups(metalake));
   }
 
   @Override
   public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
-    return userGroupManager.listGroupNames(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.READ,
+        () -> userGroupManager.listGroupNames(metalake));
   }
 
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
-    return permissionManager.grantRolesToUser(metalake, roles, user);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUser(metalake, user),
+        LockType.WRITE,
+        () -> permissionManager.grantRolesToUser(metalake, roles, user));
   }
 
   @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
-    return permissionManager.grantRolesToGroup(metalake, roles, group);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofGroup(metalake, group),
+        LockType.WRITE,
+        () -> permissionManager.grantRolesToGroup(metalake, roles, group));
   }
 
   @Override
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
-    return permissionManager.revokeRolesFromGroup(metalake, roles, group);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofGroup(metalake, group),
+        LockType.WRITE,
+        () -> permissionManager.revokeRolesFromGroup(metalake, roles, group));
   }
 
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
-    return permissionManager.revokeRolesFromUser(metalake, roles, user);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUser(metalake, user),
+        LockType.WRITE,
+        () -> permissionManager.revokeRolesFromUser(metalake, roles, user));
   }
 
   @Override
@@ -143,42 +189,62 @@ public class AccessControlManager implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
-    return roleManager.createRole(metalake, role, properties, securableObjects);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> roleManager.createRole(metalake, role, properties, securableObjects));
   }
 
   @Override
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
-    return roleManager.getRole(metalake, role);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofRole(metalake, role),
+        LockType.READ,
+        () -> roleManager.getRole(metalake, role));
   }
 
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
-    return roleManager.deleteRole(metalake, role);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> roleManager.deleteRole(metalake, role));
   }
 
   @Override
   public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
-    return roleManager.listRoleNames(metalake);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+        LockType.READ,
+        () -> roleManager.listRoleNames(metalake));
   }
 
   @Override
   public String[] listRoleNamesByObject(String metalake, MetadataObject object)
       throws NoSuchMetalakeException, NoSuchMetadataObjectException {
-    return roleManager.listRoleNamesByObject(metalake, object);
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+    return TreeLockUtils.doWithTreeLock(
+        identifier, LockType.READ, () -> roleManager.listRoleNamesByObject(metalake, object));
   }
 
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
-    return permissionManager.grantPrivilegesToRole(metalake, role, object, privileges);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofRole(metalake, role),
+        LockType.WRITE,
+        () -> permissionManager.grantPrivilegesToRole(metalake, role, object, privileges));
   }
 
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
-    return permissionManager.revokePrivilegesFromRole(metalake, role, object, privileges);
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofRole(metalake, role),
+        LockType.WRITE,
+        () -> permissionManager.revokePrivilegesFromRole(metalake, role, object, privileges));
   }
 }

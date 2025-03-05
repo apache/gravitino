@@ -17,9 +17,9 @@
  * under the License.
  */
 
-export const nameRegex = /^\w[\w]{0,63}$/
+export const nameRegex = /^\w[\w/=-]{0,63}$/
 
 export const nameRegexDesc =
-  'This field must begin with a letter or underscore, contain only alphanumeric characters or underscores, and be between 1 and 64 characters in length'
+  'This field must start with a letter, digit, or underscore, can include alphanumeric characters, underscores, slashes (/), equal signs (=), or hyphens (-), and must be between 1 and 64 characters long.'
 
 export const keyRegex = /^[a-zA-Z_][a-zA-Z0-9-_.]*$/

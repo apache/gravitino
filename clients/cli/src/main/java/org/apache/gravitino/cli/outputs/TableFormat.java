@@ -45,9 +45,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Table;
 
 /**
  * Abstract base class for formatting entity information into ASCII-art tables. Provides
@@ -75,6 +78,18 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new CatalogTableFormat(context).output((Catalog) entity);
     } else if (entity instanceof Catalog[]) {
       new CatalogListTableFormat(context).output((Catalog[]) entity);
+    } else if (entity instanceof Schema) {
+      new SchemaTableFormat(context).output((Schema) entity);
+    } else if (entity instanceof Schema[]) {
+      new SchemaListTableFormat(context).output((Schema[]) entity);
+    } else if (entity instanceof Table) {
+      new TableDetailsTableFormat(context).output((Table) entity);
+    } else if (entity instanceof Table[]) {
+      new TableListTableFormat(context).output((Table[]) entity);
+    } else if (entity instanceof Audit) {
+      new AuditTableFormat(context).output((Audit) entity);
+    } else if (entity instanceof org.apache.gravitino.rel.Column[]) {
+      new ColumnListTableFormat(context).output((org.apache.gravitino.rel.Column[]) entity);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -538,6 +553,178 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       Arrays.stream(catalogs).forEach(metalake -> columnName.addCell(metalake.name()));
 
       return getTableFormat(columnName);
+    }
+  }
+
+  /**
+   * Formats a single {@link Schema} instance into a two-column table display. Displays catalog
+   * details including name and comment information.
+   */
+  static final class SchemaTableFormat extends TableFormat<Schema> {
+    public SchemaTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Schema schema) {
+      Column columnName = new Column(context, "schema");
+      Column columnComment = new Column(context, "comment");
+
+      columnName.addCell(schema.name());
+      columnComment.addCell(schema.comment());
+
+      return getTableFormat(columnName, columnComment);
+    }
+  }
+
+  /**
+   * Formats an array of Schemas into a single-column table display. Lists all schema names in a
+   * vertical format.
+   */
+  static final class SchemaListTableFormat extends TableFormat<Schema[]> {
+    public SchemaListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Schema[] schemas) {
+      Column column = new Column(context, "schema");
+      Arrays.stream(schemas).forEach(schema -> column.addCell(schema.name()));
+
+      return getTableFormat(column);
+    }
+  }
+
+  /**
+   * Formats a single {@link Table} instance into a two-column table display. Displays table details
+   * including name and comment information.
+   */
+  static final class TableDetailsTableFormat extends TableFormat<Table> {
+    public TableDetailsTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Table table) {
+      Column columnName = new Column(context, "name");
+      Column columnType = new Column(context, "type");
+      Column columnDefaultValue = new Column(context, "default");
+      Column columnAutoIncrement = new Column(context, "AutoIncrement");
+      Column columnNullable = new Column(context, "nullable");
+      Column columnComment = new Column(context, "comment");
+
+      org.apache.gravitino.rel.Column[] columns = table.columns();
+      for (org.apache.gravitino.rel.Column column : columns) {
+        columnName.addCell(column.name());
+        columnType.addCell(column.dataType().simpleString());
+        columnDefaultValue.addCell(LineUtil.getDefaultValue(column));
+        columnAutoIncrement.addCell(LineUtil.getAutoIncrement(column));
+        columnNullable.addCell(column.nullable());
+        columnComment.addCell(
+            column.comment() == null || column.comment().isEmpty() ? "N/A" : column.comment());
+      }
+
+      return getTableFormat(
+          columnName,
+          columnType,
+          columnDefaultValue,
+          columnAutoIncrement,
+          columnNullable,
+          columnComment);
+    }
+  }
+
+  /**
+   * Formats an array of {@link Table} into a single-column table display. Lists all table names in
+   * a vertical format.
+   */
+  static final class TableListTableFormat extends TableFormat<Table[]> {
+    public TableListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Table[] tables) {
+      Column column = new Column(context, "table");
+      Arrays.stream(tables).forEach(table -> column.addCell(table.name()));
+
+      return getTableFormat(column);
+    }
+  }
+
+  /**
+   * Formats a single {@link Audit} instance into a four-column table display. Displays audit
+   * details, including creator, create time, modified, and modify time.
+   */
+  static final class AuditTableFormat extends TableFormat<Audit> {
+    public AuditTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Audit audit) {
+      Column columnCreator = new Column(context, "creator");
+      Column columnCreateTime = new Column(context, "creation at");
+      Column columnModified = new Column(context, "modifier");
+      Column columnModifyTime = new Column(context, "modified at");
+
+      columnCreator.addCell(audit.creator());
+      columnCreateTime.addCell(audit.createTime() == null ? "N/A" : audit.createTime().toString());
+      columnModified.addCell(audit.lastModifier() == null ? "N/A" : audit.lastModifier());
+      columnModifyTime.addCell(
+          audit.lastModifiedTime() == null ? "N/A" : audit.lastModifiedTime().toString());
+
+      return getTableFormat(columnCreator, columnCreateTime, columnModified, columnModifyTime);
+    }
+  }
+
+  /**
+   * Formats an array of {@link org.apache.gravitino.rel.Column} into a six-column table display.
+   * Lists all column names, types, default values, auto-increment, nullable, and comments in a
+   * vertical format.
+   */
+  static final class ColumnListTableFormat extends TableFormat<org.apache.gravitino.rel.Column[]> {
+
+    /**
+     * Creates a new {@link TableFormat} with the specified properties.
+     *
+     * @param context the command context.
+     */
+    public ColumnListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(org.apache.gravitino.rel.Column[] columns) {
+      Column columnName = new Column(context, "name");
+      Column columnType = new Column(context, "type");
+      Column columnDefaultVal = new Column(context, "default");
+      Column columnAutoIncrement = new Column(context, "AutoIncrement");
+      Column columnNullable = new Column(context, "nullable");
+      Column columnComment = new Column(context, "comment");
+
+      for (org.apache.gravitino.rel.Column column : columns) {
+        columnName.addCell(column.name());
+        columnType.addCell(column.dataType().simpleString());
+        columnDefaultVal.addCell(LineUtil.getDefaultValue(column));
+        columnAutoIncrement.addCell(LineUtil.getAutoIncrement(column));
+        columnNullable.addCell(column.nullable());
+        columnComment.addCell(LineUtil.getComment(column));
+      }
+
+      return getTableFormat(
+          columnName,
+          columnType,
+          columnDefaultVal,
+          columnAutoIncrement,
+          columnNullable,
+          columnComment);
     }
   }
 }

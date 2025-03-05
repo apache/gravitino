@@ -63,31 +63,6 @@ public class ListColumns extends TableCommand {
       exitWithError(exp.getMessage());
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < columns.length; i++) {
-      String name = columns[i].name();
-      String dataType = columns[i].dataType().simpleString();
-      String comment = columns[i].comment();
-      String nullable = columns[i].nullable() ? "true" : "false";
-      String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
-
-      if (i == 0) {
-        all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
-      }
-      // TODO default values
-      all.append(
-          name
-              + ","
-              + dataType
-              + ","
-              + comment
-              + ","
-              + nullable
-              + ","
-              + autoIncrement
-              + System.lineSeparator());
-    }
-
-    printResults(all.toString());
+    printResults(columns);
   }
 }

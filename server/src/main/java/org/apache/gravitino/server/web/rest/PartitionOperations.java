@@ -45,8 +45,6 @@ import org.apache.gravitino.dto.responses.PartitionListResponse;
 import org.apache.gravitino.dto.responses.PartitionNameListResponse;
 import org.apache.gravitino.dto.responses.PartitionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.server.web.Utils;
@@ -87,34 +85,29 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            return TreeLockUtils.doWithTreeLock(
-                tableIdent,
-                LockType.READ,
-                () -> {
-                  if (verbose) {
-                    Partition[] partitions = dispatcher.listPartitions(tableIdent);
-                    Response response = Utils.ok(new PartitionListResponse(toDTOs(partitions)));
-                    LOG.info(
-                        "List {} partitions in table {}.{}.{}.{}",
-                        partitions.length,
-                        metalake,
-                        catalog,
-                        schema,
-                        table);
-                    return response;
-                  } else {
-                    String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
-                    Response response = Utils.ok(new PartitionNameListResponse((partitionNames)));
-                    LOG.info(
-                        "List {} partition names in table {}.{}.{}.{}",
-                        partitionNames.length,
-                        metalake,
-                        catalog,
-                        schema,
-                        table);
-                    return response;
-                  }
-                });
+            if (verbose) {
+              Partition[] partitions = dispatcher.listPartitions(tableIdent);
+              Response response = Utils.ok(new PartitionListResponse(toDTOs(partitions)));
+              LOG.info(
+                  "List {} partitions in table {}.{}.{}.{}",
+                  partitions.length,
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
+              return response;
+            } else {
+              String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
+              Response response = Utils.ok(new PartitionNameListResponse((partitionNames)));
+              LOG.info(
+                  "List {} partition names in table {}.{}.{}.{}",
+                  partitionNames.length,
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
+              return response;
+            }
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.LIST, "", table, e);
@@ -144,21 +137,16 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            return TreeLockUtils.doWithTreeLock(
-                tableIdent,
-                LockType.READ,
-                () -> {
-                  Partition p = dispatcher.getPartition(tableIdent, partition);
-                  Response response = Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
-                  LOG.info(
-                      "Got partition[{}] in table[{}.{}.{}.{}]",
-                      partition,
-                      metalake,
-                      catalog,
-                      schema,
-                      table);
-                  return response;
-                });
+            Partition p = dispatcher.getPartition(tableIdent, partition);
+            Response response = Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
+            LOG.info(
+                "Got partition[{}] in table[{}.{}.{}.{}]",
+                partition,
+                metalake,
+                catalog,
+                schema,
+                table);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.GET, "", table, e);
@@ -190,24 +178,12 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            return TreeLockUtils.doWithTreeLock(
-                tableIdent,
-                LockType.WRITE,
-                () -> {
-                  Partition p =
-                      dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
-                  Response response =
-                      Utils.ok(
-                          new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
-                  LOG.info(
-                      "Added {} partition(s) to table {}.{}.{}.{} ",
-                      1,
-                      metalake,
-                      catalog,
-                      schema,
-                      table);
-                  return response;
-                });
+            Partition p = dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
+            Response response =
+                Utils.ok(new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
+            LOG.info(
+                "Added {} partition(s) to table {}.{}.{}.{} ", 1, metalake, catalog, schema, table);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.CREATE, "", table, e);
@@ -239,32 +215,27 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            return TreeLockUtils.doWithTreeLock(
-                tableIdent,
-                LockType.WRITE,
-                () -> {
-                  boolean dropped =
-                      purge
-                          ? dispatcher.purgePartition(tableIdent, partition)
-                          : dispatcher.dropPartition(tableIdent, partition);
-                  if (!dropped) {
-                    LOG.warn(
-                        "Failed to drop partition {} under table {} under schema {}",
-                        partition,
-                        table,
-                        schema);
-                  }
-                  Response response = Utils.ok(new DropResponse(dropped));
-                  LOG.info(
-                      "Partition {} {} in table {}.{}.{}.{}",
-                      partition,
-                      purge ? "purged" : "dropped",
-                      metalake,
-                      catalog,
-                      schema,
-                      table);
-                  return response;
-                });
+            boolean dropped =
+                purge
+                    ? dispatcher.purgePartition(tableIdent, partition)
+                    : dispatcher.dropPartition(tableIdent, partition);
+            if (!dropped) {
+              LOG.warn(
+                  "Failed to drop partition {} under table {} under schema {}",
+                  partition,
+                  table,
+                  schema);
+            }
+            Response response = Utils.ok(new DropResponse(dropped));
+            LOG.info(
+                "Partition {} {} in table {}.{}.{}.{}",
+                partition,
+                purge ? "purged" : "dropped",
+                metalake,
+                catalog,
+                schema,
+                table);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);

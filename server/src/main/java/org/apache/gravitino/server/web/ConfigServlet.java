@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -56,6 +57,15 @@ public class ConfigServlet extends HttpServlet {
         .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       for (ConfigEntry<?> key : oauthConfigEntries) {
         configs.put(key.getKey(), serverConfig.get(key));
+      }
+    }
+
+    List<String> visibleConfigs = serverConfig.get(Configs.VISIBLE_CONFIGS);
+
+    for (String config : visibleConfigs) {
+      String configValue = serverConfig.getRawString(config);
+      if (configValue != null) {
+        configs.put(config, configValue);
       }
     }
   }

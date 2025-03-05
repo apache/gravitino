@@ -33,6 +33,12 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +70,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockMetalake, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("demo_metalake, This is a demo metalake", output);
+    Assertions.assertEquals("demo_metalake,This is a demo metalake", output);
   }
 
   @Test
@@ -85,8 +91,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockCatalog, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "demo_catalog, RELATIONAL, demo_provider, This is a demo catalog", output);
+    Assertions.assertEquals("demo_catalog,RELATIONAL,demo_provider,This is a demo catalog", output);
   }
 
   @Test
@@ -100,6 +105,150 @@ public class TestPlainFormat {
     PlainFormat.output(new Catalog[] {mockCatalog1, mockCatalog2}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals("catalog1\n" + "catalog2", output);
+  }
+
+  @Test
+  void testSchemaDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema = getMockSchema();
+    PlainFormat.output(mockSchema, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_schema,This is a demo schema", output);
+  }
+
+  @Test
+  void testListSchemaWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema1 = getMockSchema("schema1", "This is a schema");
+    Schema mockSchema2 = getMockSchema("schema2", "This is another schema");
+
+    PlainFormat.output(new Schema[] {mockSchema1, mockSchema2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("schema1\n" + "schema2", output);
+  }
+
+  @Test
+  void testTableDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable = getMockTable();
+    PlainFormat.output(mockTable, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_table,This is a demo table", output);
+  }
+
+  @Test
+  void testAuditWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(mockAudit.lastModifier()).thenReturn("demo_user");
+    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+
+    PlainFormat.output(mockAudit, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "demo_user,2021-01-20T02:51:51.111Z,demo_user,2021-01-20T02:51:51.111Z", output);
+  }
+
+  @Test
+  void testAuditWithTableFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(null);
+    when(mockAudit.lastModifier()).thenReturn(null);
+    when(mockAudit.lastModifiedTime()).thenReturn(null);
+
+    PlainFormat.output(mockAudit, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_user,N/A,N/A,N/A", output);
+  }
+
+  @Test
+  void testListTableWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Table mockTable1 = getMockTable("table1", "This is a table");
+    Table mockTable2 = getMockTable("table2", "This is another table");
+
+    PlainFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("table1\n" + "table2", output);
+  }
+
+  @Test
+  void testListColumnWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    org.apache.gravitino.rel.Column mockColumn1 =
+        getMockColumn(
+            "column1",
+            Types.IntegerType.get(),
+            "This is a int " + "column",
+            false,
+            true,
+            new Literal<Integer>() {
+              @Override
+              public Integer value() {
+                return 4;
+              }
+
+              @Override
+              public Type dataType() {
+                return null;
+              }
+            });
+    org.apache.gravitino.rel.Column mockColumn2 =
+        getMockColumn(
+            "column2",
+            Types.StringType.get(),
+            "This is a string " + "column",
+            true,
+            false,
+            new Literal<String>() {
+              @Override
+              public String value() {
+                return "default value";
+              }
+
+              @Override
+              public Type dataType() {
+                return null;
+              }
+            });
+
+    PlainFormat.output(
+        new org.apache.gravitino.rel.Column[] {mockColumn1, mockColumn2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "name,datatype,default_value,comment,nullable,auto_increment\n"
+            + "column1,integer,4,This is a int column,false,true\n"
+            + "column2,string,default value,This is a string column,true,",
+        output);
+  }
+
+  @Test
+  void testListColumnWithTableFormatAndEmptyDefaultValues() {
+    CommandContext mockContext = getMockContext();
+    org.apache.gravitino.rel.Column mockColumn1 =
+        getMockColumn(
+            "column1", Types.IntegerType.get(), "", false, true, Column.DEFAULT_VALUE_NOT_SET);
+    org.apache.gravitino.rel.Column mockColumn2 =
+        getMockColumn(
+            "column2",
+            Types.StringType.get(),
+            "",
+            true,
+            false,
+            Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+
+    PlainFormat.output(
+        new org.apache.gravitino.rel.Column[] {mockColumn1, mockColumn2}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "name,datatype,default_value,comment,nullable,auto_increment\n"
+            + "column1,integer,,,false,true\n"
+            + "column2,string,current_timestamp(),,true,",
+        output);
   }
 
   @Test
@@ -159,13 +308,53 @@ public class TestPlainFormat {
     return mockSchema;
   }
 
-  private Audit getMockAudit() {
-    Audit mockAudit = mock(Audit.class);
-    when(mockAudit.creator()).thenReturn("demo_user");
-    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
-    when(mockAudit.lastModifier()).thenReturn("demo_user");
-    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+  private Table getMockTable() {
+    return getMockTable("demo_table", "This is a demo table");
+  }
 
-    return mockAudit;
+  private Table getMockTable(String name, String comment) {
+    Table mockTable = mock(Table.class);
+    org.apache.gravitino.rel.Column mockColumnInt =
+        getMockColumn(
+            "id",
+            Types.IntegerType.get(),
+            "This is a int column",
+            false,
+            true,
+            Column.DEFAULT_VALUE_NOT_SET);
+    org.apache.gravitino.rel.Column mockColumnString =
+        getMockColumn(
+            "name",
+            Types.StringType.get(),
+            "This is a string column",
+            true,
+            true,
+            Column.DEFAULT_VALUE_NOT_SET);
+
+    when(mockTable.name()).thenReturn(name);
+    when(mockTable.comment()).thenReturn(comment);
+    when(mockTable.columns())
+        .thenReturn(new org.apache.gravitino.rel.Column[] {mockColumnInt, mockColumnString});
+
+    return mockTable;
+  }
+
+  private org.apache.gravitino.rel.Column getMockColumn(
+      String name,
+      Type dataType,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
+
+    org.apache.gravitino.rel.Column mockColumn = mock(org.apache.gravitino.rel.Column.class);
+    when(mockColumn.name()).thenReturn(name);
+    when(mockColumn.dataType()).thenReturn(dataType);
+    when(mockColumn.comment()).thenReturn(comment);
+    when(mockColumn.nullable()).thenReturn(nullable);
+    when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
+    when(mockColumn.defaultValue()).thenReturn(defaultValue);
+
+    return mockColumn;
   }
 }
