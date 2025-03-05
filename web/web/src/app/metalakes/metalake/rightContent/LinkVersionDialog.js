@@ -64,12 +64,9 @@ const schema = yup.object().shape({
     .array()
     .of(
       yup.object().shape({
-        name: yup
-          .string()
-          .required('The alias is required')
-          .test('not-number', 'Alias cannot be a number or a numeric string', value => {
-            return value === undefined || isNaN(Number(value))
-          })
+        name: yup.string().test('not-number', 'Alias cannot be a number or a numeric string', value => {
+          return (value && isNaN(Number(value))) || !value
+        })
       })
     )
     .test('unique', 'Alias must be unique', (aliases, ctx) => {
@@ -214,7 +211,7 @@ const LinkVersionDialog = props => {
 
         const schemaData = {
           uri: data.uri,
-          aliases: data.aliases.map(alias => alias.name),
+          aliases: data.aliases.map(alias => alias.name).filter(aliasName => aliasName),
           comment: data.comment,
           properties
         }
