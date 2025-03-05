@@ -41,6 +41,9 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsByTableIds")
+  List<TablePO> listTablePOsByTableIds(@Param("tableIds") List<Long> tableIds);
+
   @SelectProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "selectTableIdBySchemaIdAndName")
