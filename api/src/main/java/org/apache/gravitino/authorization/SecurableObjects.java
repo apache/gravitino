@@ -89,6 +89,22 @@ public class SecurableObjects {
   }
 
   /**
+   * Create the column {@link SecurableObject} with the given securable schema object, column name
+   * and privileges.
+   *
+   * @param table The table securable object
+   * @param column The column name
+   * @param privileges The privileges of the column
+   * @return The created column {@link SecurableObject}
+   */
+  public static SecurableObject ofColumn(
+      SecurableObject table, String column, List<Privilege> privileges) {
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(table.fullName()));
+    names.add(column);
+    return of(MetadataObject.Type.TABLE, names, privileges);
+  }
+
+  /**
    * Create the topic {@link SecurableObject} with the given securable schema object ,topic name and
    * privileges.
    *
@@ -105,7 +121,7 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * Create the fileset {@link SecurableObject} with the given securable schema object, fileset name
    * and privileges.
    *
    * @param schema The schema securable object
