@@ -29,6 +29,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -297,6 +298,49 @@ public class MetadataObjectService {
         });
 
     return filesetIdAndNameMap;
+  }
+
+  public static Map<Long, String> getModelObjectFullNames(List<Long> ids) {
+    List<ModelPO> modelPOs =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class, mapper -> mapper.listModelPOsByModelIds(ids));
+
+    if (modelPOs == null || modelPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        modelPOs.stream().map(ModelPO::getCatalogId).collect(Collectors.toList());
+    List<Long> schemaIds = modelPOs.stream().map(ModelPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+
+    HashMap<Long, String> modelIdAndNameMap = new HashMap<>();
+
+    modelPOs.forEach(
+        modelPO -> {
+          // since the catalog or schema can be deleted, we need to check the null value,
+          // and when catalog or schema is deleted, we will set fullName of modelPO to null
+          String catalogName = catalogIdAndNameMap.getOrDefault(modelPO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of model {} may be deleted", modelPO.getModelId());
+            modelIdAndNameMap.put(modelPO.getModelId(), null);
+            return;
+          }
+
+          String schemaName = schemaIdAndNameMap.getOrDefault(modelPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of model {} may be deleted", modelPO.getModelId());
+            modelIdAndNameMap.put(modelPO.getModelId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(catalogName, schemaName, modelPO.getModelName());
+          modelIdAndNameMap.put(modelPO.getModelId(), fullName);
+        });
+
+    return modelIdAndNameMap;
   }
 
   public static Map<Long, String> getTableObjectFullNames(List<Long> ids) {

@@ -120,6 +120,22 @@ public class SecurableObjects {
     return of(MetadataObject.Type.FILESET, names, privileges);
   }
 
+  /**
+   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * and privileges.
+   *
+   * @param schema The schema securable object
+   * @param model The model name
+   * @param privileges The privileges of the model
+   * @return The created model {@link SecurableObject}
+   */
+  public static SecurableObject ofModel(
+      SecurableObject schema, String model, List<Privilege> privileges) {
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
+    names.add(model);
+    return of(MetadataObject.Type.MODEL, names, privileges);
+  }
+
   private static class SecurableObjectImpl extends MetadataObjectImpl implements SecurableObject {
 
     private List<Privilege> privileges;
