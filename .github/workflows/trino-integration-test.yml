@@ -87,6 +87,8 @@ jobs:
         run: |
           ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
           ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
+          # Disable the Trino cascading query integration test, because the connector jars are private now.
+          #trino-connector/integration-test/trino-test-tools/run_test.sh
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
