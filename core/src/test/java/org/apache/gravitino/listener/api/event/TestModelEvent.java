@@ -296,6 +296,9 @@ public class TestModelEvent {
 
     GetModelVersionPreEvent getModelVersionPreEvent = (GetModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentB, getModelVersionPreEvent.identifier());
+    Assertions.assertTrue(getModelVersionPreEvent.alias().isPresent());
+    Assertions.assertEquals("aliasTest", getModelVersionPreEvent.alias().get());
+    Assertions.assertFalse(getModelVersionPreEvent.version().isPresent());
   }
 
   @Test

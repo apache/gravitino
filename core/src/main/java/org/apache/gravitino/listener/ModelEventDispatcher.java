@@ -178,7 +178,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
-    eventBus.dispatchEvent(new GetModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    eventBus.dispatchEvent(
+        new GetModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, null, version));
     try {
       // TODO: ModelEvent
       return dispatcher.getModelVersion(ident, version);
@@ -192,7 +193,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public ModelVersion getModelVersion(NameIdentifier ident, String alias)
       throws NoSuchModelVersionException {
-    eventBus.dispatchEvent(new GetModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    eventBus.dispatchEvent(
+        new GetModelVersionPreEvent(PrincipalUtils.getCurrentUserName(), ident, alias, null));
     try {
       ModelVersion modelVersion = dispatcher.getModelVersion(ident, alias);
       // TODO: ModelEvent
