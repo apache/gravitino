@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -280,8 +281,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
     String comment = table.getComment();
     Map<String, String> properties =
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
+
     Transform[] partitions =
-        partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
+        partitionConverter != null
+            ? partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys())
+            : new Transform[0];
 
     try {
 
@@ -558,7 +562,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     flinkPrimaryKey.ifPresent(builder::primaryKey);
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
-    List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
+    List<String> partitionKeys =
+        partitionConverter != null
+            ? partitionConverter.toFlinkPartitionKeys(table.partitioning())
+            : new ArrayList<>();
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 

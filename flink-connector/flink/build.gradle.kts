@@ -99,6 +99,7 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.metrics.core)
   testImplementation(libs.flinkjdbc)
+
   testImplementation("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
   testImplementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-common:$flinkVersion")

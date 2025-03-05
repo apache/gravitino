@@ -79,12 +79,12 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   }
 
   @BeforeAll
-  void setup() {
+  void jdbcStartup() {
     init();
   }
 
   @AfterAll
-  static void stop() {
+  void jdbcStop() {
     Preconditions.checkNotNull(metalake);
     metalake.dropCatalog(CATALOG_NAME, true);
   }

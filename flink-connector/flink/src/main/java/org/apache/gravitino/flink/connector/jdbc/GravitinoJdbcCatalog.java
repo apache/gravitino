@@ -57,6 +57,18 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   }
 
   @Override
+  public void open() throws CatalogException {
+    super.open();
+    jdbcCatalog.open();
+  }
+
+  @Override
+  public void close() throws CatalogException {
+    super.close();
+    jdbcCatalog.close();
+  }
+
+  @Override
   protected AbstractCatalog realCatalog() {
     return jdbcCatalog;
   }
