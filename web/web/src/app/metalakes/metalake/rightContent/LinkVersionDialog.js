@@ -64,11 +64,9 @@ const schema = yup.object().shape({
     .array()
     .of(
       yup.object().shape({
-        name: yup
-          .string()
-          .test('not-number', 'Alias cannot be a number or a numeric string', value => {
-            return value && isNaN(Number(value)) || !value
-          })
+        name: yup.string().test('not-number', 'Alias cannot be a number or a numeric string', value => {
+          return (value && isNaN(Number(value))) || !value
+        })
       })
     )
     .test('unique', 'Alias must be unique', (aliases, ctx) => {
