@@ -78,6 +78,8 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         ImmutableSet.of(RangerHadoopSQLPrivilege.CREATE),
         Privilege.Name.MODIFY_TABLE,
         ImmutableSet.of(
+            RangerHadoopSQLPrivilege.READ,
+            RangerHadoopSQLPrivilege.SELECT,
             RangerHadoopSQLPrivilege.UPDATE,
             RangerHadoopSQLPrivilege.ALTER,
             RangerHadoopSQLPrivilege.WRITE),

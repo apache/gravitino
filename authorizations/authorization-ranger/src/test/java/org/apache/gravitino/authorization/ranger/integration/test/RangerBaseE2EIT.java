@@ -313,7 +313,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadWriteTableWithMetalakeLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithMetalakeLevelRole() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -368,7 +368,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadWriteTableWithTableLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithTableLevelRole() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -432,7 +432,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadOnlyTable() throws InterruptedException {
+  void testSelectOnlyTable() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -486,7 +486,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testWriteOnlyTable() throws InterruptedException {
+  void testModifyOnlyTable() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -514,9 +514,8 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 1: Succeed to insert data into the table
     sparkSession.sql(SQL_INSERT_TABLE);
 
-    // case 2: Fail to select data from the table
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    // case 2: Fail select data from the table
+    sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
     checkUpdateSQLWithWritePrivileges();
