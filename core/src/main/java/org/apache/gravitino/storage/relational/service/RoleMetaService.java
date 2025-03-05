@@ -367,6 +367,7 @@ public class RoleMetaService {
                 case CATALOG:
                 case FILESET:
                 case TABLE:
+                case MODEL:
                   List<Long> objectIds =
                       objects.stream()
                           .map(SecurableObjectPO::getMetadataObjectId)
@@ -375,14 +376,16 @@ public class RoleMetaService {
                   Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
                       objectFullNameGetterFnMap =
                           ImmutableMap.of(
-                              MetadataObject.Type.FILESET,
-                                  MetadataObjectService::getFilesetObjectFullNames,
                               MetadataObject.Type.METALAKE,
-                                  MetadataObjectService::getMetalakeObjectFullNames,
+                              MetadataObjectService::getMetalakeObjectFullNames,
                               MetadataObject.Type.CATALOG,
-                                  MetadataObjectService::getCatalogObjectFullNames,
+                              MetadataObjectService::getCatalogObjectFullNames,
+                              MetadataObject.Type.FILESET,
+                              MetadataObjectService::getFilesetObjectFullNames,
                               MetadataObject.Type.TABLE,
-                                  MetadataObjectService::getTableObjectFullNames);
+                              MetadataObjectService::getTableObjectFullNames,
+                              MetadataObject.Type.MODEL,
+                              MetadataObjectService::getModelObjectFullNames);
 
                   // dynamically calling getter function based on type
                   Map<Long, String> objectIdAndNameMap =

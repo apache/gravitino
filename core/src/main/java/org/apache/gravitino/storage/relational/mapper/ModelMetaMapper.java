@@ -40,6 +40,9 @@ public interface ModelMetaMapper {
   @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "listModelPOsBySchemaId")
   List<ModelPO> listModelPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "listModelPOsByModelIds")
+  List<ModelPO> listModelPOsByModelIds(@Param("modelIds") List<Long> modelIds);
+
   @SelectProvider(
       type = ModelMetaSQLProviderFactory.class,
       method = "selectModelMetaBySchemaIdAndModelName")
