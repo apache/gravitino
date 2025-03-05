@@ -31,4 +31,3 @@ ln -sf /dev/stdout /root/gravitino/logs/gravitino-server.log
 ln -sf /dev/stderr /root/gravitino/logs/gravitino-server.out
 echo "Start the Gravitino Server"
 /bin/bash /root/gravitino/bin/gravitino.sh start
-# tail -f /dev/null

@@ -1,32 +1,71 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+  
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ .Release.Name }}-test-pod"
+  name: {{ include "gravitino.name" . }}-test-pod
   annotations:
     "helm.sh/hook": test
 spec:
-  serviceAccountName: {{ .Release.Name }}-pod-reader
+  serviceAccountName: {{ include "gravitino.name" . }}-pod-reader
   containers:
-      - name: test-container
-        image: bitnami/kubectl:latest
-        command:
-          - "sh"
-          - "-c"
-          - |
-            echo "Checking for running pods in namespace {{ .Release.Namespace }}..."
-            running_pods=$(kubectl get pods -n {{ .Release.Namespace }} --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}')
-            if [ -z "$running_pods" ]; then
-              echo "No running pods found in namespace {{ .Release.Namespace }}."
-              exit 1
+    - name: check-pods
+      image: bitnami/kubectl:latest
+      command:
+        - "sh"
+        - "-c"
+        - |
+          # echo "Checking for running pods in namespace {{ .Release.Namespace }}..."
+          # running_pods=$(kubectl get pods -n {{ .Release.Namespace }} --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}')
+          # if [ -z "$running_pods" ]; then
+          #   echo "No running pods found in namespace {{ .Release.Namespace }}."
+          #   exit 1
+          # else
+          #   echo "Running pods: $running_pods"
+          #   exit 0
+          # fi
+          maxWaitTime=$((15 * 60))
+          sleepInterval=10
+          elapsedTime=0
+          echo "Checking for all pods in namespace {{ .Release.Namespace }} 'Running'..."
+          while true; do
+            notRunningPods=$(kubectl get pods -n {{ .Release.Namespace }} -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' | grep -v "Running\|Evicted\|Completed")
+            if [ -z "$notRunningPods" ]; then
+              echo "All pods are running."
+              break
             else
-              echo "Running pods: $running_pods"
-              exit 0
+              echo "Some pods are not running yet:"
+              echo "$notRunningPods"
+              sleep $sleepInterval
+              elapsedTime=$((elapsedTime + sleepInterval))
+              if [ "$elapsedTime" -ge "$maxWaitTime" ]; then
+                echo "Reached maximum wait time of 15 minutes. Exiting."
+                exit 1
+              fi
             fi
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "250m"
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
+          done
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
   restartPolicy: Never
