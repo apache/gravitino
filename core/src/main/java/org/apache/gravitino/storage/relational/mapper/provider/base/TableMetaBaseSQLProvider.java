@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -34,6 +35,24 @@ public class TableMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  public String listTablePOsByTableIds(List<Long> tableIds) {
+    return "<script>"
+        + " SELECT table_id as tableId, table_name as tableName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND table_id in ("
+        + "<foreach collection='tableIds' item='tableId' separator=','>"
+        + "#{tableId}"
+        + "</foreach>"
+        + ") "
+        + "</script>";
   }
 
   public String selectTableIdBySchemaIdAndName(

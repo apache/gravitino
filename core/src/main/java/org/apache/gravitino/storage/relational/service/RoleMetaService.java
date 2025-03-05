@@ -363,8 +363,10 @@ public class RoleMetaService {
               // If the type is Fileset, use the batch retrieval interface;
               // otherwise, use the single retrieval interface
               switch (MetadataObject.Type.valueOf(type)) {
-                case FILESET:
                 case METALAKE:
+                case CATALOG:
+                case FILESET:
+                case TABLE:
                   List<Long> objectIds =
                       objects.stream()
                           .map(SecurableObjectPO::getMetadataObjectId)
@@ -376,7 +378,11 @@ public class RoleMetaService {
                               MetadataObject.Type.FILESET,
                                   MetadataObjectService::getFilesetObjectFullNames,
                               MetadataObject.Type.METALAKE,
-                                  MetadataObjectService::getMetalakeObjectFullNames);
+                                  MetadataObjectService::getMetalakeObjectFullNames,
+                              MetadataObject.Type.CATALOG,
+                                  MetadataObjectService::getCatalogObjectFullNames,
+                              MetadataObject.Type.TABLE,
+                                  MetadataObjectService::getTableObjectFullNames);
 
                   // dynamically calling getter function based on type
                   Map<Long, String> objectIdAndNameMap =
