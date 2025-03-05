@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENAB
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
@@ -35,6 +36,7 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.spark.SparkUnsupportedOperationException;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.SparkSession;
@@ -219,9 +221,16 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
             "true");
 
-    metalake.createCatalog("test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
-
-    metalake.dropCatalog("test", true);
+    try {
+      List<RangerService> serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
+      int expectServiceCount = serviceList.size() + 1;
+      metalake.createCatalog("test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
+      serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
+      Assertions.assertEquals(expectServiceCount, serviceList.size());
+      metalake.dropCatalog("test", true);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {
