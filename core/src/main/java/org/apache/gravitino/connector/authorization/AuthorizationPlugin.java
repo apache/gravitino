@@ -19,6 +19,8 @@
 package org.apache.gravitino.connector.authorization;
 
 import java.io.Closeable;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * Authorization operations plugin interfaces. <br>
@@ -29,4 +31,12 @@ public interface AuthorizationPlugin
     extends UserGroupAuthorizationPlugin,
         RoleAuthorizationPlugin,
         MetadataAuthorizationPlugin,
-        Closeable {}
+        Closeable {
+    /**
+     *
+     * @return
+     */
+    default Map<String, String> getProperties() {
+        return Collections.emptyMap();
+    }
+}

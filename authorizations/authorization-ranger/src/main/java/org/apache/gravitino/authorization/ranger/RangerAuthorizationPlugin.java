@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.time.Instant;
@@ -86,6 +87,7 @@ public abstract class RangerAuthorizationPlugin
   protected RangerClientExtension rangerClient;
   protected RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
+  private final Map<String, String> properties = Maps.newHashMap();
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
@@ -93,10 +95,17 @@ public abstract class RangerAuthorizationPlugin
         new RangerAuthorizationProperties(config);
     rangerAuthorizationProperties.validate();
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
+    properties.put(RangerAuthorizationProperties.RANGER_ADMIN_URL, rangerUrl);
+
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
+    properties.put(RangerAuthorizationProperties.RANGER_AUTH_TYPE, authType);
+
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
+    properties.put(RangerAuthorizationProperties.RANGER_USERNAME, rangerAdminName);
+
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
+    properties.put(RangerAuthorizationProperties.RANGER_PASSWORD, password);
 
     String serviceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
@@ -111,6 +120,8 @@ public abstract class RangerAuthorizationPlugin
     }
 
     rangerServiceName = serviceName;
+    properties.put(RangerAuthorizationProperties.RANGER_SERVICE_NAME, serviceName);
+
     rangerHelper =
         new RangerHelper(
             rangerClient,
@@ -784,6 +795,11 @@ public abstract class RangerAuthorizationPlugin
       return Boolean.FALSE;
     }
     return Boolean.TRUE;
+  }
+
+  @Override
+  public Map<String, String> getProperties() {
+    return properties;
   }
 
   private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {

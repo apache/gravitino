@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
+import com.google.common.collect.Maps;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
@@ -43,6 +45,7 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
   private final String metalake;
+  private final Map<String, String> properties = Maps.newHashMap();
 
   public ChainedAuthorizationPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
@@ -89,6 +92,10 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
                 AuthorizationPlugin authorizationPlugin =
                     classLoader.withClassLoader(
                         cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
+                authorizationPlugin.getProperties().forEach((key, value) -> {
+                  String newKey = "authorization.chain." + key.substring("authorization".length());
+                  properties.put(newKey, value);
+                });
                 plugins.add(authorizationPlugin);
               } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -193,6 +200,10 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
       throws AuthorizationPluginException {
     return chainedAction(plugin -> plugin.onOwnerSet(metadataObject, preOwner, newOwner));
+  }
+
+  @Override
+  public Map<String, String> getProperties() {
   }
 
   private Boolean chainedAction(Function<AuthorizationPlugin, Boolean> action) {

@@ -358,6 +358,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+
+          // Authorization plugin may produce some new properties.
+          authorizationPlugin.getProperties().forEach(tempProperties::putIfAbsent);
           properties = tempProperties;
         }
       }
