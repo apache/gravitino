@@ -413,22 +413,24 @@ public class MetalakeManager implements MetalakeDispatcher {
             boolean inUse = metalakeInUse(store, ident);
             if (inUse) {
               METALAKE_CACHE.invalidate(ident);
-              store.update(
-                  ident,
-                  BaseMetalake.class,
-                  EntityType.METALAKE,
-                  metalake -> {
-                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+              BaseMetalake baseMetalake =
+                  store.update(
+                      ident,
+                      BaseMetalake.class,
+                      EntityType.METALAKE,
+                      metalake -> {
+                        BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
 
-                    Map<String, String> newProps =
-                        metalake.properties() == null
-                            ? Maps.newHashMap()
-                            : Maps.newHashMap(metalake.properties());
-                    newProps.put(PROPERTY_IN_USE, "false");
-                    builder.withProperties(newProps);
+                        Map<String, String> newProps =
+                            metalake.properties() == null
+                                ? Maps.newHashMap()
+                                : Maps.newHashMap(metalake.properties());
+                        newProps.put(PROPERTY_IN_USE, "false");
+                        builder.withProperties(newProps);
 
-                    return builder.build();
-                  });
+                        return builder.build();
+                      });
+              METALAKE_CACHE.put(ident, newMetalakeWithResolvedProperties(baseMetalake));
             }
             return null;
           } catch (IOException e) {

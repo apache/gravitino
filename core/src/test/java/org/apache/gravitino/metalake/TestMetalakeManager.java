@@ -227,8 +227,10 @@ public class TestMetalakeManager {
 
     metalakeManager.disableMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
-    Assertions.assertNull(baseMetalake);
+    Assertions.assertNotNull(baseMetalake);
     metalakeManager.dropMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNull(baseMetalake);
 
     metalakeManager.createMetalake(ident, "comment", props);
     baseMetalake = cache.getIfPresent(ident);
@@ -252,15 +254,19 @@ public class TestMetalakeManager {
     Assertions.assertNotNull(baseMetalake);
     metalakeManager.disableMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
-    Assertions.assertNull(baseMetalake);
+    Assertions.assertNotNull(baseMetalake);
+    Assertions.assertEquals("false", baseMetalake.properties().get("in-use"));
     metalakeManager.enableMetalake(ident);
+    baseMetalake = cache.getIfPresent(ident);
+    Assertions.assertNotNull(baseMetalake);
+    Assertions.assertEquals("true", baseMetalake.properties().get("in-use"));
 
     metalakeManager.loadMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
     Assertions.assertNotNull(baseMetalake);
     metalakeManager.disableMetalake(ident);
     baseMetalake = cache.getIfPresent(ident);
-    Assertions.assertNull(baseMetalake);
+    Assertions.assertNotNull(baseMetalake);
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
