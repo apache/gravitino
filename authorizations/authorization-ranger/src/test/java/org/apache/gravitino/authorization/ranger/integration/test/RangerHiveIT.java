@@ -21,6 +21,8 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerClient;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -48,11 +50,14 @@ import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerClientExtension;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLSecurableObject;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.authorization.ranger.reference.VXUserList;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -60,12 +65,15 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerRole;
+import org.glassfish.jersey.internal.guava.Sets;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,10 +142,29 @@ public class RangerHiveIT {
 
   // Use the different db.table different privilege to test OnRoleCreated()
   @Test
-  public void testOnRoleCreated() {
+  public void testOnRoleCreated() throws Exception {
     RoleEntity role = mock3TableRole(currentFunName());
+
+    // test to throw an exception
+    RangerClientExtension client = Mockito.mock(RangerClientExtension.class);
+    RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
+    rangerAuthHivePlugin.setRangerClient(client);
+    RangerHelper originHelper = rangerAuthHivePlugin.getRangerHelper();
+
+    RangerHelper helper =
+        new RangerHelper(client, "test", "test", Sets.newHashSet(), Lists.newArrayList());
+    rangerAuthHivePlugin.setRangerHelper(helper);
+    when(client.createRole(any(), any())).thenThrow(new RangerServiceException(new Exception("")));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class, () -> rangerAuthHivePlugin.onRoleCreated(role));
+    rangerAuthHivePlugin.setRangerClient(originClient);
+    rangerAuthHivePlugin.setRangerHelper(originHelper);
+
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
     verifyRoleInRanger(rangerAuthHivePlugin, role);
+
+    // Repeat to create the same to verify the idempotent operation
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
   }
 
   @Test
@@ -256,7 +283,7 @@ public class RangerHiveIT {
   }
 
   @Test
-  public void testOnRoleDeleted() {
+  public void testOnRoleDeleted() throws Exception {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
@@ -266,6 +293,26 @@ public class RangerHiveIT {
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
     // Check if the policy is deleted
     assertFindManagedPolicyItems(role, false);
+
+    // Repeat to delete the same role to verify the idempotent operation
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
+
+    // test to throw an exception
+    RangerClientExtension client = Mockito.mock(RangerClientExtension.class);
+    RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
+    RangerHelper originHelper = rangerAuthHivePlugin.getRangerHelper();
+    rangerAuthHivePlugin.setRangerClient(client);
+
+    RangerHelper helper = Mockito.mock(RangerHelper.class);
+    rangerAuthHivePlugin.setRangerHelper(helper);
+    Mockito.doThrow(new RangerServiceException(new Exception("test")))
+        .when(client)
+        .deleteRole(any(), any(), any());
+    Mockito.when(helper.getRangerRole(any())).thenReturn(Mockito.mock(RangerRole.class));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class, () -> rangerAuthHivePlugin.onRoleDeleted(role));
+    rangerAuthHivePlugin.setRangerClient(originClient);
+    rangerAuthHivePlugin.setRangerHelper(originHelper);
   }
 
   @Test
@@ -294,7 +341,7 @@ public class RangerHiveIT {
 
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
-    // Because this metaobject has owner, so the policy should not be deleted
+    // Because this metadata object has owner, so the policy should not be deleted
     assertFindManagedPolicyItems(role, false);
   }
 
@@ -1083,7 +1130,7 @@ public class RangerHiveIT {
   }
 
   @Test
-  public void testOnGrantedRolesToUser() {
+  public void testOnGrantedRolesToUser() throws Exception {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
@@ -1107,6 +1154,18 @@ public class RangerHiveIT {
         rangerAuthHivePlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
     verifyRoleInRanger(rangerAuthHivePlugin, role, Lists.newArrayList(userName1));
 
+    // test to throw an exception
+    RangerClientExtension client = Mockito.mock(RangerClientExtension.class);
+    RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
+    rangerAuthHivePlugin.setRangerClient(client);
+    when(client.searchUser(any())).thenReturn(Mockito.mock(VXUserList.class));
+    when(client.grantRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () -> rangerAuthHivePlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
+    rangerAuthHivePlugin.setRangerClient(originClient);
+
     // granted a role to the user2
     String userName2 = "user2";
     UserEntity userEntity2 =
@@ -1125,7 +1184,7 @@ public class RangerHiveIT {
   }
 
   @Test
-  public void testOnRevokedRolesFromUser() {
+  public void testOnRevokedRolesFromUser() throws Exception {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
@@ -1152,10 +1211,22 @@ public class RangerHiveIT {
     Assertions.assertTrue(
         rangerAuthHivePlugin.onRevokedRolesFromUser(Lists.newArrayList(role), userEntity1));
     verifyRoleInRanger(rangerAuthHivePlugin, role, null, Lists.newArrayList(userName1));
+
+    // test to throw an exception
+    RangerClientExtension client = Mockito.mock(RangerClientExtension.class);
+    RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
+    rangerAuthHivePlugin.setRangerClient(client);
+    when(client.searchUser(any())).thenReturn(Mockito.mock(VXUserList.class));
+    when(client.revokeRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () -> rangerAuthHivePlugin.onRevokedRolesFromUser(Lists.newArrayList(role), userEntity1));
+    rangerAuthHivePlugin.setRangerClient(originClient);
   }
 
   @Test
-  public void testOnGrantedRolesToGroup() {
+  public void testOnGrantedRolesToGroup() throws Exception {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
@@ -1179,6 +1250,18 @@ public class RangerHiveIT {
         rangerAuthHivePlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(rangerAuthHivePlugin, role, null, null, Lists.newArrayList(groupName1));
 
+    // test to throw an exception
+    RangerClientExtension client = Mockito.mock(RangerClientExtension.class);
+    RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
+    rangerAuthHivePlugin.setRangerClient(client);
+    when(client.createGroup(any())).thenReturn(true);
+    when(client.grantRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () -> rangerAuthHivePlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
+    rangerAuthHivePlugin.setRangerClient(originClient);
+
     // granted a role to the group2
     String groupName2 = "group2";
     GroupEntity groupEntity2 =
@@ -1198,7 +1281,7 @@ public class RangerHiveIT {
   }
 
   @Test
-  public void testOnRevokedRolesFromGroup() {
+  public void testOnRevokedRolesFromGroup() throws Exception {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
@@ -1227,6 +1310,18 @@ public class RangerHiveIT {
         rangerAuthHivePlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(
         rangerAuthHivePlugin, role, null, null, null, Lists.newArrayList(groupName1));
+
+    // test to throw an exception
+    RangerClientExtension client = Mockito.mock(RangerClientExtension.class);
+    RangerClientExtension originClient = rangerAuthHivePlugin.getRangerClient();
+    rangerAuthHivePlugin.setRangerClient(client);
+    when(client.createGroup(any())).thenReturn(true);
+    when(client.revokeRole(any(), any()))
+        .thenThrow(new RangerServiceException(new Exception("test")));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () -> rangerAuthHivePlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
+    rangerAuthHivePlugin.setRangerClient(originClient);
   }
 
   private void assertFindManagedPolicyItems(Role role, boolean gravitinoPolicyItemExist) {
