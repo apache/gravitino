@@ -44,7 +44,7 @@
     "yup": "^1.4.0"
   },
   "devDependencies": {
-    "@iconify/react": "^4.1.1",
+    "@iconify/react": "^5.2.0",
     "@iconify/tools": "^4.0.4",
     "@iconify/utils": "^2.1.25",
     "@next/bundle-analyzer": "^14.2.4",
