@@ -817,11 +817,11 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   @Override
   protected Map<String, String> getServiceConfigs(Map<String, String> config) {
     return ImmutableMap.<String, String>builder()
-        .put(USERNAME, getConfValue(config, USERNAME, DEFAULT_USERNAME))
-        .put(PASSWORD, getConfValue(config, PASSWORD, DEFAULT_PASSWORD))
+        .put(USERNAME, getByPassConfValue(config, USERNAME, DEFAULT_USERNAME))
+        .put(PASSWORD, getByPassConfValue(config, PASSWORD, DEFAULT_PASSWORD))
         .put(
             JDBC_DRIVER_CLASS_NAME,
-            getConfValue(config, JDBC_DRIVER_CLASS_NAME, DEFAULT_JDBC_DRIVER_CLASS_NAME))
+            getByPassConfValue(config, JDBC_DRIVER_CLASS_NAME, DEFAULT_JDBC_DRIVER_CLASS_NAME))
         .put(JDBC_URL, DEFAULT_JDBC_URL)
         .build();
   }

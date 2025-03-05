@@ -699,19 +699,19 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   protected Map<String, String> getServiceConfigs(Map<String, String> config) {
     return ImmutableMap.<String, String>builder()
-        .put(USERNAME, getConfValue(config, USERNAME, DEFAULT_USERNAME))
-        .put(PASSWORD, getConfValue(config, PASSWORD, DEFAULT_PASSWORD))
+        .put(USERNAME, getByPassConfValue(config, USERNAME, DEFAULT_USERNAME))
+        .put(PASSWORD, getByPassConfValue(config, PASSWORD, DEFAULT_PASSWORD))
         .put(
             HADOOP_SECURITY_AUTHENTICATION,
-            getConfValue(
+            getByPassConfValue(
                 config, HADOOP_SECURITY_AUTHENTICATION, DEFAULT_HADOOP_SECURITY_AUTHENTICATION))
         .put(
             HADOOP_RPC_PROTECTION,
-            getConfValue(config, HADOOP_RPC_PROTECTION, DEFAULT_HADOOP_RPC_PROTECTION))
+            getByPassConfValue(config, HADOOP_RPC_PROTECTION, DEFAULT_HADOOP_RPC_PROTECTION))
         .put(
             HADOOP_SECURITY_AUTHORIZATION,
-            getConfValue(config, HADOOP_SECURITY_AUTHORIZATION, "false"))
-        .put(FS_DEFAULT_NAME, getConfValue(config, FS_DEFAULT_NAME, FS_DEFAULT_VALUE))
+            getByPassConfValue(config, HADOOP_SECURITY_AUTHORIZATION, "false"))
+        .put(FS_DEFAULT_NAME, getByPassConfValue(config, FS_DEFAULT_NAME, FS_DEFAULT_VALUE))
         .build();
   }
 }

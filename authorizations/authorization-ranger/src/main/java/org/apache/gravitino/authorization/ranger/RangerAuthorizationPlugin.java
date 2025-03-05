@@ -1004,7 +1004,7 @@ public abstract class RangerAuthorizationPlugin
     }
   }
 
-  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
+  protected String getByPassConfValue(Map<String, String> conf, String key, String defaultValue) {
     if (conf.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + key)) {
       return conf.get(BaseCatalog.CATALOG_BYPASS_PREFIX + key);
     }
