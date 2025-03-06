@@ -508,6 +508,44 @@ public class MetadataObjectService {
     return catalogIdAndNameMap;
   }
 
+  public static Map<Long, String> getSchemaObjectFullNames(List<Long> ids) {
+    List<SchemaPO> schemaPOs =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(ids));
+
+    if (schemaPOs == null || schemaPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        schemaPOs.stream().map(SchemaPO::getCatalogId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+
+    HashMap<Long, String> schemaIdAndNameMap = new HashMap<>();
+
+    schemaPOs.forEach(
+        schemaPO -> {
+          if (schemaPO.getSchemaId() == null) {
+            schemaIdAndNameMap.put(schemaPO.getSchemaId(), null);
+            return;
+          }
+
+          String catalogName = catalogIdAndNameMap.getOrDefault(schemaPO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of schema {} may be deleted", schemaPO.getSchemaId());
+            schemaIdAndNameMap.put(schemaPO.getSchemaId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(catalogName, schemaPO.getSchemaName());
+
+          schemaIdAndNameMap.put(schemaPO.getSchemaId(), fullName);
+        });
+
+    return schemaIdAndNameMap;
+  }
+
   public static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
