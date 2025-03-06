@@ -63,7 +63,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     String jdbcDriver = properties.get(IcebergConstants.GRAVITINO_JDBC_DRIVER);
     if (StringUtils.isNotBlank(jdbcDriver)) {
       // If `spark.sql.hive.metastore.jars` is set to path, Spark will use IsolatedClientLoader to
-      // JDBC drivers, which makes Iceberg could not find corresponding JDBC driver.
+      // load JDBC drivers, which makes Iceberg could not find corresponding JDBC driver.
       try {
         Class.forName(jdbcDriver);
       } catch (Exception e) {
