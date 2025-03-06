@@ -77,8 +77,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
-  protected abstract String getProvider();
-
   protected abstract boolean supportDropCascade();
 
   protected boolean supportsPrimaryKey() {
