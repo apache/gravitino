@@ -22,7 +22,9 @@ package org.apache.gravitino.catalog.hadoop.fs;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -36,6 +38,21 @@ public class TestFileSystemUtils {
       Map<String, String> predefineKeys) {
     Map<String, String> result = FileSystemUtils.toHadoopConfigMap(confMap, predefineKeys);
     Assertions.assertEquals(toHadoopConf, result);
+  }
+
+  @Test
+  void testCreateConfiguration() {
+    Map<String, String> confMap =
+        ImmutableMap.of(
+            "s3a-endpoint", "v1",
+            "fs.s3a.impl", "v2",
+            "fs.s3a.endpoint", "v3",
+            "gravitino.bypass.fs.s3a.endpoint", "v4");
+    Configuration configuration = FileSystemUtils.createConfiguration(confMap);
+    Assertions.assertEquals("v1", configuration.get("s3a-endpoint"));
+    Assertions.assertEquals("v2", configuration.get("fs.s3a.impl"));
+    Assertions.assertEquals("v3", configuration.get("fs.s3a.endpoint"));
+    Assertions.assertEquals("v4", configuration.get("gravitino.bypass.fs.s3a.endpoint"));
   }
 
   private static Stream<Arguments> mapArguments() {

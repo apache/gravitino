@@ -46,7 +46,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 :::note
 For `list-all-tables=false`, the Hive catalog will filter out:
 - Iceberg tables by table property `table_type=ICEBERG`
-- Paimon tables by table property `table_type=PAINMON`
+- Paimon tables by table property `table_type=PAIMON`
 - Hudi tables by table property `provider=hudi`
 :::
 
