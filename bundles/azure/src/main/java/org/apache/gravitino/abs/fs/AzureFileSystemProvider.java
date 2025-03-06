@@ -72,7 +72,7 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
     }
 
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
-    return FileSystem.newInstance(path.toUri(), configuration);
+    return FileSystem.get(path.toUri(), configuration);
   }
 
   @Override

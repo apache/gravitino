@@ -66,6 +66,23 @@ public interface FileSystemProvider {
       throws IOException;
 
   /**
+   * Get the FileSystem instance according to the configuration map and file path.
+   *
+   * @param config The configuration for the FileSystem instance.
+   * @param path The path to the file system.
+   * @param disableCache Whether to cache the FileSystem instance.
+   * @return The FileSystem instance.
+   * @throws IOException If the FileSystem instance cannot be created.
+   */
+  default FileSystem getFileSystem(
+      @Nonnull Path path, @Nonnull Map<String, String> config, boolean disableCache)
+      throws IOException {
+    // disable cache
+    config.put(String.format("fs.%s.impl.disable.cache", scheme()), String.valueOf(disableCache));
+    return getFileSystem(path, config);
+  }
+
+  /**
    * Scheme of this FileSystem provider. The value is 'file' for LocalFileSystem, 'hdfs' for HDFS,
    * etc.
    *
