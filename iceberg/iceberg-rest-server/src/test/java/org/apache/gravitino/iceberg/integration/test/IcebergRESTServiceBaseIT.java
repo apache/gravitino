@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
 public abstract class IcebergRESTServiceBaseIT {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
-  private SparkSession sparkSession;
+  protected SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
   private IcebergRESTServerManager icebergRESTServerManager;
 
@@ -121,14 +121,14 @@ public abstract class IcebergRESTServiceBaseIT {
     LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
 
-  private int getServerPort() {
+  protected int getServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
             icebergRESTServerManager.getServerConfig(), IcebergConfig.ICEBERG_CONFIG_PREFIX);
     return jettyServerConfig.getHttpPort();
   }
 
-  private void initSparkEnv() {
+  protected void initSparkEnv() {
     int port = getServerPort();
     LOG.info("Iceberg REST server port:{}", port);
     String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
