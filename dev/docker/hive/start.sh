@@ -167,14 +167,6 @@ echo """
   CREATE DATABASE hive;
 """ | mysql --user=root --password=${MYSQL_PWD}
 
-
-# change charset
-
-set -i 's/CHARACTER SET latin1 COLLATE latin1_bin/CHARACTER SET utf8mb4 COLLATE utf8mb4_bin/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
-set -i 's/CHARSET=latin1/CHARSET=utf8/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
-set -i 's/varchar(4000)/text/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
-set -i 's/varchar(767)/text/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
-
 # start hive
 echo "Starting Hive..."
 ${HIVE_HOME}/bin/schematool -initSchema -dbType mysql
