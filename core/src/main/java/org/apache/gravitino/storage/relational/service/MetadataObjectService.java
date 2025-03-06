@@ -499,7 +499,7 @@ public class MetadataObjectService {
     catalogPOs.forEach(
         catalogPO -> {
           if (catalogPO.getCatalogId() == null) {
-            catalogIdAndNameMap.put(catalogPO.getMetalakeId(), null);
+            catalogIdAndNameMap.put(catalogPO.getCatalogId(), null);
             return;
           }
           catalogIdAndNameMap.put(catalogPO.getCatalogId(), catalogPO.getCatalogName());
