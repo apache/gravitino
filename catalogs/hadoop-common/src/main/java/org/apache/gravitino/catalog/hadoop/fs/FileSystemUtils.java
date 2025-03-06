@@ -25,15 +25,25 @@ import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITIN
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamWriter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 public class FileSystemUtils {
+
+  private static final String CONFIG_ROOT = "configuration";
+  private static final String PROPERTY_TAG = "property";
+  private static final String NAME_TAG = "name";
+  private static final String VALUE_TAG = "value";
 
   private FileSystemUtils() {}
 
@@ -182,5 +192,63 @@ public class FileSystemUtils {
     } catch (Exception e) {
       throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
     }
+  }
+
+  /**
+   * Create a configuration from the config map.
+   *
+   * @param config properties map.
+   * @return
+   */
+  public static Configuration createConfiguration(Map<String, String> config) {
+    return createConfiguration(null, config);
+  }
+
+  /**
+   * Create a configuration from the config map.
+   *
+   * @param bypass prefix to remove from the config keys.
+   * @param config properties map.
+   * @return
+   */
+  public static Configuration createConfiguration(String bypass, Map<String, String> config) {
+    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      XMLStreamWriter writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out);
+      writer.writeStartDocument();
+      writer.writeStartElement(CONFIG_ROOT);
+
+      config.forEach(
+          (k, v) ->
+              writeProperty(writer, StringUtils.isNotBlank(bypass) ? k.replace(bypass, "") : k, v));
+      writer.writeEndElement();
+      writer.writeEndDocument();
+      writer.close();
+
+      return new Configuration() {
+        {
+          addResource(new ByteArrayInputStream(out.toByteArray()));
+        }
+      };
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create configuration", e);
+    }
+  }
+
+  private static void writeProperty(XMLStreamWriter writer, String key, String value) {
+    try {
+      writer.writeStartElement(PROPERTY_TAG);
+      writeElement(writer, NAME_TAG, key);
+      writeElement(writer, VALUE_TAG, value);
+      writer.writeEndElement();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to write property: " + key, e);
+    }
+  }
+
+  private static void writeElement(XMLStreamWriter writer, String tag, String content)
+      throws Exception {
+    writer.writeStartElement(tag);
+    writer.writeCharacters(content);
+    writer.writeEndElement();
   }
 }
