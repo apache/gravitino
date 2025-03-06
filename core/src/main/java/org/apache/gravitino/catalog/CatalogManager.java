@@ -858,6 +858,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return (boolean)
           BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
               catalogEntity.getProperties(), PROPERTY_IN_USE);
+
     } catch (NoSuchEntityException e) {
       LOG.warn("Catalog {} does not exist", catalogIdent, e);
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, catalogIdent);
