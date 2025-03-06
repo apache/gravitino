@@ -55,6 +55,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -233,13 +234,15 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
     autoProperties.put("authorization.chain.hdfs1.ranger.service.type", "HDFS");
     autoProperties.put("authorization.chain.hdfs1.ranger.service.name", "test833");
     autoProperties.put("authorization.chain.hdfs1.ranger.service.create-if-absent", "true");
-    Catalog catalogTest =
-        metalake.createCatalog("test", Catalog.Type.RELATIONAL, "hive", "comment", autoProperties);
-    Map<String, String> newProperties = catalogTest.properties();
-    Assertions.assertTrue(
-        newProperties.containsKey("authorization.chain.hdfs1.ranger.service.name"));
-    Assertions.assertTrue(
-        newProperties.containsKey("authorization.chain.hive1.ranger.service.name"));
+    metalake.createCatalog("test", Catalog.Type.RELATIONAL, "hive", "comment", autoProperties);
+    try {
+      RangerService rangerService = RangerITEnv.rangerClient.getService("test833");
+      Assertions.assertNotNull(rangerService);
+      rangerService = RangerITEnv.rangerClient.getService("test899");
+      Assertions.assertNotNull(rangerService);
+    } catch (Exception e) {
+      Assertions.fail();
+    }
     metalake.dropCatalog("test", true);
   }
 
