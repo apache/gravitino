@@ -31,7 +31,9 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
@@ -386,6 +388,103 @@ public class MetadataObjectService {
     return tableIdAndNameMap;
   }
 
+  public static Map<Long, String> getTopicObjectFullNames(List<Long> ids) {
+    List<TopicPO> topicPOs =
+        SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class, mapper -> mapper.listTopicPOsByTopicIds(ids));
+
+    if (topicPOs == null || topicPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        topicPOs.stream().map(TopicPO::getCatalogId).collect(Collectors.toList());
+    List<Long> schemaIds = topicPOs.stream().map(TopicPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+
+    HashMap<Long, String> topicIdAndNameMap = new HashMap<>();
+
+    topicPOs.forEach(
+        tablePO -> {
+          // since the catalog or schema can be deleted, we need to check the null value,
+          // and when catalog or schema is deleted, we will set fullName of tablePO to null
+          String catalogName = catalogIdAndNameMap.getOrDefault(tablePO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of topic {} may be deleted", tablePO.getTopicId());
+            topicIdAndNameMap.put(tablePO.getTopicId(), null);
+            return;
+          }
+
+          String schemaName = schemaIdAndNameMap.getOrDefault(tablePO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of topic {} may be deleted", tablePO.getTopicId());
+            topicIdAndNameMap.put(tablePO.getTopicId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(catalogName, schemaName, tablePO.getTopicName());
+          topicIdAndNameMap.put(tablePO.getTopicId(), fullName);
+        });
+
+    return topicIdAndNameMap;
+  }
+
+  public static Map<Long, String> getColumnObjectFullNames(List<Long> ids) {
+    List<ColumnPO> columnPOs =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(ids));
+
+    if (columnPOs == null || columnPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        columnPOs.stream().map(ColumnPO::getCatalogId).collect(Collectors.toList());
+    List<Long> schemaIds =
+        columnPOs.stream().map(ColumnPO::getSchemaId).collect(Collectors.toList());
+    List<Long> tableIds = columnPOs.stream().map(ColumnPO::getTableId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+    Map<Long, String> tableIdAndNameMap = getTableIdAndNameMap(tableIds);
+
+    HashMap<Long, String> columnIdAndNameMap = new HashMap<>();
+
+    columnPOs.forEach(
+        columnPO -> {
+          // since the catalog or schema can be deleted, we need to check the null value,
+          // and when catalog or schema is deleted, we will set fullName of filesetPO to null
+          String catalogName = catalogIdAndNameMap.getOrDefault(columnPO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of column {} may be deleted", columnPO.getColumnId());
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
+          String schemaName = schemaIdAndNameMap.getOrDefault(columnPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of column {} may be deleted", columnPO.getColumnId());
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
+          String tableName = tableIdAndNameMap.getOrDefault(columnPO.getTableId(), null);
+          if (tableName == null) {
+            LOG.warn("The table of column {} may be deleted", columnPO.getColumnId());
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
+          String fullName =
+              DOT_JOINER.join(catalogName, schemaName, tableName, columnPO.getColumnName());
+          columnIdAndNameMap.put(columnPO.getColumnId(), fullName);
+        });
+
+    return columnIdAndNameMap;
+  }
+
   public static Map<Long, String> getCatalogObjectFullNames(List<Long> ids) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
@@ -409,6 +508,14 @@ public class MetadataObjectService {
     return catalogIdAndNameMap;
   }
 
+  public static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
+    return catalogPOs.stream()
+        .collect(Collectors.toMap(CatalogPO::getCatalogId, CatalogPO::getCatalogName));
+  }
+
   public static Map<Long, String> getSchemaIdAndNameMap(List<Long> schemaIds) {
     List<SchemaPO> schemaPOS =
         SessionUtils.getWithoutCommit(
@@ -417,11 +524,10 @@ public class MetadataObjectService {
         .collect(Collectors.toMap(SchemaPO::getSchemaId, SchemaPO::getSchemaName));
   }
 
-  public static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
-    List<CatalogPO> catalogPOs =
+  public static Map<Long, String> getTableIdAndNameMap(List<Long> tableIds) {
+    List<TablePO> tablePOS =
         SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
-    return catalogPOs.stream()
-        .collect(Collectors.toMap(CatalogPO::getCatalogId, CatalogPO::getCatalogName));
+            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
+    return tablePOS.stream().collect(Collectors.toMap(TablePO::getTableId, TablePO::getTableName));
   }
 }
