@@ -45,6 +45,7 @@ import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
@@ -55,16 +56,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugin {
-  public static final String JDBC_URL = "jdbc.url";
   private static final Logger LOG =
       LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
-  public static final String USERNAME = "username";
-  public static final String DEFAULT_USERNAME = "admin";
-  public static final String PASSWORD = "password";
-  public static final String DEFAULT_PASSWORD = "admin";
-  public static final String JDBC_DRIVER_CLASS_NAME = "jdbc.driverClassName";
-  public static final String DEFAULT_JDBC_DRIVER_CLASS_NAME = "org.apache.hive.jdbc.HiveDriver";
-  public static final String DEFAULT_JDBC_URL = "jdbc:hive2://127.0.0.1:8081";
 
   public RangerAuthorizationHadoopSQLPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
@@ -817,12 +810,24 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   @Override
   protected Map<String, String> getServiceConfigs(Map<String, String> config) {
     return ImmutableMap.<String, String>builder()
-        .put(USERNAME, getByPassConfValue(config, USERNAME, DEFAULT_USERNAME))
-        .put(PASSWORD, getByPassConfValue(config, PASSWORD, DEFAULT_PASSWORD))
         .put(
-            JDBC_DRIVER_CLASS_NAME,
-            getByPassConfValue(config, JDBC_DRIVER_CLASS_NAME, DEFAULT_JDBC_DRIVER_CLASS_NAME))
-        .put(JDBC_URL, DEFAULT_JDBC_URL)
+            RangerAuthorizationProperties.RANGER_USERNAME.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_USERNAME))
+        .put(
+            RangerAuthorizationProperties.RANGER_PASSWORD.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_PASSWORD))
+        .put(
+            RangerAuthorizationProperties.JDBC_DRIVER_CLASS_NAME.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.JDBC_DRIVER_CLASS_NAME,
+                RangerAuthorizationProperties.DEFAULT_JDBC_DRIVER_CLASS_NAME))
+        .put(
+            RangerAuthorizationProperties.JDBC_URL.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.JDBC_URL,
+                RangerAuthorizationProperties.DEFAULT_JDBC_URL))
         .build();
   }
 }

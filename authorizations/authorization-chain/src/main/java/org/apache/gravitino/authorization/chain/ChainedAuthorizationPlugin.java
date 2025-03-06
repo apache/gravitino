@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.chain;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +43,6 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
   private final String metalake;
-  private final Map<String, String> autoGenerateProperties = Maps.newHashMap();
 
   public ChainedAuthorizationPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
@@ -65,16 +63,6 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
               Map<String, String> pluginConfig =
                   chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
 
-              for (Map.Entry<String, String> entry : properties.entrySet()) {
-                if (!entry
-                    .getKey()
-                    .startsWith(ChainedAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY)) {
-                  pluginConfig.put(entry.getKey(), entry.getValue());
-                }
-              }
-              pluginConfig.put(
-                  BaseAuthorization.UUID, pluginConfig.get(BaseAuthorization.UUID) + pluginName);
-
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
               BaseAuthorization.buildAuthorizationPkgPath(
                       ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, authzProvider))
@@ -91,17 +79,6 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
                 AuthorizationPlugin authorizationPlugin =
                     classLoader.withClassLoader(
                         cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
-                authorizationPlugin
-                    .retrieveGeneratedProps()
-                    .forEach(
-                        (key, value) -> {
-                          String newKey =
-                              "authorization.chain."
-                                  + pluginName
-                                  + "."
-                                  + key.substring("authorization.".length());
-                          autoGenerateProperties.put(newKey, value);
-                        });
                 plugins.add(authorizationPlugin);
               } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -206,11 +183,6 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
       throws AuthorizationPluginException {
     return chainedAction(plugin -> plugin.onOwnerSet(metadataObject, preOwner, newOwner));
-  }
-
-  @Override
-  public Map<String, String> retrieveGeneratedProps() {
-    return autoGenerateProperties;
   }
 
   private Boolean chainedAction(Function<AuthorizationPlugin, Boolean> action) {

@@ -209,17 +209,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             BaseAuthorization<?> authorization =
                 BaseAuthorization.createAuthorization(classLoader, authorizationProvider);
 
-            // Load the authorization plugin with the class loader of the catalog.
-            // Because the JDBC authorization plugin may load JDBC driver using the class loader.
-            Map<String, String> authzPluginConf = Maps.newHashMap();
-            authzPluginConf.putAll(this.conf);
-            authzPluginConf.put(BaseAuthorization.UUID, String.valueOf(entity.id()));
-
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
                         authorization.newPlugin(
-                            entity.namespace().level(0), provider(), authzPluginConf));
+                            entity.namespace().level(0), provider(), this.conf));
 
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
@@ -359,10 +353,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
 
-          // Authorization plugin may produce some new properties.
-          if (authorizationPlugin != null) {
-            authorizationPlugin.retrieveGeneratedProps().forEach(tempProperties::putIfAbsent);
-          }
           properties = tempProperties;
         }
       }

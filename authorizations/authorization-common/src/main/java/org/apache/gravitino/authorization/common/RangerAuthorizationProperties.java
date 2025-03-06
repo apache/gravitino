@@ -49,6 +49,24 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
   public static final String RANGER_SERVICE_CREATE_IF_ABSENT =
       "authorization.ranger.service.create-if-absent";
 
+  public static final String HADOOP_SECURITY_AUTHENTICATION =
+      "authorization.ranger.hadoop.security.authentication";
+  public static final String DEFAULT_HADOOP_SECURITY_AUTHENTICATION = "simple";
+  public static final String HADOOP_RPC_PROTECTION = "authorization.ranger.hadoop.rpc.protection";
+  public static final String DEFAULT_HADOOP_RPC_PROTECTION = "authentication";
+  public static final String HADOOP_SECURITY_AUTHORIZATION =
+      "authorization.ranger.hadoop.security.authorization";
+  public static final String FS_DEFAULT_NAME = "authorization.ranger.fs.default.name";
+  public static final String FS_DEFAULT_VALUE = "hdfs://127.0.0.1:8090";
+
+  public static final String JDBC_DRIVER_CLASS_NAME = "authorization.ranger.jdbc.driverClassName";
+
+  public static final String DEFAULT_JDBC_DRIVER_CLASS_NAME = "org.apache.hive.jdbc.HiveDriver";
+
+  public static final String JDBC_URL = "authorization.ranger.jdbc.url";
+
+  public static final String DEFAULT_JDBC_URL = "jdbc:hive2://127.0.0.1:8081";
+
   public RangerAuthorizationProperties(Map<String, String> properties) {
     super(properties);
   }
@@ -84,12 +102,8 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
     Preconditions.checkArgument(
         properties.get(RANGER_PASSWORD) != null, String.format("%s is required", RANGER_PASSWORD));
 
-    if (!Boolean.parseBoolean(properties.get(RANGER_SERVICE_CREATE_IF_ABSENT))) {
-      Preconditions.checkArgument(
-          properties.get(RANGER_SERVICE_NAME) != null,
-          String.format(
-              "%s is required unless %s is specified",
-              RANGER_SERVICE_NAME, RANGER_SERVICE_CREATE_IF_ABSENT));
-    }
+    Preconditions.checkArgument(
+        properties.get(RANGER_SERVICE_NAME) != null,
+        String.format("%s is required", RANGER_SERVICE_NAME));
   }
 }

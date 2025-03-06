@@ -39,7 +39,6 @@ import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -160,28 +159,6 @@ public class RangerITEnv {
             RangerITEnv.RANGER_HDFS_REPO_NAME,
             rangerAuthHDFSPlugin.ownerMappingRule(),
             rangerAuthHDFSPlugin.policyResourceDefinesRule());
-
-    // Test to use UUID create authz plugin
-    new RangerAuthorizationHadoopSQLPlugin(
-        metalakeName,
-        ImmutableMap.of(
-            RangerAuthorizationProperties.RANGER_ADMIN_URL,
-            String.format(
-                "http://%s:%d",
-                containerSuite.getRangerContainer().getContainerIpAddress(),
-                RangerContainer.RANGER_SERVER_PORT),
-            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
-            RangerContainer.authType,
-            RangerAuthorizationProperties.RANGER_USERNAME,
-            RangerContainer.rangerUserName,
-            RangerAuthorizationProperties.RANGER_PASSWORD,
-            RangerContainer.rangerPassword,
-            BaseAuthorization.UUID,
-            "123",
-            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
-            "HadoopSQL",
-            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
-            "true"));
 
     if (!initRangerService) {
       synchronized (RangerITEnv.class) {

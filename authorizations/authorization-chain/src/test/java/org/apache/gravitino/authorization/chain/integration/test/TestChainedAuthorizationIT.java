@@ -211,28 +211,30 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
 
-    // Test chained authorization plugin using uuid
-    Map<String, String> uuidProperties = new HashMap<>();
-    uuidProperties.put(HiveConstants.METASTORE_URIS, HIVE_METASTORE_URIS);
-    uuidProperties.put(IMPERSONATION_ENABLE, "true");
-    uuidProperties.put(Catalog.AUTHORIZATION_PROVIDER, "chain");
-    uuidProperties.put(ChainedAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
-    uuidProperties.put("authorization.chain.hive1.provider", "ranger");
-    uuidProperties.put("authorization.chain.hive1.ranger.auth.type", RangerContainer.authType);
-    uuidProperties.put("authorization.chain.hive1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);
-    uuidProperties.put("authorization.chain.hive1.ranger.username", RangerContainer.rangerUserName);
-    uuidProperties.put("authorization.chain.hive1.ranger.password", RangerContainer.rangerPassword);
-    uuidProperties.put("authorization.chain.hive1.ranger.service.type", "HadoopSQL");
-    uuidProperties.put("authorization.chain.hive1.ranger.service.create-if-absent", "true");
-    uuidProperties.put("authorization.chain.hdfs1.provider", "ranger");
-    uuidProperties.put("authorization.chain.hdfs1.ranger.auth.type", RangerContainer.authType);
-    uuidProperties.put("authorization.chain.hdfs1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);
-    uuidProperties.put("authorization.chain.hdfs1.ranger.username", RangerContainer.rangerUserName);
-    uuidProperties.put("authorization.chain.hdfs1.ranger.password", RangerContainer.rangerPassword);
-    uuidProperties.put("authorization.chain.hdfs1.ranger.service.type", "HDFS");
-    uuidProperties.put("authorization.chain.hdfs1.ranger.service.create-if-absent", "true");
+    // Test to create chained authorization plugin automatically
+    Map<String, String> autoProperties = new HashMap<>();
+    autoProperties.put(HiveConstants.METASTORE_URIS, HIVE_METASTORE_URIS);
+    autoProperties.put(IMPERSONATION_ENABLE, "true");
+    autoProperties.put(Catalog.AUTHORIZATION_PROVIDER, "chain");
+    autoProperties.put(ChainedAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
+    autoProperties.put("authorization.chain.hive1.provider", "ranger");
+    autoProperties.put("authorization.chain.hive1.ranger.auth.type", RangerContainer.authType);
+    autoProperties.put("authorization.chain.hive1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);
+    autoProperties.put("authorization.chain.hive1.ranger.username", RangerContainer.rangerUserName);
+    autoProperties.put("authorization.chain.hive1.ranger.password", RangerContainer.rangerPassword);
+    autoProperties.put("authorization.chain.hive1.ranger.service.type", "HadoopSQL");
+    autoProperties.put("authorization.chain.hive1.ranger.service.name", "test899");
+    autoProperties.put("authorization.chain.hive1.ranger.service.create-if-absent", "true");
+    autoProperties.put("authorization.chain.hdfs1.provider", "ranger");
+    autoProperties.put("authorization.chain.hdfs1.ranger.auth.type", RangerContainer.authType);
+    autoProperties.put("authorization.chain.hdfs1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);
+    autoProperties.put("authorization.chain.hdfs1.ranger.username", RangerContainer.rangerUserName);
+    autoProperties.put("authorization.chain.hdfs1.ranger.password", RangerContainer.rangerPassword);
+    autoProperties.put("authorization.chain.hdfs1.ranger.service.type", "HDFS");
+    autoProperties.put("authorization.chain.hdfs1.ranger.service.name", "test833");
+    autoProperties.put("authorization.chain.hdfs1.ranger.service.create-if-absent", "true");
     Catalog catalogTest =
-        metalake.createCatalog("test", Catalog.Type.RELATIONAL, "hive", "comment", uuidProperties);
+        metalake.createCatalog("test", Catalog.Type.RELATIONAL, "hive", "comment", autoProperties);
     Map<String, String> newProperties = catalogTest.properties();
     Assertions.assertTrue(
         newProperties.containsKey("authorization.chain.hdfs1.ranger.service.name"));

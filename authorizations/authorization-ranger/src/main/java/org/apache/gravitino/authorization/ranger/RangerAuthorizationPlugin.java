@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.time.Instant;
@@ -50,9 +49,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -87,7 +84,7 @@ public abstract class RangerAuthorizationPlugin
   protected RangerClientExtension rangerClient;
   protected RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
-  private final Map<String, String> properties = Maps.newHashMap();
+  private final int prefixLength;
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
@@ -103,20 +100,16 @@ public abstract class RangerAuthorizationPlugin
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
 
-    String serviceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
+    rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
+
+    // We should consider `.` to add 1
+    prefixLength = rangerAuthorizationProperties.getPropertiesPrefix().length() + 1;
 
     if (Boolean.parseBoolean(
         config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))) {
-      if (serviceName == null) {
-        serviceName = config.get(BaseAuthorization.UUID);
-      }
-
-      createRangerServiceIfNecessary(config, serviceName);
+      createRangerServiceIfNecessary(config, rangerServiceName);
     }
-
-    rangerServiceName = serviceName;
-    properties.put(RangerAuthorizationProperties.RANGER_SERVICE_NAME, serviceName);
 
     rangerHelper =
         new RangerHelper(
@@ -793,11 +786,6 @@ public abstract class RangerAuthorizationPlugin
     return Boolean.TRUE;
   }
 
-  @Override
-  public Map<String, String> retrieveGeneratedProps() {
-    return properties;
-  }
-
   private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {
     try {
       rangerClient.getService(serviceName);
@@ -1016,9 +1004,9 @@ public abstract class RangerAuthorizationPlugin
     }
   }
 
-  protected String getByPassConfValue(Map<String, String> conf, String key, String defaultValue) {
-    if (conf.containsKey(BaseCatalog.CATALOG_BYPASS_PREFIX + key)) {
-      return conf.get(BaseCatalog.CATALOG_BYPASS_PREFIX + key);
+  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
+    if (conf.containsKey(key)) {
+      return conf.get(key);
     }
     return defaultValue;
   }
@@ -1026,6 +1014,10 @@ public abstract class RangerAuthorizationPlugin
   protected abstract String getServiceType();
 
   protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
+
+  protected int getPrefixLength() {
+    return prefixLength;
+  }
 
   @Override
   public void close() throws IOException {}

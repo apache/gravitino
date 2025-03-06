@@ -51,6 +51,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -63,17 +64,6 @@ import org.slf4j.LoggerFactory;
 public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHDFSPlugin.class);
   private static final Pattern HDFS_PATTERN = Pattern.compile("^hdfs://[^/]*");
-  public static final String USERNAME = "username";
-  public static final String DEFAULT_USERNAME = "admin";
-  public static final String PASSWORD = "password";
-  public static final String DEFAULT_PASSWORD = "admin";
-  public static final String HADOOP_SECURITY_AUTHENTICATION = "hadoop.security.authentication";
-  public static final String DEFAULT_HADOOP_SECURITY_AUTHENTICATION = "simple";
-  public static final String HADOOP_RPC_PROTECTION = "hadoop.rpc.protection";
-  public static final String DEFAULT_HADOOP_RPC_PROTECTION = "authentication";
-  public static final String HADOOP_SECURITY_AUTHORIZATION = "hadoop.security.authorization";
-  public static final String FS_DEFAULT_NAME = "fs.default.name";
-  public static final String FS_DEFAULT_VALUE = "hdfs://127.0.0.1:8090";
 
   public RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
@@ -699,19 +689,36 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   protected Map<String, String> getServiceConfigs(Map<String, String> config) {
     return ImmutableMap.<String, String>builder()
-        .put(USERNAME, getByPassConfValue(config, USERNAME, DEFAULT_USERNAME))
-        .put(PASSWORD, getByPassConfValue(config, PASSWORD, DEFAULT_PASSWORD))
         .put(
-            HADOOP_SECURITY_AUTHENTICATION,
-            getByPassConfValue(
-                config, HADOOP_SECURITY_AUTHENTICATION, DEFAULT_HADOOP_SECURITY_AUTHENTICATION))
+            RangerAuthorizationProperties.RANGER_USERNAME.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_USERNAME))
         .put(
-            HADOOP_RPC_PROTECTION,
-            getByPassConfValue(config, HADOOP_RPC_PROTECTION, DEFAULT_HADOOP_RPC_PROTECTION))
+            RangerAuthorizationProperties.RANGER_PASSWORD.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_PASSWORD))
         .put(
-            HADOOP_SECURITY_AUTHORIZATION,
-            getByPassConfValue(config, HADOOP_SECURITY_AUTHORIZATION, "false"))
-        .put(FS_DEFAULT_NAME, getByPassConfValue(config, FS_DEFAULT_NAME, FS_DEFAULT_VALUE))
+            RangerAuthorizationProperties.HADOOP_SECURITY_AUTHENTICATION.substring(
+                getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.HADOOP_SECURITY_AUTHENTICATION,
+                RangerAuthorizationProperties.DEFAULT_HADOOP_SECURITY_AUTHENTICATION))
+        .put(
+            RangerAuthorizationProperties.HADOOP_RPC_PROTECTION.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.HADOOP_RPC_PROTECTION,
+                RangerAuthorizationProperties.DEFAULT_HADOOP_RPC_PROTECTION))
+        .put(
+            RangerAuthorizationProperties.HADOOP_SECURITY_AUTHORIZATION.substring(
+                getPrefixLength()),
+            getConfValue(
+                config, RangerAuthorizationProperties.HADOOP_SECURITY_AUTHORIZATION, "false"))
+        .put(
+            RangerAuthorizationProperties.FS_DEFAULT_NAME.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.FS_DEFAULT_NAME,
+                RangerAuthorizationProperties.FS_DEFAULT_VALUE))
         .build();
   }
 }
