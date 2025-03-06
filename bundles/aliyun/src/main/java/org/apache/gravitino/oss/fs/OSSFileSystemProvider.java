@@ -56,8 +56,6 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration = new Configuration();
-
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_OSS_HADOOP_KEY);
     // OSS do not use service loader to load the file system, so we need to set the impl class
@@ -65,7 +63,7 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
-    hadoopConfMap.forEach(configuration::set);
+    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
   }
