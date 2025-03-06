@@ -368,6 +368,7 @@ public class RoleMetaService {
                 case FILESET:
                 case TABLE:
                 case MODEL:
+                case TOPIC:
                   List<Long> objectIds =
                       objects.stream()
                           .map(SecurableObjectPO::getMetadataObjectId)
@@ -385,7 +386,9 @@ public class RoleMetaService {
                               MetadataObject.Type.TABLE,
                               MetadataObjectService::getTableObjectFullNames,
                               MetadataObject.Type.MODEL,
-                              MetadataObjectService::getModelObjectFullNames);
+                              MetadataObjectService::getModelObjectFullNames,
+                              MetadataObject.Type.TOPIC,
+                              MetadataObjectService::getTopicObjectFullNames);
 
                   // dynamically calling getter function based on type
                   Map<Long, String> objectIdAndNameMap =
