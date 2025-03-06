@@ -360,79 +360,50 @@ public class RoleMetaService {
         .collect(Collectors.groupingBy(SecurableObjectPO::getType))
         .forEach(
             (type, objects) -> {
-              // If the type is Fileset, use the batch retrieval interface;
-              // otherwise, use the single retrieval interface
-              switch (MetadataObject.Type.valueOf(type)) {
-                case METALAKE:
-                case CATALOG:
-                case FILESET:
-                case TABLE:
-                case MODEL:
-                case TOPIC:
-                  List<Long> objectIds =
-                      objects.stream()
-                          .map(SecurableObjectPO::getMetadataObjectId)
-                          .collect(Collectors.toList());
+              List<Long> objectIds =
+                  objects.stream()
+                      .map(SecurableObjectPO::getMetadataObjectId)
+                      .collect(Collectors.toList());
 
-                  Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
-                      objectFullNameGetterFnMap =
-                          ImmutableMap.of(
-                              MetadataObject.Type.METALAKE,
-                              MetadataObjectService::getMetalakeObjectFullNames,
-                              MetadataObject.Type.CATALOG,
-                              MetadataObjectService::getCatalogObjectFullNames,
-                              MetadataObject.Type.FILESET,
-                              MetadataObjectService::getFilesetObjectFullNames,
-                              MetadataObject.Type.TABLE,
-                              MetadataObjectService::getTableObjectFullNames,
-                              MetadataObject.Type.MODEL,
-                              MetadataObjectService::getModelObjectFullNames,
-                              MetadataObject.Type.TOPIC,
-                              MetadataObjectService::getTopicObjectFullNames);
+              Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
+                  objectFullNameGetterFnMap =
+                      ImmutableMap.of(
+                          MetadataObject.Type.METALAKE,
+                          MetadataObjectService::getMetalakeObjectFullNames,
+                          MetadataObject.Type.CATALOG,
+                          MetadataObjectService::getCatalogObjectFullNames,
+                          MetadataObject.Type.FILESET,
+                          MetadataObjectService::getFilesetObjectFullNames,
+                          MetadataObject.Type.TABLE,
+                          MetadataObjectService::getTableObjectFullNames,
+                          MetadataObject.Type.MODEL,
+                          MetadataObjectService::getModelObjectFullNames,
+                          MetadataObject.Type.TOPIC,
+                          MetadataObjectService::getTopicObjectFullNames);
 
-                  // dynamically calling getter function based on type
-                  Map<Long, String> objectIdAndNameMap =
-                      Optional.of(MetadataObject.Type.valueOf(type))
-                          .map(objectFullNameGetterFnMap::get)
-                          .map(getter -> getter.apply(objectIds))
-                          .orElseThrow(
-                              () ->
-                                  new IllegalArgumentException(
-                                      "Unsupported metadata object type: " + type));
+              // dynamically calling getter function based on type
+              Map<Long, String> objectIdAndNameMap =
+                  Optional.of(MetadataObject.Type.valueOf(type))
+                      .map(objectFullNameGetterFnMap::get)
+                      .map(getter -> getter.apply(objectIds))
+                      .orElseThrow(
+                          () ->
+                              // For example: COLUMN doesn't have securable object
+                              new IllegalArgumentException(
+                                  "Unsupported metadata object type: " + type));
 
-                  for (SecurableObjectPO securableObjectPO : objects) {
-                    String fullName =
-                        objectIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
-                    if (fullName != null) {
-                      securableObjects.add(
-                          POConverters.fromSecurableObjectPO(
-                              fullName, securableObjectPO, getType(securableObjectPO.getType())));
-                    } else {
-                      LOG.warn(
-                          "The securable object {} {} may be deleted",
-                          securableObjectPO.getMetadataObjectId(),
-                          securableObjectPO.getType());
-                    }
-                  }
-                  break;
-                default:
-
-                  // todo：to get other securable object fullNames using batch retrieving
-                  for (SecurableObjectPO securableObjectPO : objects) {
-                    String fullName =
-                        MetadataObjectService.getMetadataObjectFullName(
-                            securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
-                    if (fullName != null) {
-                      securableObjects.add(
-                          POConverters.fromSecurableObjectPO(
-                              fullName, securableObjectPO, getType(securableObjectPO.getType())));
-                    } else {
-                      LOG.warn(
-                          "The securable object {} {} may be deleted",
-                          securableObjectPO.getMetadataObjectId(),
-                          securableObjectPO.getType());
-                    }
-                  }
+              for (SecurableObjectPO securableObjectPO : objects) {
+                String fullName = objectIdAndNameMap.get(securableObjectPO.getMetadataObjectId());
+                if (fullName != null) {
+                  securableObjects.add(
+                      POConverters.fromSecurableObjectPO(
+                          fullName, securableObjectPO, getType(securableObjectPO.getType())));
+                } else {
+                  LOG.warn(
+                      "The securable object {} {} may be deleted",
+                      securableObjectPO.getMetadataObjectId(),
+                      securableObjectPO.getType());
+                }
               }
             });
 
