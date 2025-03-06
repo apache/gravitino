@@ -32,11 +32,8 @@ public interface AuthorizationPlugin
         RoleAuthorizationPlugin,
         MetadataAuthorizationPlugin,
         Closeable {
-    /**
-     *
-     * @return
-     */
-    default Map<String, String> getProperties() {
-        return Collections.emptyMap();
-    }
+  /** @return */
+  default Map<String, String> retrieveGeneratedProps() {
+    return Collections.emptyMap();
+  }
 }

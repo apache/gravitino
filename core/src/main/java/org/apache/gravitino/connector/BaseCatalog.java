@@ -360,7 +360,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
 
           // Authorization plugin may produce some new properties.
-          authorizationPlugin.getProperties().forEach(tempProperties::putIfAbsent);
+          authorizationPlugin.retrieveGeneratedProps().forEach(tempProperties::putIfAbsent);
           properties = tempProperties;
         }
       }

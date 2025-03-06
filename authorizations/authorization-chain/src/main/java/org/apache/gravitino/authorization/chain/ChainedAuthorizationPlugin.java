@@ -20,13 +20,12 @@ package org.apache.gravitino.authorization.chain;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-
-import com.google.common.collect.Maps;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
@@ -92,10 +91,14 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
                 AuthorizationPlugin authorizationPlugin =
                     classLoader.withClassLoader(
                         cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
-                authorizationPlugin.getProperties().forEach((key, value) -> {
-                  String newKey = "authorization.chain." + key.substring("authorization".length());
-                  properties.put(newKey, value);
-                });
+                authorizationPlugin
+                    .retrieveGeneratedProps()
+                    .forEach(
+                        (key, value) -> {
+                          String newKey =
+                              "authorization.chain." + key.substring("authorization.".length());
+                          properties.put(newKey, value);
+                        });
                 plugins.add(authorizationPlugin);
               } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -203,7 +206,8 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   @Override
-  public Map<String, String> getProperties() {
+  public Map<String, String> retrieveGeneratedProps() {
+    return properties;
   }
 
   private Boolean chainedAction(Function<AuthorizationPlugin, Boolean> action) {

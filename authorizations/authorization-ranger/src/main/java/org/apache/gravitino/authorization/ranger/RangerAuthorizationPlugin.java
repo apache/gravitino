@@ -95,17 +95,13 @@ public abstract class RangerAuthorizationPlugin
         new RangerAuthorizationProperties(config);
     rangerAuthorizationProperties.validate();
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
-    properties.put(RangerAuthorizationProperties.RANGER_ADMIN_URL, rangerUrl);
 
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
-    properties.put(RangerAuthorizationProperties.RANGER_AUTH_TYPE, authType);
 
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
-    properties.put(RangerAuthorizationProperties.RANGER_USERNAME, rangerAdminName);
 
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
-    properties.put(RangerAuthorizationProperties.RANGER_PASSWORD, password);
 
     String serviceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
@@ -798,7 +794,7 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Map<String, String> getProperties() {
+  public Map<String, String> retrieveGeneratedProps() {
     return properties;
   }
 

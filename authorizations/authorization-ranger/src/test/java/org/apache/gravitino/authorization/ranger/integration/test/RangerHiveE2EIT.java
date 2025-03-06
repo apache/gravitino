@@ -224,7 +224,11 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     try {
       List<RangerService> serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
       int expectServiceCount = serviceList.size() + 1;
-      metalake.createCatalog("test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
+      Catalog catalogTest =
+          metalake.createCatalog(
+              "test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
+      Map<String, String> newProperties = catalogTest.properties();
+      Assertions.assertTrue(newProperties.containsKey("authorization.ranger.service.name"));
       serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
       Assertions.assertEquals(expectServiceCount, serviceList.size());
       metalake.dropCatalog("test", true);
