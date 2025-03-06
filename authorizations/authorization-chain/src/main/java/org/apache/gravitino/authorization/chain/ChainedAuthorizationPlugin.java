@@ -44,7 +44,7 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
   private final String metalake;
-  private final Map<String, String> properties = Maps.newHashMap();
+  private final Map<String, String> autoGenerateProperties = Maps.newHashMap();
 
   public ChainedAuthorizationPlugin(
       String metalake, String catalogProvider, Map<String, String> config) {
@@ -96,8 +96,11 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
                     .forEach(
                         (key, value) -> {
                           String newKey =
-                              "authorization.chain." + key.substring("authorization.".length());
-                          properties.put(newKey, value);
+                              "authorization.chain."
+                                  + pluginName
+                                  + "."
+                                  + key.substring("authorization.".length());
+                          autoGenerateProperties.put(newKey, value);
                         });
                 plugins.add(authorizationPlugin);
               } catch (Exception e) {
@@ -207,7 +210,7 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Map<String, String> retrieveGeneratedProps() {
-    return properties;
+    return autoGenerateProperties;
   }
 
   private Boolean chainedAction(Function<AuthorizationPlugin, Boolean> action) {
