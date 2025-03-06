@@ -76,6 +76,10 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Run chart-testing (install)
+      - name: Run chart-testing (install default)
         if: steps.list-changed.outputs.changed == 'true'
         run: ct install --chart-dirs=dev/charts --target-branch ${{ github.event.repository.default_branch }}
+
+      - name: Run chart-testing (install mysql enable)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --chart-dirs=dev/charts --helm-extra-set-args "--set=mysql.enabled=true" --target-branch ${{ github.event.repository.default_branch }}

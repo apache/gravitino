@@ -18,7 +18,7 @@
 #
 image:
   repository: apache/gravitino
-  tag: latest
+  tag: 0.9.0-incubating-SNAPSHOT
   pullPolicy: IfNotPresent
   ## Optionally specify an array of imagePullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -42,7 +42,7 @@ mysql:
     password: "gravitino"
 
 # Use H2 as the default embedded database, or set up an external database for enhanced scalability and performance.
-# schema-0.8.0-mysql.sql is the data init script that should be executed in the external database manually.
+# schema-0.*.0-mysql.sql is the data init script that should be executed in the external database manually.
 entity:
   store: "relational"
   maxTransactionSkewTimeMs: 2000

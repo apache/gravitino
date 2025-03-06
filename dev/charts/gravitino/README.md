@@ -32,26 +32,26 @@ for data and AI assets.
 
 ## Values
 
-| Key                 | Default                   | Description                                                           |
-|---------------------|---------------------------|-----------------------------------------------------------------------|
-| image.repository    | `"apache/gravitino"`      |                                                                       |
-| image.tag           | `"0.8.0-incubating"`      |                                                                       |
-| image.pullPolicy    | `"IfNotPresent"`          |                                                                       |
-| image.pullSecrets   | `[]       `               | Optionally specify secrets for pulling images from a private registry |                            
-| mysql.enabled       | `false`                   | Flag to enable MySQL as the storage backend for Gravitino             |
-| entity.jdbcUrl      | `"jdbc:h2"`               | The JDBC URL for the database                                         |
-| entity.jdbcDriver   | `"org.h2.Driver"`         | The JDBC driver class name                                            |
-| entity.jdbcUser     | `"gravitino"`             | The username for the JDBC connection                                  |
-| entity.jdbcPassword | `"gravitino"`             | The password for the JDBC connection                                  |
-| env                 | `HADOOP_USER_NAME: hdfs ` | Environment variables to pass to the container                        |
-| resources           | `{}            `          | esource requests and limits for the container                         |
+| Key                 | Default                       | Description                                                           |
+|---------------------|-------------------------------|-----------------------------------------------------------------------|
+| image.repository    | `"apache/gravitino"`          |                                                                       |
+| image.tag           | `"0.9.0-incubating-SNAPSHOT"` |                                                                       |
+| image.pullPolicy    | `"IfNotPresent"`              |                                                                       |
+| image.pullSecrets   | `[]       `                   | Optionally specify secrets for pulling images from a private registry |                            
+| mysql.enabled       | `false`                       | Flag to enable MySQL as the storage backend for Gravitino             |
+| entity.jdbcUrl      | `"jdbc:h2"`                   | The JDBC URL for the database                                         |
+| entity.jdbcDriver   | `"org.h2.Driver"`             | The JDBC driver class name                                            |
+| entity.jdbcUser     | `"gravitino"`                 | The username for the JDBC connection                                  |
+| entity.jdbcPassword | `"gravitino"`                 | The password for the JDBC connection                                  |
+| env                 | `HADOOP_USER_NAME: hdfs `     | Environment variables to pass to the container                        |
+| resources           | `{}            `              | esource requests and limits for the container                         |
 
 ## Deploy gravitino to your cluster
 
 ### Update chart dependency
 
 ```bash
-cd gravitino
+cd charts/gravitino
 helm dependency update
 ```
 
@@ -90,7 +90,7 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --s
 To init the existed MySQL, run the following command:
 
 ```bash
-mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.8.0-mysql.sql
+mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
 ```
 
 To see the "gravitino.conf", run the following command:

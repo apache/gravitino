@@ -16,7 +16,7 @@
   specific language governing permissions and limitations
   under the License.
   */}}
-
+  
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,8 +25,20 @@ metadata:
   labels:
     {{- include "gravitino.labels" . | nindent 4 }}
 data:
-  {{- $sqlFiles := .Files.Glob "resources/files/*.sql" }}
+  {{- $sqlFiles := .Files.Glob "resources/files/mysql/schema-*-mysql.sql" }}
+  {{- $maxVersionFile := "" }}
+  {{- $maxVersion := "0.0.0" }}
   {{- range $path, $content := $sqlFiles }}
-  {{ base $path }}: |-
-    {{- tpl ($content | toString) $ | nindent 4 }}
+    {{- $fileName := base $path }}
+    {{- $version := regexFind "schema-(\\d+\\.\\d+\\.\\d+)-mysql\\.sql" $fileName | replace "schema-" "" | replace "-mysql.sql" "" }}
+    {{- if (semverCompare ">= 0.0.0" $version) }}
+        {{- if (semverCompare (printf "> %s" $maxVersion) $version) }}
+          {{- $maxVersion = $version }}
+          {{- $maxVersionFile = $path }}
+        {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- if $maxVersionFile }}
+  {{ base $maxVersionFile }}: |-
+    {{- tpl (.Files.Get $maxVersionFile | toString) $ | nindent 4 }}
   {{- end }}
