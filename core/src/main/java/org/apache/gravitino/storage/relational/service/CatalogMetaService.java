@@ -65,10 +65,11 @@ public class CatalogMetaService {
 
   private CatalogMetaService() {}
 
-  public CatalogPO getCatalogPOByName(String catalogName) {
+  public CatalogPO getCatalogPOByName(String metalakeName, String catalogName) {
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaByName(catalogName));
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogMetaByName(metalakeName, catalogName));
 
     if (catalogPO == null) {
       throw new NoSuchEntityException(
@@ -104,10 +105,11 @@ public class CatalogMetaService {
     return catalogId;
   }
 
-  public Long getCatalogIdByName(String catalogName) {
+  public Long getCatalogIdByName(String metalakeName, String catalogName) {
     Long catalogId =
         SessionUtils.doWithCommitAndFetchResult(
-            CatalogMetaMapper.class, mapper -> mapper.selectCatalogIdByName(catalogName));
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogIdByName(metalakeName, catalogName));
 
     if (catalogId == null) {
       throw new NoSuchEntityException(
@@ -122,7 +124,7 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
     String catalogName = identifier.name();
 
-    CatalogPO catalogPO = getCatalogPOByName(catalogName);
+    CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
 
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
   }
@@ -167,7 +169,7 @@ public class CatalogMetaService {
 
     String catalogName = identifier.name();
 
-    CatalogPO oldCatalogPO = getCatalogPOByName(catalogName);
+    CatalogPO oldCatalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
 
     CatalogEntity oldCatalogEntity =
         POConverters.fromCatalogPO(oldCatalogPO, identifier.namespace());
@@ -204,8 +206,9 @@ public class CatalogMetaService {
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkCatalog(identifier);
 
+    String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
-    long catalogId = getCatalogIdByName(catalogName);
+    long catalogId = getCatalogIdByName(metalakeName, catalogName);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(

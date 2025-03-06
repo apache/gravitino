@@ -56,7 +56,8 @@ public interface CatalogMetaMapper {
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogIdByName")
-  Long selectCatalogIdByName(@Param("catalogName") String name);
+  Long selectCatalogIdByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String name);
 
   @SelectProvider(
       type = CatalogMetaSQLProviderFactory.class,
@@ -65,7 +66,8 @@ public interface CatalogMetaMapper {
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaByName")
-  CatalogPO selectCatalogMetaByName(@Param("catalogName") String catalogName);
+  CatalogPO selectCatalogMetaByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
 
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);

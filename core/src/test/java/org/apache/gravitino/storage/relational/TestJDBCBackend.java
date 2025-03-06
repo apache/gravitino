@@ -794,8 +794,13 @@ public class TestJDBCBackend {
 
     CatalogEntity catalogEntity = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     assertEquals(catalog, catalogEntity);
-    assertNotNull(CatalogMetaService.getInstance().getCatalogPOByName(catalog.name()));
-    assertEquals(catalog.id(), CatalogMetaService.getInstance().getCatalogIdByName(catalog.name()));
+    assertNotNull(
+        CatalogMetaService.getInstance()
+            .getCatalogPOByName(catalogEntity.namespace().level(0), catalog.name()));
+    assertEquals(
+        catalog.id(),
+        CatalogMetaService.getInstance()
+            .getCatalogIdByName(catalog.namespace().level(0), catalog.name()));
 
     UserEntity userEntity = backend.get(user.nameIdentifier(), Entity.EntityType.USER);
     assertEquals(user, userEntity);

@@ -71,13 +71,15 @@ public class CatalogMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String selectCatalogIdByName(@Param("catalogName") String name) {
+  public String selectCatalogIdByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
     return "SELECT cm.catalog_id as catalogId FROM "
         + TABLE_NAME
         + " cm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON cm.metalake_id = mm.metalake_id"
-        + " WHERE catalog_name = #{catalogName} AND cm.deleted_at = 0";
+        + " WHERE catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
   public String selectCatalogIdByMetalakeIdAndName(
@@ -99,7 +101,8 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0";
   }
 
-  public String selectCatalogMetaByName(@Param("catalogName") String name) {
+  public String selectCatalogMetaByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
     return "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
         + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
         + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
@@ -110,7 +113,8 @@ public class CatalogMetaBaseSQLProvider {
         + " cm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON cm.metalake_id = mm.metalake_id"
-        + " WHERE cm.catalog_name = #{catalogName} AND cm.deleted_at = 0";
+        + " WHERE cm.catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
   public String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
