@@ -80,6 +80,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
+
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -87,6 +88,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
             "table",
             auditInfo);
     backend.insert(table, false);
+
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -122,15 +124,19 @@ public class TestSecurableObjects extends TestJDBCBackend {
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
     SecurableObject tableObject =
         SecurableObjects.ofTable(
             schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
+
     SecurableObject filesetObject =
         SecurableObjects.ofFileset(
             schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+
     SecurableObject topicObject =
         SecurableObjects.ofTopic(
             schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
+
     SecurableObject modelObject =
         SecurableObjects.ofModel(
             schemaObject, "model", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
