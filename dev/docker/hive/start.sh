@@ -69,6 +69,8 @@ if [[ -n "$SERVICE_ACCOUNT_FILE" ]]; then
   sed -i "s|SERVICE_ACCOUNT_FILE|${SERVICE_ACCOUNT_FILE}|g" ${HIVE_CONF_DIR}/hive-site.xml
 fi
 
+sed -i "s/useSSL=false/useSSL=false&amp;characterEncoding=utf8&amp;useUnicode=true/g" ${HIVE_CONF_DIR}/hive-site.xml
+
 # Link mysql-connector-java after deciding where HIVE_HOME symbolic link points to.
 ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.jar ${HIVE_HOME}/lib
 
@@ -164,6 +166,14 @@ echo """
   FLUSH PRIVILEGES;
   CREATE DATABASE hive;
 """ | mysql --user=root --password=${MYSQL_PWD}
+
+
+# change charset
+
+set -i 's/CHARACTER SET latin1 COLLATE latin1_bin/CHARACTER SET utf8mb4 COLLATE utf8mb4_bin/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
+set -i 's/CHARSET=latin1/CHARSET=utf8/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
+set -i 's/varchar(4000)/text/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
+set -i 's/varchar(767)/text/g' ${HIVE_HOME}/scripts/metastore/upgrade/mysql/hive-schema-2.3.0.mysql.sql
 
 # start hive
 echo "Starting Hive..."
