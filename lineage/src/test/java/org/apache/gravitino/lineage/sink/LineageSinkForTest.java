@@ -17,21 +17,40 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage.source;
+package org.apache.gravitino.lineage.sink;
 
-import com.google.common.collect.ImmutableSet;
+import io.openlineage.server.OpenLineage.RunEvent;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.gravitino.lineage.LineageDispatcher;
-import org.apache.gravitino.lineage.source.rest.LineageOperations;
-import org.apache.gravitino.server.web.SupportsRESTPackages;
+import java.util.concurrent.TimeUnit;
+import lombok.Getter;
+import org.awaitility.Awaitility;
 
-public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
-  @Override
-  public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
+@Getter
+public class LineageSinkForTest implements LineageSink {
+  private Map<String, String> configs;
+  private List<RunEvent> runEvents = new LinkedList<>();
 
   @Override
-  public Set<String> getRESTPackages() {
-    return ImmutableSet.of(LineageOperations.class.getPackage().getName());
+  public void initialize(Map<String, String> configs) {
+    this.configs = configs;
+  }
+
+  @Override
+  public void sink(RunEvent event) {
+    this.runEvents.add(event);
+  }
+
+  public List<RunEvent> tryGetEvents() {
+    Awaitility.await()
+        .atMost(20, TimeUnit.SECONDS)
+        .pollInterval(10, TimeUnit.MILLISECONDS)
+        .until(() -> getEvents().size() > 0);
+    return getEvents();
+  }
+
+  private List<RunEvent> getEvents() {
+    return runEvents;
   }
 }

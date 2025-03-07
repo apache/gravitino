@@ -17,21 +17,19 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage.source;
+package org.apache.gravitino.listener.api.event;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Map;
-import java.util.Set;
-import org.apache.gravitino.lineage.LineageDispatcher;
-import org.apache.gravitino.lineage.source.rest.LineageOperations;
-import org.apache.gravitino.server.web.SupportsRESTPackages;
+import org.apache.gravitino.NameIdentifier;
 
-public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
-  @Override
-  public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
+public class EventWrapper<T> extends Event {
+  private T t;
 
-  @Override
-  public Set<String> getRESTPackages() {
-    return ImmutableSet.of(LineageOperations.class.getPackage().getName());
+  public EventWrapper(T t) {
+    super("mockUser", NameIdentifier.of("mock"));
+    this.t = t;
+  }
+
+  public T getObject() {
+    return t;
   }
 }

@@ -17,21 +17,18 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage.source;
+package org.apache.gravitino.lineage;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Map;
-import java.util.Set;
-import org.apache.gravitino.lineage.LineageDispatcher;
-import org.apache.gravitino.lineage.source.rest.LineageOperations;
-import org.apache.gravitino.server.web.SupportsRESTPackages;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import io.openlineage.client.OpenLineage;
+import io.openlineage.server.OpenLineage.RunEvent;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 
-public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
-  @Override
-  public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
+public class RunEventUtils {
 
-  @Override
-  public Set<String> getRESTPackages() {
-    return ImmutableSet.of(LineageOperations.class.getPackage().getName());
+  public static OpenLineage.RunEvent getClientRunEvent(RunEvent event)
+      throws JsonProcessingException {
+    String value = ObjectMapperProvider.objectMapper().writeValueAsString(event);
+    return ObjectMapperProvider.objectMapper().readValue(value, OpenLineage.RunEvent.class);
   }
 }
