@@ -36,6 +36,9 @@ public interface TableColumnMapper {
   List<ColumnPO> listColumnPOsByTableIdAndVersion(
       @Param("tableId") Long tableId, @Param("tableVersion") Long tableVersion);
 
+  @SelectProvider(type = TableColumnSQLProviderFactory.class, method = "listColumnPOsByColumnIds")
+  List<ColumnPO> listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds);
+
   @InsertProvider(type = TableColumnSQLProviderFactory.class, method = "insertColumnPOs")
   void insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs);
 
