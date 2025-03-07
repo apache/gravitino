@@ -23,6 +23,8 @@ import java.util.Map;
 
 /** The properties for Ranger authorization plugin. */
 public class RangerAuthorizationProperties extends AuthorizationProperties {
+  public static final String RANGER_PREFIX = "authorization.ranger";
+
   /** Ranger admin web URIs */
   public static final String RANGER_ADMIN_URL = "authorization.ranger.admin.url";
 
@@ -73,7 +75,7 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
 
   @Override
   public String getPropertiesPrefix() {
-    return "authorization.ranger";
+    return RANGER_PREFIX;
   }
 
   @Override

@@ -84,7 +84,6 @@ public abstract class RangerAuthorizationPlugin
   protected RangerClientExtension rangerClient;
   protected RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
-  private final int prefixLength;
 
   protected RangerAuthorizationPlugin(String metalake, Map<String, String> config) {
     this.metalake = metalake;
@@ -102,9 +101,6 @@ public abstract class RangerAuthorizationPlugin
 
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
-
-    // We should consider `.` to add 1
-    prefixLength = rangerAuthorizationProperties.getPropertiesPrefix().length() + 1;
 
     if (Boolean.parseBoolean(
         config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))) {
@@ -1016,7 +1012,8 @@ public abstract class RangerAuthorizationPlugin
   protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
 
   protected int getPrefixLength() {
-    return prefixLength;
+    // We should consider `.`. We need to add 1
+    return RangerAuthorizationProperties.RANGER_PREFIX.length() + 1;
   }
 
   @Override
