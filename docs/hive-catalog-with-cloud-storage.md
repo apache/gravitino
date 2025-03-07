@@ -44,7 +44,7 @@ Below are the essential properties to add or modify in the `hive-site.xml` file 
 definition and table definition, as shown in the examples below. After explicitly setting this
 property, you can omit the location property in the schema and table definitions.
 
-It's also applicable for Azure Blob Storage(ADSL) and GCS.
+It's also applicable for Azure Blob Storage(ADLS) and GCS.
 -->
 <property>
   <name>hive.metastore.warehouse.dir</name>

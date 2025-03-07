@@ -32,11 +32,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
-    Configuration configuration = new Configuration();
-    config.forEach(
-        (k, v) -> {
-          configuration.set(k.replace(GRAVITINO_BYPASS, ""), v);
-        });
+    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
