@@ -376,8 +376,6 @@ public class RoleMetaService {
                           MetadataObjectService::getSchemaObjectFullNames,
                           MetadataObject.Type.TABLE,
                           MetadataObjectService::getTableObjectFullNames,
-                          MetadataObject.Type.COLUMN,
-                          MetadataObjectService::getColumnObjectFullNames,
                           MetadataObject.Type.FILESET,
                           MetadataObjectService::getFilesetObjectFullNames,
                           MetadataObject.Type.MODEL,
@@ -392,6 +390,7 @@ public class RoleMetaService {
                       .map(getter -> getter.apply(objectIds))
                       .orElseThrow(
                           () ->
+                              // for example: MetadataObject.Type.COLUMN
                               new IllegalArgumentException(
                                   "Unsupported metadata object type: " + type));
 
