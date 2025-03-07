@@ -32,7 +32,11 @@ import org.apache.gravitino.utils.ClassUtils;
 
 public class LineageSinkEventListener implements EventListenerPlugin {
 
+<<<<<<< HEAD
   private LineageSink lineageSink;
+=======
+  private LineageSink sink;
+>>>>>>> c0a1126c0 (support lineage)
 
   @Override
   public void init(Map<String, String> properties) throws RuntimeException {
@@ -40,8 +44,13 @@ public class LineageSinkEventListener implements EventListenerPlugin {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sinkClassName),
         LineageConfig.LINEAGE_SINK_CLASS_NAME + " is not set.");
+<<<<<<< HEAD
     this.lineageSink = ClassUtils.loadClass(sinkClassName);
     lineageSink.initialize(properties);
+=======
+    this.sink = ClassUtils.loadClass(sinkClassName);
+    sink.initialize(properties);
+>>>>>>> c0a1126c0 (support lineage)
   }
 
   @Override
@@ -49,8 +58,13 @@ public class LineageSinkEventListener implements EventListenerPlugin {
 
   @Override
   public void stop() throws RuntimeException {
+<<<<<<< HEAD
     if (lineageSink != null) {
       lineageSink.close();
+=======
+    if (sink != null) {
+      sink.close();
+>>>>>>> c0a1126c0 (support lineage)
     }
   }
 
@@ -62,11 +76,20 @@ public class LineageSinkEventListener implements EventListenerPlugin {
   @Override
   public void onPostEvent(Event postEvent) throws RuntimeException {
     EventWrapper<RunEvent> wrapper = (EventWrapper<RunEvent>) postEvent;
+<<<<<<< HEAD
     lineageSink.sink(wrapper.getObject());
   }
 
   @VisibleForTesting
   LineageSink lineageSink() {
     return lineageSink;
+=======
+    sink.sink(wrapper.getObject());
+  }
+
+  @VisibleForTesting
+  LineageSink getSink() {
+    return sink;
+>>>>>>> c0a1126c0 (support lineage)
   }
 }

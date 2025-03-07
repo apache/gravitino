@@ -60,6 +60,7 @@ public class LineageSinkManager implements Closeable {
    * details such as event listener names, event listener classes, and the capacity of the
    * asynchronous event queue.
    */
+
   @VisibleForTesting
   static Map<String, String> transformToEventListenerConfigs(
       List<String> sinks, Map<String, String> lineageConfigs) {
