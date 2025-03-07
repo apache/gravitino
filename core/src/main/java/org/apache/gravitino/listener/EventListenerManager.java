@@ -52,7 +52,8 @@ public class EventListenerManager {
   private static final Logger LOG = LoggerFactory.getLogger(EventListenerManager.class);
   public static final String GRAVITINO_EVENT_LISTENER_PREFIX = "gravitino.eventListener.";
   static final String GRAVITINO_EVENT_LISTENER_NAMES = "names";
-  @VisibleForTesting static final String GRAVITINO_EVENT_LISTENER_CLASS = "class";
+  @VisibleForTesting
+  static final String GRAVITINO_EVENT_LISTENER_CLASS = "class";
   static final String GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY = "queueCapacity";
   static final String GRAVITINO_EVENT_LISTENER_DISPATCHER_JOIN_SECONDS = "dispatcherJoinSeconds";
   private static final Splitter splitter = Splitter.on(",");
