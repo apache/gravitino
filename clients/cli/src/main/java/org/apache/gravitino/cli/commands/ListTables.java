@@ -47,7 +47,7 @@ public class ListTables extends TableCommand {
   /** List the names of all tables in a schema. */
   @Override
   public void handle() {
-    try {
+
       Namespace name = Namespace.of(schema);
       NameIdentifier[] tables = tableCatalog().listTables(name);
 
@@ -55,7 +55,8 @@ public class ListTables extends TableCommand {
         printInformation("No tables exist.");
         return;
       }
-
+      
+      try {
       Table[] gTables = new Table[tables.length];
       for (int i = 0; i < tables.length; i++) {
         String tableName = tables[i].name();

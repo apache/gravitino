@@ -82,7 +82,7 @@ public class ListColumns extends TableCommand {
               + " "
               + Joiner.on(".").join(metalake, catalog, schema, table));
     } catch (Exception exp) {
-      exitWithError("An error occurred while retrieving column details: " + exp.getMessage());
+      printResults("An error occurred while retrieving column details: " + exp.getMessage());
     }
   }
 }

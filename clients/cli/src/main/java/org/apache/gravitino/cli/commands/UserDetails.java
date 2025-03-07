@@ -51,18 +51,18 @@ public class UserDetails extends Command {
 
     try (GravitinoClient client = buildClient(metalake)) {
       roles = client.getUser(user).roles();
-    } catch (NoSuchMetalakeException e) {
+    } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchUserException e) {
+    } catch (NoSuchUserException err) {
       exitWithError(ErrorMessages.UNKNOWN_USER);
-    } catch (Exception e) {
-      exitWithError(e.getMessage());
+    } catch (Exception err) {
+      exitWithError(err.getMessage());
     }
 
     if (roles == null || roles.isEmpty()) {
       printInformation("The user has no assigned roles.");
     } else {
-      printResults("User Roles: " + String.join(", ", roles));
+      printResults(String.join(",", roles));
     }
   }
 }

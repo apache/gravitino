@@ -78,7 +78,7 @@ public class ModelDetails extends Command {
     } catch (NoSuchModelException err) {
       exitWithError(ErrorMessages.UNKNOWN_MODEL);
     } catch (Exception err) {
-      exitWithError("An unexpected error occurred: " + err.getMessage());
+      exitWithError(err.getMessage());
     }
 
     if (gModel == null) {

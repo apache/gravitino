@@ -59,7 +59,7 @@ public class ListTagProperties extends ListProperties {
     } catch (NoSuchTagException err) {
       exitWithError(ErrorMessages.UNKNOWN_TAG);
     } catch (Exception exp) {
-      exitWithError("An unexpected error occurred: " + exp.getMessage());
+      exitWithError(exp.getMessage());
     }
 
     if (gTag == null) {

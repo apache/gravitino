@@ -70,7 +70,6 @@ public class SchemaAudit extends AuditCommand {
 
     if (result == null) {
       exitWithError("Failed to retrieve schema details.");
-      return;
     }
 
     displayAuditInfo(result.auditInfo());
