@@ -47,6 +47,28 @@ public class TableColumnBaseSQLProvider {
         + " ON t1.column_id = t2.column_id AND t1.table_version = t2.max_table_version";
   }
 
+  public String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
+    return "<script>"
+        + " SELECT t1.column_id AS columnId, t1.column_name AS columnName,"
+        + " t1.column_position AS columnPosition,"
+        + " t1.metalake_id AS metalakeId, t1.catalog_id AS catalogId,"
+        + " t1.schema_id AS schemaId, t1.table_id AS tableId,"
+        + " t1.table_version AS tableVersion, t1.column_type AS columnType,"
+        + " t1.column_comment AS columnComment, t1.column_nullable AS nullable,"
+        + " t1.column_auto_increment AS autoIncrement,"
+        + " t1.column_default_value AS defaultValue, t1.column_op_type AS columnOpType,"
+        + " t1.deleted_at AS deletedAt, t1.audit_info AS auditInfo"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND column_id in ("
+        + "<foreach collection='columnIds' item='columnId' separator=','>"
+        + "#{columnId}"
+        + "</foreach>"
+        + ") "
+        + "</script>";
+  }
+
   public String insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs) {
     return "<script>"
         + "INSERT INTO "

@@ -376,6 +376,8 @@ public class RoleMetaService {
                           MetadataObjectService::getSchemaObjectFullNames,
                           MetadataObject.Type.TABLE,
                           MetadataObjectService::getTableObjectFullNames,
+                          MetadataObject.Type.COLUMN,
+                          MetadataObjectService::getColumnObjectFullNames,
                           MetadataObject.Type.FILESET,
                           MetadataObjectService::getFilesetObjectFullNames,
                           MetadataObject.Type.MODEL,
