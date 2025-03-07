@@ -55,6 +55,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -210,6 +211,39 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "comment", catalogConf);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
+
+    // Test to create chained authorization plugin automatically
+    Map<String, String> autoProperties = new HashMap<>();
+    autoProperties.put(HiveConstants.METASTORE_URIS, HIVE_METASTORE_URIS);
+    autoProperties.put(IMPERSONATION_ENABLE, "true");
+    autoProperties.put(Catalog.AUTHORIZATION_PROVIDER, "chain");
+    autoProperties.put(ChainedAuthorizationProperties.CHAIN_PLUGINS_PROPERTIES_KEY, "hive1,hdfs1");
+    autoProperties.put("authorization.chain.hive1.provider", "ranger");
+    autoProperties.put("authorization.chain.hive1.ranger.auth.type", RangerContainer.authType);
+    autoProperties.put("authorization.chain.hive1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);
+    autoProperties.put("authorization.chain.hive1.ranger.username", RangerContainer.rangerUserName);
+    autoProperties.put("authorization.chain.hive1.ranger.password", RangerContainer.rangerPassword);
+    autoProperties.put("authorization.chain.hive1.ranger.service.type", "HadoopSQL");
+    autoProperties.put("authorization.chain.hive1.ranger.service.name", "test899");
+    autoProperties.put("authorization.chain.hive1.ranger.service.create-if-absent", "true");
+    autoProperties.put("authorization.chain.hdfs1.provider", "ranger");
+    autoProperties.put("authorization.chain.hdfs1.ranger.auth.type", RangerContainer.authType);
+    autoProperties.put("authorization.chain.hdfs1.ranger.admin.url", RangerITEnv.RANGER_ADMIN_URL);
+    autoProperties.put("authorization.chain.hdfs1.ranger.username", RangerContainer.rangerUserName);
+    autoProperties.put("authorization.chain.hdfs1.ranger.password", RangerContainer.rangerPassword);
+    autoProperties.put("authorization.chain.hdfs1.ranger.service.type", "HDFS");
+    autoProperties.put("authorization.chain.hdfs1.ranger.service.name", "test833");
+    autoProperties.put("authorization.chain.hdfs1.ranger.service.create-if-absent", "true");
+    metalake.createCatalog("test", Catalog.Type.RELATIONAL, "hive", "comment", autoProperties);
+    try {
+      RangerService rangerService = RangerITEnv.rangerClient.getService("test833");
+      Assertions.assertNotNull(rangerService);
+      rangerService = RangerITEnv.rangerClient.getService("test899");
+      Assertions.assertNotNull(rangerService);
+    } catch (Exception e) {
+      Assertions.fail();
+    }
+    metalake.dropCatalog("test", true);
   }
 
   private String storageLocation(String dirName) {

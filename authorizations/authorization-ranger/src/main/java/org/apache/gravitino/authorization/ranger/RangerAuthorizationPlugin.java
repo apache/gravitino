@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -56,6 +57,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.ranger.plugin.util.GrantRevokeRoleRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +76,8 @@ import org.slf4j.LoggerFactory;
 public abstract class RangerAuthorizationPlugin
     implements AuthorizationPlugin, AuthorizationPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
+  protected static final String HDFS_SERVICE_TYPE = "hdfs";
+  protected static final String HADOOP_SQL_SERVICE_TYPE = "hive";
 
   protected String metalake;
   protected final String rangerServiceName;
@@ -87,12 +91,21 @@ public abstract class RangerAuthorizationPlugin
         new RangerAuthorizationProperties(config);
     rangerAuthorizationProperties.validate();
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
+
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
+
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
+
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
+
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
+
+    if (Boolean.parseBoolean(
+        config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))) {
+      createRangerServiceIfNecessary(config, rangerServiceName);
+    }
 
     rangerHelper =
         new RangerHelper(
@@ -769,6 +782,34 @@ public abstract class RangerAuthorizationPlugin
     return Boolean.TRUE;
   }
 
+  private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {
+    try {
+      rangerClient.getService(serviceName);
+    } catch (RangerServiceException rse) {
+      if (rse.getStatus().equals(ClientResponse.Status.NOT_FOUND)) {
+        try {
+          RangerService rangerService = new RangerService();
+          rangerService.setType(getServiceType());
+          rangerService.setName(serviceName);
+          rangerService.setConfigs(getServiceConfigs(config));
+          rangerClient.createService(rangerService);
+          // We should remove some default policies, they will cause users to get more policies
+          // than they should do.
+          List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
+          for (RangerPolicy policy : policies) {
+            rangerClient.deletePolicy(policy.getId());
+          }
+        } catch (RangerServiceException crse) {
+          throw new AuthorizationPluginException(
+              "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
+        }
+      } else {
+        throw new AuthorizationPluginException(
+            "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
+      }
+    }
+  }
+
   /**
    * Add the securable object's privilege to the Ranger policy. <br>
    * 1. Find the policy base the metadata object. <br>
@@ -957,6 +998,22 @@ public abstract class RangerAuthorizationPlugin
     if (policy != null) {
       rangerHelper.removeAllGravitinoManagedPolicyItem(policy);
     }
+  }
+
+  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
+    if (conf.containsKey(key)) {
+      return conf.get(key);
+    }
+    return defaultValue;
+  }
+
+  protected abstract String getServiceType();
+
+  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
+
+  protected int getPrefixLength() {
+    // We should consider `.`. We need to add 1
+    return RangerAuthorizationProperties.RANGER_PREFIX.length() + 1;
   }
 
   @Override
