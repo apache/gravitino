@@ -514,7 +514,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 1: Succeed to insert data into the table
     sparkSession.sql(SQL_INSERT_TABLE);
 
-    // case 2: Fail select data from the table
+    // case 2: Succeed to select data from the table
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
