@@ -274,10 +274,8 @@ servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "
 mail = { group = "javax.mail", name = "mail", version.ref = "mail" }
 rome = { group = "rome", name = "rome", version.ref = "rome" }
 jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "jettison" }
-
 google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
-
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }

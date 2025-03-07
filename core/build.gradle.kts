@@ -37,6 +37,10 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.mybatis)
+  implementation(libs.openlineage.java)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jackson.databind)
 
   annotationProcessor(libs.lombok)
 

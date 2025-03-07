@@ -39,6 +39,7 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
   implementation(libs.metrics.jersey2)
+  implementation(libs.openlineage.java)
 
   // As of Java 9 or newer, the javax.activation package (needed by the jetty server) is no longer part of the JDK. It was removed because it was part of the
   // JavaBeans Activation Framework (JAF) which has been removed from Java SE. So we need to add it as a dependency. For more,
