@@ -188,20 +188,22 @@ public class MetalakeManager implements MetalakeDispatcher {
     return TreeLockUtils.doWithTreeLock(
         ident,
         LockType.READ,
-        () -> {
-          try {
-            BaseMetalake baseMetalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
-            baseMetalake = newMetalakeWithResolvedProperties(baseMetalake);
-            METALAKE_CACHE.put(ident, baseMetalake);
-            return baseMetalake;
-          } catch (NoSuchEntityException e) {
-            LOG.warn("Metalake {} does not exist", ident, e);
-            throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
-          } catch (IOException ioe) {
-            LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+        () ->
+            METALAKE_CACHE.get(
+                ident,
+                k -> {
+                  try {
+                    BaseMetalake baseMetalake =
+                        store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+                    return newMetalakeWithResolvedProperties(baseMetalake);
+                  } catch (NoSuchEntityException e) {
+                    LOG.warn("Metalake {} does not exist", ident, e);
+                    throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+                  } catch (IOException ioe) {
+                    LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
+                    throw new RuntimeException(ioe);
+                  }
+                }));
   }
 
   private BaseMetalake newMetalakeWithResolvedProperties(BaseMetalake metalakeEntity) {
