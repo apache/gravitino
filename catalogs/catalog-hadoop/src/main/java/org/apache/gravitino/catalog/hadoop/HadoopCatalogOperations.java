@@ -263,12 +263,13 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
       FileSystem fs = getFileSystem(filesetPath, conf);
       if (!fs.exists(filesetPath)) {
+        /*
         if (!fs.mkdirs(filesetPath)) {
           throw new RuntimeException(
               "Failed to create fileset " + ident + " location " + filesetPath);
-        }
+        }*/
 
-        LOG.info("Created fileset {} location {}", ident, filesetPath);
+        LOG.info("Skip fileset {} location {}", ident, filesetPath);
       } else {
         LOG.info("Fileset {} manages the existing location {}", ident, filesetPath);
       }
