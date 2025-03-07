@@ -133,35 +133,35 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkUpdateSQLWithReadWritePrivileges() {
+  protected void checkUpdateSQLWithSelectModifyPrivileges() {
     Assertions.assertThrows(
         SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkUpdateSQLWithReadPrivileges() {
+  protected void checkUpdateSQLWithSelectPrivileges() {
     Assertions.assertThrows(
         SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkUpdateSQLWithWritePrivileges() {
+  protected void checkUpdateSQLWithModifyPrivileges() {
     Assertions.assertThrows(
         SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithReadWritePrivileges() {
+  protected void checkDeleteSQLWithSelectModifyPrivileges() {
     Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithReadPrivileges() {
+  protected void checkDeleteSQLWithSelectPrivileges() {
     Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithWritePrivileges() {
+  protected void checkDeleteSQLWithModifyPrivileges() {
     Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 

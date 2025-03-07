@@ -320,22 +320,22 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   }
 
   @Test
-  void testReadWriteTableWithMetalakeLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithMetalakeLevelRole() throws InterruptedException {
     // TODO
   }
 
   @Test
-  void testReadWriteTableWithTableLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithTableLevelRole() throws InterruptedException {
     // TODO
   }
 
   @Test
-  void testReadOnlyTable() throws InterruptedException {
+  void testSelectOnlyTable() throws InterruptedException {
     // TODO
   }
 
   @Test
-  void testWriteOnlyTable() throws InterruptedException {
+  void testModifyOnlyTable() throws InterruptedException {
     // TODO
   }
 
@@ -385,32 +385,32 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkUpdateSQLWithReadWritePrivileges() {
+  protected void checkUpdateSQLWithSelectModifyPrivileges() {
     // TODO
   }
 
   @Override
-  protected void checkUpdateSQLWithReadPrivileges() {
+  protected void checkUpdateSQLWithSelectPrivileges() {
     // TODO
   }
 
   @Override
-  protected void checkUpdateSQLWithWritePrivileges() {
+  protected void checkUpdateSQLWithModifyPrivileges() {
     // TODO
   }
 
   @Override
-  protected void checkDeleteSQLWithReadWritePrivileges() {
+  protected void checkDeleteSQLWithSelectModifyPrivileges() {
     // TODO
   }
 
   @Override
-  protected void checkDeleteSQLWithReadPrivileges() {
+  protected void checkDeleteSQLWithSelectPrivileges() {
     // TODO
   }
 
   @Override
-  protected void checkDeleteSQLWithWritePrivileges() {
+  protected void checkDeleteSQLWithModifyPrivileges() {
     // TODO
   }
 

@@ -191,17 +191,17 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   protected abstract void checkTableAllPrivilegesExceptForCreating();
 
-  protected abstract void checkUpdateSQLWithReadWritePrivileges();
+  protected abstract void checkUpdateSQLWithSelectModifyPrivileges();
 
-  protected abstract void checkUpdateSQLWithReadPrivileges();
+  protected abstract void checkUpdateSQLWithSelectPrivileges();
 
-  protected abstract void checkUpdateSQLWithWritePrivileges();
+  protected abstract void checkUpdateSQLWithModifyPrivileges();
 
-  protected abstract void checkDeleteSQLWithReadWritePrivileges();
+  protected abstract void checkDeleteSQLWithSelectModifyPrivileges();
 
-  protected abstract void checkDeleteSQLWithReadPrivileges();
+  protected abstract void checkDeleteSQLWithSelectPrivileges();
 
-  protected abstract void checkDeleteSQLWithWritePrivileges();
+  protected abstract void checkDeleteSQLWithModifyPrivileges();
 
   protected abstract void useCatalog();
 
@@ -313,7 +313,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadWriteTableWithMetalakeLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithMetalakeLevelRole() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -346,10 +346,10 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
-    checkUpdateSQLWithReadWritePrivileges();
+    checkUpdateSQLWithSelectModifyPrivileges();
 
     // case 4:  Delete data from the table.
-    checkDeleteSQLWithReadWritePrivileges();
+    checkDeleteSQLWithSelectModifyPrivileges();
 
     // case 5: Succeed to alter the table
     testAlterTable();
@@ -368,7 +368,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadWriteTableWithTableLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithTableLevelRole() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -410,10 +410,10 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table.
-    checkUpdateSQLWithReadWritePrivileges();
+    checkUpdateSQLWithSelectModifyPrivileges();
 
     // case 4: Delete data from the table.
-    checkDeleteSQLWithReadWritePrivileges();
+    checkDeleteSQLWithSelectModifyPrivileges();
 
     // case 5: Succeed to alter the table
     testAlterTable();
@@ -432,7 +432,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadOnlyTable() throws InterruptedException {
+  void testSelectOnlyTable() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -464,10 +464,10 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
-    checkUpdateSQLWithReadPrivileges();
+    checkUpdateSQLWithSelectPrivileges();
 
     // case 4: Delete data from the table
-    checkDeleteSQLWithReadPrivileges();
+    checkDeleteSQLWithSelectPrivileges();
 
     // case 5: Fail to alter the table
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_ALTER_TABLE));
@@ -486,7 +486,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testWriteOnlyTable() throws InterruptedException {
+  void testModifyOnlyTable() throws InterruptedException {
     // Choose a catalog
     useCatalog();
 
@@ -514,15 +514,14 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 1: Succeed to insert data into the table
     sparkSession.sql(SQL_INSERT_TABLE);
 
-    // case 2: Fail to select data from the table
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    // case 2: Succeed to select data from the table
+    sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
-    checkUpdateSQLWithWritePrivileges();
+    checkUpdateSQLWithModifyPrivileges();
 
     // case 4: Delete data from the table
-    checkDeleteSQLWithWritePrivileges();
+    checkDeleteSQLWithModifyPrivileges();
 
     // case 5: Succeed to alter the table
     testAlterTable();
