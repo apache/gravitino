@@ -621,7 +621,7 @@ public class MetadataObjectService {
     return schemaIdAndNameMap;
   }
 
-  public static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
+  private static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
@@ -629,7 +629,7 @@ public class MetadataObjectService {
         .collect(Collectors.toMap(CatalogPO::getCatalogId, CatalogPO::getCatalogName));
   }
 
-  public static Map<Long, String> getSchemaIdAndNameMap(List<Long> schemaIds) {
+  private static Map<Long, String> getSchemaIdAndNameMap(List<Long> schemaIds) {
     List<SchemaPO> schemaPOS =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
@@ -637,7 +637,7 @@ public class MetadataObjectService {
         .collect(Collectors.toMap(SchemaPO::getSchemaId, SchemaPO::getSchemaName));
   }
 
-  public static Map<Long, String> getTableIdAndNameMap(List<Long> tableIds) {
+  private static Map<Long, String> getTableIdAndNameMap(List<Long> tableIds) {
     List<TablePO> tablePOS =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
