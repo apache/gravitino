@@ -110,7 +110,7 @@ adls_properties = {
 }
 
 adls_properties = gravitino_client.create_catalog(name="example_catalog",
-                                                  type=Catalog.Type.FILESET,
+                                                  catalog_type=Catalog.Type.FILESET,
                                                   provider="hadoop",
                                                   comment="This is a ADLS fileset catalog",
                                                   properties=adls_properties)
