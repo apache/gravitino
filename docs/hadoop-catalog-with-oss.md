@@ -114,7 +114,7 @@ oss_properties = {
 }
 
 oss_catalog = gravitino_client.create_catalog(name="test_catalog",
-                                              type=Catalog.Type.FILESET,
+                                              catalog_type=Catalog.Type.FILESET,
                                               provider="hadoop",
                                               comment="This is a OSS fileset catalog",
                                               properties=oss_properties)
