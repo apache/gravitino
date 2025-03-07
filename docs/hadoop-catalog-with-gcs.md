@@ -105,7 +105,7 @@ gcs_properties = {
 }
 
 gcs_properties = gravitino_client.create_catalog(name="test_catalog",
-                                                 type=Catalog.Type.FILESET,
+                                                 catalog_type=Catalog.Type.FILESET,
                                                  provider="hadoop",
                                                  comment="This is a GCS fileset catalog",
                                                  properties=gcs_properties)
