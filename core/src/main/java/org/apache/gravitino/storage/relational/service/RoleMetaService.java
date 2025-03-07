@@ -392,7 +392,6 @@ public class RoleMetaService {
                       .map(getter -> getter.apply(objectIds))
                       .orElseThrow(
                           () ->
-                              // For example: COLUMN doesn't have securable object
                               new IllegalArgumentException(
                                   "Unsupported metadata object type: " + type));
 
