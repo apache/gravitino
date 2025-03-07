@@ -268,7 +268,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               "Failed to create fileset " + ident + " location " + filesetPath);
         }
 
-        LOG.info("Created fileset {} location {}", ident, filesetPath);
+        LOG.info("Create fileset {} location {}", ident, filesetPath);
       } else {
         LOG.info("Fileset {} manages the existing location {}", ident, filesetPath);
       }

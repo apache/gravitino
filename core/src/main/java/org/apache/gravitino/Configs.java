@@ -38,6 +38,7 @@ public class Configs {
 
   public static final String DEFAULT_ENTITY_RELATIONAL_STORE = "JDBCBackend";
   public static final String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
+  public static final String DATA_LINEAGE_KEY = "gravitino.lineage";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY =
       "gravitino.entity.store.relational.jdbcUrl";
