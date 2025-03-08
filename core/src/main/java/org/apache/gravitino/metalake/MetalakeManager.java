@@ -311,7 +311,8 @@ public class MetalakeManager implements MetalakeDispatcher {
 
                       return builder.build();
                     });
-            METALAKE_CACHE.put(ident, newMetalakeWithResolvedProperties(baseMetalake));
+            METALAKE_CACHE.put(
+                baseMetalake.nameIdentifier(), newMetalakeWithResolvedProperties(baseMetalake));
             return baseMetalake;
           } catch (NoSuchEntityException ne) {
             LOG.warn("Metalake {} does not exist", ident, ne);
