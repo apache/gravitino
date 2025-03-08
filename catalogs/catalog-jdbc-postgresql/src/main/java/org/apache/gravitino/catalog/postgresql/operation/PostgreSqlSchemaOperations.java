@@ -156,6 +156,12 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   @Override
+  protected String generateDatabaseExistSql(String databaseName) {
+    return String.format(
+        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname='%s'", databaseName);
+  }
+
+  @Override
   protected boolean supportSchemaComment() {
     return true;
   }

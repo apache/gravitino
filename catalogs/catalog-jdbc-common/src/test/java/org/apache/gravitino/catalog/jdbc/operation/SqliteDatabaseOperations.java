@@ -64,9 +64,11 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
-    Preconditions.checkArgument(exist(databaseName), "Database %s does not exist", databaseName);
+    Preconditions.checkArgument(
+        this.exist(databaseName), "Database %s does not exist", databaseName);
   }
 
+  @Override
   public boolean exist(String databaseName) {
     return new File(dbPath + "/" + databaseName).exists();
   }
@@ -87,7 +89,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    if (exist(databaseName)) {
+    if (this.exist(databaseName)) {
       return JdbcSchema.builder().withName(databaseName).withAuditInfo(AuditInfo.EMPTY).build();
     }
     return null;
