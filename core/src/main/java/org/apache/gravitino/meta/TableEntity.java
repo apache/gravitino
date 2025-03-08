@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import lombok.ToString;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -131,11 +132,14 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     }
 
     TableEntity baseTable = (TableEntity) o;
+    // Objects.equal() will judge the sequence of elements in the list. For example, if the
+    // sequence of columns is different, it will return false. So we need to use
+    // CollectionUtils.isEqualCollection() to compare the two lists.
     return Objects.equal(id, baseTable.id)
         && Objects.equal(name, baseTable.name)
         && Objects.equal(namespace, baseTable.namespace)
         && Objects.equal(auditInfo, baseTable.auditInfo)
-        && Objects.equal(columns, baseTable.columns);
+        && CollectionUtils.isEqualCollection(columns, baseTable.columns);
   }
 
   @Override

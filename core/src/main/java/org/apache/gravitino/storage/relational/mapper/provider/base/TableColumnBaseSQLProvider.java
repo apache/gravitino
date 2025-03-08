@@ -45,7 +45,7 @@ public class TableColumnBaseSQLProvider {
         + " WHERE table_id = #{tableId} AND table_version <= #{tableVersion} AND deleted_at = 0"
         + " GROUP BY column_id) t2"
         + " ON t1.column_id = t2.column_id AND t1.table_version = t2.max_table_version"
-        + " AND table_id = #{tableId}";
+        + " AND t1.table_id = #{tableId}";
   }
 
   public String insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs) {
