@@ -23,14 +23,18 @@ use clap::Parser;
 use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, LOG_FILE_NAME, PID_FILE_NAME};
-use log::{error, info};
 use std::fs::{create_dir, OpenOptions};
-use std::io;
 use std::path::Path;
 use std::process::Command;
+use std::{env, io};
 use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
+use tracing::{error, info};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, EnvFilter};
 
 fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
@@ -165,15 +169,31 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
     ))
 }
 
+/// init tracing subscriber with given max_level and directives,
+/// if `RUST_LOG` is set, then the directives in it will be applied.
+fn init_tracing_subscriber(max_level: LevelFilter, directives: &str) {
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::builder()
+            .with_default_directive(max_level.into())
+            .parse(directives)
+            .unwrap()
+    });
+
+    // Initialize the subscriber
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(env_filter)
+        .init();
+}
+
 fn main() -> Result<(), i32> {
-    tracing_subscriber::fmt().init();
     let args = command_args::Arguments::parse();
     match args.command {
         Commands::Mount {
             mount_point,
             fileset_location,
             config,
-            debug: _,
+            debug,
             foreground,
         } => {
             let app_config = AppConfig::from_file(config);
@@ -193,6 +213,33 @@ fn main() -> Result<(), i32> {
                 path.to_string_lossy().to_string()
             };
 
+            if env::var("RUST_LOG").is_ok() {
+                init_tracing_subscriber(LevelFilter::INFO, "");
+            } else {
+                // if debug > 0, it means that we needs fuse_debug.
+                app_config.fuse.fuse_debug = debug > 0 || app_config.fuse.fuse_debug;
+                match debug {
+                    0 => {
+                        init_tracing_subscriber(LevelFilter::INFO, "");
+                    }
+                    1 => {
+                        // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
+                        init_tracing_subscriber(
+                            LevelFilter::DEBUG,
+                            "info,gvfs_fuse::fuse_api_handle_debug=debug",
+                        );
+                    }
+                    _ => {
+                        // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
+                        // TODO: log FuseApiHandleDebug and other module like PathFileSystemDebugLog
+                        init_tracing_subscriber(
+                            LevelFilter::DEBUG,
+                            "info,gvfs_fuse::fuse_api_handle_debug=debug",
+                        );
+                    }
+                }
+            }
+
             let result = init_dirs(&mut app_config, &mount_point);
             if let Err(e) = result {
                 error!("Failed to initialize working directories: {:?}", e);
@@ -203,6 +250,7 @@ fn main() -> Result<(), i32> {
                 mount_fuse(app_config, mount_point, fileset_location)
             } else {
                 let result = make_daemon(&app_config);
+                info!("Making daemon");
                 if let Err(e) = result {
                     error!("Failed to daemonize: {:?}", e);
                     return Err(-1);
@@ -217,6 +265,8 @@ fn main() -> Result<(), i32> {
             Ok(())
         }
         Commands::Umount { mount_point, force } => {
+            init_tracing_subscriber(LevelFilter::INFO, "");
+
             let result = do_umount(&mount_point, force);
             if let Err(e) = result {
                 error!("Failed to unmount gvfs: {:?}", e.to_string());

@@ -21,15 +21,16 @@ use crate::default_raw_filesystem::DefaultRawFileSystem;
 use crate::error::ErrorCode::UnSupportedFilesystem;
 use crate::filesystem::FileSystemContext;
 use crate::fuse_api_handle::FuseApiHandle;
+use crate::fuse_api_handle_debug::FuseApiHandleDebug;
 use crate::fuse_server::FuseServer;
 use crate::gravitino_fileset_filesystem::GravitinoFilesetFileSystem;
 use crate::gvfs_creator::create_gvfs_filesystem;
 use crate::memory_filesystem::MemoryFileSystem;
 use crate::utils::GvfsResult;
-use log::info;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::info;
 
 static SERVER: Lazy<Mutex<Option<Arc<FuseServer>>>> = Lazy::new(|| Mutex::new(None));
 
@@ -38,6 +39,8 @@ pub(crate) enum CreateFileSystemResult {
     Gvfs(GravitinoFilesetFileSystem),
     FuseMemoryFs(FuseApiHandle<DefaultRawFileSystem<MemoryFileSystem>>),
     FuseGvfs(FuseApiHandle<DefaultRawFileSystem<GravitinoFilesetFileSystem>>),
+    FuseMemoryFsWithDebug(FuseApiHandleDebug<DefaultRawFileSystem<MemoryFileSystem>>),
+    FuseGvfsWithDebug(FuseApiHandleDebug<DefaultRawFileSystem<GravitinoFilesetFileSystem>>),
     None,
 }
 
@@ -56,7 +59,9 @@ pub async fn mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> Gvfs
     let fs = create_fuse_fs(mount_from, config).await?;
     match fs {
         CreateFileSystemResult::FuseMemoryFs(vfs) => svr.start(vfs).await?,
+        CreateFileSystemResult::FuseMemoryFsWithDebug(vfs) => svr.start(vfs).await?,
         CreateFileSystemResult::FuseGvfs(vfs) => svr.start(vfs).await?,
+        CreateFileSystemResult::FuseGvfsWithDebug(vfs) => svr.start(vfs).await?,
         _ => return Err(UnSupportedFilesystem.to_error("Unsupported filesystem type".to_string())),
     }
     Ok(())
@@ -93,6 +98,14 @@ pub async fn create_raw_fs(
 ) -> GvfsResult<CreateFileSystemResult> {
     match path_fs {
         CreateFileSystemResult::Memory(fs) => {
+            if config.fuse.fuse_debug {
+                let fs = FuseApiHandleDebug::new(
+                    DefaultRawFileSystem::new(fs, config, &fs_context),
+                    config,
+                    fs_context,
+                );
+                return Ok(CreateFileSystemResult::FuseMemoryFsWithDebug(fs));
+            }
             let fs = FuseApiHandle::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
@@ -101,6 +114,14 @@ pub async fn create_raw_fs(
             Ok(CreateFileSystemResult::FuseMemoryFs(fs))
         }
         CreateFileSystemResult::Gvfs(fs) => {
+            if config.fuse.fuse_debug {
+                let fs = FuseApiHandleDebug::new(
+                    DefaultRawFileSystem::new(fs, config, &fs_context),
+                    config,
+                    fs_context,
+                );
+                return Ok(CreateFileSystemResult::FuseGvfsWithDebug(fs));
+            }
             let fs = FuseApiHandle::new(
                 DefaultRawFileSystem::new(fs, config, &fs_context),
                 config,
