@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -91,4 +92,12 @@ public interface SchemaMetaMapper {
       method = "deleteSchemaMetasByLegacyTimeline")
   Integer deleteSchemaMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
+  SchemaIds selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
 }

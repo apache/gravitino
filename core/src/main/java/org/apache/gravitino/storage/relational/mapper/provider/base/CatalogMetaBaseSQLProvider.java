@@ -74,6 +74,15 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0";
   }
 
+  public String selectCatalogIdByMetalakeNameAndCatalogName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return "SELECT me.metalake_id as metalakeId, ca.catalog_id as catalogId FROM "
+        + TABLE_NAME
+        + " ca INNER JOIN metalake_meta me ON ca.metalake_id = me.metalake_id"
+        + " WHERE me.metalake_name = #{metalakeName} AND ca.catalog_name = #{catalogName} "
+        + " AND ca.deleted_at = 0 AND me.deleted_at = 0";
+  }
+
   public String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
