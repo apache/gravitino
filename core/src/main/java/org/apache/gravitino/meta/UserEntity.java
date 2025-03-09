@@ -30,6 +30,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a user metadata entity in Apache Gravitino. */
 @ToString
@@ -164,8 +165,8 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roleNames, that.roleNames)
-        && Objects.equals(roleIds, that.roleIds);
+        && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
+        && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override
