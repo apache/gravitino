@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -164,8 +165,8 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roleNames, that.roleNames)
-        && Objects.equals(roleIds, that.roleIds);
+        && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
+        && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override
