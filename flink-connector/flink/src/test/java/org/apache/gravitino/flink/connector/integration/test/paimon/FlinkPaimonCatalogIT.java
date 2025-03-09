@@ -67,7 +67,7 @@ public class FlinkPaimonCatalogIT extends FlinkCommonIT {
   }
 
   @AfterAll
-  static void stop() {
+  void stop() {
     Preconditions.checkNotNull(metalake);
     metalake.dropCatalog(DEFAULT_PAIMON_CATALOG, true);
   }

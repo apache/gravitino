@@ -26,6 +26,7 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.junit.jupiter.api.Assertions;
 
 public class TestUtils {
@@ -48,14 +49,20 @@ public class TestUtils {
     }
   }
 
-  public static void assertColumns(Column[] expected, Column[] actual) {
+  public static void assertColumns(Column[] expected, Column[] actual, String provider) {
     Assertions.assertEquals(expected.length, actual.length);
     for (int i = 0; i < expected.length; i++) {
       Assertions.assertEquals(expected[i].name(), actual[i].name());
       Assertions.assertEquals(expected[i].comment(), actual[i].comment());
       Assertions.assertEquals(
           expected[i].dataType().simpleString(), actual[i].dataType().simpleString());
-      Assertions.assertEquals(expected[i].defaultValue(), actual[i].defaultValue());
+      if (expected[i].defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
+          && expected[i].nullable()
+          && provider.startsWith("jdbc")) {
+        Assertions.assertEquals(Literals.NULL, actual[i].defaultValue());
+      } else {
+        Assertions.assertEquals(expected[i].defaultValue(), actual[i].defaultValue());
+      }
       Assertions.assertEquals(expected[i].autoIncrement(), actual[i].autoIncrement());
       Assertions.assertEquals(expected[i].nullable(), actual[i].nullable());
     }
