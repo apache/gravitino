@@ -25,6 +25,7 @@ import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
@@ -168,7 +169,8 @@ public class SecurableObjects {
       }
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
-      return super.equals(other) && Objects.equals(privileges, otherSecurableObject.privileges());
+      return super.equals(other)
+          && CollectionUtils.isEqualCollection(privileges, otherSecurableObject.privileges());
     }
   }
 
