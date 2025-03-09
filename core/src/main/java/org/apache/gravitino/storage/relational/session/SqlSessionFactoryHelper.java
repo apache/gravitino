@@ -89,8 +89,9 @@ public class SqlSessionFactoryHelper {
     dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
     // Close the auto commit, so that we can control the transaction manual commit
     dataSource.setDefaultAutoCommit(false);
-    dataSource.setMaxWaitMillis(1000L);
-    dataSource.setMaxTotal(20);
+    dataSource.setMaxWaitMillis(
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
+    dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
     dataSource.setMaxIdle(5);
     dataSource.setMinIdle(0);
     dataSource.setLogAbandoned(true);
