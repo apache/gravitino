@@ -31,6 +31,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.utils.CollectionUtils;
 
 @ToString
 public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
@@ -146,7 +147,7 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
     return Objects.equals(version, that.version)
         && Objects.equals(modelIdent, that.modelIdent)
         && Objects.equals(comment, that.comment)
-        && Objects.equals(aliases, that.aliases)
+        && CollectionUtils.isEqualCollection(aliases, that.aliases)
         && Objects.equals(uri, that.uri)
         && Objects.equals(properties, that.properties)
         && Objects.equals(auditInfo, that.auditInfo);
