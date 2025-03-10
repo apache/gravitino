@@ -351,6 +351,7 @@ public class Types {
       this.precision = precision;
     }
 
+    /** @return The precision of the time type. */
     public int precision() {
       return precision;
     }
