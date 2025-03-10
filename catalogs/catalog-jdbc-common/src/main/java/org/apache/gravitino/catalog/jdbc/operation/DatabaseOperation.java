@@ -59,6 +59,14 @@ public interface DatabaseOperation {
   List<String> listDatabases();
 
   /**
+   * Checks if the specified database exists.
+   *
+   * @param databaseName The name of the database to check.
+   * @return true if the database exists; false otherwise.
+   */
+  boolean exist(String databaseName);
+
+  /**
    * @param databaseName The name of the database to check.
    * @return information object of the JDBC database.
    */
