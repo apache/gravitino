@@ -10,7 +10,7 @@ follow [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and
 
 Installing and configuring Hive can be a little complex.
 If you don't already have Hive set up and running, you can use the Docker container
-Datastrato provides to get Gravitino up and running.
+that Datastrato provides to get Gravitino up and running.
 
 Follow these instructions for setting up
 [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
