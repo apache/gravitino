@@ -90,7 +90,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
           .build();
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     METALAKE_CACHE.invalidateAll();
   }
 

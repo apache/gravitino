@@ -94,6 +94,8 @@ public class GravitinoEnv {
 
   private CatalogManager catalogManager;
 
+  private MetalakeManager metalakeManager;
+
   private SchemaDispatcher schemaDispatcher;
 
   private TableDispatcher tableDispatcher;
@@ -390,6 +392,10 @@ public class GravitinoEnv {
       eventListenerManager.stop();
     }
 
+    if (metalakeManager != null) {
+      metalakeManager.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -420,7 +426,7 @@ public class GravitinoEnv {
     // Create and initialize metalake related modules, the operation chain is:
     // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
     // MetalakeManager
-    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
