@@ -601,11 +601,6 @@ public class MetadataObjectService {
 
     schemaPOs.forEach(
         schemaPO -> {
-          if (schemaPO.getSchemaId() == null) {
-            schemaIdAndNameMap.put(schemaPO.getSchemaId(), null);
-            return;
-          }
-
           String catalogName = catalogIdAndNameMap.getOrDefault(schemaPO.getCatalogId(), null);
           if (catalogName == null) {
             LOG.warn("The catalog of schema {} may be deleted", schemaPO.getSchemaId());
