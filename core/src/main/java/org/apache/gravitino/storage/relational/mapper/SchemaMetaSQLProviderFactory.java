@@ -103,4 +103,13 @@ public class SchemaMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider()
+        .selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+            metalakeName, catalogName, schemaName);
+  }
 }

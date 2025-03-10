@@ -77,8 +77,11 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
+import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -204,10 +207,58 @@ public class TestHadoopCatalogOperations {
         .when(spyCatalogMetaService)
         .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
 
+    SchemaMetaService serviceMetaService = SchemaMetaService.getInstance();
+    SchemaMetaService spySchemaMetaService = Mockito.spy(serviceMetaService);
+
+    doReturn(new CatalogIds(1L, 1L))
+        .when(spyCatalogMetaService)
+        .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
+
+    doReturn(new SchemaIds(1L, 1L, 1L))
+        .when(spySchemaMetaService)
+        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+            Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema11"));
+
+    for (int i = 10; i < 30; i++) {
+      doReturn(new SchemaIds(1L, 1L, (long) i))
+          .when(spySchemaMetaService)
+          .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+              Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema" + i));
+    }
+
+    Stream<Arguments> argumentsStream = testRenameArguments();
+    argumentsStream.forEach(
+        arguments -> {
+          String oldName = (String) arguments.get()[0];
+          String newName = (String) arguments.get()[1];
+          long schemaId = idGenerator.nextId();
+          doReturn(new SchemaIds(1L, 1L, schemaId))
+              .when(spySchemaMetaService)
+              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                  Mockito.anyString(), Mockito.anyString(), Mockito.eq("s24_" + oldName));
+          doReturn(new SchemaIds(1L, 1L, schemaId))
+              .when(spySchemaMetaService)
+              .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                  Mockito.anyString(), Mockito.anyString(), Mockito.eq("s24_" + newName));
+        });
+
+    locationArguments()
+        .forEach(
+            arguments -> {
+              String name = (String) arguments.get()[0];
+              long schemaId = idGenerator.nextId();
+              doReturn(new SchemaIds(1L, 1L, schemaId))
+                  .when(spySchemaMetaService)
+                  .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                      Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
+            });
+
     MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
         Mockito.mockStatic(MetalakeMetaService.class);
     MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
         Mockito.mockStatic(CatalogMetaService.class);
+    MockedStatic<SchemaMetaService> schemaMetaServiceMockedStatic =
+        Mockito.mockStatic(SchemaMetaService.class);
 
     metalakeMetaServiceMockedStatic
         .when(MetalakeMetaService::getInstance)
@@ -215,6 +266,9 @@ public class TestHadoopCatalogOperations {
     catalogMetaServiceMockedStatic
         .when(CatalogMetaService::getInstance)
         .thenReturn(spyCatalogMetaService);
+    schemaMetaServiceMockedStatic
+        .when(SchemaMetaService::getInstance)
+        .thenReturn(spySchemaMetaService);
   }
 
   @AfterAll
@@ -856,8 +910,8 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testGetFileLocation() throws IOException {
-    String schemaName = "schema1024";
-    String comment = "comment1024";
+    String schemaName = "schema29";
+    String comment = "schema29";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
     createSchema(schemaName, comment, null, schemaPath);
 

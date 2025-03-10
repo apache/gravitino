@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -78,6 +79,12 @@ public class CatalogMetaService {
           catalogName);
     }
     return catalogPO;
+  }
+
+  public CatalogIds getCatalogIdByMetalakeAndCatalogName(String metalakeName, String catalogName) {
+    return SessionUtils.getWithoutCommit(
+        CatalogMetaMapper.class,
+        mapper -> mapper.selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName));
   }
 
   // Catalog may be deleted, so the CatalogPO may be null.
