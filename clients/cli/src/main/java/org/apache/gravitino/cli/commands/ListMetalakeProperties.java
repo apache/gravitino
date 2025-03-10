@@ -46,8 +46,8 @@ public class ListMetalakeProperties extends ListProperties {
   @Override
   public void handle() {
     Metalake gMetalake = null;
-    try {
-      GravitinoAdminClient client = buildAdminClient();
+
+    try (GravitinoAdminClient client = buildAdminClient()) { // Ensure resource cleanup
       gMetalake = client.loadMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -55,8 +55,11 @@ public class ListMetalakeProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    Map<String, String> properties = gMetalake.properties();
+    if (gMetalake == null) {
+      exitWithError("Metalake not found: " + metalake);
+    }
 
+    Map<String, String> properties = gMetalake.properties();
     printProperties(properties);
   }
 }
