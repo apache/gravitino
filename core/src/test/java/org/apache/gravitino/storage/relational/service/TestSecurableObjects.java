@@ -34,7 +34,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -97,17 +96,6 @@ public class TestSecurableObjects extends TestJDBCBackend {
             auditInfo);
     backend.insert(topic, false);
 
-    ModelEntity model =
-        createModelEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
-            "model",
-            "model comment",
-            1,
-            ImmutableMap.of("key", "value"),
-            auditInfo);
-    backend.insert(model, false);
-
     SecurableObject metalakeObject =
         SecurableObjects.ofMetalake(
             metalake.name(), Lists.newArrayList(Privileges.UseCatalog.allow()));
@@ -137,10 +125,6 @@ public class TestSecurableObjects extends TestJDBCBackend {
         SecurableObjects.ofTopic(
             schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
 
-    SecurableObject modelObject =
-        SecurableObjects.ofModel(
-            schemaObject, "model", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
-
     ArrayList<SecurableObject> securableObjects =
         Lists.newArrayList(
             metalakeObject,
@@ -149,7 +133,6 @@ public class TestSecurableObjects extends TestJDBCBackend {
             schemaObject,
             tableObject,
             filesetObject,
-            modelObject,
             topicObject);
     securableObjects.sort(Comparator.comparing(MetadataObject::fullName));
 
