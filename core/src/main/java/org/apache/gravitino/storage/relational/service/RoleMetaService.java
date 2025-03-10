@@ -24,7 +24,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -412,12 +411,6 @@ public class RoleMetaService {
                 }
               }
             });
-
-    // To ensure that the order of the returned securable objects remains consistent,
-    // the securable objects are sorted by fullName here,
-    // since the order of securable objects after grouping by is different each time.
-    securableObjects.sort(Comparator.comparing(MetadataObject::fullName));
-
     return securableObjects;
   }
 

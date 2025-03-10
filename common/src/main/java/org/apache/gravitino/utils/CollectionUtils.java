@@ -16,23 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
 
-dependencies {
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.collections4)
-  implementation(libs.guava)
-  implementation(libs.slf4j.api)
+package org.apache.gravitino.utils;
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+import java.util.Collection;
 
-tasks.build {
-  dependsOn("javadoc")
+/** Utility class for working with collection. */
+public class CollectionUtils {
+  private CollectionUtils() {}
+
+  /**
+   * Returns true if the two collections are equal.
+   *
+   * @param c1 the first collection, may be null
+   * @param c2 the second collection, may be null
+   * @return true if the two collections are equal
+   */
+  public static boolean isEqualCollection(Collection<?> c1, Collection<?> c2) {
+    if (c1 == c2) {
+      return true;
+    }
+    if (c1 == null || c2 == null) {
+      return false;
+    }
+    return org.apache.commons.collections4.CollectionUtils.isEqualCollection(c1, c2);
+  }
 }
