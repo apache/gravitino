@@ -30,18 +30,8 @@ public class GetModelVersionPreEvent extends ModelPreEvent {
   private final Optional<Integer> version;
 
   /**
-   * Create a new {@link GetModelVersionPreEvent} instance.
-   *
-   * @param user The username of the individual who initiated the model version linking.
-   * @param identifier The unique identifier of the model that was linked.
-   */
-  public GetModelVersionPreEvent(String user, NameIdentifier identifier) {
-    this(user, identifier, null, null);
-  }
-
-  /**
    * Create a new {@link GetModelVersionPreEvent} instance with optional alias and version
-   * arguments.
+   * arguments. only one of alias or version are valid.
    *
    * @param user The username of the individual who initiated the model version to get.
    * @param identifier The unique identifier of the model that was getting the version.

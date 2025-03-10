@@ -40,7 +40,8 @@ public class DeleteModelVersionPreEvent extends ModelPreEvent {
   }
 
   /**
-   * Create a new {@link DeleteModelVersionPreEvent} instance.
+   * Create a new {@link DeleteModelVersionPreEvent} instance. only one of alias or version are
+   * valid.
    *
    * @param user The username of the individual who initiated the model version deleted.
    * @param identifier The unique identifier of the model that was deleted.
