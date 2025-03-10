@@ -26,6 +26,7 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -61,7 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Manages Metalakes within the Apache Gravitino system. */
-public class MetalakeManager implements MetalakeDispatcher {
+public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
@@ -71,6 +72,8 @@ public class MetalakeManager implements MetalakeDispatcher {
 
   private final IdGenerator idGenerator;
 
+  // Currently, there will be only one MetalakeManager instance in the system. In this case
+  // we can clear or close the cache when the instance is destroyed.
   @VisibleForTesting
   static final Cache<NameIdentifier, BaseMetalake> METALAKE_CACHE =
       Caffeine.newBuilder()
@@ -86,8 +89,8 @@ public class MetalakeManager implements MetalakeDispatcher {
                           .build())))
           .build();
 
-  @VisibleForTesting
-  public static void clearCache() {
+  @Override
+  public void close() throws IOException {
     METALAKE_CACHE.invalidateAll();
   }
 

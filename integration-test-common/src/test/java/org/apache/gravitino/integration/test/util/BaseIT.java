@@ -55,7 +55,6 @@ import org.apache.gravitino.integration.test.MiniGravitinoContext;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
-import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -370,9 +369,6 @@ public class BaseIT {
       client.close();
     }
     customConfigs.clear();
-
-    // Clear static cache in MetalakeManager
-    MetalakeManager.clearCache();
 
     LOG.info("Tearing down Gravitino Server");
   }
