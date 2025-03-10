@@ -187,7 +187,7 @@ Changelog
 
 
 - apache/gravitino-ci:hive-0.1.18
-  - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. for more information, please see [PR](https://github.com/apache/gravitino/pull/6625)
+  - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. For more information, please see [PR](https://github.com/apache/gravitino/pull/6625)
 
 - apache/gravitino-ci:hive-0.1.17
   - Add support for JDBC SQL standard authorization
