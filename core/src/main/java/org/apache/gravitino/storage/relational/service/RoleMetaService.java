@@ -369,19 +369,19 @@ public class RoleMetaService {
                   objectFullNameGetterFnMap =
                       ImmutableMap.of(
                           MetadataObject.Type.METALAKE,
-                          MetadataObjectService::getMetalakeObjectFullNames,
+                          MetadataObjectService::getMetalakeObjectsFullName,
                           MetadataObject.Type.CATALOG,
-                          MetadataObjectService::getCatalogObjectFullNames,
+                          MetadataObjectService::getCatalogObjectsFullName,
                           MetadataObject.Type.SCHEMA,
-                          MetadataObjectService::getSchemaObjectFullNames,
+                          MetadataObjectService::getSchemaObjectsFullName,
                           MetadataObject.Type.TABLE,
-                          MetadataObjectService::getTableObjectFullNames,
+                          MetadataObjectService::getTableObjectsFullName,
                           MetadataObject.Type.FILESET,
-                          MetadataObjectService::getFilesetObjectFullNames,
+                          MetadataObjectService::getFilesetObjectsFullName,
                           MetadataObject.Type.MODEL,
-                          MetadataObjectService::getModelObjectFullNames,
+                          MetadataObjectService::getModelObjectsFullName,
                           MetadataObject.Type.TOPIC,
-                          MetadataObjectService::getTopicObjectFullNames);
+                          MetadataObjectService::getTopicObjectsFullName);
 
               // dynamically calling getter function based on type
               Map<Long, String> objectIdAndNameMap =
