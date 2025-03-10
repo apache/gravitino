@@ -70,7 +70,6 @@ macro_rules! log_value {
         }
     };
 }
-
 /// Log the result with custom formatting
 macro_rules! log_value_custom {
     ($method_call:expr, $method_name:expr, $req:ident, $format_reply_fn:ident) => {
@@ -94,7 +93,7 @@ macro_rules! log_value_custom {
 
 /// Log the result for readdir operations
 macro_rules! log_readdir {
-    ($method_call:expr, $req:ident) => {{
+    ($method_call:expr, $method_name:expr, $req:ident, $entry_to_desc_str:expr, $reply_type:ident) => {{
         match $method_call.await {
             Ok(mut reply_dir) => {
                 let mut entries = Vec::new();
@@ -114,60 +113,24 @@ macro_rules! log_readdir {
                     "[{}]",
                     entries
                         .iter()
-                        .map(|entry| directory_entry_to_desc_str(entry))
+                        .map(|entry| $entry_to_desc_str(entry))
                         .collect::<Vec<String>>()
                         .join(", ")
                 );
 
-                debug!($req.unique, entries = entries_info, "READDIR completed");
+                debug!(
+                    $req.unique,
+                    entries = entries_info,
+                    "{} completed",
+                    $method_name.to_uppercase()
+                );
 
-                Ok(ReplyDirectory {
+                Ok($reply_type {
                     entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
                 })
             }
             Err(e) => {
                 error!($req.unique, ?e, "READDIR failed");
-                Err(e)
-            }
-        }
-    }};
-}
-
-/// Log the result for readdirplus operations
-macro_rules! log_readdirplus {
-    ($method_call:expr, $req:ident) => {{
-        match $method_call.await {
-            Ok(mut reply_dir) => {
-                let mut entries = Vec::new();
-
-                while let Some(entry_result) = reply_dir.entries.next().await {
-                    match entry_result {
-                        Ok(entry) => {
-                            entries.push(entry);
-                        }
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                    }
-                }
-
-                let entries_info = format!(
-                    "[{}]",
-                    entries
-                        .iter()
-                        .map(|entry| directory_entry_plus_to_desc_str(entry))
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                );
-
-                debug!($req.unique, entries = entries_info, "READDIRPLUS completed");
-
-                Ok(ReplyDirectoryPlus {
-                    entries: stream::iter(entries.into_iter().map(Ok)).boxed(),
-                })
-            }
-            Err(e) => {
-                error!($req.unique, ?e, "READDIRPLUS failed");
                 Err(e)
             }
         }
@@ -740,7 +703,13 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READDIR started"
         );
 
-        log_readdir!(self.inner.readdir(req, parent, fh, offset), req)
+        log_readdir!(
+            self.inner.readdir(req, parent, fh, offset),
+            "READDIR",
+            req,
+            directory_entry_to_desc_str,
+            ReplyDirectory
+        )
     }
 
     async fn releasedir(
@@ -826,9 +795,12 @@ impl<T: RawFileSystem> Filesystem for FuseApiHandleDebug<T> {
             "READDIRPLUS started"
         );
 
-        log_readdirplus!(
+        log_readdir!(
             self.inner.readdirplus(req, parent, fh, offset, lock_owner),
-            req
+            "READDIRPLUS",
+            req,
+            directory_entry_plus_to_desc_str,
+            ReplyDirectoryPlus
         )
     }
 }
