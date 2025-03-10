@@ -95,8 +95,8 @@ If you don't want to run tests, you can proceed to the [next step](#build-gravit
 
 - You can use [OrbStack](https://orbstack.dev) as an alternative for Docker for macOS.
   With OrbStack, you can run Gravitino integration tests without `docker-connector`.
+  OrbStack automatically configures the network between the Docker containers.
 :::
-
 
 1. Add the apt repository for Docker-CE:
 
@@ -125,101 +125,123 @@ If you don't want to run tests, you can proceed to the [next step](#build-gravit
    sudo usermod -aG docker $USER
    ```
 
-## Build Gravitino
+## Building Gravitino
 
-1. Clone the Gravitino project.
+### Clone the Gravitino project.
 
-   ```shell
-   git clone git@github.com:apache/gravitino.git
-   ```
+Run the following command to clone the project to your local environment:
 
-1. Build the Gravitino project. Running this for the first time can take 15 minutes or more.
+```shell
+git clone git@github.com:apache/gravitino.git
+```
 
-   ```shell
-   cd gravitino
-   ./gradlew build
-   ```
+### Build the Gravitino project
 
-   You can customize the property `jdkVersion` in the `gradle.properties` file to use JDK 11 or JDK 17.
-   Alternatively, you can specify the version using the `-P` Gradle flag. e.g.
+The `./gradlew build` command builds all the Gravitino components,
+including the Gravitino server, Java and Python clients, Trino and Spark connectors etc.
+The built JARs are under the modules `build/libs` directory.
+You can publish them to the Maven repository for your project.
+Run the following commands to build the project.
+The first run may take 15 minutes or more.
+ 
+```shell
+cd gravitino
+./gradlew build
+```
 
-   ```shell
-   ./gradlew build -PjdkVersion=11
-   ```
+You can customize the build properties to meet your environment:
 
-   The `./gradlew build` command builds all the Gravitino components,
-   including the Gravitino server, Java and Python clients, Trino and Spark connectors etc.
+- **JDK version**:
 
-   You can customize the `pythonVersion` property in the `gradle.properties` file
-   to use Python 3.9, 3.10, or 3.11. Alternatively, you can set it on the command line
-   using the `-P` Gradle flag. e.g.
+  To use other JDKs instead of the default JDK 8 (e.g. JDK 11 or 17),
+  you can customize `jdkVersion` property in the `gradle.properties` file.
+  Alternatively, you can specify the version using the `-P` Gradle flag.
 
-   ```shell
-   ./gradlew build -PpythonVersion=3.9
-   ```
+  ```shell
+  ./gradlew build -PjdkVersion=11
 
-   :::note
-   The Gravitino libraries built are Java 8 compatible and verified under Java 8, 11, and 17.
-   You can run the Gravitino server using JRE 8, 11, or 17,
-   regardless of which JDK version was used to build the project.
+  ```
 
-   The built JARs are under the modules `build/libs` directory.
-   You can publish them to the Maven repository for your project.
-   :::
+  :::note
+  The Gravitino libraries built are Java 8 compatible and verified under Java 8, 11, and 17.
+  You can run the Gravitino server using JRE 8/11/17, regardless of the JDK version used to build the project.
+  :::
 
-1. Build the Gravitino server binary package.
+- **Python version**:
 
-   ```shell
-   ./gradlew compileDistribution
-   ```
+  To use Python versions other than the default one (Python 3.8),
+  You can customize the `pythonVersion` property in the `gradle.properties` file.
+  Alternatively, you can set it on the command line using the `-P` Gradle flag.
+  Python 3.9, 3.10, and 3.11 are all acceptable.
+ 
+  ```shell
+  ./gradlew build -PpythonVersion=3.9
+  ```
 
-   The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory.
-   You can use the `-x test` flag to skip tests explicitly.
+- **Skipping Tests**:
 
-   :::note
-   The `./gradlew clean` command deletes the `distribution` directory.
-   :::
+  If you want to skip tests during build or you want to run the tests later,
+  you can use the following flags when running `./gradlew build`:
 
-1. Assemble the Gravitino server distribution package.
+  * `-PskipTests`: skip unit tests.
+  * `-PskipITs`: skip integration tests.
+  * `-x test`: skip both the unit tests and the integration tests.
+  * `-x :web:integration-test:test`: skip the Web frontend integration tests.
 
-   ```shell
-   ./gradlew assembleDistribution
-   ```
+### Compile the binary package
 
-   The `assembleDistribution` command creates the distribution packages for production deployment:
+The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory.
 
-   - `distribution/gravitino-{version}-bin.tar.gz`
-   - `distribution/gravitino-{version}-bin.tar.gz.sha256`
-   - `distribution/gravitino-trino-connector-{version}.tar.gz`
-   - `distribution/gravitino-trino-connector-{version}.tar.gz.sha256`
-   - `distribution/gravitino-iceberg-rest-server-{version}.tar.gz`
-   - `distribution/gravitino-iceberg-rest-server-{version}.tar.gz.sha256`
+```shell
+./gradlew compileDistribution
+```
 
-   :::note
-   You can assemble the Gravitino Trino connector package alone by running
-   the `assembleTrinoConnector` Gradle command.
-   Similarly, you can assemble the Gravitino Iceberg REST server package alone
-   by running the `assembleIcebergRESTServer` Gradle command.
+:::note
+The `./gradlew clean` command deletes the `distribution` directory.
+:::
 
-   ```shell
-   ./gradlew assembleTrinoConnector
-   ./gradlew assembleIcebergRESTServer
-   ```
-   :::
+### Assemble the distribution package
 
-1. Start the server for verification:
+```shell
+./gradlew assembleDistribution
+```
 
-   ```shell
-   cd distribution/package/
-   ./bin/gravitino.sh start
-   ```
+The `assembleDistribution` command creates the distribution packages for production deployment:
+ 
+- `distribution/gravitino-{version}-bin.tar.gz`
+- `distribution/gravitino-{version}-bin.tar.gz.sha256`
+- `distribution/gravitino-trino-connector-{version}.tar.gz`
+- `distribution/gravitino-trino-connector-{version}.tar.gz.sha256`
+- `distribution/gravitino-iceberg-rest-server-{version}.tar.gz`
+- `distribution/gravitino-iceberg-rest-server-{version}.tar.gz.sha256`
+ 
+:::note
+You can assemble the Gravitino Trino connector package alone by running
+the `assembleTrinoConnector` Gradle command.
+Similarly, you can assemble the Gravitino Iceberg REST server package alone
+by running the `assembleIcebergRESTServer` Gradle command.
 
-   The Web UI for Gravitino can now be accessed at [http://localhost:8090](http://localhost:8090).
+```shell
+./gradlew assembleTrinoConnector
+./gradlew assembleIcebergRESTServer
+```
+:::
 
-### On Building an Individual Module
+### Start the server
+
+To start the Gravitino server for verification, run the following commands:
+
+```shell
+cd distribution/package/
+./bin/gravitino.sh start
+```
+
+The Web UI for Gravitino can now be accessed at [http://localhost:8090](http://localhost:8090).
+
+## On Building an Individual Module
 
 If you want to build a module on its own, like the Spark connector,
-you can use Gradle to build a module with a specific name:
+you can provide a specific build target:
 
 ```shell
 ./gradlew spark-connector:spark-runtime-3.4:build -PscalaVersion=2.12
