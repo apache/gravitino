@@ -19,10 +19,10 @@
 use crate::error::ErrorCode::{ConfigNotFound, InvalidConfig};
 use crate::utils::GvfsResult;
 use config::{builder, Config};
-use log::{error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
+use tracing::{error, info, warn};
 
 // FuseConfig
 pub(crate) const CONF_FUSE_FILE_MASK: ConfigEntity<u32> = ConfigEntity::new(
@@ -292,6 +292,8 @@ pub struct FuseConfig {
     pub dir_mask: u32,
     #[serde(default)]
     pub fs_type: String,
+    #[serde(default = "default_fuse_debug")]
+    pub fuse_debug: bool,
     #[serde(default)]
     pub config_file_path: String,
     #[serde(default)]
@@ -300,6 +302,10 @@ pub struct FuseConfig {
     pub log_dir: String,
     #[serde(default)]
     pub properties: HashMap<String, String>,
+}
+
+fn default_fuse_debug() -> bool {
+    true
 }
 
 impl FuseConfig {
