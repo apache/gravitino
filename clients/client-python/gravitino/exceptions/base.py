@@ -159,3 +159,11 @@ class BadRequestException(GravitinoRuntimeException):
 
 class IllegalStateException(GravitinoRuntimeException):
     """An exception thrown when the state is invalid."""
+
+
+class NoSuchTagException(NotFoundException):
+    """An exception thrown when a tag with specified name is not existed."""
+
+
+class TagAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a tag with specified name already associated to a metadata object."""
