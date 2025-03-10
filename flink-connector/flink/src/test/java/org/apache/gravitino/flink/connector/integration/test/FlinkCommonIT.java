@@ -85,6 +85,18 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
+  protected boolean supportTablePropertiesOperation() {
+    return true;
+  }
+
+  protected boolean supportModifyColumnsMultipleByOneSql() {
+    return true;
+  }
+
+  protected String defaultDatabaseName() {
+    return "default";
+  }
+
   @Test
   public void testCreateSchema() {
     doWithCatalog(
@@ -177,7 +189,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             TestUtils.assertTableResult(
                 sql("SHOW DATABASES"),
                 ResultKind.SUCCESS_WITH_CONTENT,
-                Row.of("default"),
+                Row.of(defaultDatabaseName()),
                 Row.of(schema),
                 Row.of(schema2),
                 Row.of(schema3));
@@ -185,7 +197,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             String[] schemas = catalog.asSchemas().listSchemas();
             Arrays.sort(schemas);
             Assertions.assertEquals(4, schemas.length);
-            Assertions.assertEquals("default", schemas[0]);
+            Assertions.assertEquals(defaultDatabaseName(), schemas[0]);
             Assertions.assertEquals(schema, schemas[1]);
             Assertions.assertEquals(schema2, schemas[2]);
             Assertions.assertEquals(schema3, schemas[3]);
@@ -262,13 +274,15 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
           Assertions.assertEquals(comment, table.comment());
-          Assertions.assertEquals(value, table.properties().get(key));
+          if (supportTablePropertiesOperation()) {
+            Assertions.assertEquals(value, table.properties().get(key));
+          }
           Column[] columns =
               new Column[] {
                 Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
                 Column.of("double_type", Types.DoubleType.get(), "double_type")
               };
-          assertColumns(columns, table.columns());
+          assertColumns(columns, table.columns(), getProvider());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
 
           TestUtils.assertTableResult(
@@ -511,7 +525,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("user_id_new", Types.IntegerType.get(), "USER_ID"),
                 Column.of("order_amount", Types.DoubleType.get(), "ORDER_AMOUNT")
               };
-          assertColumns(expected, actual);
+          assertColumns(expected, actual, getProvider());
         },
         true,
         supportDropCascade());
@@ -610,7 +624,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT"),
                 Column.of("new_column_2", Types.IntegerType.get(), null),
               };
-          assertColumns(expected, actual);
+          assertColumns(expected, actual, getProvider());
         },
         true,
         supportDropCascade());
@@ -642,15 +656,15 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   .columns();
           Column[] expected =
               new Column[] {Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT")};
-          assertColumns(expected, actual);
+          assertColumns(expected, actual, getProvider());
         },
         true,
         supportDropCascade());
   }
 
   @Test
-  @EnabledIf("supportColumnOperation")
-  public void testAlterColumnTypeAndChangeOrder() {
+  @EnabledIf("supportModifyColumnsMultipleByOneSql")
+  public void testAlterColumnTypeAndChangeOrderInOneSql() {
     String databaseName = "test_alter_table_alter_column_db";
     String tableName = "test_alter_table_rename_column";
     doWithSchema(
@@ -685,7 +699,51 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("order_amount", Types.LongType.get(), "new comment2"),
                 Column.of("user_id", Types.LongType.get(), "new comment")
               };
-          assertColumns(expected, actual);
+          assertColumns(expected, actual, getProvider());
+        },
+        true,
+        supportDropCascade());
+  }
+
+  @Test
+  @EnabledIf("supportColumnOperation")
+  public void testAlterColumnTypeAndChangeOrder() {
+    String databaseName = "test_alter_table_alter_column_db";
+    String tableName = "test_alter_table_rename_column";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id BIGINT COMMENT 'USER_ID', "
+                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'"
+                      + " WITH ("
+                      + "'%s' = '%s')",
+                  tableName, "test key", "test value");
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s MODIFY order_amount INT COMMENT 'new comment2'", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result =
+              sql("ALTER TABLE %s MODIFY order_amount BIGINT COMMENT 'new comment2'", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s MODIFY user_id BIGINT COMMENT 'new comment'", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s MODIFY user_id BIGINT AFTER order_amount", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          Column[] actual =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected =
+              new Column[] {
+                Column.of("order_amount", Types.LongType.get(), "new comment2"),
+                Column.of("user_id", Types.LongType.get(), "new comment")
+              };
+          assertColumns(expected, actual, getProvider());
         },
         true,
         supportDropCascade());
@@ -721,7 +779,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportTableOperation")
+  @EnabledIf("supportTablePropertiesOperation")
   public void testAlterTableProperties() {
     String databaseName = "test_alter_table_properties_db";
     String tableName = "test_alter_table_properties";
