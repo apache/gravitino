@@ -88,7 +88,7 @@ catalog.management=dynamic
 
 ### Configuring the Apache Gravitino Trino connector
 
-Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino getting started](../getting-started.md).
+Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino getting started](../getting-started/index.md).
 
 To configure Gravitino Trino connector correctly, you need to put the following configurations to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 

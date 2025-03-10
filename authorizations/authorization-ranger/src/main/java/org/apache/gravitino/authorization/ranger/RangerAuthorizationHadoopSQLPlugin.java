@@ -45,6 +45,7 @@ import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
@@ -78,6 +79,8 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         ImmutableSet.of(RangerHadoopSQLPrivilege.CREATE),
         Privilege.Name.MODIFY_TABLE,
         ImmutableSet.of(
+            RangerHadoopSQLPrivilege.READ,
+            RangerHadoopSQLPrivilege.SELECT,
             RangerHadoopSQLPrivilege.UPDATE,
             RangerHadoopSQLPrivilege.ALTER,
             RangerHadoopSQLPrivilege.WRITE),
@@ -799,5 +802,34 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
       }
     }
     return Boolean.TRUE;
+  }
+
+  @Override
+  protected String getServiceType() {
+    return HADOOP_SQL_SERVICE_TYPE;
+  }
+
+  @Override
+  protected Map<String, String> getServiceConfigs(Map<String, String> config) {
+    return ImmutableMap.<String, String>builder()
+        .put(
+            RangerAuthorizationProperties.RANGER_USERNAME.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_USERNAME))
+        .put(
+            RangerAuthorizationProperties.RANGER_PASSWORD.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_PASSWORD))
+        .put(
+            RangerAuthorizationProperties.JDBC_DRIVER_CLASS_NAME.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.JDBC_DRIVER_CLASS_NAME,
+                RangerAuthorizationProperties.DEFAULT_JDBC_DRIVER_CLASS_NAME))
+        .put(
+            RangerAuthorizationProperties.JDBC_URL.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.JDBC_URL,
+                RangerAuthorizationProperties.DEFAULT_JDBC_URL))
+        .build();
   }
 }

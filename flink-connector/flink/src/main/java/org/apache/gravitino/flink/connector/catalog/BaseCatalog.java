@@ -105,10 +105,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
   protected abstract AbstractCatalog realCatalog();
 
   @Override
-  public void open() throws CatalogException {}
+  public void open() throws CatalogException {
+    realCatalog().open();
+  }
 
   @Override
-  public void close() throws CatalogException {}
+  public void close() throws CatalogException {
+    realCatalog().close();
+  }
 
   @Override
   public List<String> listDatabases() throws CatalogException {
