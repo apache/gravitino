@@ -142,8 +142,6 @@ public class MetadataObjectService {
         case SCHEMA:
           SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(objectId);
           if (schemaPO != null) {
-            // if fullName is null:
-            // fullName = catalogPO.getCatalogName(),schemaPO.getSchemaName()
             fullName =
                 fullName != null
                     ? DOT_JOINER.join(schemaPO.getSchemaName(), fullName)
