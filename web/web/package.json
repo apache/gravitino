@@ -24,7 +24,7 @@
     "@mui/icons-material": "^5.15.21",
     "@mui/lab": "5.0.0-alpha.170",
     "@mui/material": "^5.16.14",
-    "@mui/x-data-grid": "^6.20.3",
+    "@mui/x-data-grid": "^7.27.3",
     "@reduxjs/toolkit": "^1.9.7",
     "antd": "^5.24.2",
     "axios": "^1.7.4",
