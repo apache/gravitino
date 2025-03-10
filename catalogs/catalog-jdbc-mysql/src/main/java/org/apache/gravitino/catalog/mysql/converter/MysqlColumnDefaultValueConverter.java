@@ -49,7 +49,8 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     }
 
     if (isExpression) {
-      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
+      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)
+          || columnDefaultValue.startsWith(CURRENT_TIMESTAMP + "(")) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
       // The parsing of MySQL expressions is complex, so we are not currently undertaking the
@@ -88,6 +89,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
         return CURRENT_TIMESTAMP.equals(columnDefaultValue)
+                || columnDefaultValue.startsWith(CURRENT_TIMESTAMP + "(")
             ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
             : Literals.timestampLiteral(
                 LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));

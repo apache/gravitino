@@ -100,4 +100,59 @@ public class TestMySQLDataTypeTransformer {
         generalDataTypeTransformer.getTrinoType(unsignBigintType),
         io.trino.spi.type.DecimalType.createDecimalType(20, 0));
   }
+
+  @Test
+  public void testGravitinoTimeToTrinoType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    // Test TIME type with different precisions
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimeType.of(0)), io.trino.spi.type.TimeType.TIME_SECONDS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimeType.of(3)), io.trino.spi.type.TimeType.TIME_MILLIS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimeType.of(6)), io.trino.spi.type.TimeType.TIME_MICROS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimeType.of(9)), io.trino.spi.type.TimeType.TIME_NANOS);
+  }
+
+  @Test
+  public void testGravitinoTimestampToTrinoType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(0)),
+        io.trino.spi.type.TimestampType.TIMESTAMP_SECONDS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(3)),
+        io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(6)),
+        io.trino.spi.type.TimestampType.TIMESTAMP_MICROS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(9)),
+        io.trino.spi.type.TimestampType.TIMESTAMP_NANOS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withTimeZone(0)),
+        io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withTimeZone(3)),
+        io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withTimeZone(6)),
+        io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withTimeZone(9)),
+        io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_NANOS);
+  }
 }

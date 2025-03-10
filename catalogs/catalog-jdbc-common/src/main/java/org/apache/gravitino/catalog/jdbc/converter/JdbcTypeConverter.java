@@ -40,6 +40,8 @@ public abstract class JdbcTypeConverter
     /** Scale. For example: 2 in decimal (10,2). */
     private Integer scale;
 
+    private Integer datetimePrecision;
+
     public JdbcTypeBean(String typeName) {
       this.typeName = typeName;
     }
@@ -68,6 +70,14 @@ public abstract class JdbcTypeConverter
       this.scale = scale;
     }
 
+    public Integer getDatetimePrecision() {
+      return datetimePrecision;
+    }
+
+    public void setDatetimePrecision(Integer datetimePrecision) {
+      this.datetimePrecision = datetimePrecision;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -75,12 +85,13 @@ public abstract class JdbcTypeConverter
       JdbcTypeBean typeBean = (JdbcTypeBean) o;
       return Objects.equals(typeName, typeBean.typeName)
           && Objects.equals(columnSize, typeBean.columnSize)
-          && Objects.equals(scale, typeBean.scale);
+          && Objects.equals(scale, typeBean.scale)
+          && Objects.equals(datetimePrecision, typeBean.datetimePrecision);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(typeName, columnSize, scale);
+      return Objects.hash(typeName, columnSize, scale, datetimePrecision);
     }
 
     @Override
@@ -94,6 +105,9 @@ public abstract class JdbcTypeConverter
           + '\''
           + ", scale='"
           + scale
+          + '\''
+          + ", datetimePrecision='"
+          + datetimePrecision
           + '\''
           + '}';
     }
