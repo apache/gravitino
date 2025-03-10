@@ -10,11 +10,11 @@ There are several options for getting started with Apache Gravitino.
 Installing and configuring Hive and Trino can be a little complex.
 If you are unfamiliar with the technologies, using Docker might be a good choice.
 There are pre-packaged containers for Gravitino, Apache Hive, Apache Hadoop,
-Trino, MySQL, PostgesSQL, and others,
-check [installing Gravitino playground](./playground.md) for more details.
+Trino, MySQL, PostgesSQL, and others.
+Check [installing Gravitino playground](./playground.md) for more details.
 
 <!--Build from source-->
-This page guides you through the process to download and install Gravitino
+This page guides you through the process of downloading and installing Gravitino
 from source.
 
 1. [Prepare environment](#environment-preparation)
@@ -42,8 +42,8 @@ To work in an AWS environment, follow these steps:
    Create a key pair named *Gravitino.pem* for SSH access and download it.
    Allow HTTP and HTTPS traffic if you want to connect to the instance remotely.
    Set the Elastic Block Store storage to 20GiB.
-   Leave all other settings as their defaults.
-   Other operating systems and instance types may work, but are not be fully tested.
+   Leave all other settings at their defaults.
+   Other operating systems and instance types may work but have not been fully tested.
 
 1. Start the instance and connect to it via SSH using the downloaded `.pem` file:
 
@@ -64,7 +64,7 @@ To work in an AWS environment, follow these steps:
    <!--TODO: need Red Hat commands?-->
    You may need to reboot the instance for all changes to take effect.
 
-1. Install the Java Development Kit (JDK), Java 8, 11 and 17 are supported.
+1. Install the Java Development Kit (JDK). Java 8, 11 and 17 are supported.
 
    ```shell
    sudo apt install openjdk-<version>-jdk-headless
@@ -121,7 +121,7 @@ To work on the GCP platform, follow these steps:
 To build and install Gravitino locally on a macOS or a Linux workstation,
 follow these steps:
 
-1. Install the Java Development Kit (JDK), Java 8, 11 and 17 are supported.
+1. Install the Java Development Kit (JDK). Java 8, 11 and 17 are supported.
    This can be done using [sdkman](https://sdkman.io/), for example:
 
    ```shell
@@ -156,13 +156,12 @@ Or else, you can follow the [instructions](./hive.md) to install Apache Hive.
 
 ## Interact with Apache Gravitino API
 
-After having deployed the Gravitino server, you can interact it using
-the RESTful APIs to create and modify metadata.
+After deploying the Gravitino server, you can interact with it
+using the RESTful APIs to create and modify metadata.
 
 :::tip
 The following examples use `localhost` as the host name.
-You may need to revise it accordingly based on the environment
-you are using.
+You may need to revise it based on your environment.
 :::
 
 1. Create a Metalake:
@@ -238,13 +237,13 @@ you are using.
 - Read our [blogs](https://gravitino.apache.org/blog)
 
 - Join the Gravitino community forums to connect with developers and other users,
-  for experience sharing and seeking helps if needed.
-  Questions and comments are all welcomed.
+  for experience sharing and seeking help if needed.
+  Questions and comments are all welcome.
 
   - Join [Gravitino Slack channel](https://the-asf.slack.com)
   - Explore the GitHub repository for [issues](https://github.com/apache/gravitino/issues)
     or [pull requests](https://github.com/apache/gravitino/pulls),
-    and pick something you are interested to work on.
+    and pick something you are interested in working on.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=GettingStarted" alt="" />
 
