@@ -243,7 +243,7 @@ public class MetadataObjectService {
    *     if no Metalake objects are found for the given IDs. {@code @example} value of metalake full
    *     name: "metalake1.catalog1.schema1.table1"
    */
-  public static Map<Long, String> getMetalakeObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getMetalakeObjectsFullName(List<Long> ids) {
     List<MetalakePO> metalakePOs =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.listMetalakePOsByMetalakeIds(ids));
@@ -275,7 +275,7 @@ public class MetadataObjectService {
    *     if no Fileset objects are found for the given IDs. {@code @example} value of fileset full
    *     name: "catalog1.schema1.fileset1"
    */
-  public static Map<Long, String> getFilesetObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getFilesetObjectsFullName(List<Long> ids) {
     List<FilesetPO> filesetPOs =
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsByFilesetIds(ids));
@@ -329,7 +329,7 @@ public class MetadataObjectService {
    *     no Model objects are found for the given IDs. {@code @example} value of model full name:
    *     "catalog1.schema1.model1"
    */
-  public static Map<Long, String> getModelObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getModelObjectsFullName(List<Long> ids) {
     List<ModelPO> modelPOs =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class, mapper -> mapper.listModelPOsByModelIds(ids));
@@ -382,7 +382,7 @@ public class MetadataObjectService {
    *     no Table objects are found for the given IDs. {@code @example} value of table full name:
    *     "catalog1.schema1.table1"
    */
-  public static Map<Long, String> getTableObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getTableObjectsFullName(List<Long> ids) {
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(ids));
@@ -435,7 +435,7 @@ public class MetadataObjectService {
    *     no Topic objects are found for the given IDs. {@code @example} value of topic full name:
    *     "catalog1.schema1.topic1"
    */
-  public static Map<Long, String> getTopicObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getTopicObjectsFullName(List<Long> ids) {
     List<TopicPO> topicPOs =
         SessionUtils.getWithoutCommit(
             TopicMetaMapper.class, mapper -> mapper.listTopicPOsByTopicIds(ids));
@@ -488,7 +488,7 @@ public class MetadataObjectService {
    *     no Column objects are found for the given IDs. {@code @example} value of column full name:
    *     "catalog1.schema1.table1.column1"
    */
-  public static Map<Long, String> getColumnObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getColumnObjectsFullName(List<Long> ids) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
             TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(ids));
@@ -552,7 +552,7 @@ public class MetadataObjectService {
    *     if no Catalog objects are found for the given IDs. {@code @example} value of catalog full
    *     name: "catalog1"
    */
-  public static Map<Long, String> getCatalogObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getCatalogObjectsFullName(List<Long> ids) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(ids));
@@ -581,7 +581,7 @@ public class MetadataObjectService {
    *     no Schema objects are found for the given IDs. {@code @example} value of schema full name:
    *     "catalog1.schema1"
    */
-  public static Map<Long, String> getSchemaObjectFullNames(List<Long> ids) {
+  public static Map<Long, String> getSchemaObjectsFullName(List<Long> ids) {
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(ids));
