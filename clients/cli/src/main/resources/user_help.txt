@@ -1,0 +1,26 @@
+gcli user [details|list|create|delete]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Create a user
+gcli user create --user new_user
+
+Show a user's details
+gcli user details --user new_user
+
+List all users
+gcli user list
+
+Show a roles's audit information
+gcli user details --user new_user --audit
+
+Delete a user
+gcli user delete --user new_user
+
+Revoke a user's role
+gcli user revoke --user new_user --role admin
+
+Revoke all roles from a user
+gcli user revoke --user new_user --all

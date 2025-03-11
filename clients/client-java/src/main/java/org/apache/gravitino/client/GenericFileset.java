@@ -26,6 +26,9 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.file.Fileset;
@@ -33,11 +36,13 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic fileset. */
-class GenericFileset implements Fileset, SupportsTags {
+class GenericFileset implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials {
 
   private final FilesetDTO filesetDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectRoleOperations objectRoleOperations;
+  private final MetadataObjectCredentialOperations objectCredentialOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
     this.filesetDTO = filesetDTO;
@@ -46,6 +51,10 @@ class GenericFileset implements Fileset, SupportsTags {
     MetadataObject filesetObject = MetadataObjects.of(filesetFullName, MetadataObject.Type.FILESET);
     this.objectTagOperations =
         new MetadataObjectTagOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectRoleOperations =
+        new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectCredentialOperations =
+        new MetadataObjectCredentialOperations(filesetNs.level(0), filesetObject, restClient);
   }
 
   @Override
@@ -85,6 +94,16 @@ class GenericFileset implements Fileset, SupportsTags {
   }
 
   @Override
+  public SupportsRoles supportsRoles() {
+    return this;
+  }
+
+  @Override
+  public SupportsCredentials supportsCredentials() {
+    return this;
+  }
+
+  @Override
   public String[] listTags() {
     return objectTagOperations.listTags();
   }
@@ -102,6 +121,16 @@ class GenericFileset implements Fileset, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return objectRoleOperations.listBindingRoleNames();
+  }
+
+  @Override
+  public Credential[] getCredentials() {
+    return objectCredentialOperations.getCredentials();
   }
 
   @Override

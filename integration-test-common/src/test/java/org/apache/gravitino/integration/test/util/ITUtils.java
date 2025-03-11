@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -47,8 +48,10 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.junit.jupiter.api.Assertions;
 
 public class ITUtils {
+
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
+  public static final String DEPLOY_TEST_MODE = "deploy";
 
   public static String joinPath(String... dirs) {
     return String.join(File.separator, dirs);
@@ -173,6 +176,34 @@ public class ITUtils {
               ((IdentityPartitionDTO) expected).values(),
               ((IdentityPartitionDTO) actual).values()));
     }
+  }
+
+  public static boolean isEmbedded() {
+    String mode =
+        System.getProperty(TEST_MODE) == null
+            ? EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
+  }
+
+  public static String icebergVersion() {
+    return System.getProperty("ICEBERG_VERSION");
+  }
+
+  public static String getBundleJarSourceFile(String bundleName) {
+    String jarName = ITUtils.getBundleJarName(bundleName);
+    String gcsJars = ITUtils.joinPath(ITUtils.getBundleJarDirectory(bundleName), jarName);
+    return "file://" + gcsJars;
+  }
+
+  public static String getBundleJarName(String bundleName) {
+    return String.format("gravitino-%s-%s.jar", bundleName, System.getenv("PROJECT_VERSION"));
+  }
+
+  public static String getBundleJarDirectory(String bundleName) {
+    return ITUtils.joinPath(
+        System.getenv("GRAVITINO_ROOT_DIR"), "bundles", bundleName, "build", "libs");
   }
 
   private ITUtils() {}

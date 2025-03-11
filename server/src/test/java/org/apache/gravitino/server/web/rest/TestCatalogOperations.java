@@ -19,10 +19,12 @@
 package org.apache.gravitino.server.web.rest;
 
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -48,6 +50,7 @@ import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
+import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
@@ -65,6 +68,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
@@ -184,13 +188,15 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals("catalog1", catalogDTO1.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO1.type());
     Assertions.assertEquals("comment", catalogDTO1.comment());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO1.properties());
+    Assertions.assertEquals(
+        ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO1.properties());
 
     CatalogDTO catalogDTO2 = catalogDTOs[1];
     Assertions.assertEquals("catalog2", catalogDTO2.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO2.type());
     Assertions.assertEquals("comment", catalogDTO2.comment());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO2.properties());
+    Assertions.assertEquals(
+        ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO2.properties());
 
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogsInfo(any());
     Response resp1 =
@@ -237,7 +243,8 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals("catalog1", catalogDTO.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO.type());
     Assertions.assertEquals("comment", catalogDTO.comment());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO.properties());
+    Assertions.assertEquals(
+        ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO.properties());
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
@@ -351,7 +358,8 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals("catalog1", catalogDTO.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO.type());
     Assertions.assertEquals("comment", catalogDTO.comment());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO.properties());
+    Assertions.assertEquals(
+        ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO.properties());
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).loadCatalog(any());
@@ -420,7 +428,8 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals("catalog2", catalogDTO.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO.type());
     Assertions.assertEquals("comment", catalogDTO.comment());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO.properties());
+    Assertions.assertEquals(
+        ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO.properties());
 
     // Test throw NoSuchCatalogException
     doThrow(new NoSuchCatalogException("mock error")).when(manager).alterCatalog(any(), any());
@@ -468,7 +477,7 @@ public class TestCatalogOperations extends JerseyTest {
 
   @Test
   public void testDropCatalog() {
-    when(manager.dropCatalog(any())).thenReturn(true);
+    when(manager.dropCatalog(any(), anyBoolean())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/catalogs/catalog1")
@@ -481,8 +490,8 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(0, dropResponse.getCode());
     Assertions.assertTrue(dropResponse.dropped());
 
-    // Test when failed to drop catalog
-    when(manager.dropCatalog(any())).thenReturn(false);
+    // Test catalog does not exist
+    when(manager.dropCatalog(any(), anyBoolean())).thenReturn(false);
 
     Response resp2 =
         target("/metalakes/metalake1/catalogs/catalog1")
@@ -496,7 +505,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertFalse(dropResponse2.dropped());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).dropCatalog(any());
+    doThrow(new RuntimeException("mock error")).when(manager).dropCatalog(any(), anyBoolean());
     Response resp3 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -508,6 +517,37 @@ public class TestCatalogOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testSetCatalog() {
+    CatalogSetRequest req = new CatalogSetRequest(true);
+    doNothing().when(manager).enableCatalog(any());
+
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    BaseResponse baseResponse = resp.readEntity(BaseResponse.class);
+    Assertions.assertEquals(0, baseResponse.getCode());
+
+    req = new CatalogSetRequest(false);
+    doNothing().when(manager).disableCatalog(any());
+
+    resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    baseResponse = resp.readEntity(BaseResponse.class);
+    Assertions.assertEquals(0, baseResponse.getCode());
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

@@ -19,8 +19,10 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -29,6 +31,9 @@ import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.ModelOperationDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
@@ -41,6 +46,7 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
@@ -56,6 +62,7 @@ import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
+import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
@@ -65,6 +72,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,12 +85,16 @@ public class GravitinoEnv {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoEnv.class);
 
   private Config config;
+  // Iceberg REST server use base components while Gravitino Server use full components.
+  private boolean manageFullComponents = true;
 
   private EntityStore entityStore;
 
   private CatalogDispatcher catalogDispatcher;
 
   private CatalogManager catalogManager;
+
+  private MetalakeManager metalakeManager;
 
   private SchemaDispatcher schemaDispatcher;
 
@@ -94,7 +106,13 @@ public class GravitinoEnv {
 
   private TopicDispatcher topicDispatcher;
 
+  private ModelDispatcher modelDispatcher;
+
   private MetalakeDispatcher metalakeDispatcher;
+
+  private CredentialOperationDispatcher credentialOperationDispatcher;
+
+  private TagDispatcher tagDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
 
@@ -108,9 +126,11 @@ public class GravitinoEnv {
 
   private EventListenerManager eventListenerManager;
 
-  private TagManager tagManager;
+  private AuditLogManager auditLogManager;
+
   private EventBus eventBus;
   private OwnerManager ownerManager;
+  private FutureGrantManager futureGrantManager;
 
   protected GravitinoEnv() {}
 
@@ -128,21 +148,30 @@ public class GravitinoEnv {
   }
 
   /**
-   * Initialize the Gravitino environment.
+   * Initialize base components, used for Iceberg REST server.
    *
    * @param config The configuration object to initialize the environment.
-   * @param isGravitinoServer A boolean flag indicating whether the initialization is for the
-   *     Gravitino server. If true, server-specific components will be initialized in addition to
-   *     the base components.
    */
-  public void initialize(Config config, boolean isGravitinoServer) {
-    LOG.info("Initializing Gravitino Environment...");
+  public void initializeBaseComponents(Config config) {
+    LOG.info("Initializing Gravitino base environment...");
     this.config = config;
+    this.manageFullComponents = false;
     initBaseComponents();
-    if (isGravitinoServer) {
-      initGravitinoServerComponents();
-    }
-    LOG.info("Gravitino Environment is initialized.");
+    LOG.info("Gravitino base environment is initialized.");
+  }
+
+  /**
+   * Initialize all components, used for Gravitino server.
+   *
+   * @param config The configuration object to initialize the environment.
+   */
+  public void initializeFullComponents(Config config) {
+    LOG.info("Initializing Gravitino full environment...");
+    this.config = config;
+    this.manageFullComponents = true;
+    initBaseComponents();
+    initGravitinoServerComponents();
+    LOG.info("Gravitino full environment is initialized.");
   }
 
   /**
@@ -192,6 +221,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the ModelDispatcher associated with the Gravitino environment.
+   *
+   * @return The ModelDispatcher instance.
+   */
+  public ModelDispatcher modelDispatcher() {
+    return modelDispatcher;
+  }
+
+  /**
    * Get the PartitionDispatcher associated with the Gravitino environment.
    *
    * @return The PartitionDispatcher instance.
@@ -225,6 +263,15 @@ public class GravitinoEnv {
    */
   public MetalakeDispatcher metalakeDispatcher() {
     return metalakeDispatcher;
+  }
+
+  /**
+   * Get the {@link CredentialOperationDispatcher} associated with the Gravitino environment.
+   *
+   * @return The {@link CredentialOperationDispatcher} instance.
+   */
+  public CredentialOperationDispatcher credentialOperationDispatcher() {
+    return credentialOperationDispatcher;
   }
 
   /**
@@ -279,22 +326,38 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the TagManager associated with the Gravitino environment.
+   * Get the tagDispatcher associated with the Gravitino environment.
    *
-   * @return The TagManager instance.
+   * @return The tagDispatcher instance.
    */
-  public TagManager tagManager() {
-    return tagManager;
+  public TagDispatcher tagDispatcher() {
+    return tagDispatcher;
   }
 
+  /**
+   * Get the OwnerManager associated with the Gravitino environment.
+   *
+   * @return The OwnerManager instance.
+   */
   public OwnerManager ownerManager() {
     return ownerManager;
   }
 
+  /**
+   * Get the FutureGrantManager associated with the Gravitino environment.
+   *
+   * @return The FutureGrantManager instance.
+   */
+  public FutureGrantManager futureGrantManager() {
+    return futureGrantManager;
+  }
+
   public void start() {
-    auxServiceManager.serviceStart();
     metricsSystem.start();
     eventListenerManager.start();
+    if (manageFullComponents) {
+      auxServiceManager.serviceStart();
+    }
   }
 
   /** Shutdown the Gravitino environment. */
@@ -329,6 +392,10 @@ public class GravitinoEnv {
       eventListenerManager.stop();
     }
 
+    if (metalakeManager != null) {
+      metalakeManager.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -340,6 +407,9 @@ public class GravitinoEnv {
     eventListenerManager.init(
         config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
     this.eventBus = eventListenerManager.createEventBus();
+
+    this.auditLogManager = new AuditLogManager();
+    auditLogManager.init(config, eventListenerManager);
   }
 
   private void initGravitinoServerComponents() {
@@ -350,19 +420,29 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
-    // Create and initialize metalake related modules
-    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    // Tree lock
+    this.lockManager = new LockManager(config);
+
+    // Create and initialize metalake related modules, the operation chain is:
+    // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
+    // MetalakeManager
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
-    // Create and initialize Catalog related modules
+    // Create and initialize Catalog related modules, the operation chain is:
+    // CatalogEventDispatcher -> CatalogNormalizeDispatcher -> CatalogHookDispatcher ->
+    // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogHookDispatcher catalogHookDispatcher = new CatalogHookDispatcher(catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
+
+    this.credentialOperationDispatcher =
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
@@ -401,6 +481,13 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
+    // TODO(jerryshao). Add Hook and event dispatcher support for Model.
+    ModelOperationDispatcher modelOperationDispatcher =
+        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+    ModelNormalizeDispatcher modelNormalizeDispatcher =
+        new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
+    this.modelDispatcher = modelNormalizeDispatcher;
+
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
@@ -410,18 +497,17 @@ public class GravitinoEnv {
 
       this.accessControlDispatcher = accessControlHookDispatcher;
       this.ownerManager = new OwnerManager(entityStore);
+      this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
       this.ownerManager = null;
+      this.futureGrantManager = null;
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(config);
 
-    // Tree lock
-    this.lockManager = new LockManager(config);
-
-    // Tag manager
-    this.tagManager = new TagManager(idGenerator, entityStore);
+    // Create and initialize Tag related modules
+    this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
   }
 }

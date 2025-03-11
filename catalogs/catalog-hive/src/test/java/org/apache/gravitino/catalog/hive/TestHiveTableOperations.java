@@ -31,8 +31,8 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -59,7 +59,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   public static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
-    initHiveSchema(hiveCatalog);
+    initHiveSchema(hiveCatalogOperations);
     hiveTable = createPartitionedTable();
 
     // add partition: city=0/dt=2020-01-01

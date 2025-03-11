@@ -31,15 +31,27 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(project(":iceberg:iceberg-common"))
-  implementation(project(":server-common"))
+  implementation(project(":server-common")) {
+    exclude("*")
+  }
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
+  implementation(libs.bundles.metrics)
+  implementation(libs.bundles.prometheus)
+  implementation(libs.caffeine)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
@@ -48,9 +60,13 @@ dependencies {
   implementation(libs.metrics.jersey2)
 
   annotationProcessor(libs.lombok)
-
   compileOnly(libs.lombok)
 
+  // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
+  testImplementation(project(":bundles:aliyun-bundle"))
+  testImplementation(project(":bundles:aws"))
+  testImplementation(project(":bundles:gcp", configuration = "shadow"))
+  testImplementation(project(":bundles:azure", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -63,6 +79,15 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.iceberg.aws.bundle)
+  testImplementation(libs.iceberg.gcp.bundle)
+  // Prevent netty conflict
+  testImplementation(libs.reactor.netty.http)
+  testImplementation(libs.reactor.netty.core)
+  testImplementation(libs.iceberg.azure.bundle) {
+    exclude("io.netty")
+    exclude("com.google.guava", "guava")
+  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
@@ -146,26 +171,12 @@ tasks {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.3")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

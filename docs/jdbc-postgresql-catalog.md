@@ -31,7 +31,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ### Catalog properties
 
-Any property that isn't defined by Gravitino can pass to MySQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+Any property that isn't defined by Gravitino can pass to PostgreSQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 When you use the Gravitino with Trino. You can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
@@ -88,7 +88,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 - Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
-#### Table column types
+### Table column types
 
 | Gravitino Type | PostgreSQL Type |
 |----------------|-----------------|
@@ -111,10 +111,10 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-#### Table column auto-increment
+### Table column auto-increment
 
 - Supports setting auto-increment.
 

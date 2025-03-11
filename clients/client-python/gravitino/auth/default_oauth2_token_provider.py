@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import time
 import json
@@ -26,7 +24,10 @@ from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.dto.requests.oauth2_client_credential_request import (
     OAuth2ClientCredentialRequest,
 )
-from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
+    IllegalArgumentException,
+)
 from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLER
 
 CLIENT_CREDENTIALS = "client_credentials"
@@ -61,11 +62,14 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         self._token = self._fetch_token()
 
     def validate(self):
-        assert (
-            self._credential and self._credential.strip()
-        ), "OAuth2TokenProvider must set credential"
-        assert self._scope and self._scope.strip(), "OAuth2TokenProvider must set scope"
-        assert self._path and self._path.strip(), "OAuth2TokenProvider must set path"
+        if not self._credential or not self._credential.strip():
+            raise IllegalArgumentException("OAuth2TokenProvider must set credential")
+
+        if not self._scope or not self._scope.strip():
+            raise IllegalArgumentException("OAuth2TokenProvider must set scope")
+
+        if not self._path or not self._path.strip():
+            raise IllegalArgumentException("OAuth2TokenProvider must set path")
 
     def _get_access_token(self) -> Optional[str]:
 
@@ -81,7 +85,8 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         return self._token
 
     def _parse_credential(self):
-        assert self._credential is not None, "Invalid credential: None"
+        if self._credential is None:
+            raise ValueError("Invalid credential: None")
 
         credential_info = self._credential.split(CREDENTIAL_SPLITTER, maxsplit=1)
         client_id = None

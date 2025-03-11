@@ -21,8 +21,11 @@ package org.apache.gravitino;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
+import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -37,16 +40,42 @@ public interface Catalog extends Auditable {
   /** The type of the catalog. */
   enum Type {
     /** Catalog Type for Relational Data Structure, like db.table, catalog.db.table. */
-    RELATIONAL,
+    RELATIONAL(false),
 
     /** Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file */
-    FILESET,
+    FILESET(false),
 
     /** Catalog Type for Message Queue, like Kafka://topic */
-    MESSAGING,
+    MESSAGING(false),
+
+    /** Catalog Type for ML model */
+    MODEL(true),
 
     /** Catalog Type for test only. */
-    UNSUPPORTED;
+    UNSUPPORTED(false);
+
+    private final boolean supportsManagedCatalog;
+
+    Type(boolean supportsManagedCatalog) {
+      this.supportsManagedCatalog = supportsManagedCatalog;
+    }
+
+    /**
+     * A flag to indicate whether the catalog type supports managed catalog. Managed catalog is a
+     * concept in Gravitino, for the details of managed catalog, please refer to the class comment
+     * of {@link CatalogProvider}. If the catalog type supports managed catalog, users can create
+     * managed catalog of this type without specifying the provider, Gravitino will use the type as
+     * the provider to create the managed catalog. If the catalog type does not support managed
+     * catalog, users need to specify the provider when creating the catalog.
+     *
+     * <p>Currently, only the model catalog supports managed catalog.
+     *
+     * @return Whether the catalog type supports managed catalog. Returns true if the catalog type
+     *     supports managed catalog.
+     */
+    public boolean supportsManagedCatalog() {
+      return supportsManagedCatalog;
+    }
 
     /**
      * Convert the string (case-insensitive) to the catalog type.
@@ -62,6 +91,8 @@ public interface Catalog extends Auditable {
           return FILESET;
         case "messaging":
           return MESSAGING;
+        case "model":
+          return MODEL;
         default:
           throw new IllegalArgumentException("Unknown catalog type: " + type);
       }
@@ -96,6 +127,9 @@ public interface Catalog extends Auditable {
    * different location, the "package" property is needed.
    */
   String PROPERTY_PACKAGE = "package";
+
+  /** The property indicates the catalog is in use. */
+  String PROPERTY_IN_USE = "in-use";
 
   /**
    * The property to specify the cloud that the catalog is running on. The value should be one of
@@ -175,10 +209,34 @@ public interface Catalog extends Auditable {
   }
 
   /**
+   * @return the {@link ModelCatalog} if the catalog supports model operations.
+   * @throws UnsupportedOperationException if the catalog does not support model operations.
+   */
+  default ModelCatalog asModelCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support model operations");
+  }
+
+  /**
    * @return the {@link SupportsTags} if the catalog supports tag operations.
    * @throws UnsupportedOperationException if the catalog does not support tag operations.
    */
   default SupportsTags supportsTags() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support tag operations");
+  }
+
+  /**
+   * @return the {@link SupportsRoles} if the catalog supports role operations.
+   * @throws UnsupportedOperationException if the catalog does not support role operations.
+   */
+  default SupportsRoles supportsRoles() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support role operations");
+  }
+
+  /**
+   * @return the {@link SupportsCredentials} if the catalog supports credential operations.
+   * @throws UnsupportedOperationException if the catalog does not support credential operations.
+   */
+  default SupportsCredentials supportsCredentials() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support credential operations");
   }
 }

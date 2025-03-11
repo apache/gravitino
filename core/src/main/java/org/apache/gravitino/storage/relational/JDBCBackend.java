@@ -43,6 +43,8 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -55,16 +57,21 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.ModelMetaService;
+import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
 import org.apache.gravitino.storage.relational.service.NameIdMappingService;
 import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
@@ -73,6 +80,8 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
   private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
       ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
@@ -91,7 +100,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType) throws IOException {
+      Namespace namespace, Entity.EntityType entityType, boolean allFields) throws IOException {
     switch (entityType) {
       case METALAKE:
         return (List<E>) MetalakeMetaService.getInstance().listMetalakes();
@@ -107,6 +116,17 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) TopicMetaService.getInstance().listTopicsByNamespace(namespace);
       case TAG:
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
+      case USER:
+        return (List<E>) UserMetaService.getInstance().listUsersByNamespace(namespace, allFields);
+      case ROLE:
+        return (List<E>) RoleMetaService.getInstance().listRolesByNamespace(namespace);
+      case GROUP:
+        return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace, allFields);
+      case MODEL:
+        return (List<E>) ModelMetaService.getInstance().listModelsByNamespace(namespace);
+      case MODEL_VERSION:
+        return (List<E>)
+            ModelVersionMetaService.getInstance().listModelVersionsByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -147,6 +167,15 @@ public class JDBCBackend implements RelationalBackend {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
     } else if (e instanceof TagEntity) {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
+    } else if (e instanceof ModelEntity) {
+      ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
+    } else if (e instanceof ModelVersionEntity) {
+      if (overwritten) {
+        LOG.warn(
+            "'overwritten' is not supported for model version meta, ignoring this flag and "
+                + "inserting the new model version.");
+      }
+      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -181,6 +210,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) UserMetaService.getInstance().updateUser(ident, updater);
       case GROUP:
         return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().updateRole(ident, updater);
       case TAG:
         return (E) TagMetaService.getInstance().updateTag(ident, updater);
       default:
@@ -214,6 +245,10 @@ public class JDBCBackend implements RelationalBackend {
         return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       case TAG:
         return (E) TagMetaService.getInstance().getTagByIdentifier(ident);
+      case MODEL:
+        return (E) ModelMetaService.getInstance().getModelByIdentifier(ident);
+      case MODEL_VERSION:
+        return (E) ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -252,6 +287,10 @@ public class JDBCBackend implements RelationalBackend {
           return RoleMetaService.getInstance().deleteRole(ident);
         case TAG:
           return TagMetaService.getInstance().deleteTag(ident);
+        case MODEL:
+          return ModelMetaService.getInstance().deleteModel(ident);
+        case MODEL_VERSION:
+          return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
         default:
           throw new UnsupportedEntityTypeException(
               "Unsupported entity type: %s for delete operation", entityType);
@@ -308,6 +347,16 @@ public class JDBCBackend implements RelationalBackend {
             .deleteTagMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case COLUMN:
+        return TableColumnMetaService.getInstance()
+            .deleteColumnsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case MODEL:
+        return ModelMetaService.getInstance()
+            .deleteModelMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case MODEL_VERSION:
+        return ModelVersionMetaService.getInstance()
+            .deleteModelVersionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -333,6 +382,8 @@ public class JDBCBackend implements RelationalBackend {
       case AUDIT:
       case ROLE:
       case TAG:
+      case MODEL:
+      case MODEL_VERSION:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
@@ -350,6 +401,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
+    SQLExceptionConverterFactory.close();
 
     NameIdMappingService.getInstance().close();
 
@@ -391,9 +443,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields) {
     switch (relType) {
       case OWNER_REL:
         List<E> list = Lists.newArrayList();
@@ -401,6 +451,24 @@ public class JDBCBackend implements RelationalBackend {
             .getOwner(nameIdentifier, identType)
             .ifPresent(e -> list.add((E) e));
         return list;
+      case METADATA_OBJECT_ROLE_REL:
+        return (List<E>)
+            RoleMetaService.getInstance()
+                .listRolesByMetadataObject(nameIdentifier, identType, allFields);
+      case ROLE_GROUP_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_GROUP_REL doesn't support type %s", identType.name()));
+        }
+      case ROLE_USER_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -425,9 +493,10 @@ public class JDBCBackend implements RelationalBackend {
     }
   }
 
-  enum JDBCBackendType {
+  public enum JDBCBackendType {
     H2(true),
-    MYSQL(false);
+    MYSQL(false),
+    POSTGRESQL(false);
 
     private final boolean embedded;
 
@@ -440,8 +509,23 @@ public class JDBCBackend implements RelationalBackend {
         return JDBCBackendType.H2;
       } else if (jdbcURI.startsWith("jdbc:mysql")) {
         return JDBCBackendType.MYSQL;
+      } else if (jdbcURI.startsWith("jdbc:postgresql")) {
+        return JDBCBackendType.POSTGRESQL;
       } else {
         throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
+      }
+    }
+
+    public static JDBCBackendType fromString(String jdbcType) {
+      switch (jdbcType) {
+        case "h2":
+          return JDBCBackendType.H2;
+        case "mysql":
+          return JDBCBackendType.MYSQL;
+        case "postgresql":
+          return JDBCBackendType.POSTGRESQL;
+        default:
+          throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }
     }
   }

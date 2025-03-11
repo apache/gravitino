@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 import configparser
@@ -29,6 +27,7 @@ from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.dto.responses.version_response import VersionResponse
 from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
+from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.constants.version import VERSION_INI, Version
@@ -77,7 +76,7 @@ class GravitinoClientBase:
 
         self.check_metalake_name(name)
         response = self._rest_client.get(
-            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name,
+            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + encode_string(name),
             error_handler=METALAKE_ERROR_HANDLER,
         )
         metalake_response = MetalakeResponse.from_json(
@@ -138,10 +137,7 @@ class GravitinoClientBase:
     def close(self):
         """Closes the GravitinoClient and releases any underlying resources."""
         if self._rest_client is not None:
-            try:
-                self._rest_client.close()
-            except Exception as e:
-                logger.warning("Failed to close the HTTP REST client: %s", e)
+            self._rest_client.close()
 
     def check_metalake_name(self, metalake_name: str):
         identifier = NameIdentifier.parse(metalake_name)

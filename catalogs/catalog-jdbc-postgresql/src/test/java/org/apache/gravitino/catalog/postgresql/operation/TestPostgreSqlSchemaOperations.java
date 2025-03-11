@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
-import static org.apache.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations.SYS_PG_DATABASE_NAMES;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -49,8 +47,10 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
     String comment = null;
     List<String> initDatabases = DATABASE_OPERATIONS.listDatabases();
 
-    SYS_PG_DATABASE_NAMES.forEach(
-        sysPgDatabaseName -> Assertions.assertFalse(initDatabases.contains(sysPgDatabaseName)));
+    ((PostgreSqlSchemaOperations) DATABASE_OPERATIONS)
+        .createSysDatabaseNameSet()
+        .forEach(
+            sysPgDatabaseName -> Assertions.assertFalse(initDatabases.contains(sysPgDatabaseName)));
 
     testBaseOperation(databaseName, properties, comment);
     // delete database.

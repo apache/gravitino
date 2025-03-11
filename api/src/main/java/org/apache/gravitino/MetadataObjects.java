@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -49,7 +50,8 @@ public class MetadataObjects {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
 
-    return new MetadataObjectImpl(parent, name, type);
+    String fullName = parent == null ? name : DOT_JOINER.join(parent, name);
+    return parse(fullName, type);
   }
 
   /**
@@ -82,8 +84,9 @@ public class MetadataObjects {
         names.size() != 3
             || type == MetadataObject.Type.FILESET
             || type == MetadataObject.Type.TABLE
-            || type == MetadataObject.Type.TOPIC,
-        "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
+            || type == MetadataObject.Type.TOPIC
+            || type == MetadataObject.Type.MODEL,
+        "If the length of names is 3, it must be FILESET, TABLE, TOPIC or MODEL");
 
     Preconditions.checkArgument(
         names.size() != 4 || type == MetadataObject.Type.COLUMN,
@@ -123,6 +126,7 @@ public class MetadataObjects {
       case TABLE:
       case FILESET:
       case TOPIC:
+      case MODEL:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:
@@ -149,10 +153,19 @@ public class MetadataObjects {
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
+    if (type == MetadataObject.Type.ROLE) {
+      return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.ROLE);
+    }
 
     return MetadataObjects.of(parts, type);
   }
 
+  /**
+   * Get the parent full name of the given full name.
+   *
+   * @param names The names of the metadata object
+   * @return The parent full name if it exists, otherwise null
+   */
   private static String getParentFullName(List<String> names) {
     if (names.size() <= 1) {
       return null;

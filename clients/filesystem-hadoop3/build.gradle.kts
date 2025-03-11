@@ -24,15 +24,52 @@ plugins {
 }
 
 dependencies {
-  compileOnly(libs.hadoop3.common)
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.caffeine)
+  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
 
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":catalogs:hadoop-common")) {
+    exclude(group = "*")
+  }
+
+  implementation(libs.caffeine)
+  implementation(libs.guava)
+  implementation(libs.commons.lang3)
+
+  testImplementation(project(":api"))
   testImplementation(project(":core"))
+  testImplementation(project(":catalogs:catalog-hadoop"))
+  testImplementation(project(":common"))
+  testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+
+  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
+
   testImplementation(libs.awaitility)
+  testImplementation(libs.bundles.jetty)
+  testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
-  testImplementation(libs.hadoop3.common)
+
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
+
+  testImplementation(libs.hadoop3.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+    exclude("io.netty")
+  }
+  testImplementation(libs.httpclient5)
+  testImplementation(libs.javax.jaxb.api) {
+    exclude("*")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc)
@@ -40,6 +77,10 @@ dependencies {
   testImplementation(libs.mockserver.netty) {
     exclude("com.google.guava", "guava")
   }
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -47,8 +88,32 @@ tasks.build {
   dependsOn("javadoc")
 }
 
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-hadoop:jar")
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+  }
+
+  // this task depends on :bundles:aws-bundle:shadowJar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
+  dependsOn(":bundles:azure-bundle:jar")
+}
+
 tasks.javadoc {
   dependsOn(":clients:client-java-runtime:javadoc")
   source = sourceSets["main"].allJava +
     project(":clients:client-java-runtime").sourceSets["main"].allJava
+}
+
+tasks.clean {
+  delete("target")
 }

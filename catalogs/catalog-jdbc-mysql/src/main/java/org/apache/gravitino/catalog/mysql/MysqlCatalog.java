@@ -22,12 +22,10 @@ import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
 import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import org.apache.gravitino.catalog.mysql.operation.MysqlTableOperations;
@@ -60,11 +58,6 @@ public class MysqlCatalog extends JdbcCatalog {
   @Override
   public Capability newCapability() {
     return new MysqlCatalogCapability();
-  }
-
-  @Override
-  protected JdbcExceptionConverter createExceptionConverter() {
-    return new MysqlExceptionConverter();
   }
 
   @Override

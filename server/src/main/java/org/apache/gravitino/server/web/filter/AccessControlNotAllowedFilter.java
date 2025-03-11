@@ -19,16 +19,13 @@
 
 package org.apache.gravitino.server.web.filter;
 
-import static javax.servlet.http.HttpServletResponse.SC_METHOD_NOT_ALLOWED;
-
 import java.io.IOException;
-import java.util.Collections;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.web.Utils;
 
 /**
  * AccessControlNotAllowedFilter is used for filter the requests related to access control if Apache
@@ -43,13 +40,10 @@ public class AccessControlNotAllowedFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
     requestContext.abortWith(
-        Response.status(
-                SC_METHOD_NOT_ALLOWED,
-                String.format(
-                    "You should set '%s' to true in the server side `gravitino.conf`"
-                        + " to enable the authorization of the system, otherwise these interfaces can't work.",
-                    Configs.ENABLE_AUTHORIZATION.getKey()))
-            .allow(Collections.emptySet())
-            .build());
+        Utils.unsupportedOperation(
+            String.format(
+                "You should set '%s' to true in the server side `gravitino.conf`"
+                    + " to enable the authorization of the system, otherwise these interfaces can't work.",
+                Configs.ENABLE_AUTHORIZATION.getKey())));
   }
 }

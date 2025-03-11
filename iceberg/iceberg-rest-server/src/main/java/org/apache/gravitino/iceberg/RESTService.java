@@ -18,15 +18,29 @@
  */
 package org.apache.gravitino.iceberg;
 
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -47,9 +61,12 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   public static final String SERVICE_NAME = "iceberg-rest";
   public static final String ICEBERG_SPEC = "/iceberg/*";
+  private static final String ICEBERG_REST_SPEC_PACKAGE =
+      "org.apache.gravitino.iceberg.service.rest";
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
+  private IcebergConfigProvider configProvider;
 
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
@@ -58,7 +75,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
     ResourceConfig config = new ResourceConfig();
-    config.packages("org.apache.gravitino.iceberg.service.rest");
+    config.packages(getIcebergRESTPackages(icebergConfig));
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
@@ -66,14 +83,40 @@ public class RESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
-    icebergTableOpsManager = new IcebergTableOpsManager(icebergConfig.getAllConfig());
-    icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    Map<String, String> configProperties = icebergConfig.getAllConfig();
+    this.configProvider = IcebergConfigProviderFactory.create(configProperties);
+    configProvider.initialize(configProperties);
+    String metalakeName = configProvider.getMetalakeName();
+
+    EventBus eventBus = GravitinoEnv.getInstance().eventBus();
+    this.icebergCatalogWrapperManager =
+        new IcebergCatalogWrapperManager(configProperties, configProvider);
+    this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    IcebergTableOperationExecutor icebergTableOperationExecutor =
+        new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
+    IcebergTableEventDispatcher icebergTableEventDispatcher =
+        new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus, metalakeName);
+    IcebergViewOperationExecutor icebergViewOperationExecutor =
+        new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
+    IcebergViewEventDispatcher icebergViewEventDispatcher =
+        new IcebergViewEventDispatcher(icebergViewOperationExecutor, eventBus, metalakeName);
+    IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
+        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+    IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+        new IcebergNamespaceEventDispatcher(
+            icebergNamespaceOperationExecutor, eventBus, metalakeName);
+
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(icebergTableOpsManager).to(IcebergTableOpsManager.class).ranked(1);
+            bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
+            bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
+            bind(icebergNamespaceEventDispatcher)
+                .to(IcebergNamespaceOperationDispatcher.class)
+                .ranked(1);
           }
         });
 
@@ -114,8 +157,11 @@ public class RESTService implements GravitinoAuxiliaryService {
       server.stop();
       LOG.info("Iceberg REST service stopped");
     }
-    if (icebergTableOpsManager != null) {
-      icebergTableOpsManager.close();
+    if (configProvider != null) {
+      configProvider.close();
+    }
+    if (icebergCatalogWrapperManager != null) {
+      icebergCatalogWrapperManager.close();
     }
     if (icebergMetricsManager != null) {
       icebergMetricsManager.close();
@@ -126,5 +172,11 @@ public class RESTService implements GravitinoAuxiliaryService {
     if (server != null) {
       server.join();
     }
+  }
+
+  private String[] getIcebergRESTPackages(IcebergConfig icebergConfig) {
+    List<String> packages = Lists.newArrayList(ICEBERG_REST_SPEC_PACKAGE);
+    packages.addAll(icebergConfig.get(IcebergConfig.REST_API_EXTENSION_PACKAGES));
+    return packages.toArray(new String[0]);
   }
 }

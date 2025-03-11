@@ -16,7 +16,7 @@ Through Gravitino, you can create, update, delete, and list topics via unified R
 To use messaging catalog, please make sure that:
 
  - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created.
+ - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -138,7 +138,7 @@ in relational catalog for more details. For a messaging catalog, the list operat
 ## Topic operations
 
 :::tip
-Users should create a metalake, a catalog and a schema before creating a table.
+Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before operating topics.
 :::
 
 ### Create a topic

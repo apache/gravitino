@@ -97,6 +97,7 @@ public class JdbcTable extends BaseTable {
       jdbcTable.auditInfo = auditInfo;
       jdbcTable.columns = columns;
       jdbcTable.partitioning = partitioning;
+      jdbcTable.distribution = distribution;
       jdbcTable.sortOrders = sortOrders;
       jdbcTable.indexes = indexes;
       jdbcTable.proxyPlugin = proxyPlugin;

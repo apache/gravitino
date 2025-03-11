@@ -24,7 +24,10 @@ import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * Interface for supporting metalakes. It includes methods for listing, loading, creating, altering
@@ -89,10 +92,68 @@ public interface SupportsMetalakes {
       throws NoSuchMetalakeException, IllegalArgumentException;
 
   /**
-   * Drop a metalake with specified identifier.
+   * Drop a metalake with specified identifier. Please make sure:
+   *
+   * <ul>
+   *   <li>There is no catalog in the metalake. Otherwise, a {@link NonEmptyEntityException} will be
+   *       thrown.
+   *   <li>The method {@link #disableMetalake(NameIdentifier)} has been called before dropping the
+   *       metalake. Otherwise, a {@link MetalakeInUseException} will be thrown.
+   * </ul>
+   *
+   * It is equivalent to calling {@code dropMetalake(ident, false)}.
    *
    * @param ident The identifier of the metalake.
    * @return True if the metalake was dropped, false if the metalake does not exist.
+   * @throws NonEmptyEntityException If the metalake is not empty.
+   * @throws MetalakeInUseException If the metalake is in use.
    */
-  boolean dropMetalake(NameIdentifier ident);
+  default boolean dropMetalake(NameIdentifier ident)
+      throws NonEmptyEntityException, MetalakeInUseException {
+    return dropMetalake(ident, false);
+  }
+
+  /**
+   * Drop a metalake with specified identifier. If the force flag is true, it will:
+   *
+   * <ul>
+   *   <li>Cascade drop all sub-entities (tags, catalogs, schemas, tables, etc.) of the metalake in
+   *       Gravitino store.
+   *   <li>Drop the metalake even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       deleted unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * @param ident The identifier of the metalake.
+   * @param force Whether to force the drop.
+   * @return True if the metalake was dropped, false if the metalake does not exist.
+   * @throws NonEmptyEntityException If the metalake is not empty and force is false.
+   * @throws MetalakeInUseException If the metalake is in use and force is false.
+   */
+  boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, MetalakeInUseException;
+
+  /**
+   * Enable a metalake. If the metalake is already in use, this method does nothing.
+   *
+   * @param ident The identifier of the metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException;
+
+  /**
+   * Disable a metalake. If the metalake is already disabled, this method does nothing. Once a
+   * metalake is disable:
+   *
+   * <ul>
+   *   <li>It can only be listed, loaded, dropped, or enable.
+   *   <li>Any other operations on the metalake will throw an {@link MetalakeNotInUseException}.
+   *   <li>Any operation on the sub-entities (catalogs, schemas, tables, etc.) will throw an {@link
+   *       MetalakeNotInUseException}.
+   * </ul>
+   *
+   * @param ident The identifier of the metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException;
 }

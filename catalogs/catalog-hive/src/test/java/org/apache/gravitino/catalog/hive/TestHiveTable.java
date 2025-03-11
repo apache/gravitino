@@ -18,13 +18,14 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.day;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -32,9 +33,9 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rel.Column;
@@ -70,24 +71,28 @@ public class TestHiveTable extends MiniHiveMetastoreService {
       NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME);
 
   @BeforeAll
-  private static void setup() {
+  public static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
-    hiveSchema = initHiveSchema(hiveCatalog);
+    hiveSchema = initHiveSchema();
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     hiveCatalogOperations.dropSchema(schemaIdent, true);
-    hiveSchema = initHiveSchema(hiveCatalog);
+    hiveSchema = initHiveSchema();
   }
 
-  protected static HiveSchema initHiveSchema(HiveCatalog hiveCatalog) {
+  protected static HiveSchema initHiveSchema() {
+    return initHiveSchema(hiveCatalogOperations);
+  }
+
+  protected static HiveSchema initHiveSchema(HiveCatalogOperations ops) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    return hiveCatalogOperations.createSchema(schemaIdent, HIVE_COMMENT, properties);
+    return ops.createSchema(schemaIdent, HIVE_COMMENT, properties);
   }
 
   protected static HiveCatalog initHiveCatalog() {
@@ -339,7 +344,35 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testListTableException() {
+  public void testListTable() {
+    // mock iceberg table and hudi table
+    NameIdentifier icebergTableIdent =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), "iceberg_table");
+    NameIdentifier hudiTableIdent =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), "hudi_table");
+
+    hiveCatalogOperations.createTable(
+        icebergTableIdent,
+        new Column[] {
+          HiveColumn.builder().withName("col_1").withType(Types.ByteType.get()).build()
+        },
+        HIVE_COMMENT,
+        ImmutableMap.of("table_type", "ICEBERG"));
+    hiveCatalogOperations.createTable(
+        hudiTableIdent,
+        new Column[] {
+          HiveColumn.builder().withName("col_1").withType(Types.ByteType.get()).build()
+        },
+        HIVE_COMMENT,
+        ImmutableMap.of("provider", "hudi"));
+
+    // test list table
+    NameIdentifier[] tableIdents =
+        hiveCatalogOperations.listTables(
+            Namespace.of("metalake", hiveCatalog.name(), hiveSchema.name()));
+    Assertions.assertEquals(0, tableIdents.length);
+
+    // test exception
     Namespace tableNs = Namespace.of("metalake", hiveCatalog.name(), "not_exist_db");
     TableCatalog tableCatalog = hiveCatalogOperations;
     Throwable exception =

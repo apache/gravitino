@@ -40,6 +40,7 @@ import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -209,6 +210,29 @@ public class TestRole extends TestBase {
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, rolePath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.deleteRole(roleName));
+  }
+
+  @Test
+  public void testListRoleNames() throws Exception {
+    String rolePath = withSlash(String.format(API_METALAKES_ROLES_PATH, metalakeName, ""));
+
+    NameListResponse listResponse = new NameListResponse(new String[] {"role1", "role2"});
+    buildMockResource(Method.GET, rolePath, null, listResponse, SC_OK);
+
+    Assertions.assertArrayEquals(new String[] {"role1", "role2"}, gravitinoClient.listRoleNames());
+
+    ErrorResponse errRespNoMetalake =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
+    buildMockResource(Method.GET, rolePath, null, errRespNoMetalake, SC_NOT_FOUND);
+    Exception ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> gravitinoClient.listRoleNames());
+    Assertions.assertEquals("metalake not found", ex.getMessage());
+
+    // Test RuntimeException
+    ErrorResponse errResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.GET, rolePath, null, errResp, SC_SERVER_ERROR);
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listRoleNames());
   }
 
   private RoleDTO mockRoleDTO(String name) {

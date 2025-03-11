@@ -94,6 +94,32 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the tag {@link NameIdentifier} with the given metalake and tag name.
+   *
+   * @param metalake The metalake name
+   * @param tagName The tag name
+   * @return The created tag {@link NameIdentifier}
+   */
+  public static NameIdentifier ofTag(String metalake, String tagName) {
+    return NameIdentifier.of(NamespaceUtil.ofTag(metalake), tagName);
+  }
+  /**
+   * Create the column {@link NameIdentifier} with the given metalake, catalog, schema, table and
+   * column name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param table The table name
+   * @param column The column name
+   * @return The created column {@link NameIdentifier}
+   */
+  public static NameIdentifier ofColumn(
+      String metalake, String catalog, String schema, String table, String column) {
+    return NameIdentifier.of(metalake, catalog, schema, table, column);
+  }
+
+  /**
    * Create the fileset {@link NameIdentifier} with the given metalake, catalog, schema and fileset
    * name.
    *
@@ -124,6 +150,105 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the model {@link NameIdentifier} with the given metalake, catalog, schema and model
+   * name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param model The model name
+   * @return The created model {@link NameIdentifier}
+   */
+  public static NameIdentifier ofModel(
+      String metalake, String catalog, String schema, String model) {
+    return NameIdentifier.of(metalake, catalog, schema, model);
+  }
+
+  /**
+   * Create the model {@link NameIdentifier} from the give model version's namespace.
+   *
+   * @param modelVersionNs The model version's namespace
+   * @return The created model {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelIdentifier(Namespace modelVersionNs) {
+    return NameIdentifier.of(modelVersionNs.levels());
+  }
+
+  /**
+   * Create the model {@link NameIdentifier} from the give model version's name identifier.
+   *
+   * @param modelIdent The model version's name identifier
+   * @return The created model {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelIdentifier(NameIdentifier modelIdent) {
+    return NameIdentifier.of(modelIdent.namespace().levels());
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given metalake, catalog, schema, model
+   * and version.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param model The model name
+   * @param version The model version
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier ofModelVersion(
+      String metalake, String catalog, String schema, String model, int version) {
+    return NameIdentifier.of(metalake, catalog, schema, model, String.valueOf(version));
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given metalake, catalog, schema, model
+   * and alias.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param model The model name
+   * @param alias The model version alias
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier ofModelVersion(
+      String metalake, String catalog, String schema, String model, String alias) {
+    return NameIdentifier.of(metalake, catalog, schema, model, alias);
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given model identifier and version.
+   *
+   * @param modelIdent The model identifier
+   * @param version The model version
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelVersionIdentifier(NameIdentifier modelIdent, int version) {
+    return ofModelVersion(
+        modelIdent.namespace().level(0),
+        modelIdent.namespace().level(1),
+        modelIdent.namespace().level(2),
+        modelIdent.name(),
+        version);
+  }
+
+  /**
+   * Create the model version {@link NameIdentifier} with the given model identifier and alias.
+   *
+   * @param modelIdent The model identifier
+   * @param alias The model version alias
+   * @return The created model version {@link NameIdentifier}
+   */
+  public static NameIdentifier toModelVersionIdentifier(NameIdentifier modelIdent, String alias) {
+    return ofModelVersion(
+        modelIdent.namespace().level(0),
+        modelIdent.namespace().level(1),
+        modelIdent.namespace().level(2),
+        modelIdent.name(),
+        alias);
+  }
+
+  /**
    * Try to get the catalog {@link NameIdentifier} from the given {@link NameIdentifier}.
    *
    * @param ident The {@link NameIdentifier} to check.
@@ -134,7 +259,8 @@ public class NameIdentifierUtil {
   public static NameIdentifier getCatalogIdentifier(NameIdentifier ident)
       throws IllegalNameIdentifierException {
     NameIdentifier.check(
-        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
     Namespace.check(
         ident.namespace() != null && !ident.namespace().isEmpty(),
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
@@ -148,6 +274,34 @@ public class NameIdentifierUtil {
           "Cannot create a catalog NameIdentifier less than two elements.");
     }
     return NameIdentifier.of(allElems.get(0), allElems.get(1));
+  }
+
+  /**
+   * Try to get the schema {@link NameIdentifier} from the given {@link NameIdentifier}.
+   *
+   * @param ident The {@link NameIdentifier} to check.
+   * @return The schema {@link NameIdentifier}
+   * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
+   *     schema name
+   */
+  public static NameIdentifier getSchemaIdentifier(NameIdentifier ident)
+      throws IllegalNameIdentifierException {
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
+    Namespace.check(
+        ident.namespace() != null && !ident.namespace().isEmpty() && ident.namespace().length() > 1,
+        "Schema namespace must be non-null and at least 1 level, the input namespace is %s",
+        ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 3) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a schema NameIdentifier less than three elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2));
   }
 
   /**
@@ -197,6 +351,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The column {@link NameIdentifier} to check.
+   */
+  public static void checkColumn(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Column identifier must not be null");
+    NamespaceUtil.checkColumn(ident.namespace());
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a fileset identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -216,6 +381,28 @@ public class NameIdentifierUtil {
   public static void checkTopic(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Topic identifier must not be null");
     NamespaceUtil.checkTopic(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a model identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The model {@link NameIdentifier} to check.
+   */
+  public static void checkModel(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Model identifier must not be null");
+    NamespaceUtil.checkModel(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a model version identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The model version {@link NameIdentifier} to check.
+   */
+  public static void checkModelVersion(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Model version identifier must not be null");
+    NamespaceUtil.checkModelVersion(ident.namespace());
   }
 
   /**
@@ -266,6 +453,12 @@ public class NameIdentifierUtil {
         String tableParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(tableParent, ident.name(), MetadataObject.Type.TABLE);
 
+      case COLUMN:
+        checkColumn(ident);
+        Namespace columnNs = ident.namespace();
+        String columnParent = dot.join(columnNs.level(1), columnNs.level(2), columnNs.level(3));
+        return MetadataObjects.of(columnParent, ident.name(), MetadataObject.Type.COLUMN);
+
       case FILESET:
         checkFileset(ident);
         String filesetParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
@@ -276,6 +469,11 @@ public class NameIdentifierUtil {
         String topicParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(topicParent, ident.name(), MetadataObject.Type.TOPIC);
 
+      case MODEL:
+        checkModel(ident);
+        String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
+
       case ROLE:
         AuthorizationUtils.checkRole(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
@@ -283,6 +481,20 @@ public class NameIdentifierUtil {
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");
+    }
+  }
+
+  /**
+   * Get the metalake name of the given {@link NameIdentifier}.
+   *
+   * @param identifier The name identifier of the entity
+   * @return metalake name
+   */
+  public static String getMetalake(NameIdentifier identifier) {
+    if (identifier.hasNamespace()) {
+      return identifier.namespace().level(0);
+    } else {
+      return identifier.name();
     }
   }
 }

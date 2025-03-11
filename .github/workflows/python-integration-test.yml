@@ -2,7 +2,6 @@ name: Python Client Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -16,39 +15,49 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             source_changes:
               - .github/**
               - api/**
-              - catalogs/catalog-hadoop/**
+              - authorizations/**
+              - bin/**
+              - catalogs/**
               - clients/client-python/**
               - common/**
               - conf/**
               - core/**
+              - dev/**
+              - gradle/**
+              - iceberg/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  PythonIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       matrix:
+        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 8 ]
+        java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
@@ -57,7 +66,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Python Client Integration Test
         id: integrationTest
@@ -73,7 +82,7 @@ jobs:
           done
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         with:
           name: integrate test reports

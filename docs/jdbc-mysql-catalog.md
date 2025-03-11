@@ -85,35 +85,36 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
-#### Table column types
+### Table column types
 
-| Gravitino Type   | MySQL Type          |
-|------------------|---------------------|
-| `Byte`           | `Tinyint`           |
-| `Byte(false)`    | `Tinyint Unsigned`  |
-| `Short`          | `Smallint`          |
-| `Short(false)`   | `Smallint Unsigned` |
-| `Integer`        | `Int`               |
-| `Integer(false)` | `Int Unsigned`      |
-| `Long`           | `Bigint`            |
-| `Long(false)`    | `Bigint Unsigned`   | 
-| `Float`          | `Float`             |
-| `Double`         | `Double`            |
-| `String`         | `Text`              |
-| `Date`           | `Date`              |
-| `Time`           | `Time`              |
-| `Timestamp`      | `Timestamp`         |
-| `Decimal`        | `Decimal`           |
-| `VarChar`        | `VarChar`           |
-| `FixedChar`      | `FixedChar`         |
-| `Binary`         | `Binary`            |
+| Gravitino Type     | MySQL Type          |
+|--------------------|---------------------|
+| `Byte`             | `Tinyint`           |
+| `Unsigned Byte`    | `Tinyint Unsigned`  |
+| `Short`            | `Smallint`          |
+| `Unsigned Short`   | `Smallint Unsigned` |
+| `Integer`          | `Int`               |
+| `Unsigned Integer` | `Int Unsigned`      |
+| `Long`             | `Bigint`            |
+| `Unsigned Long`    | `Bigint Unsigned`   |
+| `Float`            | `Float`             |
+| `Double`           | `Double`            |
+| `String`           | `Text`              |
+| `Date`             | `Date`              |
+| `Time`             | `Time`              |
+| `Timestamp`        | `Timestamp`         |
+| `Decimal`          | `Decimal`           |
+| `VarChar`          | `VarChar`           |
+| `FixedChar`        | `FixedChar`         |
+| `Binary`           | `Binary`            |
+| `BOOLEAN`          | `BIT`               |
 
 :::info
-MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-#### Table column auto-increment
+### Table column auto-increment
 
 :::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
@@ -160,7 +161,7 @@ Column[] cols = new Column[] {
 };
 Index[] indexes = new Index[] {
     Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-}
+};
 ```
 
 </TabItem>
@@ -170,12 +171,26 @@ Index[] indexes = new Index[] {
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
-| Property Name           | Description                                                                                                                                                                             | Required  | Since version |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|---------------|
-| `engine`                | The engine used by the table. The default value is `InnoDB`. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | No        | 0.4.0         |
-| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                                                         | No        | 0.4.0         |
+:::note
+**Reserved**: Fields that cannot be passed to the Gravitino server.
 
-- Doesn't support remove table properties. You can only modify values, not delete properties.
+**Immutable**: Fields that cannot be modified once set.
+:::
+
+:::caution
+- Doesn't support remove table properties. You can only add or modify properties, not delete properties.
+:::
+
+| Property Name           | Description                                                                                                                                              | Default Value | Required  | Reserved   | Immutable | Since version |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------|------------|-----------|---------------|
+| `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No        | No         | Yes       | 0.4.0         |
+| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |
+
+
+:::note
+Some MySQL storage engines, such as FEDERATED, are not enabled by default and require additional configuration to use. For example, to enable the FEDERATED engine, set federated=1 in the MySQL configuration file. Similarly, engines like ndbinfo, MRG_MYISAM, and PERFORMANCE_SCHEMA may also require specific prerequisites or configurations. For detailed instructions, 
+refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html).
+:::
 
 ### Table indexes
 
@@ -213,7 +228,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
 Index[] indexes = new Index[] {
     Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
     Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-}
+};
 ```
 
 </TabItem>

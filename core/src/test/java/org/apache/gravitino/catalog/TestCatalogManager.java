@@ -35,6 +35,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -79,7 +80,6 @@ public class TestCatalogManager {
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
 
     entityStore.put(metalakeEntity, true);
 
@@ -247,7 +247,7 @@ public class TestCatalogManager {
     testProperties(props, testCatalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, testCatalog.type());
 
-    Assertions.assertNotNull(catalogManager.catalogCache.getIfPresent(ident));
+    Assertions.assertNotNull(CatalogManager.catalogCache.getIfPresent(ident));
 
     // test before creation
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
@@ -265,14 +265,14 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception1.getMessage().contains("Metalake metalake1 does not exist"));
-    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident2));
+    Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(ident2));
 
     // test before creation
     Assertions.assertThrows(
-        NoSuchMetalakeException.class,
+        CatalogAlreadyExistsException.class,
         () ->
             catalogManager.testConnection(
-                ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props));
 
     // Test create with duplicated name
     Throwable exception2 =
@@ -285,7 +285,7 @@ public class TestCatalogManager {
         exception2.getMessage().contains("Catalog metalake.test1 already exists"));
 
     // Test if the catalog is already cached
-    CatalogManager.CatalogWrapper cached = catalogManager.catalogCache.getIfPresent(ident);
+    CatalogManager.CatalogWrapper cached = CatalogManager.catalogCache.getIfPresent(ident);
     Assertions.assertNotNull(cached);
 
     // Test failed creation
@@ -300,7 +300,7 @@ public class TestCatalogManager {
     Assertions.assertTrue(
         exception3.getMessage().contains("Properties are reserved and cannot be set"),
         exception3.getMessage());
-    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
+    Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(failedIdent));
     // Test failed for the second time
     Throwable exception4 =
         Assertions.assertThrows(
@@ -309,8 +309,9 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(
-        exception4.getMessage().contains("Properties are reserved and cannot be set"));
-    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
+        exception4.getMessage().contains("Properties are reserved and cannot be set"),
+        exception4.getMessage());
+    Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(failedIdent));
   }
 
   @Test
@@ -393,7 +394,7 @@ public class TestCatalogManager {
         exception.getMessage().contains("Catalog metalake.test22 does not exist"));
 
     // Load operation will cache the catalog
-    Assertions.assertNotNull(catalogManager.catalogCache.getIfPresent(ident));
+    Assertions.assertNotNull(CatalogManager.catalogCache.getIfPresent(ident));
   }
 
   @Test
@@ -439,8 +440,8 @@ public class TestCatalogManager {
         exception.getMessage().contains("Catalog metalake.test33 does not exist"));
 
     // Alter operation will update the cache
-    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident));
-    Assertions.assertNotNull(catalogManager.catalogCache.getIfPresent(ident1));
+    Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(ident));
+    Assertions.assertNotNull(CatalogManager.catalogCache.getIfPresent(ident1));
   }
 
   @Test
@@ -453,6 +454,12 @@ public class TestCatalogManager {
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
 
     // Test drop catalog
+    Exception exception =
+        Assertions.assertThrows(
+            CatalogInUseException.class, () -> catalogManager.dropCatalog(ident));
+    Assertions.assertTrue(exception.getMessage().contains("Catalog metalake.test41 is in use"));
+
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
     boolean dropped = catalogManager.dropCatalog(ident);
     Assertions.assertTrue(dropped);
 
@@ -462,7 +469,7 @@ public class TestCatalogManager {
     Assertions.assertFalse(dropped1);
 
     // Drop operation will update the cache
-    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident));
+    Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(ident));
   }
 
   @Test

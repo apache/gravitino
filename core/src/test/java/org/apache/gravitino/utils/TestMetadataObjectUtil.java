@@ -68,6 +68,11 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.COLUMN,
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.MODEL,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL)));
   }
 
   @Test
@@ -113,12 +118,15 @@ public class TestMetadataObjectUtil {
             "metalake",
             MetadataObjects.of("catalog.schema", "fileset", MetadataObject.Type.FILESET)));
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            MetadataObjectUtil.toEntityIdent(
-                "metalake",
-                MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN)),
-        "Cannot convert column metadata object to entity identifier: catalog.schema.table.column");
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "model"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake", MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "table", "column"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake",
+            MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN)));
   }
 }

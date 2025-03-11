@@ -31,4 +31,19 @@ public class HadoopCatalogCapability implements Capability {
     return CapabilityResult.unsupported(
         String.format("Hadoop catalog does not support managed storage for %s.", scope));
   }
+
+  @Override
+  public CapabilityResult specificationOnName(Scope scope, String name) {
+    CapabilityResult capabilityResult = Capability.super.specificationOnName(scope, name);
+    if (!capabilityResult.supported()) {
+      return capabilityResult;
+    }
+
+    if (name.contains("/")) {
+      return CapabilityResult.unsupported(
+          String.format("Hadoop catalog does not support '/' in the name for %s.", scope));
+    }
+
+    return CapabilityResult.SUPPORTED;
+  }
 }

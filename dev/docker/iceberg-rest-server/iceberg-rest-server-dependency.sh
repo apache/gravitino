@@ -34,6 +34,46 @@ cd distribution
 tar xfz gravitino-iceberg-rest-server-*.tar.gz
 cp -r gravitino-iceberg-rest-server*-bin ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server
 
+cd ${gravitino_home}
+./gradlew :bundles:gcp:jar
+./gradlew :bundles:aws:jar
+./gradlew :bundles:azure:jar
+## Iceberg doesn't provide Iceberg Aliyun bundle jar, so use Gravitino aliyun bundle to provide OSS packages.
+./gradlew :bundles:aliyun-bundle:jar
+
+# prepare bundle jar
+cd ${iceberg_rest_server_dir}
+mkdir -p bundles
+cp ${gravitino_home}/bundles/gcp/build/libs/gravitino-gcp-*.jar bundles/
+cp ${gravitino_home}/bundles/aws/build/libs/gravitino-aws-*.jar bundles/
+cp ${gravitino_home}/bundles/azure/build/libs/gravitino-azure-*.jar bundles/
+cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-*.jar bundles/
+
+iceberg_version="1.6.1"
+
+iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
+if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then
+  curl -L -s -o bundles/${iceberg_gcp_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/${iceberg_version}/${iceberg_gcp_bundle}
+fi
+
+iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"
+if [ ! -f "bundles/${iceberg_aws_bundle}" ]; then
+  curl -L -s -o bundles/${iceberg_aws_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${iceberg_version}/${iceberg_aws_bundle}
+fi
+
+iceberg_azure_bundle="iceberg-azure-bundle-${iceberg_version}.jar"
+if [ ! -f "bundles/${iceberg_azure_bundle}" ]; then
+  curl -L -s -o bundles/${iceberg_azure_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-azure-bundle/${iceberg_version}/${iceberg_azure_bundle}
+fi
+
+# download jdbc driver
+curl -L -s -o bundles/sqlite-jdbc-3.42.0.0.jar https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar
+
+cp bundles/*jar ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/
+
+cp start-iceberg-rest-server.sh ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/
+cp rewrite_config.py ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/
+
 # Keeping the container running at all times
 cat <<EOF >> "${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
 

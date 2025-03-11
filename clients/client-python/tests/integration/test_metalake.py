@@ -1,29 +1,28 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from typing import Dict, List
 
 from gravitino import GravitinoAdminClient, GravitinoMetalake, MetalakeChange
-from gravitino.dto.dto_converters import DTOConverters
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
     NoSuchMetalakeException,
     MetalakeAlreadyExistsException,
 )
@@ -54,16 +53,23 @@ class TestMetalake(IntegrationTestEnv):
         self.clean_test_data()
 
     def clean_test_data(self):
-        logger.info(
-            "Drop metalake %s[%s]",
-            self.metalake_name,
-            self.drop_metalake(self.metalake_name),
-        )
-        logger.info(
-            "Drop metalake %s[%s]",
-            self.metalake_new_name,
-            self.drop_metalake(self.metalake_new_name),
-        )
+        try:
+            logger.info(
+                "Drop metalake %s[%s]",
+                self.metalake_name,
+                self.drop_metalake(self.metalake_name),
+            )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_name)
+
+        try:
+            logger.info(
+                "Drop metalake %s[%s]",
+                self.metalake_new_name,
+                self.drop_metalake(self.metalake_new_name),
+            )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_new_name)
 
     def test_create_metalake(self):
         metalake = self.create_metalake(self.metalake_name)
@@ -83,6 +89,14 @@ class TestMetalake(IntegrationTestEnv):
         self.create_metalake(self.metalake_name)
         with self.assertRaises(MetalakeAlreadyExistsException):
             _ = self.create_metalake(self.metalake_name)
+
+    def test_nullable_comment_metalake(self):
+        self.create_metalake(self.metalake_name)
+        changes = (MetalakeChange.update_comment(None),)
+        null_comment_metalake = self.gravitino_admin_client.alter_metalake(
+            self.metalake_name, *changes
+        )
+        self.assertIsNone(null_comment_metalake.comment())
 
     def test_alter_metalake(self):
         self.create_metalake(self.metalake_name)
@@ -112,7 +126,7 @@ class TestMetalake(IntegrationTestEnv):
         self.assertTrue(self.metalake_properties_key1 not in metalake.properties())
 
     def drop_metalake(self, metalake_name: str) -> bool:
-        return self.gravitino_admin_client.drop_metalake(metalake_name)
+        return self.gravitino_admin_client.drop_metalake(metalake_name, True)
 
     def test_drop_metalake(self):
         self.create_metalake(self.metalake_name)
@@ -146,7 +160,9 @@ class TestMetalake(IntegrationTestEnv):
         self.assertIsNotNone(metalake)
         self.assertEqual(metalake.name(), self.metalake_name)
         self.assertEqual(metalake.comment(), self.metalake_comment)
-        self.assertEqual(metalake.properties(), self.metalake_properties)
+        self.assertEqual(
+            metalake.properties(), {**self.metalake_properties, "in-use": "true"}
+        )
         self.assertEqual(metalake.audit_info().creator(), "anonymous")
 
     def test_failed_load_metalakes(self):

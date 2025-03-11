@@ -35,15 +35,15 @@ import org.apache.gravitino.annotation.Evolving;
  *
  * <p>Note: For catalog related properties metadata, use {@link BaseCatalogPropertiesMetadata}.
  *
- * <p>This class defines two reserved properties metadata for Gravitino use only. Developers should
- * not override these properties.
+ * <p>This class defines reserved properties metadata for Gravitino use only. Developers should not
+ * override these properties.
  */
 @Evolving
 public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
-  private static final Map<String, PropertyEntry<?>> BASIC_PROPERTY_ENTRIES;
+  protected static final Map<String, PropertyEntry<?>> BASIC_PROPERTY_ENTRIES;
 
-  private volatile Map<String, PropertyEntry<?>> propertyEntries;
+  protected volatile Map<String, PropertyEntry<?>> propertyEntries;
 
   static {
     // basicPropertyEntries is shared by all entities

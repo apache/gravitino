@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -34,14 +35,14 @@ import org.apache.gravitino.connector.PropertyEntry;
  */
 public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
 
-  public static final String COMMENT = "comment";
-  public static final String OWNER = "owner";
-  public static final String BUCKET_KEY = "bucket-key";
-  public static final String MERGE_ENGINE = "merge-engine";
-  public static final String SEQUENCE_FIELD = "sequence.field";
-  public static final String ROWKIND_FIELD = "rowkind.field";
-  public static final String PRIMARY_KEY = "primary-key";
-  public static final String PARTITION = "partition";
+  public static final String COMMENT = PaimonConstants.COMMENT;
+  public static final String OWNER = PaimonConstants.OWNER;
+  public static final String BUCKET_KEY = PaimonConstants.BUCKET_KEY;
+  public static final String MERGE_ENGINE = PaimonConstants.MERGE_ENGINE;
+  public static final String SEQUENCE_FIELD = PaimonConstants.SEQUENCE_FIELD;
+  public static final String ROWKIND_FIELD = PaimonConstants.ROWKIND_FIELD;
+  public static final String PRIMARY_KEY = PaimonConstants.PRIMARY_KEY;
+  public static final String PARTITION = PaimonConstants.PARTITION;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -51,9 +52,12 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(COMMENT, "The table comment", true),
             stringReservedPropertyEntry(OWNER, "The table owner", false),
             stringReservedPropertyEntry(BUCKET_KEY, "The table bucket key", false),
-            stringReservedPropertyEntry(MERGE_ENGINE, "The table merge engine", false),
-            stringReservedPropertyEntry(SEQUENCE_FIELD, "The table sequence field", false),
-            stringReservedPropertyEntry(ROWKIND_FIELD, "The table rowkind field", false),
+            stringImmutablePropertyEntry(
+                MERGE_ENGINE, "The table merge engine", false, null, false, false),
+            stringImmutablePropertyEntry(
+                SEQUENCE_FIELD, "The table sequence field", false, null, false, false),
+            stringImmutablePropertyEntry(
+                ROWKIND_FIELD, "The table rowkind field", false, null, false, false),
             stringReservedPropertyEntry(PRIMARY_KEY, "The table primary key", false),
             stringReservedPropertyEntry(PARTITION, "The table partition", false));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);

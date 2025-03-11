@@ -18,16 +18,23 @@
  */
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -46,6 +53,7 @@ import org.slf4j.LoggerFactory;
 class UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -57,7 +65,7 @@ class UserGroupManager {
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
@@ -85,7 +93,7 @@ class UserGroupManager {
 
   boolean removeUser(String metalake, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
@@ -96,7 +104,7 @@ class UserGroupManager {
 
   User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return store.get(
           AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 
@@ -109,9 +117,20 @@ class UserGroupManager {
     }
   }
 
+  String[] listUserNames(String metalake) {
+
+    return Arrays.stream(listUsersInternal(metalake, false /* allFields */))
+        .map(User::name)
+        .toArray(String[]::new);
+  }
+
+  User[] listUsers(String metalake) {
+    return listUsersInternal(metalake, true /* allFields */);
+  }
+
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       GroupEntity groupEntity =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
@@ -139,7 +158,7 @@ class UserGroupManager {
 
   boolean removeGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
@@ -153,7 +172,7 @@ class UserGroupManager {
 
   Group getGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
 
       return store.get(
           AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP, GroupEntity.class);
@@ -162,6 +181,49 @@ class UserGroupManager {
       throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  Group[] listGroups(String metalake) {
+    return listGroupInternal(metalake, true);
+  }
+
+  String[] listGroupNames(String metalake) {
+    return Arrays.stream(listGroupInternal(metalake, false))
+        .map(Group::name)
+        .toArray(String[]::new);
+  }
+
+  private User[] listUsersInternal(String metalake, boolean allFields) {
+    try {
+      checkMetalake(NameIdentifier.of(metalake), store);
+
+      Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
+      return store
+          .list(namespace, UserEntity.class, Entity.EntityType.USER, allFields)
+          .toArray(new User[0]);
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private Group[] listGroupInternal(String metalake, boolean allFields) {
+    try {
+      checkMetalake(NameIdentifier.of(metalake), store);
+      Namespace namespace = AuthorizationUtils.ofGroupNamespace(metalake);
+      return store
+          .list(namespace, GroupEntity.class, EntityType.GROUP, allFields)
+          .toArray(new Group[0]);
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Listing group under metalake {} failed due to storage issues", metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }

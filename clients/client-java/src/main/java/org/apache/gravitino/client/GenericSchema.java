@@ -23,27 +23,36 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic schema. */
-class GenericSchema implements Schema, SupportsTags {
+class GenericSchema implements Schema, SupportsTags, SupportsRoles {
 
   private final SchemaDTO schemaDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectRoleOperations objectRoleOperations;
 
   GenericSchema(SchemaDTO schemaDTO, RESTClient restClient, String metalake, String catalog) {
     this.schemaDTO = schemaDTO;
     MetadataObject schemaObject =
         MetadataObjects.of(catalog, schemaDTO.name(), MetadataObject.Type.SCHEMA);
     this.objectTagOperations = new MetadataObjectTagOperations(metalake, schemaObject, restClient);
+    this.objectRoleOperations =
+        new MetadataObjectRoleOperations(metalake, schemaObject, restClient);
   }
 
   @Override
   public SupportsTags supportsTags() {
+    return this;
+  }
+
+  @Override
+  public SupportsRoles supportsRoles() {
     return this;
   }
 
@@ -85,6 +94,11 @@ class GenericSchema implements Schema, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return objectRoleOperations.listBindingRoleNames();
   }
 
   @Override

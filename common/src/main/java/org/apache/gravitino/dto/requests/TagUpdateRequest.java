@@ -114,11 +114,9 @@ public interface TagUpdateRequest extends RESTRequest {
       return TagChange.updateComment(newComment);
     }
 
+    /** Validates the fields of the request. Always pass. */
     @Override
-    public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment), "\"newComment\" must not be blank");
-    }
+    public void validate() throws IllegalArgumentException {}
   }
 
   /** The tag update request for setting a tag property. */

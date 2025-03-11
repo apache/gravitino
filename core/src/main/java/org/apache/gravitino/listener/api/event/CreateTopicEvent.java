@@ -51,4 +51,14 @@ public final class CreateTopicEvent extends TopicEvent {
   public TopicInfo createdTopicInfo() {
     return createdTopicInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TOPIC;
+  }
 }

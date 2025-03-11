@@ -67,7 +67,7 @@ public final class EntityCombinedTable implements Table {
     return new EntityCombinedTable(table, null);
   }
 
-  public EntityCombinedTable withHiddenPropertiesSet(Set<String> hiddenProperties) {
+  public EntityCombinedTable withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;
   }
@@ -126,6 +126,14 @@ public final class EntityCombinedTable implements Table {
 
   public boolean imported() {
     return imported;
+  }
+
+  public Table tableFromCatalog() {
+    return table;
+  }
+
+  public TableEntity tableFromGravitino() {
+    return tableEntity;
   }
 
   @Override

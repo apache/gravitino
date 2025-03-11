@@ -30,9 +30,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -72,10 +74,11 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* reserved */),
             stringRequiredPropertyEntry(
                 URI, "Iceberg catalog uri config", false /* immutable */, false /* hidden */),
-            stringRequiredPropertyEntry(
+            stringOptionalPropertyEntry(
                 WAREHOUSE,
                 "Iceberg catalog warehouse config",
                 false /* immutable */,
+                null, /* defaultValue */
                 false /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.IO_IMPL,
@@ -84,18 +87,42 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID,
-                "s3 access-key-id",
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                "s3 access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */),
+                false /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                "s3 secret-access-key",
+                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "s3 secret access key",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */));
-    HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+                "OSS access key ID",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+                "OSS access key secret",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+                "Azure storage account name",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+                "Azure storage account key",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */));
+    HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);

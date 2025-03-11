@@ -19,17 +19,19 @@
 
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KEY_TAB_URI;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CHECK_INTERVAL_SEC;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CLIENT_POOL_SIZE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
 import static org.apache.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,33 +46,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestHiveCatalogOperations {
-
-  @Test
-  void testGetClientPoolSize() {
-    Map<String, String> maps = Maps.newHashMap();
-    maps.put(CLIENT_POOL_SIZE, "10");
-    HiveCatalogOperations op = new HiveCatalogOperations();
-    op.initialize(maps, null, HIVE_PROPERTIES_METADATA);
-    Assertions.assertEquals(10, op.getClientPoolSize(maps));
-
-    maps.clear();
-    maps.put(CLIENT_POOL_SIZE + "_wrong_mark", "10");
-    op = new HiveCatalogOperations();
-    op.initialize(maps, null, HIVE_PROPERTIES_METADATA);
-    Assertions.assertNotEquals(10, op.getClientPoolSize(maps));
-
-    maps.put(CLIENT_POOL_SIZE, "1");
-    op = new HiveCatalogOperations();
-    op.initialize(maps, null, HIVE_PROPERTIES_METADATA);
-    Assertions.assertEquals(1, op.getClientPoolSize(maps));
-  }
-
   @Test
   void testInitialize() {
     Map<String, String> properties = Maps.newHashMap();
@@ -91,15 +73,15 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(15, propertyEntryMap.size());
+    Assertions.assertEquals(16, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
-    Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.AUTHORIZATION_PROVIDER));
+    Assertions.assertTrue(propertyEntryMap.containsKey(PROPERTY_IN_USE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(AUTHORIZATION_PROVIDER));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
-
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
@@ -111,7 +93,9 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isImmutable());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isImmutable());
   }
 
   @Test

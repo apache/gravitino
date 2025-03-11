@@ -31,6 +31,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -46,6 +47,10 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
@@ -75,6 +80,8 @@ public class TestOwnerManager {
 
   private static IdGenerator idGenerator;
   private static OwnerManager ownerManager;
+  private static CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+  private static AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -98,6 +105,7 @@ public class TestOwnerManager {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
@@ -137,6 +145,11 @@ public class TestOwnerManager {
     entityStore.put(groupEntity, false /* overwritten*/);
 
     ownerManager = new OwnerManager(entityStore);
+    BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    Mockito.when(catalogManager.listCatalogs(Mockito.any()))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "catalog")});
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
 
   @AfterAll
@@ -155,6 +168,8 @@ public class TestOwnerManager {
     MetadataObject metalakeObject =
         MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
     Assertions.assertFalse(ownerManager.getOwner(METALAKE, metalakeObject).isPresent());
+    Mockito.verify(authorizationPlugin, Mockito.never())
+        .onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
 
     // Test not-existed metadata object
     MetadataObject notExistObject =
@@ -164,13 +179,16 @@ public class TestOwnerManager {
 
     // Test to set the user as the owner
     ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
+    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
 
     Owner owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     // Test to set the group as the owner
+    Mockito.reset(authorizationPlugin);
     ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
+    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
 
     // Test not-existed metadata object
     Assertions.assertThrows(

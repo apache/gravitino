@@ -22,20 +22,25 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -106,6 +111,21 @@ public class GroupMetaService {
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
+  }
+
+  public List<GroupEntity> listGroupsByRoleIdent(NameIdentifier roleIdent) {
+    RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
+    List<GroupPO> groupPOs =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(roleEntity.id()));
+    return groupPOs.stream()
+        .map(
+            po ->
+                POConverters.fromGroupPO(
+                    po,
+                    Collections.emptyList(),
+                    AuthorizationUtils.ofGroupNamespace(roleIdent.namespace().level(0))))
+        .collect(Collectors.toList());
   }
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {
@@ -241,6 +261,36 @@ public class GroupMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  public List<GroupEntity> listGroupsByNamespace(Namespace namespace, boolean allFields) {
+    AuthorizationUtils.checkGroupNamespace(namespace);
+    String metalakeName = namespace.level(0);
+
+    if (allFields) {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<ExtendedGroupPO> groupPOs =
+          SessionUtils.getWithoutCommit(
+              GroupMetaMapper.class, mapper -> mapper.listExtendedGroupPOsByMetalakeId(metalakeId));
+      return groupPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromExtendedGroupPO(
+                      po, AuthorizationUtils.ofGroupNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    } else {
+      List<GroupPO> groupPOs =
+          SessionUtils.getWithoutCommit(
+              GroupMetaMapper.class, mapper -> mapper.listGroupPOsByMetalake(metalakeName));
+      return groupPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromGroupPO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofGroupNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {

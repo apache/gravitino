@@ -30,47 +30,46 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
-  implementation(project(":core"))
-
-  implementation(libs.caffeine)
-  implementation(libs.guava)
-  implementation(libs.hive2.exec) {
-    artifact {
-      classifier = "core"
-    }
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.google.protobuf")
-    exclude("org.apache.avro")
-    exclude("org.apache.calcite")
-    exclude("org.apache.calcite.avatica")
-    exclude("org.apache.curator")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.zookeeper")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.openjdk.jol")
-    exclude("org.pentaho")
-    exclude("org.slf4j")
+  implementation(project(":api")) {
+    exclude("*")
   }
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
+  implementation(project(":catalogs:hive-metastore-common"))
+  implementation(project(":core")) {
+    exclude("*")
+  }
+
+  implementation(libs.commons.collections3)
+  implementation(libs.commons.configuration1)
+  implementation(libs.htrace.core4)
+  implementation(libs.commons.io)
+  implementation(libs.guava)
+  implementation(libs.hadoop2.auth) {
+    exclude("*")
+  }
+  implementation(libs.woodstox.core)
   implementation(libs.hive2.metastore) {
+    exclude("ant")
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
     exclude("com.google.code.findbugs", "jsr305")
     exclude("com.google.code.findbugs", "sr305")
     exclude("com.tdunning", "json")
     exclude("com.zaxxer", "HikariCP")
-    exclude("io.dropwizard.metricss")
+    exclude("io.dropwizard.metrics")
     exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.ant")
     exclude("org.apache.avro")
     exclude("org.apache.curator")
+    exclude("org.apache.derby")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
     exclude("org.apache.hbase")
     exclude("org.apache.logging.log4j")
     exclude("org.apache.parquet", "parquet-hadoop-bundle")
     exclude("org.apache.zookeeper")
+    exclude("org.datanucleus")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.openjdk.jol")
@@ -91,16 +90,23 @@ dependencies {
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
+  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":catalogs:hadoop-common")) {
+    exclude("*")
+  }
 
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("*")
+  }
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -108,6 +114,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
 
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
@@ -123,6 +130,18 @@ dependencies {
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.localstack)
+  testImplementation(libs.hadoop2.aws)
+  testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.gcs)
+
+  // You need this to run test CatalogHiveABSIT as it required hadoop3 environment introduced by hadoop3.abs
+  // (The protocol `abfss` was first introduced in Hadoop 3.2.0), However, as the there already exists
+  // hadoop2.common in the test classpath, If we added the following dependencies directly, it will
+  // cause the conflict between hadoop2 and hadoop3, resulting test failures, so we comment the
+  // following line temporarily, if you want to run the test, please uncomment it.
+  // In the future, we may need to refactor the test to avoid the conflict.
+  // testImplementation(libs.hadoop3.common)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -135,7 +154,13 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+      // Exclude the following jars to avoid conflict with the jars in authorization-gcp
+      exclude("protobuf-java-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/hive/libs")
   }
 
@@ -167,26 +192,12 @@ tasks {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.5")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

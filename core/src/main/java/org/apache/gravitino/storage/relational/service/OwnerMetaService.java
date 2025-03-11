@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.utils.NameIdentifierUtil.getMetalake;
+
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
@@ -82,7 +84,6 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-
     String metalakeName = getMetalake(entity);
     Long metalakeId =
         getEntityId(metalakeName, NameIdentifier.of(metalakeName), EntityType.METALAKE);
@@ -116,14 +117,6 @@ public class OwnerMetaService {
         MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
         return MetadataObjectService.getMetadataObjectId(
             metalake, object.fullName(), object.type());
-    }
-  }
-
-  private static String getMetalake(NameIdentifier identifier) {
-    if (identifier.hasNamespace()) {
-      return identifier.namespace().level(0);
-    } else {
-      return identifier.name();
     }
   }
 }

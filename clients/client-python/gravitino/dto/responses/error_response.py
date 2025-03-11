@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 from typing import List, Optional
 from dataclasses import dataclass, field
@@ -23,7 +21,7 @@ from dataclasses_json import config
 
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.constants.error import ErrorConstants, EXCEPTION_MAPPING
-from gravitino.exceptions.base import UnknownError
+from gravitino.exceptions.base import BadRequestException, UnknownError
 
 
 @dataclass
@@ -46,12 +44,11 @@ class ErrorResponse(BaseResponse):
     def validate(self):
         super().validate()
 
-        assert (
-            self._type is not None and len(self._type) != 0
-        ), "type cannot be None or empty"
-        assert (
-            self._message is not None and len(self._message) != 0
-        ), "message cannot be None or empty"
+        if self._type is None or not self._type.strip():
+            raise BadRequestException("Type cannot be None or empty")
+
+        if self._message is None or not self._message.strip():
+            raise BadRequestException("Message cannot be None or empty")
 
     def __repr__(self) -> str:
         return (

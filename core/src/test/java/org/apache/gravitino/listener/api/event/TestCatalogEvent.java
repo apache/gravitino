@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -65,22 +66,40 @@ public class TestCatalogEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     dispatcher.createCatalog(
         identifier, catalog.type(), catalog.provider(), catalog.comment(), catalog.properties());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((CreateCatalogEvent) event).createdCatalogInfo();
     checkCatalogInfo(catalogInfo, catalog);
+    Assertions.assertEquals(OperationType.CREATE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateCatalogPreEvent.class, preEvent.getClass());
+    CatalogInfo preCatalogInfo = ((CreateCatalogPreEvent) preEvent).createCatalogRequest();
+    checkCatalogInfo(preCatalogInfo, catalog);
+    Assertions.assertEquals(OperationType.CREATE_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testLoadCatalogEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     dispatcher.loadCatalog(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((LoadCatalogEvent) event).loadedCatalogInfo();
     checkCatalogInfo(catalogInfo, catalog);
+    Assertions.assertEquals(OperationType.LOAD_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -88,7 +107,7 @@ public class TestCatalogEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     CatalogChange catalogChange = CatalogChange.setProperty("a", "b");
     dispatcher.alterCatalog(identifier, catalogChange);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((AlterCatalogEvent) event).updatedCatalogInfo();
@@ -96,36 +115,73 @@ public class TestCatalogEvent {
     CatalogChange[] catalogChanges = ((AlterCatalogEvent) event).catalogChanges();
     Assertions.assertEquals(1, catalogChanges.length);
     Assertions.assertEquals(catalogChange, catalogChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterCatalogPreEvent.class, preEvent.getClass());
+    CatalogChange[] preCatalogChanges = ((AlterCatalogPreEvent) preEvent).catalogChanges();
+    Assertions.assertEquals(1, preCatalogChanges.length);
+    Assertions.assertEquals(catalogChange, preCatalogChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testDropCatalogEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     dispatcher.dropCatalog(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropCatalogEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropCatalogEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testListCatalogEvent() {
     Namespace namespace = Namespace.of("metalake");
     dispatcher.listCatalogs(namespace);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
   void testListCatalogInfoEvent() {
     Namespace namespace = Namespace.of("metalake");
     dispatcher.listCatalogsInfo(namespace);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -140,13 +196,15 @@ public class TestCatalogEvent {
                 catalog.provider(),
                 catalog.comment(),
                 catalog.properties()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
         ((CreateCatalogFailureEvent) event).exception().getClass());
     checkCatalogInfo(((CreateCatalogFailureEvent) event).createCatalogRequest(), catalog);
+    Assertions.assertEquals(OperationType.CREATE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -154,11 +212,13 @@ public class TestCatalogEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadCatalog(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadCatalogFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -168,7 +228,7 @@ public class TestCatalogEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.alterCatalog(identifier, catalogChange));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -176,6 +236,8 @@ public class TestCatalogEvent {
     CatalogChange[] catalogChanges = ((AlterCatalogFailureEvent) event).catalogChanges();
     Assertions.assertEquals(1, catalogChanges.length);
     Assertions.assertEquals(catalogChange, catalogChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -183,11 +245,13 @@ public class TestCatalogEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropCatalog(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropCatalogFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DROP_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -195,11 +259,13 @@ public class TestCatalogEvent {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listCatalogs(namespace));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(ListCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListCatalogFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListCatalogFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -207,11 +273,13 @@ public class TestCatalogEvent {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listCatalogsInfo(namespace));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(ListCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListCatalogFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListCatalogFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkCatalogInfo(CatalogInfo catalogInfo, Catalog catalog) {
@@ -243,7 +311,7 @@ public class TestCatalogEvent {
             any(Map.class)))
         .thenReturn(catalog);
     when(dispatcher.loadCatalog(any(NameIdentifier.class))).thenReturn(catalog);
-    when(dispatcher.dropCatalog(any(NameIdentifier.class))).thenReturn(true);
+    when(dispatcher.dropCatalog(any(NameIdentifier.class), anyBoolean())).thenReturn(true);
     when(dispatcher.listCatalogs(any(Namespace.class))).thenReturn(null);
     when(dispatcher.alterCatalog(any(NameIdentifier.class), any(CatalogChange.class)))
         .thenReturn(catalog);

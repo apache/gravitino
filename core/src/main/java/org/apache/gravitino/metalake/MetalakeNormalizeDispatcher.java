@@ -19,16 +19,23 @@
 package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Entity.SYSTEM_METALAKE_RESERVED_NAME;
+import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.meta.BaseMetalake.PROPERTIES_METADATA;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
   private static final Set<String> RESERVED_WORDS = ImmutableSet.of(SYSTEM_METALAKE_RESERVED_NAME);
@@ -70,6 +77,7 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
     validateMetalakeName(ident.name());
+    validatePropertyForCreate(PROPERTIES_METADATA, properties);
     return dispatcher.createMetalake(ident, comment, properties);
   }
 
@@ -83,6 +91,10 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
                 validateMetalakeName(((MetalakeChange.RenameMetalake) change).getNewName());
               }
             });
+    Pair<Map<String, String>, Map<String, String>> alterProperty =
+        getMetalakeAlterProperty(changes);
+    validatePropertyForAlter(
+        PROPERTIES_METADATA, alterProperty.getLeft(), alterProperty.getRight());
     return dispatcher.alterMetalake(ident, changes);
   }
 
@@ -93,6 +105,22 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
     return dispatcher.dropMetalake(ident);
   }
 
+  @Override
+  public boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, MetalakeInUseException {
+    return dispatcher.dropMetalake(ident, force);
+  }
+
+  @Override
+  public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    dispatcher.enableMetalake(ident);
+  }
+
+  @Override
+  public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    dispatcher.disableMetalake(ident);
+  }
+
   private void validateMetalakeName(String name) {
     if (RESERVED_WORDS.contains(name)) {
       throw new IllegalArgumentException("The metalake name '" + name + "' is reserved.");
@@ -100,5 +128,27 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
     if (!name.matches(METALAKE_NAME_PATTERN)) {
       throw new IllegalArgumentException("The metalake name '" + name + "' is illegal.");
     }
+  }
+
+  private Pair<Map<String, String>, Map<String, String>> getMetalakeAlterProperty(
+      MetalakeChange... metalakeChanges) {
+    Map<String, String> upserts = Maps.newHashMap();
+    Map<String, String> deletes = Maps.newHashMap();
+
+    Arrays.stream(metalakeChanges)
+        .forEach(
+            metalakeChange -> {
+              if (metalakeChange instanceof MetalakeChange.SetProperty) {
+                MetalakeChange.SetProperty setProperty =
+                    (MetalakeChange.SetProperty) metalakeChange;
+                upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (metalakeChange instanceof MetalakeChange.RemoveProperty) {
+                MetalakeChange.RemoveProperty removeProperty =
+                    (MetalakeChange.RemoveProperty) metalakeChange;
+                deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
+              }
+            });
+
+    return Pair.of(upserts, deletes);
   }
 }

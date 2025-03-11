@@ -27,10 +27,12 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -46,8 +48,9 @@ import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
-import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
@@ -79,7 +82,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void initialize() {
-    gravitinoEnv.initialize(serverConfig, true);
+    gravitinoEnv.initializeFullComponents(serverConfig);
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -112,13 +115,18 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
-            bind(gravitinoEnv.tagManager()).to(TagManager.class).ranked(1);
+            bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
+            bind(gravitinoEnv.credentialOperationDispatcher())
+                .to(CredentialOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
+    property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);
@@ -160,9 +168,9 @@ public class GravitinoServer extends ResourceConfig {
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = loadConfig(confPath);
     GravitinoServer server = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
-    server.initialize();
 
     try {
+      server.initialize();
       // Instantiates GravitinoServer
       server.start();
     } catch (Exception e) {

@@ -1,0 +1,17 @@
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""ds123"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino""}"
+
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""ds123"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""test_key"":""test_value"",""trino.bypass.join-pushdown.strategy"":""EAGER""}"
+
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""ds123"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""test_key"":""test_value""}"
+
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""ds123"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""trino.bypass.join-pushdown.strategy"":""EAGER""}"
+
+CALL

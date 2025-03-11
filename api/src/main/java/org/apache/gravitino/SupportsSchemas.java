@@ -65,12 +65,16 @@ public interface SupportsSchemas {
   }
 
   /**
-   * Create a schema in the catalog.
+   * Creates a schema in the catalog based on the provided details.
+   *
+   * <p>This method returns the schema as defined by the user without applying all defaults. If you
+   * need the schema with default values applied, use the {@link #loadSchema(String)} method after
+   * creation.
    *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
-   * @return The created schema.
+   * @return The schema as defined by the caller, without all default values.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */

@@ -1,35 +1,35 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from typing import List, Dict
 
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
-from gravitino.dto.dto_converters import DTOConverters
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_create_request import MetalakeCreateRequest
+from gravitino.dto.requests.metalake_set_request import MetalakeSetRequest
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.metalake_list_response import MetalakeListResponse
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
+from gravitino.rest.rest_utils import encode_string
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class GravitinoAdminClient(GravitinoClientBase):
         updates_request.validate()
 
         resp = self._rest_client.put(
-            self.API_METALAKES_IDENTIFIER_PATH + name,
+            self.API_METALAKES_IDENTIFIER_PATH + encode_string(name),
             updates_request,
             error_handler=METALAKE_ERROR_HANDLER,
         )
@@ -114,23 +114,59 @@ class GravitinoAdminClient(GravitinoClientBase):
 
         return GravitinoMetalake(metalake, self._rest_client)
 
-    def drop_metalake(self, name: str) -> bool:
+    def drop_metalake(self, name: str, force: bool = False) -> bool:
         """Drops a specific Metalake using the Gravitino API.
 
         Args:
             name: The name of the Metalake to be dropped.
+            force: Whether to force the drop operation.
 
         Returns:
-            True if the Metalake was successfully dropped, false otherwise.
+            True if the Metalake was successfully dropped, false if the Metalake does not exist.
         """
-        try:
-            resp = self._rest_client.delete(
-                self.API_METALAKES_IDENTIFIER_PATH + name,
-                error_handler=METALAKE_ERROR_HANDLER,
-            )
-            drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
-            return drop_response.dropped()
-        except Exception:
-            logger.warning("Failed to drop metalake %s", name)
-            return False
+        params = {"force": str(force)}
+        resp = self._rest_client.delete(
+            self.API_METALAKES_IDENTIFIER_PATH + encode_string(name),
+            params=params,
+            error_handler=METALAKE_ERROR_HANDLER,
+        )
+        drop_response = DropResponse.from_json(resp.body, infer_missing=True)
+
+        return drop_response.dropped()
+
+    def enable_metalake(self, name: str):
+        """Enable the metalake with specified name. If the metalake is already in use, this method does nothing.
+
+        Args:
+            name: the name of the metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake with specified name does not exist.
+        """
+
+        metalake_enable_request = MetalakeSetRequest(in_use=True)
+        metalake_enable_request.validate()
+
+        url = self.API_METALAKES_IDENTIFIER_PATH + encode_string(name)
+        self._rest_client.patch(
+            url, json=metalake_enable_request, error_handler=METALAKE_ERROR_HANDLER
+        )
+
+    def disable_metalake(self, name: str):
+        """Disable the metalake with specified name. If the metalake is already disabled, does nothing.
+
+        Args:
+            name: the name of the metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake with specified name does not exist.
+        """
+
+        metalake_disable_request = MetalakeSetRequest(in_use=False)
+        metalake_disable_request.validate()
+
+        url = self.API_METALAKES_IDENTIFIER_PATH + encode_string(name)
+        self._rest_client.patch(
+            url, json=metalake_disable_request, error_handler=METALAKE_ERROR_HANDLER
+        )

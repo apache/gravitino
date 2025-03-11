@@ -23,11 +23,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -166,5 +172,41 @@ public class TestUtils {
     assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     assertEquals("Unsupported operation", errorResponse.getMessage());
+  }
+
+  @Test
+  public void testFilterFilesetAuditHeaders() {
+    // test invalid internal client type
+    HttpServletRequest mockRequest1 = Mockito.mock(HttpServletRequest.class);
+    when(mockRequest1.getHeader(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE))
+        .thenReturn("test");
+    Map<String, String> auditMap1 = Utils.filterFilesetAuditHeaders(mockRequest1);
+    Assertions.assertEquals(
+        InternalClientType.UNKNOWN.name(),
+        auditMap1.get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
+
+    // test invalid fileset data operation
+    HttpServletRequest mockRequest2 = Mockito.mock(HttpServletRequest.class);
+    when(mockRequest2.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))
+        .thenReturn("test");
+    Map<String, String> auditMap2 = Utils.filterFilesetAuditHeaders(mockRequest2);
+    Assertions.assertEquals(
+        FilesetDataOperation.UNKNOWN.name(),
+        auditMap2.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
+
+    // test normal audit headers
+    HttpServletRequest mockRequest3 = Mockito.mock(HttpServletRequest.class);
+    when(mockRequest3.getHeader(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE))
+        .thenReturn(InternalClientType.HADOOP_GVFS.name());
+    when(mockRequest3.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))
+        .thenReturn(FilesetDataOperation.GET_FILE_STATUS.name());
+    Map<String, String> filteredMap = Utils.filterFilesetAuditHeaders(mockRequest3);
+    Assertions.assertEquals(2, filteredMap.size());
+    Assertions.assertEquals(
+        InternalClientType.HADOOP_GVFS.name(),
+        filteredMap.get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
+    Assertions.assertEquals(
+        FilesetDataOperation.GET_FILE_STATUS.name(),
+        filteredMap.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
   }
 }

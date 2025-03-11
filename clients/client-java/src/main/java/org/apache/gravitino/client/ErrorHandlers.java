@@ -28,15 +28,28 @@ import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -44,8 +57,11 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -190,12 +206,30 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to credential operations.
+   *
+   * @return A Consumer representing the credential error handler.
+   */
+  public static Consumer<ErrorResponse> credentialErrorHandler() {
+    return CredentialErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates an error handler specific to Owner operations.
    *
    * @return A Consumer representing the Owner error handler.
    */
   public static Consumer<ErrorResponse> ownerErrorHandler() {
     return OwnerErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Model operations.
+   *
+   * @return A Consumer representing the Model error handler.
+   */
+  public static Consumer<ErrorResponse> modelErrorHandler() {
+    return ModelErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -269,6 +303,19 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
         default:
           super.accept(errorResponse);
       }
@@ -302,8 +349,25 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -342,6 +406,22 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -379,8 +459,38 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new CatalogAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogInUseException.class.getSimpleName())) {
+            throw new CatalogInUseException(errorMessage);
+
+          } else if (errorResponse.getType().equals(MetalakeInUseException.class.getSimpleName())) {
+            throw new MetalakeInUseException(errorMessage);
+
+          } else {
+            throw new InUseException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptyCatalogException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -409,6 +519,15 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.IN_USE_CODE:
+          throw new MetalakeInUseException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptyMetalakeException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -494,8 +613,24 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new FilesetAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -529,8 +664,24 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -563,6 +714,12 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new UserAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -599,6 +756,12 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new GroupAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -620,19 +783,40 @@ public class ErrorHandlers {
 
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(errorMessage);
+          if (errorResponse.getType().equals(IllegalPrivilegeException.class.getSimpleName())) {
+            throw new IllegalPrivilegeException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(IllegalMetadataObjectException.class.getSimpleName())) {
+            throw new IllegalMetadataObjectException(errorMessage);
+          } else {
+            throw new IllegalArgumentException(errorMessage);
+          }
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
             throw new NoSuchMetalakeException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
             throw new NoSuchRoleException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new RoleAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -656,7 +840,13 @@ public class ErrorHandlers {
 
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(errorMessage);
+          if (errorResponse.getType().equals(IllegalPrivilegeException.class.getSimpleName())) {
+            throw new IllegalPrivilegeException(errorMessage);
+          } else if (errorResponse.getType().equals(IllegalRoleException.class.getSimpleName())) {
+            throw new IllegalRoleException(errorMessage);
+          } else {
+            throw new IllegalArgumentException(errorMessage);
+          }
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
@@ -667,9 +857,52 @@ public class ErrorHandlers {
             throw new NoSuchGroupException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
             throw new NoSuchRoleException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Credential operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class CredentialErrorHandler extends RestErrorHandler {
+
+    private static final CredentialErrorHandler INSTANCE = new CredentialErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -714,6 +947,9 @@ public class ErrorHandlers {
             throw new AlreadyExistsException(errorMessage);
           }
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -744,8 +980,77 @@ public class ErrorHandlers {
             throw new NotFoundException(errorMessage);
           }
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Model operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class ModelErrorHandler extends RestErrorHandler {
+
+    private static final ModelErrorHandler INSTANCE = new ModelErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMsg);
+          } else if (errorResponse.getType().equals(NoSuchModelException.class.getSimpleName())) {
+            throw new NoSuchModelException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchModelVersionException.class.getSimpleName())) {
+            throw new NoSuchModelVersionException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(ModelAlreadyExistsException.class.getSimpleName())) {
+            throw new ModelAlreadyExistsException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(ModelVersionAliasesAlreadyExistException.class.getSimpleName())) {
+            throw new ModelVersionAliasesAlreadyExistException(errorMsg);
+          } else {
+            throw new AlreadyExistsException(errorMsg);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMsg);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
 
         default:
           super.accept(errorResponse);

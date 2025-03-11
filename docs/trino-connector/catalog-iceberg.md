@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - Iceberg catalog"
+title: "Apache Gravitino Trino connector - Iceberg catalog"
 slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -25,20 +25,20 @@ To use Iceberg, you need:
 Users can create a schema through Apache Gravitino Trino connector as follows:
 
 ```SQL
-CREATE SCHEMA "metalake.catalog".schema_name 
+CREATE SCHEMA catalog.schema_name
 ```
 
 ## Table operations
 
 ### Create table
 
-The Gravitino connector currently supports basic Iceberg table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Apache Gravitino Trino connector currently supports basic Iceberg table creation statements, such as defining fields,
+allowing null values, and adding comments. The Apache Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Iceberg catalog:
 
 ```shell
-CREATE TABLE "metalake.catalog".schema_name.table_name
+CREATE TABLE catalog.schema_name.table_name
 (
   name varchar,
   salary int
@@ -57,7 +57,7 @@ Support for the following alter table operations:
 
 ## Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Apache Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Table and Schema properties
@@ -71,12 +71,11 @@ Iceberg schema does not support properties.
 Users can use the following example to create a table with properties:
 
 ```sql
-CREATE TABLE "metalake.catalog".dbname.tablename
+CREATE TABLE catalog.dbname.tablename
 (
   name varchar,
   salary int
 ) WITH (
-  format = 'TEXTFILE',
   KEY = 'VALUE',
   ...      
 );
@@ -93,10 +92,10 @@ Reserved properties: A reserved property is one can't be set by users but can be
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the Iceberg catalog in Trino through Gravitino.
+You need to do the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino.
 
-- Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
-then you can use the following code to create them in Gravitino:
+- Create a metalake and catalog in Apache Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
+then you can use the following code to create them in Apache Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -126,7 +125,7 @@ For More information about the Iceberg catalog, please refer to [Iceberg catalog
 
 Use the Trino CLI to connect to the Trino container and run a query.
 
-Listing all Gravitino managed catalogs:
+Listing all Apache Gravitino managed catalogs:
 
 ```sql 
 SHOW CATALOGS;
@@ -147,7 +146,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `test.iceberg_test` catalog is the catalog created by you in Gravitino.
+The `iceberg_test` catalog is the catalog created by you in Apache Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -158,7 +157,7 @@ Create a new schema named `database_01` in `test.iceberg_test` catalog.
 CREATE SCHEMA iceberg_test.database_01;
 ```
 
-Create a new table named `table_01` in schema `"test.iceberg_test".database_01`.
+Create a new table named `table_01` in schema `iceberg_test.database_01`.
 
 ```sql
 CREATE TABLE iceberg_test.database_01.table_01
@@ -182,7 +181,7 @@ INSERT INTO iceberg_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM "test.iceberg_test".database_01.table_01;
+INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM iceberg_test.database_01.table_01;
 ```
 
 ### Querying data
@@ -190,7 +189,7 @@ INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM "test
 Query the `table_01` table:
 
 ```sql
-SELECT * FROM "test.iceberg_test".database_01.table_01;
+SELECT * FROM iceberg_test.database_01.table_01;
 ```
 
 ### Modify a table
@@ -198,19 +197,19 @@ SELECT * FROM "test.iceberg_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-ALTER TABLE "test.iceberg_test".database_01.table_01 ADD COLUMN age int;
+ALTER TABLE iceberg_test.database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-ALTER TABLE "test.iceberg_test".database_01.table_01 DROP COLUMN age;
+ALTER TABLE iceberg_test.database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE "test.iceberg_test".database_01.table_01 RENAME TO "test.iceberg_test".database_01.table_02;
+ALTER TABLE iceberg_test.database_01.table_01 RENAME TO iceberg_test.database_01.table_02;
 ```
 
 ### Drop
@@ -218,13 +217,13 @@ ALTER TABLE "test.iceberg_test".database_01.table_01 RENAME TO "test.iceberg_tes
 Drop a schema:
 
 ```sql
-DROP SCHEMA "test.iceberg_test".database_01;
+DROP SCHEMA iceberg_test.database_01;
 ```
 
 Drop a table:
 
 ```sql
-DROP TABLE "test.iceberg_test".database_01.table_01;
+DROP TABLE iceberg_test.database_01.table_01;
 ```
 
 ## HDFS username and permissions
@@ -237,3 +236,52 @@ replacing hdfs_user with the appropriate username:
 ```text
 -DHADOOP_USER_NAME=hdfs_user
 ```
+
+## S3
+
+When using AWS S3 within the Iceberg catalog, users need to configure the Trino Iceberg connector's
+AWS S3-related properties in the catalog's properties. Please refer to the documentation
+of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+These configurations must use the `trino.bypass.` prefix in the Iceberg catalog's attributes to be effective.
+
+To create an Iceberg catalog with AWS S3 configuration in the Trino CLI, use the following command:
+
+```sql
+call gravitino.system.create_catalog(
+    'gt_iceberg',
+    'lakehouse-iceberg',
+    map(
+        array['uri', 'catalog-backend', 'warehouse',
+          'trino.bypass.hive.s3.aws-access-key', 'trino.bypass.hive.s3.aws-secret-key', 'trino.bypass.hive.s3.region',
+          's3-access-key-id', 's3-secret-access-key', 's3-region', 'io-impl'
+        ],
+        array['thrift://hive:9083', 'hive', 's3a://trino-test-ice/dw2',
+        '<aws-access-key>', '<aws-secret-key>', '<region>',
+        '<aws-access-key>', '<aws-secret-key>', '<region>', 'org.apache.iceberg.aws.s3.S3FileIO']
+    )
+);
+```
+
+- The configurations of `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`, `trino.bypass.hive.s3.region`
+are the required the configurations for the Apache Gravitino Trino connector.
+- The configurations of `s3-access-key-id`, `s3-secret-access-key`, `io-impl` and `s3-region`.
+are the required the configurations for the [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+- The `location` specifies the storage path on AWS S3. Ensure that the specified directory exists on AWS S3 before proceeding.
+
+Once the Iceberg catalog is successfully created, users can create schemas and tables as follows:
+
+```sql
+CREATE SCHEMA gt_iceberg.gt_db03;
+
+CREATE TABLE gt_iceberg.gt_db03.tb01 (
+    name varchar,
+    salary int
+);
+```
+
+After running the command, the tables are ready for data reading and writing operations on AWS S3.
+
+:::note
+TThe Iceberg catalog module in the Apache Gravitino server should add AWS S3 support.
+Please refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+:::

@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +43,8 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           JdbcConfig.USERNAME.getKey(),
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
-          JdbcConfig.POOL_MAX_SIZE.getKey());
+          JdbcConfig.POOL_MAX_SIZE.getKey(),
+          JdbcConfig.TEST_ON_BORROW.getKey());
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -60,24 +63,30 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.JDBC_DRIVER.getKey(),
                 JdbcConfig.JDBC_DRIVER.getDoc(),
+                true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
+                false /* hidden */,
+                false /* reserved */),
+            stringPropertyEntry(
                 JdbcConfig.USERNAME.getKey(),
                 JdbcConfig.USERNAME.getDoc(),
+                true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
+                false /* hidden */,
+                false /* reserved */),
+            stringPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(),
                 JdbcConfig.PASSWORD.getDoc(),
+                true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                false /* hidden */,
+                false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
                 JdbcConfig.POOL_MIN_SIZE.getDoc(),
@@ -93,8 +102,19 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* immutable */,
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
                 true /* hidden */,
+                false /* reserved */),
+            booleanPropertyEntry(
+                JdbcConfig.TEST_ON_BORROW.getKey(),
+                JdbcConfig.TEST_ON_BORROW.getDoc(),
+                false /* required */,
+                false /* immutable */,
+                JdbcConfig.TEST_ON_BORROW.getDefaultValue(),
+                true /* hidden */,
                 false /* reserved */));
-    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
+    PROPERTIES_METADATA =
+        ImmutableMap.<String, PropertyEntry<?>>builder()
+            .putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName))
+            .build();
   }
 
   @Override

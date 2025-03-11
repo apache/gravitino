@@ -31,11 +31,13 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -54,6 +56,9 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -63,9 +68,12 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -91,6 +99,13 @@ public class TestTagManager {
   private static final String SCHEMA = "schema_for_tag_test";
 
   private static final String TABLE = "table_for_tag_test";
+
+  private static final String COLUMN = "column_for_tag_test";
+
+  private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+  private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
+  private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+  private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
 
   private static EntityStore entityStore;
 
@@ -157,19 +172,40 @@ public class TestTagManager {
             .build();
     entityStore.put(schema, false /* overwritten */);
 
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(COLUMN)
+            .withPosition(0)
+            .withComment("Test column")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(audit)
+            .build();
+
     TableEntity table =
         TableEntity.builder()
             .withId(idGenerator.nextId())
             .withName(TABLE)
+            .withColumns(Lists.newArrayList(column))
             .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
             .withAuditInfo(audit)
             .build();
     entityStore.put(table, false /* overwritten */);
 
-    tagManager = spy(new TagManager(idGenerator, entityStore));
-    doReturn(true)
-        .when(tagManager)
-        .checkAndImportEntity(Mockito.any(), Mockito.any(), Mockito.any());
+    tagManager = new TagManager(idGenerator, entityStore);
+
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    when(catalogDispatcher.catalogExists(any())).thenReturn(true);
+    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
   }
 
   @AfterAll
@@ -201,6 +237,13 @@ public class TestTagManager {
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
     String[] tableTags = tagManager.listTagsForMetadataObject(METALAKE, tableObject);
     tagManager.associateTagsForMetadataObject(METALAKE, tableObject, null, tableTags);
+
+    MetadataObject columnObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
+            Entity.EntityType.COLUMN);
+    String[] columnTags = tagManager.listTagsForMetadataObject(METALAKE, columnObject);
+    tagManager.associateTagsForMetadataObject(METALAKE, columnObject, null, columnTags);
 
     Arrays.stream(tagManager.listTags(METALAKE)).forEach(n -> tagManager.deleteTag(METALAKE, n));
   }
@@ -422,6 +465,37 @@ public class TestTagManager {
 
     Assertions.assertEquals(2, tags6.length);
     Assertions.assertEquals(ImmutableSet.of("tag1", "tag3"), ImmutableSet.copyOf(tags6));
+
+    // Test associate and disassociate same tags for column
+    MetadataObject columnObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
+            Entity.EntityType.COLUMN);
+
+    String[] tagsToAdd3 = new String[] {tag1.name()};
+    String[] tags7 =
+        tagManager.associateTagsForMetadataObject(METALAKE, columnObject, tagsToAdd3, null);
+
+    Assertions.assertEquals(1, tags7.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tags7));
+
+    // Test associate and disassociate tags for column
+    String[] tagsToRemove2 = new String[] {tag1.name()};
+    String[] tags8 =
+        tagManager.associateTagsForMetadataObject(METALAKE, columnObject, null, tagsToRemove2);
+
+    Assertions.assertEquals(0, tags8.length);
+    Assertions.assertEquals(ImmutableSet.of(), ImmutableSet.copyOf(tags8));
+
+    // Test associate and disassociate same tags for column
+    String[] tagsToAdd4 = new String[] {tag2.name(), tag3.name()};
+    String[] tagsToRemove3 = new String[] {tag2.name()};
+    String[] tags9 =
+        tagManager.associateTagsForMetadataObject(
+            METALAKE, columnObject, tagsToAdd4, tagsToRemove3);
+
+    Assertions.assertEquals(1, tags9.length);
+    Assertions.assertEquals(ImmutableSet.of("tag3"), ImmutableSet.copyOf(tags9));
   }
 
   @Test
@@ -439,6 +513,10 @@ public class TestTagManager {
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    MetadataObject columnObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
+            Entity.EntityType.COLUMN);
 
     tagManager.associateTagsForMetadataObject(
         METALAKE, catalogObject, new String[] {tag1.name(), tag2.name(), tag3.name()}, null);
@@ -446,11 +524,14 @@ public class TestTagManager {
         METALAKE, schemaObject, new String[] {tag1.name(), tag2.name()}, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, tableObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, columnObject, new String[] {tag1.name()}, null);
 
     MetadataObject[] objects = tagManager.listMetadataObjectsForTag(METALAKE, tag1.name());
-    Assertions.assertEquals(3, objects.length);
+    Assertions.assertEquals(4, objects.length);
     Assertions.assertEquals(
-        ImmutableSet.of(catalogObject, schemaObject, tableObject), ImmutableSet.copyOf(objects));
+        ImmutableSet.of(catalogObject, schemaObject, tableObject, columnObject),
+        ImmutableSet.copyOf(objects));
 
     MetadataObject[] objects1 = tagManager.listMetadataObjectsForTag(METALAKE, tag2.name());
     Assertions.assertEquals(2, objects1.length);
@@ -487,6 +568,10 @@ public class TestTagManager {
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    MetadataObject columnObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
+            Entity.EntityType.COLUMN);
 
     tagManager.associateTagsForMetadataObject(
         METALAKE, catalogObject, new String[] {tag1.name(), tag2.name(), tag3.name()}, null);
@@ -494,6 +579,8 @@ public class TestTagManager {
         METALAKE, schemaObject, new String[] {tag1.name(), tag2.name()}, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, tableObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, columnObject, new String[] {tag1.name()}, null);
 
     String[] tags = tagManager.listTagsForMetadataObject(METALAKE, catalogObject);
     Assertions.assertEquals(3, tags.length);
@@ -518,6 +605,14 @@ public class TestTagManager {
     Tag[] tagsInfo2 = tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(1, tagsInfo2.length);
     Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo2));
+
+    String[] tags3 = tagManager.listTagsForMetadataObject(METALAKE, columnObject);
+    Assertions.assertEquals(1, tags3.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tags3));
+
+    Tag[] tagsInfo3 = tagManager.listTagsInfoForMetadataObject(METALAKE, columnObject);
+    Assertions.assertEquals(1, tagsInfo3.length);
+    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo3));
 
     // List tags for non-existent metadata object
     MetadataObject nonExistentObject =
@@ -547,6 +642,10 @@ public class TestTagManager {
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    MetadataObject columnObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
+            Entity.EntityType.COLUMN);
 
     tagManager.associateTagsForMetadataObject(
         METALAKE, catalogObject, new String[] {tag1.name(), tag2.name(), tag3.name()}, null);
@@ -554,6 +653,8 @@ public class TestTagManager {
         METALAKE, schemaObject, new String[] {tag1.name(), tag2.name()}, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, tableObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, columnObject, new String[] {tag1.name()}, null);
 
     Tag result = tagManager.getTagForMetadataObject(METALAKE, catalogObject, tag1.name());
     Assertions.assertEquals(tag1, result);
@@ -566,6 +667,9 @@ public class TestTagManager {
 
     Tag result3 = tagManager.getTagForMetadataObject(METALAKE, catalogObject, tag3.name());
     Assertions.assertEquals(tag3, result3);
+
+    Tag result4 = tagManager.getTagForMetadataObject(METALAKE, tableObject, tag1.name());
+    Assertions.assertEquals(tag1, result4);
 
     // Test get non-existent tag for metadata object
     Throwable e =

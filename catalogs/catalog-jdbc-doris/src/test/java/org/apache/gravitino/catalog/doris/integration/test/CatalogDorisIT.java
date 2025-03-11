@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -42,12 +43,13 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.rel.Column;
@@ -55,6 +57,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -73,16 +76,14 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
-@TestInstance(Lifecycle.PER_CLASS)
-public class CatalogDorisIT extends AbstractIT {
+public class CatalogDorisIT extends BaseIT {
 
   private static final String provider = "jdbc-doris";
 
@@ -111,6 +112,7 @@ public class CatalogDorisIT extends AbstractIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private GravitinoMetalake metalake;
+  private String jdbcUrl;
 
   protected Catalog catalog;
 
@@ -126,8 +128,8 @@ public class CatalogDorisIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    metalake.dropCatalog(catalogName);
-    AbstractIT.client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
   }
 
   @AfterEach
@@ -141,13 +143,12 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetalake[] gravitinoMetaLakes = AbstractIT.client.listMetalakes();
+    GravitinoMetalake[] gravitinoMetaLakes = client.listMetalakes();
     assertEquals(0, gravitinoMetaLakes.length);
 
-    GravitinoMetalake createdMetalake =
-        AbstractIT.client.createMetalake(metalakeName, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = AbstractIT.client.loadMetalake(metalakeName);
-    assertEquals(createdMetalake, loadMetalake);
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
+    assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -157,7 +158,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     DorisContainer dorisContainer = containerSuite.getDorisContainer();
 
-    String jdbcUrl =
+    jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
             dorisContainer.getContainerIpAddress(), DorisContainer.FE_MYSQL_PORT);
@@ -332,25 +333,15 @@ public class CatalogDorisIT extends AbstractIT {
 
     Map<String, String> properties = createTableProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            distribution,
-            null,
-            indexes);
-
-    ITUtils.assertionsTableInfo(
-        tableName,
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
         table_comment,
-        Arrays.asList(columns),
         properties,
-        indexes,
         Transforms.EMPTY_TRANSFORM,
-        createdTable);
+        distribution,
+        null,
+        indexes);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -475,6 +466,27 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   @Test
+  void testTestConnection() {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), DRIVER_CLASS_NAME);
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), DorisContainer.USER_NAME);
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), "wrong_password");
+
+    Exception exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("doris_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "doris catalog comment",
+                    catalogProperties));
+    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
+  }
+
+  @Test
   void testAlterDorisTable() {
     // create a table
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -489,16 +501,16 @@ public class CatalogDorisIT extends AbstractIT {
 
     Map<String, String> properties = createTableProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            distribution,
-            null,
-            indexes);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        indexes);
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
 
     ITUtils.assertionsTableInfo(
         tableName,
@@ -507,7 +519,7 @@ public class CatalogDorisIT extends AbstractIT {
         properties,
         indexes,
         Transforms.EMPTY_TRANSFORM,
-        createdTable);
+        loadedTable);
 
     // Alter column type
     tableCatalog.alterTable(
@@ -565,6 +577,16 @@ public class CatalogDorisIT extends AbstractIT {
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () -> assertEquals(4, tableCatalog.loadTable(tableIdentifier).columns().length));
+
+    // set property
+    tableCatalog.alterTable(tableIdentifier, TableChange.setProperty("in_memory", "true"));
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertEquals(
+                    "true", tableCatalog.loadTable(tableIdentifier).properties().get("in_memory")));
   }
 
   @Test
@@ -641,24 +663,15 @@ public class CatalogDorisIT extends AbstractIT {
     Map<String, String> properties = createTableProperties();
     Transform[] partitioning = {Transforms.list(new String[][] {{DORIS_COL_NAME1}})};
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            null,
-            indexes);
-    ITUtils.assertionsTableInfo(
-        tableName,
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
         table_comment,
-        Arrays.asList(columns),
         properties,
-        indexes,
         partitioning,
-        createdTable);
+        distribution,
+        null,
+        indexes);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -862,6 +875,42 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   @Test
+  void testTableWithTimeStampColumn() {
+    // create a table
+    String tableName = GravitinoITUtils.genRandomName("test_table_with_timestamp_column");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    columns =
+        ArrayUtils.add(columns, Column.of("timestamp_col", Types.TimestampType.withoutTimeZone()));
+    Distribution distribution = createDistribution();
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+        };
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        indexes);
+
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Column timestampColumn =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> "timestamp_col".equals(c.name()))
+            .findFirst()
+            .get();
+
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), timestampColumn.dataType());
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");
@@ -872,24 +921,15 @@ public class CatalogDorisIT extends AbstractIT {
     Map<String, String> properties = createTableProperties();
     Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            null,
-            indexes);
-    ITUtils.assertionsTableInfo(
-        tableName,
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
         table_comment,
-        Arrays.asList(columns),
         properties,
-        indexes,
         partitioning,
-        createdTable);
+        distribution,
+        null,
+        indexes);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -922,5 +962,46 @@ public class CatalogDorisIT extends AbstractIT {
 
     assertThrows(
         UnsupportedOperationException.class, () -> tablePartitionOperations.dropPartition("p1"));
+  }
+
+  @Test
+  void testAllDistribution() {
+    Distribution[] distributions =
+        new Distribution[] {
+          Distributions.even(1, Expression.EMPTY_EXPRESSION),
+          Distributions.hash(1, NamedReference.field(DORIS_COL_NAME1)),
+          Distributions.even(10, Expression.EMPTY_EXPRESSION),
+          Distributions.hash(0, NamedReference.field(DORIS_COL_NAME1)),
+          Distributions.hash(11, NamedReference.field(DORIS_COL_NAME1)),
+          Distributions.hash(
+              12, NamedReference.field(DORIS_COL_NAME1), NamedReference.field(DORIS_COL_NAME2))
+        };
+
+    for (Distribution distribution : distributions) {
+      String tableName = GravitinoITUtils.genRandomName("test_distribution_table");
+      NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+      Column[] columns = createColumns();
+      Index[] indexes = Indexes.EMPTY_INDEXES;
+      Map<String, String> properties = createTableProperties();
+      Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+      TableCatalog tableCatalog = catalog.asTableCatalog();
+      tableCatalog.createTable(
+          tableIdentifier,
+          columns,
+          table_comment,
+          properties,
+          partitioning,
+          distribution,
+          null,
+          indexes);
+      // load table
+      Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+      Assertions.assertEquals(distribution.strategy(), loadTable.distribution().strategy());
+      Assertions.assertArrayEquals(
+          distribution.expressions(), loadTable.distribution().expressions());
+
+      tableCatalog.dropTable(tableIdentifier);
+    }
   }
 }

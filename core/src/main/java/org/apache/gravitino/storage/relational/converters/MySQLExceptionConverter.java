@@ -30,7 +30,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
  */
 public class MySQLExceptionConverter implements SQLExceptionConverter {
   /** It means found a duplicated primary key or unique key entry in MySQL. */
-  private static final int DUPLICATED_ENTRY_ERROR_CODE = 1062;
+  static final int DUPLICATED_ENTRY_ERROR_CODE = 1062;
 
   @SuppressWarnings("FormatStringAnnotation")
   @Override
@@ -38,7 +38,8 @@ public class MySQLExceptionConverter implements SQLExceptionConverter {
       throws IOException {
     switch (se.getErrorCode()) {
       case DUPLICATED_ENTRY_ERROR_CODE:
-        throw new EntityAlreadyExistsException(se, se.getMessage());
+        throw new EntityAlreadyExistsException(
+            se, "The %s entity: %s already exists.", type.name(), name);
       default:
         throw new IOException(se);
     }

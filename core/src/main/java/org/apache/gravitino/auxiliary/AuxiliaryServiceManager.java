@@ -234,18 +234,17 @@ public class AuxiliaryServiceManager {
             .getOrDefault(AUX_SERVICE_NAMES, "");
     Map<String, String> serviceConfigs = new HashMap<>();
     serviceConfigs.put(AUX_SERVICE_NAMES, auxServiceNames);
-    config
-        .getAllConfig()
+    config.getAllConfig().entrySet().stream()
+        .filter(entry -> !entry.getKey().equals(GRAVITINO_AUX_SERVICE_PREFIX + AUX_SERVICE_NAMES))
+        .filter(entry -> entry.getKey().startsWith(GRAVITINO_AUX_SERVICE_PREFIX))
         .forEach(
-            (k, v) -> {
-              if (k.startsWith(GRAVITINO_AUX_SERVICE_PREFIX)) {
-                String extractKey = k.substring(GRAVITINO_AUX_SERVICE_PREFIX.length());
-                LOG.warn(
-                    "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
-                    k,
-                    extractKey);
-                serviceConfigs.put(extractKey, v);
-              }
+            entry -> {
+              String extractKey = entry.getKey().substring(GRAVITINO_AUX_SERVICE_PREFIX.length());
+              LOG.warn(
+                  "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
+                  entry.getKey(),
+                  extractKey);
+              serviceConfigs.put(extractKey, entry.getValue());
             });
     splitter
         .omitEmptyStrings()

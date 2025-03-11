@@ -1,0 +1,26 @@
+gcli group [details|list|create|delete]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+Create a group
+gcli group create --group new_group
+
+Display a group's details
+gcli group details --group new_group
+
+List all groups
+gcli group list
+
+Show a groups's audit information
+gcli group details --group new_group --audit
+
+Delete a group
+gcli group delete --group new_group
+
+Revoke a role from a group
+gcli group revoke --group new_group --role admin
+
+Revoke all roles from a group
+gcli group revoke --group new_group --all

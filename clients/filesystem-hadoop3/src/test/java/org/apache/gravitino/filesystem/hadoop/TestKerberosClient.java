@@ -71,6 +71,8 @@ public class TestKerberosClient extends TestGvfsBase {
   @Test
   public void testAuthConfigs() {
     // init conf
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "testAuthConfigs", true);
     Configuration configuration = new Configuration();
     configuration.set(
         String.format(
@@ -100,6 +102,9 @@ public class TestKerberosClient extends TestGvfsBase {
 
   @Test
   public void testAuthWithPrincipalAndKeytabNormally() throws Exception {
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testAuthWithPrincipalAndKeytabNormally", true);
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
     Config config = new Config(false) {};
     config.set(PRINCIPAL, KdcServerBase.getServerPrincipal());
@@ -141,6 +146,9 @@ public class TestKerberosClient extends TestGvfsBase {
 
   @Test
   public void testAuthWithInvalidInfo() throws Exception {
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testAuthWithInvalidInfo", true);
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
     Config config = new Config(false) {};
     config.set(PRINCIPAL, KdcServerBase.getServerPrincipal());

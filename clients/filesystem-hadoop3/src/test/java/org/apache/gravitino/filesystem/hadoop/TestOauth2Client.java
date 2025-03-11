@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -54,7 +55,6 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
-import org.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.HttpStatus;
@@ -160,6 +160,9 @@ public class TestOauth2Client extends TestGvfsBase {
   @Test
   public void testFileSystemAuthConfigs() throws IOException {
     // init conf
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testFileSystemAuthConfigs", true);
     Configuration configuration = new Configuration();
     configuration.set(
         String.format(
@@ -207,6 +210,9 @@ public class TestOauth2Client extends TestGvfsBase {
 
   @Test
   public void testFileSystemAuthUnauthorized() throws ParseException {
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testFileSystemAuthUnauthorized", true);
     // 1. test always throw UnauthorizedException
     HttpResponse mockResponse = response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     OAuth2ErrorResponse respBody = new OAuth2ErrorResponse("invalid_client", "invalid");
@@ -332,6 +338,9 @@ public class TestOauth2Client extends TestGvfsBase {
 
   @Test
   public void testFileSystemAuthBadRequest() {
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testFileSystemAuthBadRequest", true);
     HttpResponse mockResponse = response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     OAuth2ErrorResponse respBody = new OAuth2ErrorResponse("invalid_grant", "invalid");
     try {

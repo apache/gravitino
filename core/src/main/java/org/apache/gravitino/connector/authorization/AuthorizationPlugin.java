@@ -26,4 +26,7 @@ import java.io.Closeable;
  * permission system, the implementation method of these function interface must be idempotent.
  */
 public interface AuthorizationPlugin
-    extends UserGroupAuthorizationPlugin, RoleAuthorizationPlugin, Closeable {}
+    extends UserGroupAuthorizationPlugin,
+        RoleAuthorizationPlugin,
+        MetadataAuthorizationPlugin,
+        Closeable {}

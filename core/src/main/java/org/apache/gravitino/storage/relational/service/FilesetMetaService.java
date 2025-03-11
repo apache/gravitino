@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.HasIdentifier;
@@ -35,6 +34,8 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
@@ -258,6 +259,18 @@ public class FilesetMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        filesetId, MetadataObject.Type.FILESET.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        filesetId, MetadataObject.Type.FILESET.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         filesetId, MetadataObject.Type.FILESET.name())));
 
     return true;
@@ -313,26 +326,10 @@ public class FilesetMetaService {
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    Long entityId;
-
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String[] levels = ArrayUtils.subarray(namespace.levels(), 0, level + 1);
-      NameIdentifier nameIdentifier = NameIdentifier.of(levels);
-      switch (level) {
-        case 0:
-          entityId =
-              MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(nameIdentifier);
-          builder.withMetalakeId(entityId);
-          continue;
-        case 1:
-          entityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
-          builder.withCatalogId(entityId);
-          continue;
-        case 2:
-          entityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(nameIdentifier);
-          builder.withSchemaId(entityId);
-          break;
-      }
-    }
+    Long[] parentEntityIds =
+        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
+    builder.withMetalakeId(parentEntityIds[0]);
+    builder.withCatalogId(parentEntityIds[1]);
+    builder.withSchemaId(parentEntityIds[2]);
   }
 }

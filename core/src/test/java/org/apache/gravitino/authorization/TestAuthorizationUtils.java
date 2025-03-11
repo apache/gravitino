@@ -18,12 +18,25 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import java.util.List;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class TestAuthorizationUtils {
 
@@ -148,5 +161,90 @@ class TestAuthorizationUtils {
     Assertions.assertThrows(
         IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkRoleNamespace(Namespace.of("a", "b", "c", "d")));
+  }
+
+  @Test
+  void testFilteredSecurableObjects() {
+
+    List<SecurableObject> securableObjects = Lists.newArrayList();
+
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.SelectTable.allow()));
+    securableObjects.add(metalakeObject);
+
+    SecurableObject catalog1Object =
+        SecurableObjects.ofCatalog("catalog1", Lists.newArrayList(Privileges.SelectTable.allow()));
+    securableObjects.add(catalog1Object);
+
+    SecurableObject catalog2Object =
+        SecurableObjects.ofCatalog("catalog2", Lists.newArrayList(Privileges.SelectTable.allow()));
+    securableObjects.add(catalog2Object);
+
+    SecurableObject schema1Object =
+        SecurableObjects.ofSchema(
+            catalog1Object, "schema1", Lists.newArrayList(Privileges.SelectTable.allow()));
+    SecurableObject table1Object =
+        SecurableObjects.ofTable(
+            schema1Object, "table1", Lists.newArrayList(Privileges.SelectTable.allow()));
+    securableObjects.add(table1Object);
+    securableObjects.add(schema1Object);
+
+    SecurableObject schema2Object =
+        SecurableObjects.ofSchema(
+            catalog2Object, "schema2", Lists.newArrayList(Privileges.SelectTable.allow()));
+    SecurableObject table2Object =
+        SecurableObjects.ofTable(
+            schema2Object, "table2", Lists.newArrayList(Privileges.SelectTable.allow()));
+    securableObjects.add(table2Object);
+    securableObjects.add(schema2Object);
+
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withSecurableObjects(securableObjects)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    Role filteredRole = AuthorizationUtils.filterSecurableObjects(role, "metalake", "catalog1");
+    Assertions.assertEquals(4, filteredRole.securableObjects().size());
+    Assertions.assertTrue(filteredRole.securableObjects().contains(metalakeObject));
+    Assertions.assertTrue(filteredRole.securableObjects().contains(catalog1Object));
+    Assertions.assertTrue(filteredRole.securableObjects().contains(schema1Object));
+    Assertions.assertTrue(filteredRole.securableObjects().contains(table1Object));
+
+    filteredRole = AuthorizationUtils.filterSecurableObjects(role, "metalake", "catalog2");
+    Assertions.assertEquals(4, filteredRole.securableObjects().size());
+    Assertions.assertTrue(filteredRole.securableObjects().contains(metalakeObject));
+    Assertions.assertTrue(filteredRole.securableObjects().contains(catalog2Object));
+    Assertions.assertTrue(filteredRole.securableObjects().contains(schema2Object));
+    Assertions.assertTrue(filteredRole.securableObjects().contains(table2Object));
+  }
+
+  @Test
+  void testGetMetadataObjectLocation() throws IllegalAccessException {
+    CatalogDispatcher catalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    TableDispatcher tableDispatcher = Mockito.mock(TableDispatcher.class);
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Table table = Mockito.mock(Table.class);
+
+    Mockito.when(table.properties()).thenReturn(ImmutableMap.of("location", "gs://bucket/1"));
+    Mockito.when(catalog.provider()).thenReturn("hive");
+    Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(catalog);
+    Mockito.when(tableDispatcher.loadTable(Mockito.any())).thenReturn(table);
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "table"), Entity.EntityType.TABLE);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("gs://bucket/1", locations.get(0));
+
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.TABLE);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("gs://bucket/1", locations.get(0));
   }
 }

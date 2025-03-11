@@ -20,6 +20,8 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Collections;
@@ -38,8 +40,6 @@ import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.gravitino.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
@@ -59,8 +59,6 @@ public abstract class GravitinoMockServerBase {
   protected static final String metalakeName = "metalake_1";
   protected static final String catalogName = "fileset_catalog_1";
   protected static final String schemaName = "schema_1";
-  protected static final String managedFilesetName = "managed_fileset";
-  protected static final String externalFilesetName = "external_fileset";
   protected static final String provider = "test";
 
   @BeforeAll
@@ -92,7 +90,7 @@ public abstract class GravitinoMockServerBase {
       T reqBody,
       R respBody,
       int statusCode)
-      throws org.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
+      throws JsonProcessingException {
     List<Parameter> parameters =
         queryParams.entrySet().stream()
             .map(kv -> new Parameter(kv.getKey(), kv.getValue()))
@@ -116,7 +114,7 @@ public abstract class GravitinoMockServerBase {
 
   protected static <T, R> void buildMockResource(
       Method method, String path, T reqBody, R respBody, int statusCode)
-      throws org.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
+      throws JsonProcessingException {
     buildMockResource(method, path, Collections.emptyMap(), reqBody, respBody, statusCode);
   }
 

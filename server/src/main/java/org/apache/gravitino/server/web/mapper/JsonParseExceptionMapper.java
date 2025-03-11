@@ -33,6 +33,6 @@ public class JsonParseExceptionMapper implements ExceptionMapper<JsonParseExcept
   @Override
   public Response toResponse(JsonParseException e) {
     String errorMsg = "Malformed json request";
-    return Utils.illegalArguments(errorMsg, e);
+    return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
   }
 }

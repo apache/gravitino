@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Unstable;
 
 /**
@@ -39,6 +40,15 @@ public interface Privilege {
    */
   Condition condition();
 
+  /**
+   * If the privilege can bind to a securable object, then this method will return true, otherwise
+   * false.
+   *
+   * @param type The securable object type.
+   * @return It will return true if the privilege can bind to a securable object, otherwise false.
+   */
+  boolean canBindTo(MetadataObject.Type type);
+
   /** The name of this privilege. */
   enum Name {
     /** The privilege to create a catalog. */
@@ -51,7 +61,7 @@ public interface Privilege {
     USE_SCHEMA(0L, 1L << 4),
     /** The privilege to create a table. */
     CREATE_TABLE(0L, 1L << 5),
-    /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
+    /** The privilege to write data to a table or modify the table schema. */
     MODIFY_TABLE(0L, 1L << 6),
     /** The privilege to select data from a table. */
     SELECT_TABLE(0L, 1L << 7),

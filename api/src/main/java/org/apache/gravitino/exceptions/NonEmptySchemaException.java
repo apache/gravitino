@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a namespace is not empty. */
+/** Exception thrown when a schema is not empty. */
 public class NonEmptySchemaException extends GravitinoRuntimeException {
   /**
    * Constructs a new exception with the specified detail message.

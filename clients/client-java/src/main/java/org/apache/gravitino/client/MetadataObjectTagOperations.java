@@ -52,7 +52,7 @@ class MetadataObjectTagOperations implements SupportsTags {
     this.restClient = restClient;
     this.tagRequestPath =
         String.format(
-            "api/metalakes/%s/tags/%s/%s",
+            "api/metalakes/%s/objects/%s/%s/tags",
             metalakeName,
             metadataObject.type().name().toLowerCase(Locale.ROOT),
             metadataObject.fullName());

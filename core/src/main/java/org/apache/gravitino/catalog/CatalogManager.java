@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Catalog.Type.FILESET;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
-import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -31,7 +35,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
@@ -39,11 +42,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -51,6 +56,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
@@ -72,17 +78,26 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -97,18 +112,33 @@ import org.slf4j.LoggerFactory;
 public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
-  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
+  public static void checkCatalogInUse(EntityStore store, NameIdentifier ident)
+      throws NoSuchMetalakeException, NoSuchCatalogException, CatalogNotInUseException,
+          MetalakeNotInUseException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
+    if (!getCatalogInUseValue(store, ident)) {
+      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
+    }
+  }
+
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
+
     private BaseCatalog catalog;
     private IsolatedClassLoader classLoader;
 
     public CatalogWrapper(BaseCatalog catalog, IsolatedClassLoader classLoader) {
       this.catalog = catalog;
       this.classLoader = classLoader;
+    }
+
+    public BaseCatalog catalog() {
+      return catalog;
     }
 
     public <R> R doWithSchemaOps(ThrowableFunction<SupportsSchemas, R> fn) throws Exception {
@@ -142,6 +172,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           });
     }
 
+    public <R> R doWithCredentialOps(ThrowableFunction<BaseCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(cl -> fn.apply(catalog));
+    }
+
     public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
       return classLoader.withClassLoader(
           cl -> {
@@ -149,6 +183,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new UnsupportedOperationException("Catalog does not support topic operations");
             }
             return fn.apply(asTopics());
+          });
+    }
+
+    public <R> R doWithModelOps(ThrowableFunction<ModelCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asModels() == null) {
+              throw new UnsupportedOperationException("Catalog does not support model operations");
+            }
+            return fn.apply(asModels());
           });
     }
 
@@ -210,11 +254,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     private TopicCatalog asTopics() {
       return catalog.ops() instanceof TopicCatalog ? (TopicCatalog) catalog.ops() : null;
     }
+
+    private ModelCatalog asModels() {
+      return catalog.ops() instanceof ModelCatalog ? (ModelCatalog) catalog.ops() : null;
+    }
   }
 
   private final Config config;
 
-  @VisibleForTesting final Cache<NameIdentifier, CatalogWrapper> catalogCache;
+  @VisibleForTesting static Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
   private final EntityStore store;
 
@@ -233,7 +281,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.idGenerator = idGenerator;
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
-    this.catalogCache =
+    catalogCache =
         Caffeine.newBuilder()
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
@@ -271,36 +319,38 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
-    checkMetalakeExists(metalakeIdent);
 
-    try {
-      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
-          .map(entity -> NameIdentifier.of(namespace, entity.name()))
-          .toArray(NameIdentifier[]::new);
+    return TreeLockUtils.doWithTreeLock(
+        metalakeIdent,
+        LockType.READ,
+        () -> {
+          checkMetalake(metalakeIdent, store);
+          try {
+            return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
+                .map(entity -> NameIdentifier.of(namespace, entity.name()))
+                .toArray(NameIdentifier[]::new);
 
-    } catch (IOException ioe) {
-      LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
-      throw new RuntimeException(ioe);
-    }
+          } catch (IOException ioe) {
+            LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
-    checkMetalakeExists(metalakeIdent);
-
     try {
       List<CatalogEntity> catalogEntities =
-          store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
-
-      // Using provider as key to avoid loading the same type catalog instance multiple times
-      Map<String, Set<String>> hiddenProps = new HashMap<>();
-      Multimaps.index(catalogEntities, CatalogEntity::getProvider)
-          .asMap()
-          .forEach((p, e) -> hiddenProps.put(p, getHiddenPropertyNames(e.iterator().next())));
-
+          TreeLockUtils.doWithTreeLock(
+              metalakeIdent,
+              LockType.READ,
+              () -> {
+                checkMetalake(metalakeIdent, store);
+                return store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
+              });
       return catalogEntities.stream()
-          .map(e -> e.toCatalogInfoWithoutHiddenProps(hiddenProps.get(e.getProvider())))
+          .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -317,7 +367,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return loadCatalogAndWrap(ident).catalog;
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          checkMetalake(metalakeIdent, store);
+          return loadCatalogAndWrap(ident).catalog;
+        });
   }
 
   /**
@@ -340,8 +397,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
+    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Instant now = Instant.now();
@@ -364,39 +422,49 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .build())
             .build();
 
-    boolean createSuccess = false;
-    try {
-      NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-        LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
-      }
+    return TreeLockUtils.doWithTreeLock(
+        metalakeIdent,
+        LockType.WRITE,
+        () -> {
+          checkMetalake(metalakeIdent, store);
+          boolean needClean = true;
+          try {
+            store.put(e, false /* overwrite */);
+            CatalogWrapper wrapper =
+                catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
-      store.put(e, false /* overwrite */);
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
-      createSuccess = true;
-      return wrapper.catalog;
-    } catch (EntityAlreadyExistsException e1) {
-      LOG.warn("Catalog {} already exists", ident, e1);
-      throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
-    } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
-      throw e2;
-    } catch (Exception e3) {
-      catalogCache.invalidate(ident);
-      LOG.error("Failed to create catalog {}", ident, e3);
-      if (e3 instanceof RuntimeException) {
-        throw (RuntimeException) e3;
-      }
-      throw new RuntimeException(e3);
-    } finally {
-      if (!createSuccess) {
-        try {
-          store.delete(ident, EntityType.CATALOG, true);
-        } catch (IOException e4) {
-          LOG.error("Failed to clean up catalog {}", ident, e4);
-        }
-      }
-    }
+            needClean = false;
+            return wrapper.catalog;
+
+          } catch (EntityAlreadyExistsException e1) {
+            needClean = false;
+            LOG.warn("Catalog {} already exists", ident, e1);
+            throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+
+          } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
+            throw e2;
+
+          } catch (Exception e3) {
+            catalogCache.invalidate(ident);
+            LOG.error("Failed to create catalog {}", ident, e3);
+            if (e3 instanceof RuntimeException) {
+              throw (RuntimeException) e3;
+            }
+            throw new RuntimeException(e3);
+
+          } finally {
+            if (needClean) {
+              // since we put the catalog entity into the store but failed to create the catalog
+              // instance,
+              // we need to clean up the entity stored.
+              try {
+                store.delete(ident, EntityType.CATALOG, true);
+              } catch (IOException e4) {
+                LOG.error("Failed to clean up catalog {}", ident, e4);
+              }
+            }
+          }
+        });
   }
 
   /**
@@ -417,11 +485,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties) {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    try {
-      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
-      }
 
+    checkMetalake(metalakeIdent, store);
+    try {
       if (store.exists(ident, EntityType.CATALOG)) {
         throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
       }
@@ -447,7 +513,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity);
+      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
       wrapper.doWithCatalogOps(
           c -> {
             c.testConnection(ident, type, provider, comment, mergedConfig);
@@ -464,6 +530,86 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
+  @Override
+  public void enableCatalog(NameIdentifier ident)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+
+    TreeLockUtils.doWithTreeLock(
+        metalakeIdent,
+        LockType.WRITE,
+        () -> {
+          checkMetalake(metalakeIdent, store);
+
+          try {
+            if (catalogInUse(store, ident)) {
+              return null;
+            }
+
+            store.update(
+                ident,
+                CatalogEntity.class,
+                EntityType.CATALOG,
+                catalog -> {
+                  CatalogEntity.Builder newCatalogBuilder =
+                      newCatalogBuilder(ident.namespace(), catalog);
+
+                  Map<String, String> newProps =
+                      catalog.getProperties() == null
+                          ? new HashMap<>()
+                          : new HashMap<>(catalog.getProperties());
+                  newProps.put(PROPERTY_IN_USE, "true");
+                  newCatalogBuilder.withProperties(newProps);
+
+                  return newCatalogBuilder.build();
+                });
+            catalogCache.invalidate(ident);
+            return null;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  @Override
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+
+    TreeLockUtils.doWithTreeLock(
+        metalakeIdent,
+        LockType.WRITE,
+        () -> {
+          checkMetalake(metalakeIdent, store);
+
+          try {
+            if (!catalogInUse(store, ident)) {
+              return null;
+            }
+            store.update(
+                ident,
+                CatalogEntity.class,
+                EntityType.CATALOG,
+                catalog -> {
+                  CatalogEntity.Builder newCatalogBuilder =
+                      newCatalogBuilder(ident.namespace(), catalog);
+
+                  Map<String, String> newProps =
+                      catalog.getProperties() == null
+                          ? new HashMap<>()
+                          : new HashMap<>(catalog.getProperties());
+                  newProps.put(PROPERTY_IN_USE, "false");
+                  newCatalogBuilder.withProperties(newProps);
+
+                  return newCatalogBuilder.build();
+                });
+            catalogCache.invalidate(ident);
+            return null;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
   /**
    * Alters an existing catalog with the specified changes.
    *
@@ -476,115 +622,210 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    // There could be a race issue that someone is using the catalog from cache while we are
-    // updating it.
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          checkCatalogInUse(store, ident);
 
-    CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
-    if (catalogWrapper == null) {
-      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
-    }
+          // There could be a race issue that someone is using the catalog from cache while we are
+          // updating it.
 
-    try {
-      catalogWrapper.doWithPropertiesMeta(
-          f -> {
-            Pair<Map<String, String>, Map<String, String>> alterProperty =
-                getCatalogAlterProperty(changes);
-            validatePropertyForAlter(
-                f.catalogPropertiesMetadata(), alterProperty.getLeft(), alterProperty.getRight());
-            return null;
-          });
-    } catch (IllegalArgumentException e1) {
-      throw e1;
-    } catch (Exception e) {
-      LOG.error("Failed to alter catalog {}", ident, e);
-      throw new RuntimeException(e);
-    }
+          CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
+          if (catalogWrapper == null) {
+            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+          }
 
-    catalogCache.invalidate(ident);
-    try {
-      CatalogEntity updatedCatalog =
-          store.update(
-              ident,
-              CatalogEntity.class,
-              EntityType.CATALOG,
-              catalog -> {
-                CatalogEntity.Builder newCatalogBuilder =
-                    CatalogEntity.builder()
-                        .withId(catalog.id())
-                        .withName(catalog.name())
-                        .withNamespace(ident.namespace())
-                        .withType(catalog.getType())
-                        .withProvider(catalog.getProvider())
-                        .withComment(catalog.getComment());
+          try {
+            catalogWrapper.doWithPropertiesMeta(
+                f -> {
+                  Pair<Map<String, String>, Map<String, String>> alterProperty =
+                      getCatalogAlterProperty(changes);
+                  validatePropertyForAlter(
+                      f.catalogPropertiesMetadata(),
+                      alterProperty.getLeft(),
+                      alterProperty.getRight());
+                  return null;
+                });
+          } catch (IllegalArgumentException e1) {
+            throw e1;
+          } catch (Exception e) {
+            LOG.error("Failed to alter catalog {}", ident, e);
+            throw new RuntimeException(e);
+          }
+          return null;
+        });
 
-                AuditInfo newInfo =
-                    AuditInfo.builder()
-                        .withCreator(catalog.auditInfo().creator())
-                        .withCreateTime(catalog.auditInfo().createTime())
-                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                        .withLastModifiedTime(Instant.now())
-                        .build();
-                newCatalogBuilder.withAuditInfo(newInfo);
+    boolean containsRenameCatalog =
+        Arrays.stream(changes).anyMatch(c -> c instanceof CatalogChange.RenameCatalog);
+    NameIdentifier nameIdentifierForLock =
+        containsRenameCatalog ? NameIdentifier.of(ident.namespace().level(0)) : ident;
 
-                Map<String, String> newProps =
-                    catalog.getProperties() == null
-                        ? new HashMap<>()
-                        : new HashMap<>(catalog.getProperties());
-                newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
+    return TreeLockUtils.doWithTreeLock(
+        nameIdentifierForLock,
+        LockType.WRITE,
+        () -> {
+          catalogCache.invalidate(ident);
+          try {
+            CatalogEntity updatedCatalog =
+                store.update(
+                    ident,
+                    CatalogEntity.class,
+                    EntityType.CATALOG,
+                    catalog -> {
+                      CatalogEntity.Builder newCatalogBuilder =
+                          newCatalogBuilder(ident.namespace(), catalog);
 
-                return newCatalogBuilder.build();
-              });
-      return catalogCache.get(
-              updatedCatalog.nameIdentifier(), id -> createCatalogWrapper(updatedCatalog))
-          .catalog;
+                      Map<String, String> newProps =
+                          catalog.getProperties() == null
+                              ? new HashMap<>()
+                              : new HashMap<>(catalog.getProperties());
+                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
 
-    } catch (NoSuchEntityException ne) {
-      LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+                      return newCatalogBuilder.build();
+                    });
+            return Objects.requireNonNull(
+                    catalogCache.get(
+                        updatedCatalog.nameIdentifier(),
+                        id -> createCatalogWrapper(updatedCatalog, null)))
+                .catalog;
 
-    } catch (IllegalArgumentException iae) {
-      LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
-      throw iae;
+          } catch (NoSuchEntityException ne) {
+            LOG.warn("Catalog {} does not exist", ident, ne);
+            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
-    } catch (IOException ioe) {
-      LOG.error("Failed to alter catalog {}", ident, ioe);
-      throw new RuntimeException(ioe);
-    }
+          } catch (IllegalArgumentException iae) {
+            LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
+            throw iae;
+
+          } catch (IOException ioe) {
+            LOG.error("Failed to alter catalog {}", ident, ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
+  }
+
+  @Override
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+
+    return TreeLockUtils.doWithTreeLock(
+        metalakeIdent,
+        LockType.WRITE,
+        () -> {
+          checkMetalake(metalakeIdent, store);
+          try {
+            boolean catalogInUse = catalogInUse(store, ident);
+            if (catalogInUse && !force) {
+              throw new CatalogInUseException(
+                  "Catalog %s is in use, please disable it first or use force option", ident);
+            }
+
+            Namespace schemaNamespace = Namespace.of(ident.namespace().level(0), ident.name());
+            CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
+
+            List<SchemaEntity> schemaEntities =
+                store.list(schemaNamespace, SchemaEntity.class, EntityType.SCHEMA);
+            CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+
+            if (containsUserCreatedSchemas(schemaEntities, catalogEntity, catalogWrapper)
+                && !force) {
+              throw new NonEmptyCatalogException(
+                  "Catalog %s has schemas, please drop them first or use force option", ident);
+            }
+
+            if (includeManagedEntities(catalogEntity)) {
+              // code reach here in two cases:
+              // 1. the catalog does not have available schemas
+              // 2. the catalog has available schemas, and force is true
+              // for case 1, the forEach block can drop them without any side effect
+              // for case 2, the forEach block will drop all managed sub-entities
+              schemaEntities.forEach(
+                  schema -> {
+                    try {
+                      catalogWrapper.doWithSchemaOps(
+                          schemaOps -> schemaOps.dropSchema(schema.nameIdentifier(), true));
+                    } catch (Exception e) {
+                      LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
+                      throw new RuntimeException(
+                          "Failed to drop schema " + schema.nameIdentifier(), e);
+                    }
+                  });
+            }
+            catalogCache.invalidate(ident);
+            return store.delete(ident, EntityType.CATALOG, true);
+
+          } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
+            return false;
+          } catch (GravitinoRuntimeException e) {
+            throw e;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   /**
-   * Drops (deletes) the catalog with the specified identifier.
+   * Check if the given list of schema entities contains any currently existing user-created
+   * schemas.
    *
-   * @param ident The identifier of the catalog to drop.
-   * @return {@code true} if the catalog was successfully dropped, {@code false} otherwise.
+   * <p>This method determines if there are valid user-created schemas by comparing the provided
+   * schema entities with the actual schemas currently existing in the external data source. It
+   * excludes:
+   *
+   * <ul>
+   *   <li>1. Automatically generated schemas (such as Kafka catalog's "default" schema or
+   *       JDBC-PostgreSQL catalog's "public" schema).
+   *   <li>2. Schemas that have been dropped externally but still exist in the entity store.
+   * </ul>
+   *
+   * @param schemaEntities The list of schema entities to check.
+   * @param catalogEntity The catalog entity to which the schemas belong.
+   * @param catalogWrapper The catalog wrapper for the catalog.
+   * @return True if the list of schema entities contains any valid user-created schemas, false
+   *     otherwise.
+   * @throws Exception If an error occurs while checking the schemas.
    */
-  @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    // There could be a race issue that someone is using the catalog while we are dropping it.
-    catalogCache.invalidate(ident);
-
-    try {
-      CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      if (catalogEntity.getProvider().equals("kafka")) {
-        // Kafka catalog needs to cascade drop the default schema
-        List<SchemaEntity> schemas =
-            store.list(
-                Namespace.of(ident.namespace().level(0), ident.name()),
-                SchemaEntity.class,
-                EntityType.SCHEMA);
-        // If there is only one schema, it must be the default schema, because we don't allow to
-        // drop the default schema.
-        if (schemas.size() == 1) {
-          return store.delete(ident, EntityType.CATALOG, true);
-        }
-      }
-      return store.delete(ident, EntityType.CATALOG);
-    } catch (NoSuchEntityException e) {
+  private boolean containsUserCreatedSchemas(
+      List<SchemaEntity> schemaEntities, CatalogEntity catalogEntity, CatalogWrapper catalogWrapper)
+      throws Exception {
+    if (schemaEntities.isEmpty()) {
       return false;
-    } catch (IOException ioe) {
-      LOG.error("Failed to drop catalog {}", ident, ioe);
-      throw new RuntimeException(ioe);
     }
+
+    if (schemaEntities.size() == 1) {
+      if ("kafka".equals(catalogEntity.getProvider())) {
+        return false;
+
+      } else if ("jdbc-postgresql".equals(catalogEntity.getProvider())) {
+        // PostgreSQL catalog includes the "public" schema, see
+        // https://github.com/apache/gravitino/issues/2314
+        return !schemaEntities.get(0).name().equals("public");
+      } else if ("hive".equals(catalogEntity.getProvider())) {
+        return !schemaEntities.get(0).name().equals("default");
+      }
+    }
+
+    NameIdentifier[] allSchemas =
+        catalogWrapper.doWithSchemaOps(
+            schemaOps ->
+                schemaOps.listSchemas(
+                    Namespace.of(catalogEntity.namespace().level(0), catalogEntity.name())));
+    if (allSchemas.length == 0) {
+      return false;
+    }
+
+    Set<String> availableSchemaNames =
+        Arrays.stream(allSchemas).map(NameIdentifier::name).collect(Collectors.toSet());
+
+    // some schemas are dropped externally, but still exist in the entity store, those schemas are
+    // invalid
+    return schemaEntities.stream().map(SchemaEntity::name).anyMatch(availableSchemaNames::contains);
+  }
+
+  private boolean includeManagedEntities(CatalogEntity catalogEntity) {
+    return catalogEntity.getType().equals(FILESET);
   }
 
   /**
@@ -597,6 +838,55 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
+  }
+
+  private static boolean catalogInUse(EntityStore store, NameIdentifier ident)
+      throws NoSuchMetalakeException, NoSuchCatalogException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    return metalakeInUse(store, metalakeIdent) && getCatalogInUseValue(store, ident);
+  }
+
+  private static boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
+    try {
+      CatalogWrapper wrapper = catalogCache.getIfPresent(catalogIdent);
+      CatalogEntity catalogEntity;
+      if (wrapper != null) {
+        catalogEntity = wrapper.catalog.entity();
+      } else {
+        catalogEntity = store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);
+      }
+      return (boolean)
+          BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
+              catalogEntity.getProperties(), PROPERTY_IN_USE);
+
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Catalog {} does not exist", catalogIdent, e);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, catalogIdent);
+
+    } catch (IOException e) {
+      LOG.error("Failed to do store operation", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private CatalogEntity.Builder newCatalogBuilder(Namespace namespace, CatalogEntity catalog) {
+    CatalogEntity.Builder builder =
+        CatalogEntity.builder()
+            .withId(catalog.id())
+            .withName(catalog.name())
+            .withNamespace(namespace)
+            .withType(catalog.getType())
+            .withProvider(catalog.getProvider())
+            .withComment(catalog.getComment());
+
+    AuditInfo newInfo =
+        AuditInfo.builder()
+            .withCreator(catalog.auditInfo().creator())
+            .withCreateTime(catalog.auditInfo().createTime())
+            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+            .withLastModifiedTime(Instant.now())
+            .build();
+    return builder.withAuditInfo(newInfo);
   }
 
   private Map<String, String> buildCatalogConf(String provider, Map<String, String> properties) {
@@ -626,21 +916,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return Pair.of(upserts, deletes);
   }
 
-  private void checkMetalakeExists(NameIdentifier ident) throws NoSuchMetalakeException {
-    try {
-      if (!store.exists(ident, EntityType.METALAKE)) {
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to do storage operation", e);
-      throw new RuntimeException(e);
-    }
-  }
-
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity);
+      return createCatalogWrapper(entity, null);
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
@@ -652,7 +931,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
+  /**
+   * Create a catalog wrapper from the catalog entity and validate the given properties for
+   * creation. The properties can be null if it is not needed to validate.
+   *
+   * @param entity The catalog entity.
+   * @param propsToValidate The properties to validate.
+   * @return The created catalog wrapper.
+   */
+  private CatalogWrapper createCatalogWrapper(
+      CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
@@ -663,9 +951,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
         cl -> {
-          Map<String, String> configWithoutId = Maps.newHashMap(conf);
-          configWithoutId.remove(ID_KEY);
-          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), configWithoutId);
+          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why do we do this? Because wrapper.catalog.properties() needs to be called in
@@ -679,6 +965,23 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  /**
+   * Get the resolved properties (filter out the hidden properties and add some required default
+   * properties) of the catalog entity.
+   *
+   * @param entity The catalog entity.
+   * @return The resolved properties.
+   */
+  private Map<String, String> getResolvedProperties(CatalogEntity entity) {
+    Map<String, String> conf = entity.getProperties();
+    String provider = entity.getProvider();
+
+    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
+      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+      return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
+    }
   }
 
   private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
@@ -701,14 +1004,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+    catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;
   }
 
   private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(conf, provider);
-      return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
+      String catalogPkgPath = buildPkgPath(conf, provider);
+      String catalogConfPath = buildConfPath(conf, provider);
+      ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
+      BaseAuthorization.buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
+      return IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
     } else {
       // This will use the current class loader, it is mainly used for test.
       return new IsolatedClassLoader(

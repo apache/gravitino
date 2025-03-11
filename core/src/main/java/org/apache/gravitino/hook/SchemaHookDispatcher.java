@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -25,6 +26,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -55,6 +57,10 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(
+        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
+
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
     // Set the creator as the owner of the schema.
@@ -77,12 +83,19 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    // Schema doesn't support to rename operation now. So we don't need to change
+    // authorization plugin privileges, too.
     return dispatcher.alterSchema(ident, changes);
   }
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    return dispatcher.dropSchema(ident, cascade);
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.SCHEMA);
+    boolean dropped = dispatcher.dropSchema(ident, cascade);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        ident, Entity.EntityType.SCHEMA, locations);
+    return dropped;
   }
 
   @Override

@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - PostgreSQL catalog"
+title: "Apache Gravitino Trino connector - PostgreSQL catalog"
 slug: /trino-connector/catalog-postgresql
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -16,14 +16,13 @@ To connect to PostgreSQL, you need:
 
 ## Create table
 
-At present, the Apache Gravitino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. 
-However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
+At present, the Apache Gravitino Trino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
-The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 ## Alter table
 
-Gravitino connector supports the following alter table operations:
+Gravitino Trino connector supports the following alter table operations:
 - Rename table
 - Add a column
 - Drop a column
@@ -33,7 +32,7 @@ Gravitino connector supports the following alter table operations:
 
 ## Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
 
 ## Table and Schema properties
@@ -96,7 +95,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `test.postgresql_test` catalog is the catalog created by you in Gravitino.
+The `postgresql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -107,7 +106,7 @@ Create a new schema named `database_01` in `postgresql_test` catalog.
 CREATE SCHEMA postgresql_test.database_01;
 ```
 
-Create a new table named `table_01` in schema `"test.postgresql_test".database_01`.
+Create a new table named `table_01` in schema `postgresql_test.database_01`.
 
 ```sql
 CREATE TABLE postgresql_test.database_01.table_01
@@ -128,7 +127,7 @@ INSERT INTO postgresql_test.database_01.table_01 (name, salary) VALUES ('ice', 1
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO postgresql_test.database_01.table_01 (name, salary) SELECT * FROM "test.postgresql_test".database_01.table_01;
+INSERT INTO postgresql_test.database_01.table_01 (name, salary) SELECT * FROM postgresql_test.database_01.table_01;
 ```
 
 ### Querying data
@@ -156,7 +155,7 @@ ALTER TABLE postgresql_test.database_01.table_01 DROP COLUMN age;
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE postgresql_test.database_01.table_01 RENAME TO "test.postgresql_test".database_01.table_02;
+ALTER TABLE postgresql_test.database_01.table_01 RENAME TO postgresql_test.database_01.table_02;
 ```
 
 ### Drop

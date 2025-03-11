@@ -28,10 +28,8 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
 
   @Override
@@ -79,6 +77,6 @@ public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
         () -> createdCatalog.asSchemas().createSchema("schema1", "", null));
 
     createdCatalog.asSchemas().dropSchema("schema1", false);
-    metalake.dropCatalog(catalogNm);
+    metalake.dropCatalog(catalogNm, true);
   }
 }

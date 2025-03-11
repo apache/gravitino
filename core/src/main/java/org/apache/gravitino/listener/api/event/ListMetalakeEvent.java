@@ -32,4 +32,14 @@ public final class ListMetalakeEvent extends MetalakeEvent {
   public ListMetalakeEvent(String user) {
     super(user, null);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_METALAKE;
+  }
 }

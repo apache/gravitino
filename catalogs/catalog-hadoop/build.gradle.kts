@@ -25,38 +25,63 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
-
-  implementation(libs.guava)
-  implementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
+  implementation(project(":api")) {
+    exclude(group = "*")
   }
-
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":catalogs:hadoop-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
+  implementation(libs.commons.lang3)
+  implementation(libs.commons.io)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("com.google.guava", "guava")
+    exclude("commons-io", "commons-io")
+    exclude("org.eclipse.jetty", "*")
+    exclude("io.netty")
+    exclude("org.fusesource.leveldbjni")
+    // Exclude `protobuf-java` 2.5.0 to avoid conflict with a higher version of `protobuf-java`
+    // in the authorization module. The reason is that the class loader of `catalog-hadoop` is the
+    // parent of the class loader of the authorization module, so the class loader of `catalog-hadoop`
+    // will load the class `protobuf-java` 2.5.0 first, which will cause the authorization module to
+    // fail to load the class `protobuf-java` 3.15.8.
+    exclude("com.google.protobuf", "protobuf-java")
   }
-  implementation(libs.hadoop3.client)
-
   implementation(libs.slf4j.api)
+  implementation(libs.awaitility)
+
+  compileOnly(libs.guava)
 
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-
-  testImplementation(libs.minikdc)
-  testImplementation(libs.hadoop3.minicluster)
-
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.hadoop3.gcs)
+  testImplementation(libs.hadoop3.minicluster)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
@@ -71,7 +96,18 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("slf4j-*.jar")
+      exclude("guava-*.jar")
+      exclude("curator-*.jar")
+      exclude("netty-*.jar")
+      exclude("snappy-*.jar")
+      exclude("zookeeper-*.jar")
+      exclude("jetty-*.jar")
+      exclude("javax.servlet-*.jar")
+      exclude("kerb-*.jar")
+      exclude("kerby-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 
@@ -104,36 +140,18 @@ tasks {
 }
 
 tasks.test {
-  doFirst {
-    val testMode = project.properties["testMode"] as? String ?: "embedded"
-    if (testMode == "deploy") {
-      environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
-    } else if (testMode == "embedded") {
-      environment("GRAVITINO_HOME", project.rootDir.path)
-    }
-  }
-
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.5")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
+
+  // this task depends on :bundles:aws-bundle:jar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

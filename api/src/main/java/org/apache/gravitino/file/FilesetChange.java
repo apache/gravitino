@@ -73,7 +73,9 @@ public interface FilesetChange {
    * Creates a new fileset change to remove comment from the fileset.
    *
    * @return The fileset change.
+   * @deprecated Use {@link #updateComment(String)} with null value as the argument instead.
    */
+  @Deprecated
   static FilesetChange removeComment() {
     return RemoveComment.getInstance();
   }
@@ -310,7 +312,10 @@ public interface FilesetChange {
     }
   }
 
-  /** A fileset change to remove comment from the fileset. */
+  /**
+   * A fileset change to remove comment from the fileset. Use {@link UpdateFilesetComment} with null
+   * value as the argument instead.
+   */
   final class RemoveComment implements FilesetChange {
     private static final RemoveComment INSTANCE = new RemoveComment();
 

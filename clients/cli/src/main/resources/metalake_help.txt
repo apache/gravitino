@@ -1,0 +1,46 @@
+gcli metalake [details|list|create|delete|update|properties|set|remove]
+
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
+Example Commands
+
+Show all metalakes
+gcli metalake list
+
+Show details of a metalake
+gcli metalake details
+
+Show metalake's audit information
+gcli metalake details --audit
+
+Create a metalake
+gcli metalake create --metalake my_metalake --comment "This is my metalake"
+
+Delete a metalake
+Note:This is a potentially dangerous command to run and result in data loss.
+gcli metalake delete
+
+Rename a metalake
+Note:This is a potentially dangerous command to run and may result in unpredictable behaviour.
+gcli metalake update  --rename demo
+
+Update a metalake's comment
+gcli metalake update  --comment "new comment"
+
+Display the properties of a metalake
+gcli metalake properties
+
+Set a metalake's property
+gcli metalake set  --property test --value value
+
+Remove a metalake's property
+gcli metalake remove  --property test
+
+Enable a metalake
+gcli metalake update -m metalake_demo --enable
+
+Disable a metalke
+gcli metalake update -m metalake_demo --disable

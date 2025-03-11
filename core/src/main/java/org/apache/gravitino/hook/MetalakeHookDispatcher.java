@@ -25,10 +25,13 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -83,11 +86,40 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public Metalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    return dispatcher.alterMetalake(ident, changes);
+    Metalake alterMetalake = dispatcher.alterMetalake(ident, changes);
+    MetalakeChange.RenameMetalake lastRenameChange = null;
+    for (MetalakeChange change : changes) {
+      if (change instanceof MetalakeChange.RenameMetalake) {
+        lastRenameChange = (MetalakeChange.RenameMetalake) change;
+      }
+    }
+    if (lastRenameChange != null) {
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.METALAKE, lastRenameChange.getNewName());
+    }
+    return alterMetalake;
+  }
+
+  @Override
+  public boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, MetalakeInUseException {
+    return dispatcher.dropMetalake(ident, force);
+  }
+
+  @Override
+  public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    dispatcher.enableMetalake(ident);
+  }
+
+  @Override
+  public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    dispatcher.disableMetalake(ident);
   }
 
   @Override
   public boolean dropMetalake(NameIdentifier ident) {
+    // For metalake, we don't clear all the privileges of catalog authorization plugin.
+    // we just remove metalake.
     return dispatcher.dropMetalake(ident);
   }
 

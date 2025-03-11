@@ -26,16 +26,24 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.RelationDatasourceMetricsSource;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -73,7 +81,9 @@ public class SqlSessionFactoryHelper {
   public void init(Config config) {
     // Initialize the data source
     BasicDataSource dataSource = new BasicDataSource();
-    dataSource.setUrl(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL));
+    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
+    dataSource.setUrl(jdbcUrl);
     dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER));
     dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
     dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
@@ -95,17 +105,24 @@ public class SqlSessionFactoryHelper {
     dataSource.setSoftMinEvictableIdleTimeMillis(
         BaseObjectPoolConfig.DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME.toMillis());
     dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
-
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Add null check to avoid NPE when metrics system is not initialized in test environments
+    if (metricsSystem != null) {
+      // Register connection pool metrics when metrics system is available
+      metricsSystem.register(new RelationDatasourceMetricsSource(dataSource));
+    }
     // Create the transaction factory and env
     TransactionFactory transactionFactory = new JdbcTransactionFactory();
     Environment environment = new Environment("development", transactionFactory, dataSource);
 
     // Initialize the configuration
     Configuration configuration = new Configuration(environment);
+    configuration.setDatabaseId(jdbcType.name().toLowerCase());
     configuration.addMapper(MetalakeMetaMapper.class);
     configuration.addMapper(CatalogMetaMapper.class);
     configuration.addMapper(SchemaMetaMapper.class);
     configuration.addMapper(TableMetaMapper.class);
+    configuration.addMapper(TableColumnMapper.class);
     configuration.addMapper(FilesetMetaMapper.class);
     configuration.addMapper(FilesetVersionMapper.class);
     configuration.addMapper(TopicMetaMapper.class);
@@ -118,6 +135,9 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(TagMetaMapper.class);
     configuration.addMapper(TagMetadataObjectRelMapper.class);
     configuration.addMapper(OwnerMetaMapper.class);
+    configuration.addMapper(ModelMetaMapper.class);
+    configuration.addMapper(ModelVersionMetaMapper.class);
+    configuration.addMapper(ModelVersionAliasRelMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

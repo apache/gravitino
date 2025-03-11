@@ -22,10 +22,15 @@ import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions.DistributionImpl;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -40,6 +45,11 @@ public final class DorisUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DorisUtils.class);
   private static final Pattern PARTITION_INFO_PATTERN =
       Pattern.compile("PARTITION BY \\b(LIST|RANGE)\\b\\((.+)\\)");
+
+  private static final Pattern DISTRIBUTION_INFO_PATTERN =
+      Pattern.compile(
+          "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+))?");
+
   private static final String LIST_PARTITION = "LIST";
   private static final String RANGE_PARTITION = "RANGE";
 
@@ -175,5 +185,39 @@ public final class DorisUtils {
       listValues.add(values);
     }
     return String.format("IN (%s)", listValues.build().stream().collect(Collectors.joining(",")));
+  }
+
+  public static Distribution extractDistributionInfoFromSql(String createTableSql) {
+    Matcher matcher = DISTRIBUTION_INFO_PATTERN.matcher(createTableSql.trim());
+    if (matcher.find()) {
+      String distributionType = matcher.group(1);
+
+      // For Random distribution, no need to specify distribution columns.
+      String distributionColumns = matcher.group(3);
+      String[] columns =
+          Objects.equals(distributionColumns, null)
+              ? new String[] {}
+              : Arrays.stream(distributionColumns.split(","))
+                  .map(String::trim)
+                  .map(f -> f.substring(1, f.length() - 1))
+                  .toArray(String[]::new);
+
+      // Default bucket number is 1.
+      int bucketNum = 1;
+      if (matcher.find(5)) {
+        bucketNum = Integer.valueOf(matcher.group(5));
+      }
+
+      return new DistributionImpl.Builder()
+          .withStrategy(Strategy.getByName(distributionType))
+          .withNumber(bucketNum)
+          .withExpressions(
+              Arrays.stream(columns)
+                  .map(col -> NamedReference.field(new String[] {col}))
+                  .toArray(NamedReference[]::new))
+          .build();
+    }
+
+    throw new RuntimeException("Failed to extract distribution info in sql:" + createTableSql);
   }
 }

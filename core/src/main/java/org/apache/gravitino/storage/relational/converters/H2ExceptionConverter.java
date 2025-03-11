@@ -37,9 +37,12 @@ public class H2ExceptionConverter implements SQLExceptionConverter {
       throws IOException {
     switch (se.getErrorCode()) {
       case DUPLICATED_ENTRY_ERROR_CODE:
-        throw new EntityAlreadyExistsException(se, se.getMessage());
+        // compatible with H2 in MySQL mode
+      case MySQLExceptionConverter.DUPLICATED_ENTRY_ERROR_CODE:
+        throw new EntityAlreadyExistsException(
+            se, "The %s entity: %s already exists.", type.name(), name);
       default:
-        throw new IOException(se);
+        throw new IOException("error code: " + se.getErrorCode(), se);
     }
   }
 }

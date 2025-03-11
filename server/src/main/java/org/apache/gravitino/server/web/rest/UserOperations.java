@@ -22,23 +22,23 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.dto.requests.UserAddRequest;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
@@ -72,15 +72,35 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () ->
-              TreeLockUtils.doWithTreeLock(
-                  AuthorizationUtils.ofGroup(metalake, user),
-                  LockType.READ,
-                  () ->
-                      Utils.ok(
-                          new UserResponse(
-                              DTOConverters.toDTO(accessControlManager.getUser(metalake, user))))));
+              Utils.ok(
+                  new UserResponse(
+                      DTOConverters.toDTO(accessControlManager.getUser(metalake, user)))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);
+    }
+  }
+
+  @GET
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-user", absolute = true)
+  public Response listUsers(
+      @PathParam("metalake") String metalake,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (verbose) {
+              return Utils.ok(
+                  new UserListResponse(
+                      DTOConverters.toDTOs(accessControlManager.listUsers(metalake))));
+            } else {
+              return Utils.ok(new NameListResponse(accessControlManager.listUserNames(metalake)));
+            }
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleUserException(OperationType.LIST, "", metalake, e);
     }
   }
 
@@ -92,15 +112,13 @@ public class UserOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
-                  LockType.WRITE,
-                  () ->
-                      Utils.ok(
-                          new UserResponse(
-                              DTOConverters.toDTO(
-                                  accessControlManager.addUser(metalake, request.getName()))))));
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new UserResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.addUser(metalake, request.getName()))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -118,11 +136,7 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean removed =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
-                    LockType.WRITE,
-                    () -> accessControlManager.removeUser(metalake, user));
+            boolean removed = accessControlManager.removeUser(metalake, user);
             if (!removed) {
               LOG.warn("Failed to remove user {} under metalake {}", user, metalake);
             }

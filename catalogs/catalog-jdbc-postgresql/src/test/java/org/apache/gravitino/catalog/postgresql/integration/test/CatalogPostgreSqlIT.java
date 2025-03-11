@@ -44,12 +44,13 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -82,7 +83,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class CatalogPostgreSqlIT extends AbstractIT {
+public class CatalogPostgreSqlIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
 
@@ -117,8 +118,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
-    createCatalog();
-    createSchema();
+    catalog = createCatalog(catalogName);
+    createSchema(schemaName);
   }
 
   @AfterAll
@@ -128,7 +129,9 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     for (String schemaName : schemaNames) {
       catalog.asSchemas().dropSchema(schemaName, true);
     }
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     postgreSqlService.close();
   }
@@ -136,7 +139,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @AfterEach
   public void resetSchema() {
     clearTableAndSchema();
-    createSchema();
+    createSchema(schemaName);
   }
 
   private void clearTableAndSchema() {
@@ -152,15 +155,14 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
 
-  private void createCatalog() throws SQLException {
+  private Catalog createCatalog(String catalogName) throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
@@ -177,10 +179,10 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
-    catalog = loadCatalog;
+    return loadCatalog;
   }
 
-  private void createSchema() {
+  private void createSchema(String schemaName) {
 
     Schema createdSchema =
         catalog.asSchemas().createSchema(schemaName, schema_comment, Collections.EMPTY_MAP);
@@ -239,6 +241,32 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testTestConnection() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), "wrong_password");
+
+    Exception exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("postgresql_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    catalogProperties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("password authentication failed for user"));
+  }
+
+  @Test
   void testCreateTableWithArrayType() {
     String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
     Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
@@ -247,8 +275,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+    tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+    Table createdTable = tableCatalog.loadTable(tableIdentifier);
 
     Assertions.assertEquals(tableName, createdTable.name());
     Assertions.assertEquals(columns.length, createdTable.columns().length);
@@ -324,6 +352,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Optional<Column> column =
         Arrays.stream(t.columns()).filter(c -> c.name().equals("binary")).findFirst();
     Assertions.assertTrue(column.isPresent());
+
+    boolean result = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(result);
+
+    Assertions.assertThrows(Exception.class, () -> tableCatalog.loadTable(tableIdentifier));
+
+    // Test drop schema with upper-case name
+    result = catalog.asSchemas().dropSchema(schemaN, false);
+
+    // Test whether drop the schema succussfully.
+    Assertions.assertTrue(result);
   }
 
   private Map<String, String> createProperties() {
@@ -483,31 +522,19 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertEquals(createdTable.name(), tableName);
-    Map<String, String> resultProp = createdTable.properties();
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
-      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
-    }
-    Assertions.assertEquals(createdTable.columns().length, columns.length);
-
-    for (int i = 0; i < columns.length; i++) {
-      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
-    }
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(tableName, loadTable.name());
     Assertions.assertEquals(table_comment, loadTable.comment());
-    resultProp = loadTable.properties();
+    Map<String, String> resultProp = loadTable.properties();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
       Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
@@ -626,8 +653,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         });
   }
 
-  @Test
-  void testCreateAndLoadSchema() {
+  //  @Test TODO(mchades): https://github.com/apache/gravitino/issues/6134
+  void testCreateAndLoadSchema() throws SQLException {
     String testSchemaName = "test";
 
     Schema schema = catalog.asSchemas().createSchema(testSchemaName, "comment", null);
@@ -638,15 +665,32 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals("comment", schema.comment());
 
     // test null comment
-    testSchemaName = "test2";
+    String testSchemaName2 = "test2";
 
-    schema = catalog.asSchemas().createSchema(testSchemaName, null, null);
+    schema = catalog.asSchemas().createSchema(testSchemaName2, null, null);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     // todo: Gravitino put id to comment, makes comment is empty string not null.
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
-    schema = catalog.asSchemas().loadSchema(testSchemaName);
+    schema = catalog.asSchemas().loadSchema(testSchemaName2);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+
+    // test register PG service to multiple catalogs
+    String newCatalogName = GravitinoITUtils.genRandomName("new_catalog");
+    Catalog newCatalog = createCatalog(newCatalogName);
+    newCatalog.asSchemas().loadSchema(testSchemaName2);
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName2, false));
+    createSchema(testSchemaName2);
+    SupportsSchemas schemaOps = newCatalog.asSchemas();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> schemaOps.loadSchema(testSchemaName2));
+    // recovered by re-build the catalog
+    Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
+    newCatalog = createCatalog(newCatalogName);
+    Schema loadedSchema = newCatalog.asSchemas().loadSchema(testSchemaName2);
+    Assertions.assertEquals(testSchemaName2, loadedSchema.name());
+
+    Assertions.assertTrue(metalake.dropCatalog(newCatalogName, true));
   }
 
   @Test
@@ -795,40 +839,42 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             "Index does not support complex fields in PostgreSQL"));
 
     // Test create index with empty name success.
-    table =
-        tableCatalog.createTable(
-            NameIdentifier.of(schemaName, "test_null_key"),
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            new Index[] {
-              Indexes.of(
-                  Index.IndexType.UNIQUE_KEY,
-                  null,
-                  new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
-              Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
-            });
+    NameIdentifier tableIdent = NameIdentifier.of(schemaName, "test_null_key");
+    tableCatalog.createTable(
+        tableIdent,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+        });
+    table = tableCatalog.loadTable(tableIdent);
+
     Assertions.assertEquals(2, table.index().length);
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());
 
     // Test create index with same col success.
-    table =
-        tableCatalog.createTable(
-            NameIdentifier.of(schemaName, "many_index"),
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            new Index[] {
-              Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-              Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-            });
+    tableIdent = NameIdentifier.of(schemaName, "many_index");
+    tableCatalog.createTable(
+        tableIdent,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+        });
+    table = tableCatalog.loadTable(tableIdent);
+
     Assertions.assertEquals(1, table.index().length);
     Assertions.assertEquals("u4_key_2", table.index()[0].name());
   }
@@ -873,26 +919,20 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("pg_it_table")),
-                newColumns,
-                null,
-                ImmutableMap.of());
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("pg_it_table"));
+    catalog.asTableCatalog().createTable(tableIdent, newColumns, null, ImmutableMap.of());
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdent);
 
     Assertions.assertEquals(
-        UnparsedExpression.of("random()"), createdTable.columns()[0].defaultValue());
+        UnparsedExpression.of("random()"), loadedTable.columns()[0].defaultValue());
     Assertions.assertEquals(
-        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, createdTable.columns()[1].defaultValue());
-    Assertions.assertEquals(Literals.NULL, createdTable.columns()[2].defaultValue());
-    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, loadedTable.columns()[1].defaultValue());
+    Assertions.assertEquals(Literals.NULL, loadedTable.columns()[2].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, loadedTable.columns()[3].defaultValue());
     Assertions.assertEquals(
-        Literals.varcharLiteral(255, "current_timestamp"),
-        createdTable.columns()[4].defaultValue());
-    Assertions.assertEquals(
-        Literals.integerLiteral(1000), createdTable.columns()[5].defaultValue());
+        Literals.varcharLiteral(255, "current_timestamp"), loadedTable.columns()[4].defaultValue());
+    Assertions.assertEquals(Literals.integerLiteral(1000), loadedTable.columns()[5].defaultValue());
   }
 
   @Test

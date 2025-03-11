@@ -1,28 +1,26 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.api.fileset_change import FilesetChange
+from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.rest.rest_message import RESTRequest
 
 
@@ -81,13 +79,8 @@ class FilesetUpdateRequest:
             self._new_comment = new_comment
 
         def validate(self):
-            """Validates the fields of the request.
-
-            Raises:
-                IllegalArgumentException if the new comment is not set.
-            """
-            if not self._new_comment:
-                raise ValueError('"new_comment" field is required and cannot be empty')
+            """Validates the fields of the request. Always pass."""
+            pass
 
         def fileset_change(self):
             """Returns the fileset change"""
@@ -151,7 +144,11 @@ class FilesetUpdateRequest:
 
     @dataclass
     class RemoveFilesetCommentRequest(FilesetUpdateRequestBase):
-        """Represents a request to remove comment from a Fileset."""
+        """Represents a request to remove comment from a Fileset.
+
+        Deprecated:
+            Please use `UpdateFilesetCommentRequest` with null value as the argument instead.
+        """
 
         def __init__(self):
             super().__init__("removeComment")

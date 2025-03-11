@@ -28,7 +28,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -82,14 +81,16 @@ public class RelationalEntityStore
   }
 
   @Override
-  public void setSerDe(EntitySerDe entitySerDe) {
-    throw new UnsupportedOperationException("Unsupported operation in relational entity store.");
+  public <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
+    return backend.list(namespace, entityType, false);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
-    return backend.list(namespace, entityType);
+      Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
+      throws IOException {
+    return backend.list(namespace, entityType, allFields);
   }
 
   @Override
@@ -181,11 +182,9 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType)
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    return backend.listEntitiesByRelation(relType, nameIdentifier, identType);
+    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 
   @Override

@@ -24,12 +24,16 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -38,6 +42,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
@@ -48,14 +53,20 @@ import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -64,6 +75,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -102,8 +114,6 @@ public class TestRoleOperations extends JerseyTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
@@ -134,7 +144,7 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateRole() {
+  public void testCreateRole() throws IllegalAccessException, NoSuchFieldException {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     SecurableObject anotherSecurableObject =
@@ -152,6 +162,33 @@ public class TestRoleOperations extends JerseyTest {
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
+
+    // Test with IllegalRequest
+    RoleCreateRequest illegalRequest = new RoleCreateRequest("role", Collections.emptyMap(), null);
+    Response illegalResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
+    SecurableObjectDTO illegalObject =
+        DTOConverters.toDTO(
+            SecurableObjects.ofCatalog(
+                "illegal_catalog", Lists.newArrayList(Privileges.CreateSchema.deny())));
+    Field field = illegalObject.getClass().getDeclaredField("privileges");
+    field.setAccessible(true);
+    field.set(illegalObject, new PrivilegeDTO[] {});
+
+    illegalRequest =
+        new RoleCreateRequest(
+            "role", Collections.emptyMap(), new SecurableObjectDTO[] {illegalObject});
+    illegalResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
 
     Response resp =
         target("/metalakes/metalake1/roles")
@@ -192,8 +229,31 @@ public class TestRoleOperations extends JerseyTest {
         Privileges.UseCatalog.allow().condition(),
         roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
+    // Test with a wrong metalake name
+    RoleCreateRequest reqWithWrongMetalake =
+        new RoleCreateRequest(
+            "role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {
+              DTOConverters.toDTO(
+                  SecurableObjects.ofMetalake(
+                      "unknown", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            });
+    Response respWithWrongMetalake =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(reqWithWrongMetalake, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), respWithWrongMetalake.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, respWithWrongMetalake.getMediaType());
+    ErrorResponse withWrongMetalakeResponse = respWithWrongMetalake.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE, withWrongMetalakeResponse.getCode());
+
     // Test to a catalog which doesn't exist
-    when(catalogDispatcher.catalogExists(any())).thenReturn(false);
+    reset(catalogDispatcher);
+    when(catalogDispatcher.loadCatalog(any())).thenThrow(new NoSuchCatalogException("mock error"));
     Response respNotExist =
         target("/metalakes/metalake1/roles")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -255,6 +315,58 @@ public class TestRoleOperations extends JerseyTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+
+    // Test with wrong binding privileges
+    SecurableObject wrongPrivilegeObject =
+        SecurableObjects.ofCatalog("wrong", Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    RoleCreateRequest wrongPriRequest =
+        new RoleCreateRequest(
+            "role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {DTOConverters.toDTO(wrongPrivilegeObject)});
+
+    Response wrongPrivilegeResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(wrongPriRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), wrongPrivilegeResp.getStatus());
+
+    ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
+    Assertions.assertEquals(
+        IllegalPrivilegeException.class.getSimpleName(), wrongPriErrorResp.getType());
+
+    // Test with empty securable objects request
+    RoleCreateRequest emptyObjectRequest =
+        new RoleCreateRequest("role", Collections.emptyMap(), new SecurableObjectDTO[] {});
+
+    Role emptyObjectRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("empty")
+            .withProperties(Collections.emptyMap())
+            .withSecurableObjects(Collections.emptyList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    reset(manager);
+    when(manager.createRole(any(), any(), any(), any())).thenReturn(emptyObjectRole);
+
+    Response emptyObjectResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(emptyObjectRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), emptyObjectResp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, emptyObjectResp.getMediaType());
+
+    RoleResponse emptyObjectResponse = emptyObjectResp.readEntity(RoleResponse.class);
+    Assertions.assertEquals(0, emptyObjectResponse.getCode());
+    Role emptyRoleDTO = emptyObjectResponse.getRole();
+    Assertions.assertEquals(emptyRoleDTO.name(), "empty");
   }
 
   @Test
@@ -332,23 +444,6 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
-  private Role buildRole(String role) {
-    SecurableObject catalog =
-        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
-    SecurableObject anotherSecurableObject =
-        SecurableObjects.ofCatalog(
-            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
-
-    return RoleEntity.builder()
-        .withId(1L)
-        .withName(role)
-        .withProperties(Collections.emptyMap())
-        .withSecurableObjects(Lists.newArrayList(catalog, anotherSecurableObject))
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
-  }
-
   @Test
   public void testDeleteRole() {
     when(manager.deleteRole(any(), any())).thenReturn(true);
@@ -399,11 +494,11 @@ public class TestRoleOperations extends JerseyTest {
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(catalog)));
     when(catalogDispatcher.catalogExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
+        NoSuchMetadataObjectException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(catalog)));
 
     // check the schema
     SecurableObject schema =
@@ -411,11 +506,11 @@ public class TestRoleOperations extends JerseyTest {
             catalog, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
     when(schemaDispatcher.schemaExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(schema)));
     when(schemaDispatcher.schemaExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
+        NoSuchMetadataObjectException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(schema)));
 
     // check the table
     SecurableObject table =
@@ -423,11 +518,11 @@ public class TestRoleOperations extends JerseyTest {
             schema, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
     when(tableDispatcher.tableExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(table)));
     when(tableDispatcher.tableExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
+        NoSuchMetadataObjectException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(table)));
 
     // check the topic
     SecurableObject topic =
@@ -435,11 +530,11 @@ public class TestRoleOperations extends JerseyTest {
             schema, "topic", Lists.newArrayList(Privileges.ConsumeTopic.allow()));
     when(topicDispatcher.topicExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(topic)));
     when(topicDispatcher.topicExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
+        NoSuchMetadataObjectException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(topic)));
 
     // check the fileset
     SecurableObject fileset =
@@ -447,10 +542,133 @@ public class TestRoleOperations extends JerseyTest {
             schema, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
     when(filesetDispatcher.filesetExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(fileset)));
     when(filesetDispatcher.filesetExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
+        NoSuchMetadataObjectException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", DTOConverters.toDTO(fileset)));
+
+    AtomicReference<String> wrongParent = new AtomicReference<>();
+    AtomicReference<String> wrongName = new AtomicReference<>();
+    AtomicReference<MetadataObject.Type> wrongType = new AtomicReference<>();
+    wrongParent.set("catalog1");
+    wrongName.set("schema1");
+
+    MetadataObject wrongMetadataObject =
+        new MetadataObject() {
+          @Nullable
+          @Override
+          public String parent() {
+            return wrongParent.get();
+          }
+
+          @Override
+          public String name() {
+            return wrongName.get();
+          }
+
+          @Override
+          public Type type() {
+            return wrongType.get();
+          }
+        };
+
+    // Test catalog object
+    wrongType.set(MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", wrongMetadataObject));
+
+    // Test schema object
+    wrongType.set(MetadataObject.Type.CATALOG);
+    wrongParent.set("catalog1.schema1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", wrongMetadataObject));
+
+    // Test table object
+    wrongType.set(MetadataObject.Type.TABLE);
+    wrongParent.set("catalog1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", wrongMetadataObject));
+
+    // Test fileset object
+    wrongType.set(MetadataObject.Type.FILESET);
+    wrongParent.set("catalog1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", wrongMetadataObject));
+
+    // Test topic object
+    wrongType.set(MetadataObject.Type.TOPIC);
+    wrongParent.set("catalog1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", wrongMetadataObject));
+  }
+
+  @Test
+  public void testListRoleNames() {
+    when(manager.listRoleNames(any())).thenReturn(new String[] {"role"});
+
+    Response resp =
+        target("/metalakes/metalake1/roles/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    NameListResponse listResponse = resp.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, listResponse.getCode());
+
+    Assertions.assertEquals(1, listResponse.getNames().length);
+    Assertions.assertEquals("role", listResponse.getNames()[0]);
+
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listRoleNames(any());
+    Response resp1 =
+        target("/metalakes/metalake1/roles/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
+    doThrow(new RuntimeException("mock error")).when(manager).listRoleNames(any());
+    Response resp3 =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  private Role buildRole(String role) {
+    SecurableObject catalog =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
+
+    return RoleEntity.builder()
+        .withId(1L)
+        .withName(role)
+        .withProperties(Collections.emptyMap())
+        .withSecurableObjects(Lists.newArrayList(catalog, anotherSecurableObject))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }

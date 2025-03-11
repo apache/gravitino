@@ -30,7 +30,7 @@ import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
@@ -64,6 +64,11 @@ public class TestIcebergCatalog {
         public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Topic properties are not supported");
         }
+
+        @Override
+        public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Model properties are not supported");
+        }
       };
 
   @Test
@@ -87,10 +92,10 @@ public class TestIcebergCatalog {
     CatalogOperations catalogOperations = icebergCatalog.ops();
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 
-    IcebergTableOps icebergTableOps =
-        ((IcebergCatalogOperations) catalogOperations).icebergTableOps;
+    IcebergCatalogWrapper icebergCatalogWrapper =
+        ((IcebergCatalogOperations) catalogOperations).icebergCatalogWrapper;
     ListNamespacesResponse listNamespacesResponse =
-        icebergTableOps.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
+        icebergCatalogWrapper.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
     Assertions.assertTrue(listNamespacesResponse.namespaces().isEmpty());
   }
 
@@ -126,6 +131,53 @@ public class TestIcebergCatalog {
       map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "hive");
       map2.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
       map2.put(IcebergCatalogPropertiesMetadata.WAREHOUSE, "test");
+      Assertions.assertDoesNotThrow(
+          () -> {
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map2);
+          });
+
+      Map<String, String> map3 = Maps.newHashMap();
+      Throwable throwable =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map3));
+
+      Assertions.assertTrue(
+          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
+    }
+  }
+
+  @Test
+  void testCatalogInstanciation() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
+      ops.initialize(conf, entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
+      Map<String, String> map1 = Maps.newHashMap();
+      map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "test");
+      PropertiesMetadata metadata = ICEBERG_PROPERTIES_METADATA.catalogPropertiesMetadata();
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> {
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map1);
+          });
+
+      Map<String, String> map2 = Maps.newHashMap();
+      map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest");
+      map2.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
       Assertions.assertDoesNotThrow(
           () -> {
             PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map2);

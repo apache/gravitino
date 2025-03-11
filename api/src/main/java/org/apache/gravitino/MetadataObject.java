@@ -59,7 +59,9 @@ public interface MetadataObject {
     /** A column is a sub-collection of the table that represents a group of same type data. */
     COLUMN,
     /** A role is an object contains specific securable objects with privileges */
-    ROLE
+    ROLE,
+    /** A model is mapped to the model artifact in ML. */
+    MODEL
   }
 
   /**
@@ -72,15 +74,15 @@ public interface MetadataObject {
   String parent();
 
   /**
-   * The name of th object.
+   * The name of the object.
    *
    * @return The name of the object.
    */
   String name();
 
   /**
-   * The full name of th object. Full name will be separated by "." to represent a string identifier
-   * of the object, like catalog, catalog.table, etc.
+   * The full name of the object. Full name will be separated by "." to represent a string
+   * identifier of the object, like catalog, catalog.table, etc.
    *
    * @return The name of the object.
    */

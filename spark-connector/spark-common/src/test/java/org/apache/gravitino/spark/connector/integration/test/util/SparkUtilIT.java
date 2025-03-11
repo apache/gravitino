@@ -28,7 +28,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Assertions;
  *
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
-public abstract class SparkUtilIT extends AbstractIT {
+public abstract class SparkUtilIT extends BaseIT {
   protected static final String NULL_STRING = "NULL";
 
   protected abstract SparkSession getSparkSession();
@@ -74,10 +74,13 @@ public abstract class SparkUtilIT extends AbstractIT {
 
   // Specify Location explicitly because the default location is local HDFS, Spark will expand the
   // location to HDFS.
-  protected void createDatabaseIfNotExists(String database) {
-    sql(
-        String.format(
-            "CREATE DATABASE IF NOT EXISTS %s LOCATION '/user/hive/%s'", database, database));
+  // However, Paimon does not support create a database with a specified location.
+  protected void createDatabaseIfNotExists(String database, String provider) {
+    String locationClause =
+        "lakehouse-paimon".equalsIgnoreCase(provider) || provider.startsWith("jdbc")
+            ? ""
+            : String.format("LOCATION '/user/hive/%s'", database);
+    sql(String.format("CREATE DATABASE IF NOT EXISTS %s %s", database, locationClause));
   }
 
   protected Map<String, String> getDatabaseMetadata(String database) {

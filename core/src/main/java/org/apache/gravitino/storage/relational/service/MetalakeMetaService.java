@@ -38,10 +38,14 @@ import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -225,6 +229,10 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    TableColumnMapper.class,
+                    mapper -> mapper.softDeleteColumnsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     FilesetMetaMapper.class,
                     mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
             () ->
@@ -258,7 +266,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+                    mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,
@@ -270,7 +278,19 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,
-                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ModelVersionAliasRelMapper.class,
+                    mapper -> mapper.softDeleteModelVersionAliasRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ModelVersionMetaMapper.class,
+                    mapper -> mapper.softDeleteModelVersionMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ModelMetaMapper.class,
+                    mapper -> mapper.softDeleteModelMetasByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -307,7 +327,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+                    mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,

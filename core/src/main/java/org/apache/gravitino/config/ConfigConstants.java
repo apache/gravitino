@@ -24,6 +24,11 @@ public final class ConfigConstants {
 
   private ConfigConstants() {}
 
+  /** HTTP Server port, reused by Gravitino server and Iceberg REST server */
+  public static final String WEBSERVER_HTTP_PORT = "httpPort";
+  /** HTTPS Server port, reused by Gravitino server and Iceberg REST server */
+  public static final String WEBSERVER_HTTPS_PORT = "httpsPort";
+
   /** The value of messages used to indicate that the configuration is not set. */
   public static final String NOT_BLANK_ERROR_MSG = "The value can't be blank";
 
@@ -62,4 +67,10 @@ public final class ConfigConstants {
 
   /** The version number for the 0.7.0 release. */
   public static final String VERSION_0_7_0 = "0.7.0";
+
+  /** The version number for the 0.8.0 release. */
+  public static final String VERSION_0_8_0 = "0.8.0";
+
+  /** The version number for the 0.9.0 release. */
+  public static final String VERSION_0_9_0 = "0.9.0";
 }

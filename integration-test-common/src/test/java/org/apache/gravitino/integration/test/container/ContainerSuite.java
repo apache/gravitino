@@ -65,31 +65,45 @@ public class ContainerSuite implements Closeable {
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
   private static volatile HiveContainer kerberosHiveContainer;
+  private static volatile HiveContainer sqlBaseHiveContainer;
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
+  private static volatile OceanBaseContainer oceanBaseContainer;
+
+  private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
+
+  /**
+   * We can share the same Hive container as Hive container with S3 contains the following
+   * differences: 1. Configuration of S3 and corresponding environment variables 2. The Hive
+   * container with S3 is Hive3 container and the Hive container is Hive2 container. There is
+   * something wrong with the hive2 container to access the S3.
+   */
+  private static volatile HiveContainer hiveContainerWithS3;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static void initIfNecessary() {
-    if (initialized) {
-      return;
-    }
+    if (!initialized) {
+      synchronized (ContainerSuite.class) {
+        if (!initialized) {
+          try {
+            // Check if docker is available and you should never close the global DockerClient!
+            DockerClient dockerClient = DockerClientFactory.instance().client();
+            Info info = dockerClient.infoCmd().exec();
+            LOG.info("Docker info: {}", info);
 
-    try {
-      // Check if docker is available and you should never close the global DockerClient!
-      DockerClient dockerClient = DockerClientFactory.instance().client();
-      Info info = dockerClient.infoCmd().exec();
-      LOG.info("Docker info: {}", info);
-
-      if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
-        network = createDockerNetwork();
+            if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
+              network = createDockerNetwork();
+            }
+            initialized = true;
+          } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize ContainerSuite", e);
+          }
+        }
       }
-      initialized = true;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
   }
 
@@ -112,7 +126,11 @@ public class ContainerSuite implements Closeable {
     return network;
   }
 
-  public void startHiveContainer() {
+  public void startHiveContainer(Map<String, String> env) {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.putAll(env);
+    builder.put("HADOOP_USER_NAME", "anonymous");
+
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -121,10 +139,7 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
-                          .build())
+                  .withEnvVars(builder.build())
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
@@ -132,6 +147,33 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startHiveContainerWithS3(Map<String, String> env) {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.putAll(env);
+    builder.put("HADOOP_USER_NAME", "anonymous");
+
+    if (hiveContainerWithS3 == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveContainerWithS3 == null) {
+          initIfNecessary();
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive")
+                  .withEnvVars(builder.build())
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveContainerWithS3 = container;
+        }
+      }
+    }
+  }
+
+  public void startHiveContainer() {
+    startHiveContainer(ImmutableMap.of());
   }
 
   /**
@@ -187,6 +229,34 @@ public class ContainerSuite implements Closeable {
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
           kerberosHiveContainer = container;
+        }
+      }
+    }
+  }
+
+  public void startSQLBaseAuthHiveContainer(Map<String, String> envVars) {
+    // If you want to enable SQL based authorization, you need both set the
+    // `ENABLE_SQL_BASE_AUTHORIZATION` environment.
+    if (envVars == null
+        || (!Objects.equals(envVars.get(HiveContainer.HIVE_RUNTIME_VERSION), HiveContainer.HIVE3))
+        || (!envVars.containsKey(HiveContainer.ENABLE_SQL_BASE_AUTHORIZATION))) {
+      throw new IllegalArgumentException(
+          "Error environment variables for Hive SQL base authorization container");
+    }
+
+    if (sqlBaseHiveContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (sqlBaseHiveContainer == null) {
+          initIfNecessary();
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive")
+                  .withNetwork(network)
+                  .withEnvVars(envVars);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          sqlBaseHiveContainer = container;
         }
       }
     }
@@ -342,6 +412,36 @@ public class ContainerSuite implements Closeable {
     startPostgreSQLContainer(testDatabaseName, PGImageName.VERSION_13);
   }
 
+  public void startOceanBaseContainer() {
+    if (oceanBaseContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (oceanBaseContainer == null) {
+          // Start OceanBase container
+          OceanBaseContainer.Builder oceanBaseBuilder =
+              OceanBaseContainer.builder()
+                  .withHostName("gravitino-ci-oceanbase")
+                  .withEnvVars(
+                      ImmutableMap.of(
+                          "MODE",
+                          "mini",
+                          "OB_SYS_PASSWORD",
+                          OceanBaseContainer.PASSWORD,
+                          "OB_TENANT_PASSWORD",
+                          OceanBaseContainer.PASSWORD,
+                          "OB_DATAFILE_SIZE",
+                          "2G",
+                          "OB_LOG_DISK_SIZE",
+                          "4G"))
+                  .withNetwork(network)
+                  .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
+          OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
+          container.start();
+          oceanBaseContainer = container;
+        }
+      }
+    }
+  }
+
   public void startKafkaContainer() {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
@@ -359,6 +459,33 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startLocalStackContainer() {
+    if (gravitinoLocalStackContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (gravitinoLocalStackContainer == null) {
+          GravitinoLocalStackContainer.Builder builder =
+              GravitinoLocalStackContainer.builder().withNetwork(network);
+          GravitinoLocalStackContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start LocalStack container", e);
+            throw new RuntimeException("Failed to start LocalStack container", e);
+          }
+          gravitinoLocalStackContainer = container;
+        }
+      }
+    }
+  }
+
+  public GravitinoLocalStackContainer getLocalStackContainer() {
+    return gravitinoLocalStackContainer;
+  }
+
+  public HiveContainer getHiveContainerWithS3() {
+    return hiveContainerWithS3;
   }
 
   public KafkaContainer getKafkaContainer() {
@@ -413,6 +540,10 @@ public class ContainerSuite implements Closeable {
     return kerberosHiveContainer;
   }
 
+  public HiveContainer getSQLBaseAuthHiveContainer() {
+    return sqlBaseHiveContainer;
+  }
+
   public DorisContainer getDorisContainer() {
     return dorisContainer;
   }
@@ -438,6 +569,10 @@ public class ContainerSuite implements Closeable {
               pgImageName));
     }
     return pgContainerMap.get(pgImageName);
+  }
+
+  public OceanBaseContainer getOceanBaseContainer() {
+    return oceanBaseContainer;
   }
 
   // Let containers assign addresses in a fixed subnet to avoid
@@ -563,6 +698,18 @@ public class ContainerSuite implements Closeable {
   public void close() throws IOException {
     try {
       closer.close();
+      mySQLContainer = null;
+      mySQLVersion5Container = null;
+      hiveContainer = null;
+      hiveRangerContainer = null;
+      trinoContainer = null;
+      trinoITContainers = null;
+      rangerContainer = null;
+      kafkaContainer = null;
+      dorisContainer = null;
+      kerberosHiveContainer = null;
+      sqlBaseHiveContainer = null;
+      pgContainerMap.clear();
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);
     }

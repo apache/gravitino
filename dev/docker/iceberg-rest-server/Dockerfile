@@ -26,4 +26,4 @@ COPY packages/gravitino-iceberg-rest-server /root/gravitino-iceberg-rest-server
 
 EXPOSE 9001
 
-ENTRYPOINT ["/bin/bash", "/root/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh", "start"]
+ENTRYPOINT ["/bin/bash", "/root/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh"]

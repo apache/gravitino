@@ -47,19 +47,18 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
+import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -94,7 +93,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public abstract class CatalogIcebergBaseIT extends AbstractIT {
+public abstract class CatalogIcebergBaseIT extends BaseIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected String WAREHOUSE;
@@ -125,7 +124,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @BeforeAll
   public void startup() throws Exception {
     ignoreIcebergRestService = false;
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
     containerSuite.startHiveContainer();
     initIcebergCatalogProperties();
     createMetalake();
@@ -138,18 +137,20 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void stop() throws Exception {
     try {
       clearTableAndSchema();
+      metalake.disableCatalog(catalogName);
       metalake.dropCatalog(catalogName);
+      client.disableMetalake(metalakeName);
       client.dropMetalake(metalakeName);
     } finally {
       if (spark != null) {
         spark.close();
       }
-      AbstractIT.stopIntegrationTest();
+      super.stopIntegrationTest();
     }
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -158,10 +159,10 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   // if startIntegrationTest() is auto invoked by Junit. So here we override
   // startIntegrationTest() to disable the auto invoke by junit.
   @BeforeAll
-  public static void startIntegrationTest() {}
+  public void startIntegrationTest() {}
 
   @AfterAll
-  public static void stopIntegrationTest() {}
+  public void stopIntegrationTest() {}
 
   protected abstract void initIcebergCatalogProperties();
 
@@ -196,10 +197,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -284,7 +284,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     List<org.apache.iceberg.catalog.Namespace> icebergNamespaces =
-        icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
+        icebergSupportsNamespaces.listNamespaces(IcebergCatalogWrapperHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -298,7 +298,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     icebergNamespaces =
-        icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
+        icebergSupportsNamespaces.listNamespaces(IcebergCatalogWrapperHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
@@ -311,7 +311,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Map<String, String> hiveCatalogProps =
         icebergSupportsNamespaces.loadNamespaceMetadata(
-            IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name()));
+            IcebergCatalogWrapperHelper.getIcebergNamespace(schemaIdent.name()));
     Assertions.assertTrue(hiveCatalogProps.containsKey("t1"));
 
     Map<String, String> emptyMap = Collections.emptyMap();
@@ -324,7 +324,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
     org.apache.iceberg.catalog.Namespace icebergNamespace =
-        IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name());
+        IcebergCatalogWrapperHelper.getIcebergNamespace(schemaIdent.name());
     Assertions.assertThrows(
         NoSuchNamespaceException.class,
         () -> {
@@ -359,7 +359,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     icebergNamespaces =
-        icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
+        icebergSupportsNamespaces.listNamespaces(IcebergCatalogWrapperHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -377,6 +377,76 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertNull(loadTable.comment());
+  }
+
+  @Test
+  void testCreateTableWithNoneDistribution() {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table tableWithPartitionAndSortorder =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(tableName, tableWithPartitionAndSortorder.name());
+    Assertions.assertEquals(Distributions.RANGE, tableWithPartitionAndSortorder.distribution());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(Distributions.RANGE, loadTable.distribution());
+    tableCatalog.dropTable(tableIdentifier);
+
+    Table tableWithPartition =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            new SortOrder[0]);
+    Assertions.assertEquals(tableName, tableWithPartition.name());
+    Assertions.assertEquals(Distributions.HASH, tableWithPartition.distribution());
+
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(Distributions.HASH, loadTable.distribution());
+    tableCatalog.dropTable(tableIdentifier);
+
+    Table tableWithoutPartitionAndSortOrder =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            new Transform[0],
+            distribution,
+            new SortOrder[0]);
+    Assertions.assertEquals(tableName, tableWithoutPartitionAndSortOrder.name());
+    Assertions.assertEquals(Distributions.NONE, tableWithoutPartitionAndSortOrder.distribution());
+
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(Distributions.NONE, loadTable.distribution());
   }
 
   @Test
@@ -416,7 +486,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     // TODO add partitioning and sort order check
@@ -433,7 +503,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
 
     Assertions.assertEquals(partitioning.length, loadTable.partitioning().length);
@@ -442,7 +512,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // catalog load check
     org.apache.iceberg.Table table =
         icebergCatalog.loadTable(
-            IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
+            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier));
     Assertions.assertEquals(tableName, table.name().substring(table.name().lastIndexOf(".") + 1));
     Assertions.assertEquals(
         table_comment, table.properties().get(IcebergTable.ICEBERG_COMMENT_FIELD_NAME));
@@ -514,7 +584,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     org.apache.iceberg.Table table =
         icebergCatalog.loadTable(
-            IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
+            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier));
     org.apache.iceberg.Schema icebergSchema = table.schema();
     Assertions.assertEquals("iceberg_column_1", icebergSchema.columns().get(0).name());
     Assertions.assertEquals(
@@ -550,7 +620,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals("table_1", nameIdentifiers[0].name());
 
     List<TableIdentifier> tableIdentifiers =
-        icebergCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+        icebergCatalog.listTables(IcebergCatalogWrapperHelper.getIcebergNamespace(schemaName));
     Assertions.assertEquals(1, tableIdentifiers.size());
     Assertions.assertEquals("table_1", tableIdentifiers.get(0).name());
 
@@ -569,7 +639,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals("table_2", nameIdentifiers[1].name());
 
     tableIdentifiers =
-        icebergCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+        icebergCatalog.listTables(IcebergCatalogWrapperHelper.getIcebergNamespace(schemaName));
     Assertions.assertEquals(2, tableIdentifiers.size());
     Assertions.assertEquals("table_1", tableIdentifiers.get(0).name());
     Assertions.assertEquals("table_2", tableIdentifiers.get(1).name());
@@ -585,7 +655,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     tableIdentifiers =
-        icebergCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+        icebergCatalog.listTables(IcebergCatalogWrapperHelper.getIcebergNamespace(schemaName));
     Assertions.assertEquals(0, tableIdentifiers.size());
   }
 
@@ -968,9 +1038,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        partitioning,
+        new Transform[0],
         distribution,
-        sortOrders);
+        new SortOrder[0]);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
 
@@ -981,8 +1051,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         Arrays.asList(columns),
         properties,
         distribution,
-        sortOrders,
-        partitioning,
+        new SortOrder[0],
+        new Transform[0],
         loadTable);
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
@@ -1179,7 +1249,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
-    Distribution distribution = Distributions.NONE;
+    Distribution distribution = Distributions.HASH;
 
     final SortOrder[] sortOrders =
         new SortOrder[] {
@@ -1255,5 +1325,14 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
     }
+  }
+
+  protected void assertColumn(Column expectedColumn, Column actualColumn) {
+    Assertions.assertEquals(expectedColumn.name(), actualColumn.name());
+    Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
+    Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
+    Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
+    Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
+    Assertions.assertEquals(expectedColumn.defaultValue(), actualColumn.defaultValue());
   }
 }

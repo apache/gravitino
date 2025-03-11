@@ -30,11 +30,17 @@ public interface SupportsRelationOperations {
   /** Relation is an abstraction which connects two entities. */
   enum Type {
     /** The owner relationship */
-    OWNER_REL
+    OWNER_REL,
+    /** Metadata objet and role relationship */
+    METADATA_OBJECT_ROLE_REL,
+    /** Role and user relationship */
+    ROLE_USER_REL,
+    /** Role and group relationship */
+    ROLE_GROUP_REL
   }
 
   /**
-   * List the entities according to a give entity in a specific relation.
+   * List the entities according to a given entity in a specific relation.
    *
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier
@@ -42,8 +48,27 @@ public interface SupportsRelationOperations {
    * @return The list of entities
    * @throws IOException When occurs storage issues, it will throw IOException.
    */
+  default <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType) throws IOException {
+    return listEntitiesByRelation(relType, nameIdentifier, identType, true /* allFields*/);
+  }
+
+  /**
+   * List the entities according to a given entity in a specific relation.
+   *
+   * @param relType The type of relation.
+   * @param nameIdentifier The given entity identifier
+   * @param identType The given entity type.
+   * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provide
+   *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
+   *     true, the method will fetch all the fields, Otherwise, the method will fetch all the fields
+   *     except for high-cost fields.
+   * @return The list of entities
+   * @throws IOException When occurs storage issues, it will throw IOException.
+   */
   <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType) throws IOException;
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
+      throws IOException;
 
   /**
    * insert a relation between two entities

@@ -1,0 +1,45 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# fuse settings
+[fuse]
+file_mask= 0o600
+dir_mask= 0o700
+fs_type = "gvfs"
+data_dir = "target/debug/gvfs-dir"
+
+[fuse.properties]
+key1 = "value1"
+key2 = "value2"
+
+# filesystem settings
+[filesystem]
+block_size = 8192
+
+# Gravitino settings
+[gravitino]
+uri = "http://localhost:8090"
+metalake = "test"
+
+# extend settings
+[extend_config]
+s3-access_key_id = "XXX_access_key"
+s3-secret_access_key = "XXX_secret_key"
+s3-region = "XXX_region"
+s3-bucket = "XXX_bucket"
+s3-endpoint = "XXX_endpoint"
+

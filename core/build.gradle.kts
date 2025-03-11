@@ -25,7 +25,7 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
-  implementation(project(":meta"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
@@ -36,11 +36,6 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.mybatis)
-  implementation(libs.protobuf.java.util) {
-    exclude("com.google.guava", "guava")
-      .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
-  }
-  implementation(libs.rocksdbjni)
 
   annotationProcessor(libs.lombok)
 
@@ -50,10 +45,17 @@ dependencies {
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

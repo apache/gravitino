@@ -24,16 +24,32 @@ import static org.apache.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MetadataObjectService is used for converting full name to entity id and converting entity id to
@@ -44,6 +60,8 @@ public class MetadataObjectService {
   private static final String DOT = ".";
   private static final Joiner DOT_JOINER = Joiner.on(DOT);
   private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
+
+  private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
 
   private MetadataObjectService() {}
 
@@ -74,99 +92,413 @@ public class MetadataObjectService {
       return TopicMetaService.getInstance().getTopicIdByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.TABLE) {
       return TableMetaService.getInstance().getTableByNameIdentifier(nameIdentifier);
+    } else if (type == MetadataObject.Type.MODEL) {
+      return ModelMetaService.getInstance().getModelIdByNameIdentifier(nameIdentifier);
+    }
+    if (type == MetadataObject.Type.COLUMN) {
+      long tableId =
+          TableMetaService.getInstance()
+              .getTableByNameIdentifier(
+                  NameIdentifier.of(
+                      ArrayUtils.remove(realNames.toArray(new String[0]), realNames.size() - 1)));
+      return TableColumnMetaService.getInstance()
+          .getColumnIdByTableIdAndName(tableId, names.get(4));
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
   }
 
-  // Metadata object may be null because the metadata object can be deleted asynchronously.
+  // Metadata object may be null because the metadata object can be deleted
+  // asynchronously.
   @Nullable
   public static String getMetadataObjectFullName(String type, long metadataObjectId) {
-    MetadataObject.Type metadatatype = MetadataObject.Type.valueOf(type);
-    if (metadatatype == MetadataObject.Type.METALAKE) {
-      MetalakePO metalakePO = MetalakeMetaService.getInstance().getMetalakePOById(metadataObjectId);
-      if (metalakePO == null) {
-        return null;
+    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type);
+    String fullName = null;
+    long objectId = metadataObjectId;
+
+    do {
+      switch (metadataType) {
+        case METALAKE:
+          MetalakePO metalakePO = MetalakeMetaService.getInstance().getMetalakePOById(objectId);
+          if (metalakePO != null) {
+            fullName = metalakePO.getMetalakeName();
+            metadataType = null;
+          } else {
+            return null;
+          }
+          break;
+
+        case CATALOG:
+          CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(objectId);
+          if (catalogPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(catalogPO.getCatalogName(), fullName)
+                    : catalogPO.getCatalogName();
+            metadataType = null;
+          } else {
+            return null;
+          }
+          break;
+
+        case SCHEMA:
+          SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(objectId);
+          if (schemaPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(schemaPO.getSchemaName(), fullName)
+                    : schemaPO.getSchemaName();
+            objectId = schemaPO.getCatalogId();
+            metadataType = MetadataObject.Type.CATALOG;
+          } else {
+            return null;
+          }
+          break;
+
+        case TABLE:
+          TablePO tablePO = TableMetaService.getInstance().getTablePOById(objectId);
+          // if fullName is null:
+          // fullName = catalogPO.getSchemaName(),schemaPO.getTableName()
+          if (tablePO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(tablePO.getTableName(), fullName)
+                    : tablePO.getTableName();
+            objectId = tablePO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case TOPIC:
+          TopicPO topicPO = TopicMetaService.getInstance().getTopicPOById(objectId);
+          if (topicPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(topicPO.getTopicName(), fullName)
+                    : topicPO.getTopicName();
+            objectId = topicPO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case FILESET:
+          FilesetPO filesetPO = FilesetMetaService.getInstance().getFilesetPOById(objectId);
+          if (filesetPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(filesetPO.getFilesetName(), fullName)
+                    : filesetPO.getFilesetName();
+            objectId = filesetPO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case MODEL:
+          ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(objectId);
+          if (modelPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(modelPO.getModelName(), fullName)
+                    : modelPO.getModelName();
+            objectId = modelPO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case COLUMN:
+          ColumnPO columnPO = TableColumnMetaService.getInstance().getColumnPOById(objectId);
+          if (columnPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(columnPO.getColumnName(), fullName)
+                    : columnPO.getColumnName();
+            objectId = columnPO.getTableId();
+            metadataType = MetadataObject.Type.TABLE;
+          } else {
+            return null;
+          }
+          break;
+
+        default:
+          throw new IllegalArgumentException(
+              String.format("Doesn't support the type %s", metadataType));
       }
+    } while (metadataType != null);
 
-      return metalakePO.getMetalakeName();
-    }
-
-    if (metadatatype == MetadataObject.Type.CATALOG) {
-      return getCatalogFullName(metadataObjectId);
-    }
-
-    if (metadatatype == MetadataObject.Type.SCHEMA) {
-      return getSchemaFullName(metadataObjectId);
-    }
-
-    if (metadatatype == MetadataObject.Type.TABLE) {
-      TablePO tablePO = TableMetaService.getInstance().getTablePOById(metadataObjectId);
-      if (tablePO == null) {
-        return null;
-      }
-
-      String schemaName = getSchemaFullName(tablePO.getSchemaId());
-      if (schemaName == null) {
-        return null;
-      }
-
-      return DOT_JOINER.join(schemaName, tablePO.getTableName());
-    }
-
-    if (metadatatype == MetadataObject.Type.TOPIC) {
-      TopicPO topicPO = TopicMetaService.getInstance().getTopicPOById(metadataObjectId);
-      if (topicPO == null) {
-        return null;
-      }
-
-      String schemaName = getSchemaFullName(topicPO.getSchemaId());
-      if (schemaName == null) {
-        return null;
-      }
-
-      return DOT_JOINER.join(schemaName, topicPO.getTopicName());
-    }
-
-    if (metadatatype == MetadataObject.Type.FILESET) {
-      FilesetPO filesetPO = FilesetMetaService.getInstance().getFilesetPOById(metadataObjectId);
-      if (filesetPO == null) {
-        return null;
-      }
-
-      String schemaName = getSchemaFullName(filesetPO.getSchemaId());
-      if (schemaName == null) {
-        return null;
-      }
-
-      return DOT_JOINER.join(schemaName, filesetPO.getFilesetName());
-    }
-
-    throw new IllegalArgumentException(String.format("Doesn't support the type %s", metadatatype));
+    return fullName;
   }
 
-  @Nullable
-  private static String getCatalogFullName(Long entityId) {
-    CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(entityId);
-    if (catalogPO == null) {
-      return null;
+  /**
+   * Retrieves a map of Metalake object IDs to their full names.
+   *
+   * @param metalakeIds A list of Metalake object IDs to fetch names for.
+   * @return A Map where the key is the Metalake ID and the value is the Metalake full name. The map
+   *     may contain null values for the names if its parent object is deleted. Returns an empty map
+   *     if no Metalake objects are found for the given IDs. {@code @example} value of metalake full
+   *     name: "metalake1.catalog1.schema1.table1"
+   */
+  public static Map<Long, String> getMetalakeObjectsFullName(List<Long> metalakeIds) {
+    List<MetalakePO> metalakePOs =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.listMetalakePOsByMetalakeIds(metalakeIds));
+
+    if (metalakePOs == null || metalakePOs.isEmpty()) {
+      return new HashMap<>();
     }
-    return catalogPO.getCatalogName();
+
+    HashMap<Long, String> metalakeIdAndNameMap = new HashMap<>();
+
+    metalakePOs.forEach(
+        metalakePO ->
+            metalakeIdAndNameMap.put(metalakePO.getMetalakeId(), metalakePO.getMetalakeName()));
+
+    return metalakeIdAndNameMap;
   }
 
-  @Nullable
-  private static String getSchemaFullName(Long entityId) {
-    SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(entityId);
+  /**
+   * Retrieves a map of Fileset object IDs to their full names.
+   *
+   * @param filesetIds A list of Fileset object IDs to fetch names for.
+   * @return A Map where the key is the Fileset ID and the value is the Fileset full name. The map
+   *     may contain null values for the names if its parent object is deleted. Returns an empty map
+   *     if no Fileset objects are found for the given IDs. {@code @example} value of fileset full
+   *     name: "catalog1.schema1.fileset1"
+   */
+  public static Map<Long, String> getFilesetObjectsFullName(List<Long> filesetIds) {
+    List<FilesetPO> filesetPOs =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsByFilesetIds(filesetIds));
 
-    if (schemaPO == null) {
-      return null;
+    if (filesetPOs == null || filesetPOs.isEmpty()) {
+      return new HashMap<>();
     }
 
-    String catalogName = getCatalogFullName(schemaPO.getCatalogId());
-    if (catalogName == null) {
-      return null;
+    List<Long> schemaIds =
+        filesetPOs.stream().map(FilesetPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+
+    HashMap<Long, String> filesetIdAndNameMap = new HashMap<>();
+
+    filesetPOs.forEach(
+        filesetPO -> {
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of filesetPO to null.
+          String schemaName = schemaIdAndNameMap.getOrDefault(filesetPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of fileset {} may be deleted", filesetPO.getFilesetId());
+            filesetIdAndNameMap.put(filesetPO.getFilesetId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(schemaName, filesetPO.getFilesetName());
+          filesetIdAndNameMap.put(filesetPO.getFilesetId(), fullName);
+        });
+
+    return filesetIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of Model object IDs to their full names.
+   *
+   * @param modelIds A list of Model object IDs to fetch names for.
+   * @return A Map where the key is the Model ID and the value is the Model full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no Model objects are found for the given IDs. {@code @example} value of model full name:
+   *     "catalog1.schema1.model1"
+   */
+  public static Map<Long, String> getModelObjectsFullName(List<Long> modelIds) {
+    List<ModelPO> modelPOs =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class, mapper -> mapper.listModelPOsByModelIds(modelIds));
+
+    if (modelPOs == null || modelPOs.isEmpty()) {
+      return new HashMap<>();
     }
 
-    return DOT_JOINER.join(catalogName, schemaPO.getSchemaName());
+    List<Long> schemaIds = modelPOs.stream().map(ModelPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+
+    HashMap<Long, String> modelIdAndNameMap = new HashMap<>();
+
+    modelPOs.forEach(
+        modelPO -> {
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of modelPO to null.
+          String schemaName = schemaIdAndNameMap.getOrDefault(modelPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of model {} may be deleted", modelPO.getModelId());
+            modelIdAndNameMap.put(modelPO.getModelId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(schemaName, modelPO.getModelName());
+          modelIdAndNameMap.put(modelPO.getModelId(), fullName);
+        });
+
+    return modelIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of Table object IDs to their full names.
+   *
+   * @param tableIds A list of Table object IDs to fetch names for.
+   * @return A Map where the key is the Table ID and the value is the Table full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no Table objects are found for the given IDs. {@code @example} value of table full name:
+   *     "catalog1.schema1.table1"
+   */
+  public static Map<Long, String> getTableObjectsFullName(List<Long> tableIds) {
+    List<TablePO> tablePOs =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
+
+    if (tablePOs == null || tablePOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    tablePOs.stream().map(TablePO::getCatalogId).collect(Collectors.toList());
+    List<Long> schemaIds = tablePOs.stream().map(TablePO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+
+    HashMap<Long, String> tableIdAndNameMap = new HashMap<>();
+
+    tablePOs.forEach(
+        tablePO -> {
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of tablePO to
+          // null
+          String schemaName = schemaIdAndNameMap.getOrDefault(tablePO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of table {} may be deleted", tablePO.getTableId());
+            tableIdAndNameMap.put(tablePO.getTableId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(schemaName, tablePO.getTableName());
+          tableIdAndNameMap.put(tablePO.getTableId(), fullName);
+        });
+
+    return tableIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of Topic object IDs to their full names.
+   *
+   * @param topicIds A list of Topic object IDs to fetch names for.
+   * @return A Map where the key is the Topic ID and the value is the Topic full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no Topic objects are found for the given IDs. {@code @example} value of topic full name:
+   *     "catalog1.schema1.topic1"
+   */
+  public static Map<Long, String> getTopicObjectsFullName(List<Long> topicIds) {
+    List<TopicPO> topicPOs =
+        SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class, mapper -> mapper.listTopicPOsByTopicIds(topicIds));
+
+    if (topicPOs == null || topicPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds = topicPOs.stream().map(TopicPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+
+    HashMap<Long, String> topicIdAndNameMap = new HashMap<>();
+
+    topicPOs.forEach(
+        topicPO -> {
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of topicPO to null.
+          String schemaName = schemaIdAndNameMap.getOrDefault(topicPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of topic {} may be deleted", topicPO.getTopicId());
+            topicIdAndNameMap.put(topicPO.getTopicId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(schemaName, topicPO.getTopicName());
+          topicIdAndNameMap.put(topicPO.getTopicId(), fullName);
+        });
+
+    return topicIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of Catalog object IDs to their full names.
+   *
+   * @param catalogIds A list of Catalog object IDs to fetch names for.
+   * @return A Map where the key is the Catalog ID and the value is the Catalog full name. The map
+   *     may contain null values for the names if its parent object is deleted. Returns an empty map
+   *     if no Catalog objects are found for the given IDs. {@code @example} value of catalog full
+   *     name: "catalog1"
+   */
+  public static Map<Long, String> getCatalogObjectsFullName(List<Long> catalogIds) {
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
+
+    if (catalogPOs == null || catalogPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    HashMap<Long, String> catalogIdAndNameMap = new HashMap<>();
+
+    catalogPOs.forEach(
+        catalogPO -> catalogIdAndNameMap.put(catalogPO.getCatalogId(), catalogPO.getCatalogName()));
+
+    return catalogIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of Schema object IDs to their full names.
+   *
+   * @param schemaIds A list of Schema object IDs to fetch names for.
+   * @return A Map where the key is the Schema ID and the value is the Schema full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no Schema objects are found for the given IDs. {@code @example} value of schema full name:
+   *     "catalog1.schema1"
+   */
+  public static Map<Long, String> getSchemaObjectsFullName(List<Long> schemaIds) {
+    List<SchemaPO> schemaPOs =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
+
+    if (schemaPOs == null || schemaPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> catalogIds =
+        schemaPOs.stream().map(SchemaPO::getCatalogId).collect(Collectors.toList());
+
+    Map<Long, String> catalogIdAndNameMap = getCatalogObjectsFullName(catalogIds);
+
+    HashMap<Long, String> schemaIdAndNameMap = new HashMap<>();
+
+    schemaPOs.forEach(
+        schemaPO -> {
+          String catalogName = catalogIdAndNameMap.getOrDefault(schemaPO.getCatalogId(), null);
+          if (catalogName == null) {
+            LOG.warn("The catalog of schema {} may be deleted", schemaPO.getSchemaId());
+            schemaIdAndNameMap.put(schemaPO.getSchemaId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(catalogName, schemaPO.getSchemaName());
+
+          schemaIdAndNameMap.put(schemaPO.getSchemaId(), fullName);
+        });
+
+    return schemaIdAndNameMap;
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.jdbc.operation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -30,6 +31,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
@@ -46,9 +48,11 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -124,15 +128,20 @@ public abstract class JdbcTableOperations implements TableOperation {
     return true;
   }
 
+  /**
+   * The default implementation of this method is based on MySQL, and if the catalog does not
+   * compatible with MySQL, this method needs to be rewritten.
+   */
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    try (Connection connection = getConnection(databaseName)) {
-      final List<String> names = Lists.newArrayList();
-      try (ResultSet tables = getTables(connection)) {
-        while (tables.next()) {
-          if (Objects.equals(tables.getString("TABLE_SCHEM"), databaseName)) {
-            names.add(tables.getString("TABLE_NAME"));
-          }
+
+    final List<String> names = Lists.newArrayList();
+
+    try (Connection connection = getConnection(databaseName);
+        ResultSet tables = getTables(connection)) {
+      while (tables.next()) {
+        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
+          names.add(tables.getString("TABLE_NAME"));
         }
       }
       LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
@@ -167,6 +176,15 @@ public abstract class JdbcTableOperations implements TableOperation {
     return builder;
   }
 
+  protected JdbcColumn.Builder getColumnBuilder(
+      ResultSet columnsResult, String databaseName, String tableName) throws SQLException {
+    JdbcColumn.Builder builder = null;
+    if (Objects.equals(columnsResult.getString("TABLE_NAME"), tableName)) {
+      builder = getBasicJdbcColumnInfo(columnsResult);
+    }
+    return builder;
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
@@ -187,8 +205,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
         // TODO(yunqing): check schema and catalog also
-        if (Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
-          JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+        JdbcColumn.Builder columnBuilder = getColumnBuilder(columns, databaseName, tableName);
+        if (columnBuilder != null) {
           boolean autoIncrement = getAutoIncrementInfo(columns);
           columnBuilder.withAutoIncrement(autoIncrement);
           jdbcColumns.add(columnBuilder.build());
@@ -204,11 +222,15 @@ public abstract class JdbcTableOperations implements TableOperation {
       Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
       jdbcTableBuilder.withPartitioning(tablePartitioning);
 
-      // 5.Get table properties
+      // 5.Get distribution information
+      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
+      jdbcTableBuilder.withDistribution(distribution);
+
+      // 6.Get table properties
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
       jdbcTableBuilder.withProperties(tableProperties);
 
-      // 6.Leave the information to the bottom layer to append the table
+      // 7.Leave the information to the bottom layer to append the table
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
 
       return jdbcTableBuilder.withTableOperation(this).build();
@@ -234,6 +256,20 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
     return Transforms.EMPTY_TRANSFORM;
+  }
+
+  /**
+   * Get the distribution information of the table, including the distribution type and the fields
+   *
+   * @param connection jdbc connection.
+   * @param databaseName database name.
+   * @param tableName table name.
+   * @return Returns the distribution information of the table.
+   * @throws SQLException if an error occurs while getting the distribution information.
+   */
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    return Distributions.NONE;
   }
 
   protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
@@ -426,17 +462,35 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes);
 
-  protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected String generateRenameTableSql(String oldTableName, String newTableName) {
+    return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
+  }
 
-  protected abstract String generateDropTableSql(String tableName);
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected String generateDropTableSql(String tableName) {
+    return String.format("DROP TABLE `%s`", tableName);
+  }
 
   protected abstract String generatePurgeTableSql(String tableName);
 
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
-  protected abstract JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable);
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected JdbcTable getOrCreateTable(
+      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+    return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
+  }
 
   protected void validateUpdateColumnNullable(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
@@ -449,6 +503,61 @@ public abstract class JdbcTableOperations implements TableOperation {
       throw new IllegalArgumentException(
           "column " + col + " with null default value cannot be changed to not null");
     }
+  }
+
+  /**
+   * The auto-increment column will be verified. There can only be one auto-increment column and it
+   * must be the primary key or unique index.
+   *
+   * @param columns jdbc column
+   * @param indexes table indexes
+   */
+  protected static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
+    // Check auto increment column
+    List<JdbcColumn> autoIncrementCols =
+        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
+    String autoIncrementColsStr =
+        autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
+    Preconditions.checkArgument(
+        autoIncrementCols.size() <= 1,
+        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
+            + autoIncrementColsStr);
+    if (!autoIncrementCols.isEmpty()) {
+      Optional<Index> existAutoIncrementColIndexOptional =
+          Arrays.stream(indexes)
+              .filter(
+                  index ->
+                      Arrays.stream(index.fieldNames())
+                          .flatMap(Arrays::stream)
+                          .anyMatch(
+                              s ->
+                                  StringUtils.equalsIgnoreCase(autoIncrementCols.get(0).name(), s)))
+              .filter(
+                  index ->
+                      index.type() == Index.IndexType.PRIMARY_KEY
+                          || index.type() == Index.IndexType.UNIQUE_KEY)
+              .findAny();
+      Preconditions.checkArgument(
+          existAutoIncrementColIndexOptional.isPresent(),
+          "Incorrect table definition; there can be only one auto column and it must be defined as a key");
+    }
+  }
+
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected static String getIndexFieldStr(String[][] fieldNames) {
+    return Arrays.stream(fieldNames)
+        .map(
+            colNames -> {
+              if (colNames.length > 1) {
+                throw new IllegalArgumentException(
+                    "Index does not support complex fields in this Catalog");
+              }
+              return String.format("`%s`", colNames[0]);
+            })
+        .collect(Collectors.joining(", "));
   }
 
   protected JdbcColumn getJdbcColumnFromTable(JdbcTable jdbcTable, String colName) {
@@ -478,8 +587,8 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected JdbcColumn.Builder getBasicJdbcColumnInfo(ResultSet column) throws SQLException {
     JdbcTypeConverter.JdbcTypeBean typeBean =
         new JdbcTypeConverter.JdbcTypeBean(column.getString("TYPE_NAME"));
-    typeBean.setColumnSize(column.getString("COLUMN_SIZE"));
-    typeBean.setScale(column.getString("DECIMAL_DIGITS"));
+    typeBean.setColumnSize(column.getInt("COLUMN_SIZE"));
+    typeBean.setScale(column.getInt("DECIMAL_DIGITS"));
     String comment = column.getString("REMARKS");
     boolean nullable = column.getBoolean("NULLABLE");
 

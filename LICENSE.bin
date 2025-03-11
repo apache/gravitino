@@ -282,10 +282,15 @@
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
    Apache Hadoop
+   Apache Hadoop Aliyun connector
+   Apache Hadoop GCS connector
+   Apache Hadoop AWS connector
+   Apache Hadoop Azure connector
    Apache Hadoop Annotatations
    Apache Hadoop Auth
    Apache Hadoop Client Aggregator
    Apache Hadoop Common
+   Apache Hadoop HDFS
    Apache Hadoop HDFS Client
    Apache Hadoop MapReduce Common
    Apache Hadoop MapReduce Core
@@ -296,11 +301,20 @@
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg
+   Apache Iceberg Aliyun
+   Apache Iceberg api
+   Apache Iceberg AWS
+   Apache Iceberg Azure
+   Apache Iceberg core
+   Apache Iceberg Hive metastore
+   Apache Iceberg GCP
+   Apache Iceberg GCP bundle
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
    Apache Log4j Core
    Apache Log4j SLF4J 2.0 Binding
+   Apache Log4j Layout For Templated JSON Encoding
    Apache ORC
    Apache Parquet Hadoop Bundle
    Apache Thrift
@@ -310,6 +324,8 @@
    Apache Yetus - Audience Annotations
    Apache Kerby
    Apache Kyuubi
+   Apache Ranger
+   Apache Ranger intg
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -356,6 +372,9 @@
    WildFly
    Confluent Kafka Streams Examples
    Apache Arrow
+   Rome
+   Jettison
+   Awaitility
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -364,10 +383,9 @@
 
    This product bundles various third-party components also under the
    BSD license
-   
+
    JSR305
    LevelDB JNI
-   RocksDB JNI
    JCraft
    Javolution
    ANTLR4
@@ -384,6 +402,8 @@
    RE2/J
    ZSTD JNI
    fsspec
+   Google auth HTTP
+   Google auth Credentials
 
    This product bundles various third-party components also under the
    MIT license
@@ -402,6 +422,7 @@
    Common Development and Distribution License 1.0
 
    Javax Activation
+   Javax Mail
    Stax API
    Java Servlet API
    JSR311 API
@@ -446,6 +467,7 @@
    Jakarta RESTful WS API
    Jakarta XML Binding API
    JavaServer Pages(TM) API
+   Javax WS RS API
    HK2 API Module
    HK2 Service Locator
    HK2 Utils

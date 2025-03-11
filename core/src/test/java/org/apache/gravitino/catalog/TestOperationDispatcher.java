@@ -18,24 +18,35 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -48,6 +59,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public abstract class TestOperationDispatcher {
 
@@ -64,13 +77,12 @@ public abstract class TestOperationDispatcher {
   private static Config config;
 
   @BeforeAll
-  public static void setUp() throws IOException {
+  public static void setUp() throws IOException, IllegalAccessException {
     config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
     entityStore = spy(new TestMemoryEntityStore.InMemoryEntityStore());
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
 
     BaseMetalake metalakeEntity =
         BaseMetalake.builder()
@@ -83,6 +95,12 @@ public abstract class TestOperationDispatcher {
     entityStore.put(metalakeEntity, true);
 
     catalogManager = new CatalogManager(config, entityStore, idGenerator);
+
+    Config config = mock(Config.class);
+    doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     NameIdentifier ident = NameIdentifier.of(metalake, catalog);
     Map<String, String> props = ImmutableMap.of("key1", "value1", "key2", "value2");
@@ -138,6 +156,19 @@ public abstract class TestOperationDispatcher {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, operation);
     for (String msg : errorMessage) {
       Assertions.assertTrue(exception.getMessage().contains(msg));
+    }
+  }
+
+  public static void withMockedAuthorizationUtils(Runnable testCode) {
+    try (MockedStatic<AuthorizationUtils> authzUtilsMockedStatic =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      authzUtilsMockedStatic
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      Mockito.any(NameIdentifier.class), Mockito.any(Entity.EntityType.class)))
+          .thenReturn(ImmutableList.of("/test"));
+      testCode.run();
     }
   }
 }

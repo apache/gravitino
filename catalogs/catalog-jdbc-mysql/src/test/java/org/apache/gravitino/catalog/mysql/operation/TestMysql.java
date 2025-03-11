@@ -25,9 +25,9 @@ import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
@@ -48,7 +48,7 @@ public class TestMysql extends TestJdbc {
 
     DATABASE_OPERATIONS = new MysqlDatabaseOperations();
     TABLE_OPERATIONS = new MysqlTableOperations();
-    JDBC_EXCEPTION_CONVERTER = new MysqlExceptionConverter();
+    JDBC_EXCEPTION_CONVERTER = new JdbcExceptionConverter();
     DATABASE_OPERATIONS.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
     TABLE_OPERATIONS.initialize(
         dataSource,

@@ -260,19 +260,31 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       CreateTopicsResult createTopicsResult =
           adminClient.createTopics(Collections.singleton(buildNewTopic(ident, properties)));
       Uuid topicId = createTopicsResult.topicId(ident.name()).get();
+      Integer numPartitions = createTopicsResult.numPartitions(ident.name()).get();
+      Integer replicationFactor = createTopicsResult.replicationFactor(ident.name()).get();
+      Config topicConfigs = createTopicsResult.config(ident.name()).get();
+
+      Map<String, String> created_properties = Maps.newHashMap();
+
       LOG.info(
           "Created topic {}[id: {}] with {} partitions and replication factor {}",
           ident,
           topicId,
-          createTopicsResult.numPartitions(ident.name()).get(),
-          createTopicsResult.replicationFactor(ident.name()).get());
+          numPartitions,
+          replicationFactor);
+
+      created_properties.put(
+          KafkaTopicPropertiesMetadata.PARTITION_COUNT, String.valueOf(numPartitions));
+      created_properties.put(
+          KafkaTopicPropertiesMetadata.REPLICATION_FACTOR, String.valueOf(replicationFactor));
+      topicConfigs.entries().forEach(e -> created_properties.put(e.name(), e.value()));
 
       return KafkaTopic.builder()
           .withName(ident.name())
           .withComment(comment)
           // Because there is no way to store the Gravitino ID in Kafka, therefor we use the topic
           // ID as the Gravitino ID
-          .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), properties))
+          .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), created_properties))
           .withAuditInfo(
               AuditInfo.builder()
                   .withCreator(PrincipalUtils.getCurrentPrincipal().getName())

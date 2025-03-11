@@ -24,17 +24,24 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.listener.api.event.AlterMetalakeEvent;
 import org.apache.gravitino.listener.api.event.AlterMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakeEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.DropMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.ListMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.LoadMetalakeEvent;
 import org.apache.gravitino.listener.api.event.LoadMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadMetalakePreEvent;
 import org.apache.gravitino.listener.api.info.MetalakeInfo;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -63,6 +70,7 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
 
   @Override
   public Metalake[] listMetalakes() {
+    eventBus.dispatchEvent(new ListMetalakePreEvent(PrincipalUtils.getCurrentUserName()));
     try {
       Metalake[] metalakes = dispatcher.listMetalakes();
       eventBus.dispatchEvent(new ListMetalakeEvent(PrincipalUtils.getCurrentUserName()));
@@ -75,6 +83,7 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
 
   @Override
   public Metalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    eventBus.dispatchEvent(new LoadMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Metalake metalake = dispatcher.loadMetalake(ident);
       eventBus.dispatchEvent(
@@ -97,6 +106,10 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
   public Metalake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
+    MetalakeInfo createMetalakeRequest = new MetalakeInfo(ident.name(), comment, properties, null);
+    eventBus.dispatchEvent(
+        new CreateMetalakePreEvent(
+            PrincipalUtils.getCurrentUserName(), ident, createMetalakeRequest));
     try {
       Metalake metalake = dispatcher.createMetalake(ident, comment, properties);
       eventBus.dispatchEvent(
@@ -115,6 +128,8 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
   @Override
   public Metalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
+    eventBus.dispatchEvent(
+        new AlterMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Metalake metalake = dispatcher.alterMetalake(ident, changes);
       eventBus.dispatchEvent(
@@ -129,9 +144,11 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
   }
 
   @Override
-  public boolean dropMetalake(NameIdentifier ident) {
+  public boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, MetalakeInUseException {
+    eventBus.dispatchEvent(new DropMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
-      boolean isExists = dispatcher.dropMetalake(ident);
+      boolean isExists = dispatcher.dropMetalake(ident, force);
       eventBus.dispatchEvent(
           new DropMetalakeEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
       return isExists;
@@ -140,5 +157,17 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
           new DropMetalakeFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
       throw e;
     }
+  }
+
+  @Override
+  public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    // todo: support enable metalake event
+    dispatcher.enableMetalake(ident);
+  }
+
+  @Override
+  public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    // todo: support disable metalake event
+    dispatcher.disableMetalake(ident);
   }
 }

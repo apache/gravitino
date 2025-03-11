@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - Hive catalog"
+title: "Apache Gravitino Trino connector - Hive catalog"
 slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -26,14 +26,13 @@ properties
 per catalog:
 
 - ORC
-- Parquet
-- Avro
-- RCText (RCFile using ColumnarSerDe)
-- RCBinary (RCFile using LazyBinaryColumnarSerDe)
-- SequenceFile
-- JSON (using org.apache.hive.hcatalog.data.JsonSerDe)
-- CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
-- TextFile
+- PARQUET
+- AVRO
+- RCFILE
+- SEQUENCEFILE
+- JSON
+- CSV
+- TEXTFILE
 
 
 ## Schema operations
@@ -50,8 +49,8 @@ CREATE SCHEMA catalog.schema_name
 
 ### Create table
 
-The Gravitino connector currently supports basic Hive table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector currently supports basic Hive table creation statements, such as defining fields,
+allowing null values, and adding comments. The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Hive catalog:
 
@@ -77,7 +76,7 @@ Support for the following alter table operations:
 
 ### Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Schema and table properties
@@ -91,7 +90,7 @@ statement.
 Users can use the following example to create a schema with properties: 
 
 ```sql
-CREATE SCHEMA "metalake.catalog".dbname
+CREATE SCHEMA catalog.dbname
 WITH (
   location = 'hdfs://hdfs-host:9000/user/hive/warehouse/dbname'
 );
@@ -127,11 +126,7 @@ The following tables are the properties supported by the Hive table:
 | Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
 |----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
 | format         | Hive storage format for the table       | TEXTFILE                                                   | No       | No       | 0.2.0         |
-| total_size     | Total size of the table                 | (none)                                                     | No       | Yes      | 0.2.0         |
-| num_files      | Number of files                         | 0                                                          | No       | Yes      | 0.2.0         |
-| external       | Indicate whether it's an external table | (none)                                                     | No       | No       | 0.2.0         |
 | location       | HDFS location for table storage         | (none)                                                     | No       | No       | 0.2.0         |
-| table_type     | The type of Hive table                  | (none)                                                     | No       | No       | 0.2.0         |
 | input_format   | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | No       | 0.2.0         |
 | output_format  | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | No       | 0.2.0         |
 | serde_lib      | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | No       | 0.2.0         |
@@ -140,6 +135,15 @@ The following tables are the properties supported by the Hive table:
 | bucketed_by    | Bucket columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
 | bucket_count   | Number of buckets for the table         | (none)                                                     | No       | No       | 0.4.0         |
 | sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
+
+The following properties are automatically added and managed as reserved properties. Users are not allowed to set these properties.
+
+| Property       | Description                             | Since Version |
+|----------------|-----------------------------------------|---------------|
+| total_size     | Total size of the table                 | 0.2.0         |
+| num_files      | Number of files                         | 0.2.0         |
+| external       | Indicate whether it's an external table | 0.2.0         |
+| table_type     | The type of Hive table                  | 0.2.0         |
 
 ## Basic usage examples
 
@@ -196,7 +200,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration.
-The `test.hive_test` catalog is the catalog created by you in Gravitino.
+The `hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -221,11 +225,12 @@ Create a new table named `table_01` in schema `hive_test.database_01` and stored
 CREATE TABLE  hive_test.database_01.table_01
 (
 name varchar,
-salary int
+salary int,
+month int    
 )
 WITH (
   format = 'TEXTFILE',
-  partitioned_by = ARRAY['salary'],
+  partitioned_by = ARRAY['month'],
   bucketed_by = ARRAY['name'],
   bucket_count = 2,
   sorted_by = ARRAY['salary']  
@@ -237,13 +242,13 @@ WITH (
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
+INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12, 22);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary) SELECT * FROM hive_test.database_01.table_01;
+INSERT INTO hive_test.database_01.table_01 (name, salary, month) SELECT * FROM hive_test.database_01.table_01;
 ```
 
 ### Querying data
@@ -290,9 +295,9 @@ DROP TABLE hive_test.database_01.table_01;
 
 ## HDFS config and permissions
 
-For basic setups, Gravitino connector configures the HDFS client automatically and does not require any configuration
-files.
-Gravitino connector is not support user to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client.
+For basic setups, the Apache Gravitino Trino connector configures the HDFS client
+using catalog configurations. It supports configuring the HDFS client with `hdfs-site.xml`
+and `core-site.xml` files via the `trino.bypass.hive.config.resources` setting in the catalog configurations.
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
@@ -302,3 +307,47 @@ replacing hdfs_user with the appropriate username:
 ```text
 -DHADOOP_USER_NAME=hdfs_user
 ```
+
+## S3
+
+When using AWS S3 within the Hive catalog, users need to configure the Trino Hive connector's
+AWS S3-related properties in the catalog's properteis. Please refer to the documentation
+of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+
+To create a Hive catalog with AWS S3 configuration in the Trino CLI, use the following command:
+
+```sql
+call gravitino.system.create_catalog(
+  'gt_hive',
+  'hive',
+  map(
+    array['metastore.uris',
+        'trino.bypass.hive.s3.aws-access-key', 'trino.bypass.hive.s3.aws-secret-key', 'trino.bypass.hive.s3.region'
+    ],
+    array['thrift://hive:9083', '<aws-access-key>', '<aws-secret-key>', '<region>']
+  )
+);
+```
+
+- The settings for `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key` and `trino.bypass.hive.s3.region`
+are required by the Apache Gravitino Trino connector.
+
+Once the Hive catalog is successfully created, users can create schemas and tables as follows:
+
+```sql
+CREATE SCHEMA gt_hive.gt_db02
+WITH (location = 's3a://trino-test/dw/gt_db02');
+
+CREATE TABLE gt_hive.gt_db02.tb01 (
+    name varchar,
+    salary int
+);
+```
+
+The `location` specifies the AWS S3 storage path.
+
+After running the command, the tables are ready for data reading and writing operations on AWS S3.
+
+:::note
+Ensure the Hive Metastore service used by the Hive catalog supports AWS S3.
+:::

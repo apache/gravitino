@@ -36,12 +36,10 @@ import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class SparkHiveCatalogIT extends SparkCommonIT {
 
   @Override
@@ -79,6 +77,21 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   @Override
   protected boolean supportsSchemaEvolution() {
     return false;
+  }
+
+  @Override
+  protected boolean supportsReplaceColumns() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportsSchemaAndTableProperties() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportsComplexType() {
+    return true;
   }
 
   @Test

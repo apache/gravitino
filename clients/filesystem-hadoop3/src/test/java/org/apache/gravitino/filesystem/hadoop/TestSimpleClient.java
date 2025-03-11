@@ -90,6 +90,8 @@ public class TestSimpleClient extends TestGvfsBase {
     // set the user for simple authentication
     String user = "test";
     System.setProperty("user.name", user);
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "testSimpleAuthToken", true);
 
     Path newPath = new Path(managedFilesetPath.toString().replace(metalakeName, testMetalake));
 

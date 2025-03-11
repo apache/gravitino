@@ -33,7 +33,6 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.storage.kv.KvEntityStore;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,13 +47,7 @@ public class OwnerManager {
   private final EntityStore store;
 
   public OwnerManager(EntityStore store) {
-    if (store instanceof KvEntityStore) {
-      String errorMsg =
-          "OwnerManager cannot run with kv entity store, please configure the entity "
-              + "store to use relational entity store and restart the Gravitino server";
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    } else if (store instanceof SupportsRelationOperations) {
+    if (store instanceof SupportsRelationOperations) {
       this.store = store;
     } else {
       String errorMsg =
@@ -67,8 +60,12 @@ public class OwnerManager {
 
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
+
+    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     try {
-      NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      Optional<Owner> originOwner = getOwner(metalake, metadataObject);
+
+      OwnerImpl newOwner = new OwnerImpl();
       if (ownerType == Owner.Type.USER) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
@@ -86,6 +83,9 @@ public class OwnerManager {
                       true);
               return null;
             });
+
+        newOwner.name = ownerName;
+        newOwner.type = Owner.Type.USER;
       } else if (ownerType == Owner.Type.GROUP) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
@@ -103,7 +103,16 @@ public class OwnerManager {
                       true);
               return null;
             });
+
+        newOwner.name = ownerName;
+        newOwner.type = Owner.Type.GROUP;
       }
+
+      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+          metalake,
+          metadataObject,
+          authorizationPlugin ->
+              authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
@@ -120,9 +129,9 @@ public class OwnerManager {
   }
 
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    OwnerImpl owner = new OwnerImpl();
     try {
-      OwnerImpl owner = new OwnerImpl();
-      NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       List<? extends Entity> entities =
           TreeLockUtils.doWithTreeLock(
               ident,

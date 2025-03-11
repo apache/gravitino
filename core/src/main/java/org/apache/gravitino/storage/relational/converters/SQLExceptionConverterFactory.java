@@ -26,7 +26,7 @@ import org.apache.gravitino.Configs;
 
 public class SQLExceptionConverterFactory {
   private static final Pattern TYPE_PATTERN = Pattern.compile("jdbc:(\\w+):");
-  private static SQLExceptionConverter converter;
+  private static volatile SQLExceptionConverter converter;
 
   private SQLExceptionConverterFactory() {}
 
@@ -40,6 +40,8 @@ public class SQLExceptionConverterFactory {
           converter = new MySQLExceptionConverter();
         } else if (jdbcType.equalsIgnoreCase("h2")) {
           converter = new H2ExceptionConverter();
+        } else if (jdbcType.equalsIgnoreCase("postgresql")) {
+          converter = new PostgreSQLExceptionConverter();
         } else {
           throw new IllegalArgumentException(String.format("Unsupported jdbc type: %s", jdbcType));
         }
@@ -53,5 +55,15 @@ public class SQLExceptionConverterFactory {
   public static SQLExceptionConverter getConverter() {
     Preconditions.checkState(converter != null, "Exception converter is not initialized.");
     return converter;
+  }
+
+  public static void close() {
+    if (converter != null) {
+      synchronized (SQLExceptionConverterFactory.class) {
+        if (converter != null) {
+          converter = null;
+        }
+      }
+    }
   }
 }

@@ -1,27 +1,26 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import json
 from unittest.mock import patch
 
 from gravitino import GravitinoMetalake, Catalog, Fileset
-from gravitino.catalog.fileset_catalog import FilesetCatalog
+from gravitino.client.fileset_catalog import FilesetCatalog
+from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
@@ -45,7 +44,7 @@ def mock_load_metalake():
     return GravitinoMetalake(metalake_dto)
 
 
-def mock_load_fileset_catalog():
+def mock_load_catalog(name: str):
     audit_dto = AuditDTO(
         _creator="test",
         _create_time="2022-01-01T00:00:00Z",
@@ -55,16 +54,32 @@ def mock_load_fileset_catalog():
 
     namespace = Namespace.of("metalake_demo")
 
-    catalog = FilesetCatalog(
-        namespace=namespace,
-        name="fileset_catalog",
-        catalog_type=Catalog.Type.FILESET,
-        provider="hadoop",
-        comment="this is test",
-        properties={"k": "v"},
-        audit=audit_dto,
-        rest_client=HTTPClient("http://localhost:9090", is_debug=True),
-    )
+    catalog = None
+    if name == "fileset_catalog":
+        catalog = FilesetCatalog(
+            namespace=namespace,
+            name=name,
+            catalog_type=Catalog.Type.FILESET,
+            provider="hadoop",
+            comment="this is test",
+            properties={"k": "v"},
+            audit=audit_dto,
+            rest_client=HTTPClient("http://localhost:9090", is_debug=True),
+        )
+    elif name == "model_catalog":
+        catalog = GenericModelCatalog(
+            namespace=namespace,
+            name=name,
+            catalog_type=Catalog.Type.MODEL,
+            provider="hadoop",
+            comment="this is test",
+            properties={"k": "v"},
+            audit=audit_dto,
+            rest_client=HTTPClient("http://localhost:9090", is_debug=True),
+        )
+    else:
+        raise ValueError(f"Unknown catalog name: {name}")
+
     return catalog
 
 
@@ -93,7 +108,11 @@ def mock_data(cls):
     )
     @patch(
         "gravitino.client.gravitino_metalake.GravitinoMetalake.load_catalog",
-        return_value=mock_load_fileset_catalog(),
+        side_effect=mock_load_catalog,
+    )
+    @patch(
+        "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_load_fileset("fileset", ""),
     )
     @patch(
         "gravitino.client.gravitino_client_base.GravitinoClientBase.check_version",

@@ -27,7 +27,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -38,8 +42,12 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -102,6 +110,55 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
+  void testListRoles() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of("k1", "v1"));
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of("k1", "v1"));
+
+    backend.insert(role1, false);
+    backend.insert(role2, false);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    List<RoleEntity> actualRoles =
+        roleMetaService.listRolesByNamespace(AuthorizationUtils.ofRoleNamespace(metalakeName));
+    actualRoles.sort(Comparator.comparing(RoleEntity::name));
+    List<RoleEntity> expectRoles = Lists.newArrayList(role1, role2);
+    Assertions.assertEquals(expectRoles.size(), actualRoles.size());
+    for (int index = 0; index < expectRoles.size(); index++) {
+      RoleEntity expectRole = expectRoles.get(index);
+      RoleEntity actualRole = actualRoles.get(index);
+      Assertions.assertEquals(expectRole.name(), actualRole.name());
+    }
+  }
+
+  @Test
   void insertRole() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -127,12 +184,76 @@ class TestRoleMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(overwriteCatalog, false);
 
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog"),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
+
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "topic",
+            auditInfo);
+    backend.insert(topic, false);
+
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    backend.insert(fileset, false);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
+
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
 
+    // Test with different securable objects
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            "metalake", Lists.newArrayList(Privileges.CreateCatalog.allow()));
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
             Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            "schema",
+            Lists.newArrayList(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
+    SecurableObject topicObject =
+        SecurableObjects.ofTopic(
+            schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.allow()));
+    SecurableObject filesetObject =
+        SecurableObjects.ofFileset(
+            schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+    SecurableObject tableObject =
+        SecurableObjects.ofTable(
+            schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
+
+    // insert role
+    ArrayList<SecurableObject> securableObjects =
+        Lists.newArrayList(
+            catalogObject,
+            metalakeObject,
+            schemaObject,
+            filesetObject,
+            topicObject,
+            tableObject,
+            SecurableObjects.ofCatalog(
+                "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow())));
+
+    securableObjects.sort(Comparator.comparing(SecurableObject::fullName));
 
     // insert role
     RoleEntity role1 =
@@ -141,10 +262,7 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            Lists.newArrayList(
-                catalogObject,
-                SecurableObjects.ofCatalog(
-                    "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            securableObjects,
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,
@@ -298,6 +416,45 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
+  void listRolesBySecurableObject() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            "catalog");
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            "catalog");
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+
+    List<RoleEntity> roleEntities =
+        roleMetaService.listRolesByMetadataObject(catalog.nameIdentifier(), catalog.type(), true);
+    roleEntities.sort(Comparator.comparing(RoleEntity::name));
+    Assertions.assertEquals(Lists.newArrayList(role1, role2), roleEntities);
+  }
+
+  @Test
   void deleteMetalake() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -408,6 +565,180 @@ class TestRoleMetaService extends TestJDBCBackend {
         SessionUtils.doWithCommitAndFetchResult(
                 GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(role2.id()))
             .isEmpty());
+  }
+
+  @Test
+  void testUpdateRole() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity roleEntity =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(roleEntity, false);
+
+    // grant privileges to the role
+    Function<RoleEntity, RoleEntity> grantUpdater =
+        role -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(role.auditInfo().creator())
+                  .withCreateTime(role.auditInfo().createTime())
+                  .withLastModifier("grantRole")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          List<SecurableObject> securableObjects = Lists.newArrayList(role.securableObjects());
+          securableObjects.add(
+              SecurableObjects.ofMetalake(
+                  metalakeName, Lists.newArrayList(Privileges.CreateTable.allow())));
+
+          return RoleEntity.builder()
+              .withId(role.id())
+              .withName(role.name())
+              .withNamespace(role.namespace())
+              .withProperties(ImmutableMap.of("k1", "v1"))
+              .withSecurableObjects(securableObjects)
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+
+    Assertions.assertNotNull(roleMetaService.updateRole(roleEntity.nameIdentifier(), grantUpdater));
+    RoleEntity grantRole = roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
+
+    Assertions.assertEquals(grantRole.id(), roleEntity.id());
+    Assertions.assertEquals(grantRole.name(), roleEntity.name());
+    Assertions.assertEquals("creator", grantRole.auditInfo().creator());
+    Assertions.assertEquals("grantRole", grantRole.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            SecurableObjects.ofMetalake(
+                metalakeName, Lists.newArrayList(Privileges.CreateTable.allow()))),
+        grantRole.securableObjects());
+
+    // revoke privileges from the role
+    Function<RoleEntity, RoleEntity> revokeUpdater =
+        role -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(role.auditInfo().creator())
+                  .withCreateTime(role.auditInfo().createTime())
+                  .withLastModifier("revokeRole")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          List<SecurableObject> securableObjects = Lists.newArrayList(role.securableObjects());
+          securableObjects.remove(0);
+
+          return RoleEntity.builder()
+              .withId(role.id())
+              .withName(role.name())
+              .withNamespace(role.namespace())
+              .withAuditInfo(updateAuditInfo)
+              .withProperties(role.properties())
+              .withSecurableObjects(securableObjects)
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+    roleMetaService.updateRole(roleEntity.nameIdentifier(), revokeUpdater);
+
+    RoleEntity revokeRole = roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
+    Assertions.assertEquals(revokeRole.id(), roleEntity.id());
+    Assertions.assertEquals(revokeRole.name(), roleEntity.name());
+    Assertions.assertEquals("creator", revokeRole.auditInfo().creator());
+    Assertions.assertEquals("revokeRole", revokeRole.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        Lists.newArrayList(
+            SecurableObjects.ofMetalake(
+                metalakeName, Lists.newArrayList(Privileges.CreateTable.allow()))),
+        revokeRole.securableObjects());
+
+    // grant and revoke privileges for the role
+    Function<RoleEntity, RoleEntity> grantRevokeUpdater =
+        role -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(role.auditInfo().creator())
+                  .withCreateTime(role.auditInfo().createTime())
+                  .withLastModifier("grantRevokeRole")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          List<SecurableObject> securableObjects = Lists.newArrayList(role.securableObjects());
+          securableObjects.remove(0);
+          securableObjects.add(
+              SecurableObjects.ofCatalog(
+                  "catalog", Lists.newArrayList(Privileges.CreateTable.allow())));
+
+          return RoleEntity.builder()
+              .withId(role.id())
+              .withName(role.name())
+              .withNamespace(role.namespace())
+              .withAuditInfo(updateAuditInfo)
+              .withProperties(role.properties())
+              .withSecurableObjects(securableObjects)
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+    roleMetaService.updateRole(roleEntity.nameIdentifier(), grantRevokeUpdater);
+
+    RoleEntity grantRevokeRole = roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
+    Assertions.assertEquals(grantRevokeRole.id(), roleEntity.id());
+    Assertions.assertEquals(grantRevokeRole.name(), roleEntity.name());
+    Assertions.assertEquals("creator", grantRevokeRole.auditInfo().creator());
+    Assertions.assertEquals("grantRevokeRole", grantRevokeRole.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.CreateTable.allow()))),
+        grantRevokeRole.securableObjects());
+
+    // revoke multiple securable objects
+    roleMetaService.updateRole(roleEntity.nameIdentifier(), grantUpdater);
+    Function<RoleEntity, RoleEntity> revokeMultipleUpdater =
+        role -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(role.auditInfo().creator())
+                  .withCreateTime(role.auditInfo().createTime())
+                  .withLastModifier("revokeMultiple")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          return RoleEntity.builder()
+              .withId(role.id())
+              .withName(role.name())
+              .withNamespace(role.namespace())
+              .withAuditInfo(updateAuditInfo)
+              .withProperties(role.properties())
+              .withSecurableObjects(Collections.emptyList())
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+
+    roleMetaService.updateRole(roleEntity.nameIdentifier(), revokeMultipleUpdater);
+    RoleEntity revokeMultipleRole =
+        roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
+    Assertions.assertEquals(revokeMultipleRole.id(), roleEntity.id());
+    Assertions.assertEquals(revokeMultipleRole.name(), roleEntity.name());
+    Assertions.assertEquals("creator", revokeMultipleRole.auditInfo().creator());
+    Assertions.assertEquals("revokeMultiple", revokeMultipleRole.auditInfo().lastModifier());
+    Assertions.assertTrue(revokeMultipleRole.securableObjects().isEmpty());
   }
 
   @Test

@@ -24,10 +24,8 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
 
   @Override

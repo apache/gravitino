@@ -94,6 +94,13 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
     return dispatcher.dropFileset(normalizeCaseSensitive(ident));
   }
 
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath) {
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.getFileLocation(normalizeCaseSensitive(ident), subPath);
+  }
+
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capabilities = getCapability(ident, catalogManager);
     return applyCapabilities(ident, Capability.Scope.FILESET, capabilities);

@@ -46,7 +46,7 @@ public class PartitionUtils {
             .filter(c -> c.name().equalsIgnoreCase(fieldName[0]))
             .collect(Collectors.toList());
     Preconditions.checkArgument(
-        partitionColumn.size() == 1, "partition field %s not found in table", fieldName[0]);
+        partitionColumn.size() == 1, "Field '%s' not found in table", fieldName[0]);
 
     // TODO: should validate nested fieldName after column type support namedStruct
   }

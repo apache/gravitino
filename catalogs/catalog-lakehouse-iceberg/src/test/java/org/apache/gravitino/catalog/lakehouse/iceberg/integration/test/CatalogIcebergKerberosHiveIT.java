@@ -43,7 +43,7 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -63,7 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class CatalogIcebergKerberosHiveIT extends AbstractIT {
+public class CatalogIcebergKerberosHiveIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIcebergKerberosHiveIT.class);
 
@@ -101,7 +101,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
   private static final String HIVE_COL_NAME3 = "col3";
 
   @BeforeAll
-  public static void startIntegrationTest() {
+  public void startIntegrationTest() {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
 
@@ -129,14 +129,14 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
 
       ignoreIcebergRestService = false;
       // Start Gravitino server
-      AbstractIT.startIntegrationTest();
+      super.startIntegrationTest();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     // Reset the UGI
     UserGroupInformation.reset();
 
@@ -145,7 +145,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   private static void prepareKerberosConfig() throws Exception {
@@ -201,14 +201,12 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     }
   }
 
-  private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
+  private void addKerberosConfig() {
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
+    customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test
@@ -294,6 +292,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
 
     // Drop catalog
+    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.disableCatalog(CATALOG_NAME));
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
   }
 

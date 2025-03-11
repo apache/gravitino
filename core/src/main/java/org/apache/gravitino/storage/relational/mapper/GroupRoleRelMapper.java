@@ -21,10 +21,9 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -38,101 +37,39 @@ public interface GroupRoleRelMapper {
   String GROUP_TABLE_NAME = "group_meta";
   String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
-  @Insert({
-    "<script>",
-    "INSERT INTO "
-        + GROUP_ROLE_RELATION_TABLE_NAME
-        + "(group_id, role_id,"
-        + " audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ",
-    "<foreach collection='groupRoleRels' item='item' separator=','>",
-    "(#{item.groupId},"
-        + " #{item.roleId},"
-        + " #{item.auditInfo},"
-        + " #{item.currentVersion},"
-        + " #{item.lastVersion},"
-        + " #{item.deletedAt})",
-    "</foreach>",
-    "</script>"
-  })
+  @InsertProvider(type = GroupRoleRelSQLProviderFactory.class, method = "batchInsertGroupRoleRel")
   void batchInsertGroupRoleRel(@Param("groupRoleRels") List<GroupRoleRelPO> groupRoleRelPOS);
 
-  @Insert({
-    "<script>",
-    "INSERT INTO "
-        + GROUP_ROLE_RELATION_TABLE_NAME
-        + "(group_id, role_id,"
-        + " audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ",
-    "<foreach collection='groupRoleRels' item='item' separator=','>",
-    "(#{item.groupId},"
-        + " #{item.roleId},"
-        + " #{item.auditInfo},"
-        + " #{item.currentVersion},"
-        + " #{item.lastVersion},"
-        + " #{item.deletedAt})",
-    "</foreach>",
-    " ON DUPLICATE KEY UPDATE"
-        + " group_id = VALUES(group_id),"
-        + " role_id = VALUES(role_id),"
-        + " audit_info = VALUES(audit_info),"
-        + " current_version = VALUES(current_version),"
-        + " last_version = VALUES(last_version),"
-        + " deleted_at = VALUES(deleted_at)",
-    "</script>"
-  })
+  @InsertProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "batchInsertGroupRoleRelOnDuplicateKeyUpdate")
   void batchInsertGroupRoleRelOnDuplicateKeyUpdate(
       @Param("groupRoleRels") List<GroupRoleRelPO> groupRoleRelPOS);
 
-  @Update(
-      "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE group_id = #{groupId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "softDeleteGroupRoleRelByGroupId")
   void softDeleteGroupRoleRelByGroupId(@Param("groupId") Long groupId);
 
-  @Update({
-    "<script>",
-    "UPDATE "
-        + GROUP_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE group_id = #{groupId} AND role_id in (",
-    "<foreach collection='roleIds' item='roleId' separator=','>",
-    "#{roleId}",
-    "</foreach>",
-    ") " + "AND deleted_at = 0",
-    "</script>"
-  })
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "softDeleteGroupRoleRelByGroupAndRoles")
   void softDeleteGroupRoleRelByGroupAndRoles(
       @Param("groupId") Long groupId, @Param("roleIds") List<Long> roleIds);
 
-  @Update(
-      "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE group_id IN (SELECT group_id FROM "
-          + GROUP_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-          + " AND deleted_at = 0")
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "softDeleteGroupRoleRelByMetalakeId")
   void softDeleteGroupRoleRelByMetalakeId(Long metalakeId);
 
-  @Update(
-      "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "softDeleteGroupRoleRelByRoleId")
   void softDeleteGroupRoleRelByRoleId(Long roleId);
 
-  @Delete(
-      "DELETE FROM "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "deleteGroupRoleRelMetasByLegacyTimeline")
   Integer deleteGroupRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

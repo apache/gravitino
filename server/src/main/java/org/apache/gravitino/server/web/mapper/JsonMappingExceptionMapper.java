@@ -34,6 +34,6 @@ public class JsonMappingExceptionMapper implements ExceptionMapper<JsonMappingEx
   @Override
   public Response toResponse(JsonMappingException e) {
     String errorMsg = "Malformed json request";
-    return Utils.illegalArguments(errorMsg, e);
+    return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
   }
 }

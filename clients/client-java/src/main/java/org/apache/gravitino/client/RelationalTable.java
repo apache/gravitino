@@ -23,6 +23,7 @@ import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.requests.AddPartitionsRequest;
@@ -55,7 +57,7 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a relational table. */
-class RelationalTable implements Table, SupportsPartitions, SupportsTags {
+class RelationalTable implements Table, SupportsPartitions, SupportsTags, SupportsRoles {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
@@ -66,6 +68,7 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
   private final Namespace namespace;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectRoleOperations objectRoleOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -94,6 +97,8 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
         MetadataObjects.parse(tableFullName(namespace, tableDTO.name()), MetadataObject.Type.TABLE);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
+    this.objectRoleOperations =
+        new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
   }
 
   /**
@@ -109,7 +114,17 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
   /** @return the columns of the table. */
   @Override
   public Column[] columns() {
-    return table.columns();
+    return Arrays.stream(table.columns())
+        .map(
+            c ->
+                new GenericColumn(
+                    c,
+                    restClient,
+                    namespace.level(0),
+                    namespace.level(1),
+                    namespace.level(2),
+                    name()))
+        .toArray(Column[]::new);
   }
 
   /** @return the partitioning of the table. */
@@ -171,13 +186,13 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
   @VisibleForTesting
   String getPartitionRequestPath() {
     return "api/metalakes/"
-        + namespace.level(0)
+        + RESTUtils.encodeString(namespace.level(0))
         + "/catalogs/"
-        + namespace.level(1)
+        + RESTUtils.encodeString(namespace.level(1))
         + "/schemas/"
-        + namespace.level(2)
+        + RESTUtils.encodeString(namespace.level(2))
         + "/tables/"
-        + name()
+        + RESTUtils.encodeString(name())
         + "/partitions";
   }
 
@@ -284,6 +299,11 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
     return this;
   }
 
+  @Override
+  public SupportsRoles supportsRoles() {
+    return this;
+  }
+
   private static String tableFullName(Namespace tableNS, String tableName) {
     return DOT_JOINER.join(tableNS.level(1), tableNS.level(2), tableName);
   }
@@ -306,5 +326,10 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return objectRoleOperations.listBindingRoleNames();
   }
 }

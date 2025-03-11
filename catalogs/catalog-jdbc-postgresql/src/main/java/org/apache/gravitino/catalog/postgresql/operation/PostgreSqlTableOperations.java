@@ -22,6 +22,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -46,6 +47,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -87,6 +89,24 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(databaseName)) {
+      final List<String> names = Lists.newArrayList();
+      try (ResultSet tables = getTables(connection)) {
+        while (tables.next()) {
+          if (Objects.equals(tables.getString("TABLE_SCHEM"), databaseName)) {
+            names.add(tables.getString("TABLE_NAME"));
+          }
+        }
+      }
+      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      return names;
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @Override
   protected JdbcTable.Builder getTableBuilder(
       ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
     boolean found = false;
@@ -105,6 +125,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
     }
 
+    return builder;
+  }
+
+  @Override
+  protected JdbcColumn.Builder getColumnBuilder(
+      ResultSet columnsResult, String databaseName, String tableName) throws SQLException {
+    JdbcColumn.Builder builder = null;
+    if (Objects.equals(columnsResult.getString("TABLE_NAME"), tableName)
+        && Objects.equals(columnsResult.getString("TABLE_SCHEM"), databaseName)) {
+      builder = getBasicJdbcColumnInfo(columnsResult);
+    }
     return builder;
   }
 
@@ -215,7 +246,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     }
   }
 
-  private static String getIndexFieldStr(String[][] fieldNames) {
+  protected static String getIndexFieldStr(String[][] fieldNames) {
     return Arrays.stream(fieldNames)
         .map(
             colNames -> {
@@ -580,15 +611,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + renameColumn.getNewName()
         + PG_QUOTE
         + ";";
-  }
-
-  @Override
-  public JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadTable) {
-    if (null == lazyLoadTable) {
-      return load(databaseName, tableName);
-    }
-    return lazyLoadTable;
   }
 
   private List<String> addColumnFieldDefinition(

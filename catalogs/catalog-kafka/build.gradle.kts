@@ -25,9 +25,15 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":api")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":common")) {
+    exclude("*")
+  }
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
@@ -45,6 +51,7 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
@@ -59,7 +66,11 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(jar, runtimeJars)
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/kafka/libs")
   }
 
@@ -86,33 +97,11 @@ tasks.getByName("generateMetadataFileForMavenJavaPublication") {
 }
 
 tasks.test {
-  doFirst {
-    val testMode = project.properties["testMode"] as? String ?: "embedded"
-    if (testMode == "deploy") {
-      environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
-    } else if (testMode == "embedded") {
-      environment("GRAVITINO_HOME", project.rootDir.path)
-    }
-  }
-
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }

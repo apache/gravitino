@@ -20,13 +20,18 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.paimon.catalog.Catalog;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
 
   @Override
@@ -47,5 +52,23 @@ public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
 
     return catalogProperties;
+  }
+
+  @Test
+  void testPaimonSchemaProperties() throws Catalog.DatabaseNotExistException {
+    SupportsSchemas schemas = catalog.asSchemas();
+
+    // create schema.
+    String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
+    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    Map<String, String> schemaProperties = Maps.newHashMap();
+    schemaProperties.put("key1", "val1");
+    schemaProperties.put("key2", "val2");
+    schemas.createSchema(schemaIdent.name(), schema_comment, schemaProperties);
+
+    // load schema check, database properties is empty for Paimon FilesystemCatalog.
+    Schema schema = schemas.loadSchema(schemaIdent.name());
+    Assertions.assertTrue(schema.properties().isEmpty());
+    Assertions.assertTrue(paimonCatalog.loadDatabaseProperties(schemaIdent.name()).isEmpty());
   }
 }

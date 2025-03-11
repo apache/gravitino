@@ -30,28 +30,29 @@
 
 ## Introduction
 
-Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages metadata directly in different sources, types, and regions, providing users with unified metadata access for data and AI assets.
 
 ![Gravitino Architecture](docs/assets/gravitino-architecture.png)
 
 Gravitino aims to provide several key features:
-
-* Single Source of Truth for multi-regional data with geo-distributed architecture support.
-* Unified Data and AI asset management for both users and engines.
-* Security in one place, centralizing the security for different sources.
-* Built-in data management and data access management.
+* Unified Metadata Management: Gravitino provides a unified model and API to manage different types of metadata, including relational (e.g., Hive, MySQL) and file-based (e.g., HDFS, S3) metadata sources.
+* End-to-End Data Governance: Gravitino offers a unified governance layer for managing metadata with features like access control, auditing, and discovery.
+* Direct Metadata Management: Gravitino connects directly to metadata sources via connectors, ensuring changes are instantly reflected between Gravitino and the underlying systems.
+* Geo-Distribution Support: Gravitino enables deployment across multiple regions or clouds, allowing instances to share metadata for a global cross-region view.
+* Multi-Engine Support: Gravitino supports query engines enabling metadata access without modifying SQL dialects.
+* AI Asset Management (WIP): Gravitino is expanding to manage both data and AI assets, with support for AI models and features currently in development.
 
 ## Contributing to Apache Gravitino
 
-Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
+Gravitino is open source software available under the Apache 2.0 license. For information on contributing to Gravitino, please see the [Contribution guidelines](https://gravitino.apache.org/contrib/).
 
 ## Online documentation
 
-You can find the latest Gravitino documentation in the [doc folder](docs). This README file only contains basic setup instructions.
+The latest Gravitino documentation is available on our [official website](https://gravitino.apache.org/docs/latest/). This README file only contains basic setup instructions.
 
 ## Building Apache Gravitino
 
-You can build Gravitino using Gradle. Currently you can build Gravitino on Linux and macOS, Windows isn't supported.
+You can build Gravitino using Gradle. Currently, you can build Gravitino on Linux and macOS, and Windows isn't supported.
 
 To build Gravitino, please run:
 
@@ -77,16 +78,19 @@ to build a compressed distribution package.
 
 The directory `distribution` contains the generated binary distribution package.
 
-For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
+Please see [How to build Gravitino](https://gravitino.apache.org/docs/latest/how-to-build/) for details on building and testing Gravitino.
 
 ## Quick start
 
-### Configure and start the Apache Gravitino server
+### Use Gravitino playground
 
-If you already have a binary distribution package, go to the directory of the decompressed package.
+This is the recommended approach. Gravitino provides a docker-compose-based playground where you can experience a whole system alongside other components. Clone or download the [Gravitino playground repository](https://github.com/apache/gravitino-playground) and then follow the [README](https://github.com/apache/gravitino-playground/blob/main/README.md), to get everything running.
 
-Before starting the Gravitino server, please configure the Gravitino server configuration file. The
-configuration file, `gravitino.conf`, is in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
+### Configure and start Gravitino server in local
+
+To start Gravitino on your machine, download a binary package from the [download page](https://gravitino.apache.org/downloads) and decompress the package.
+
+Before starting the Gravitino server, configure its settings by editing the `gravitino.conf` file located in the `conf` directory. This file follows the standard properties file format, allowing you to modify the server configuration as needed.
 
 To start the Gravitino server, please run:
 
@@ -100,7 +104,7 @@ To stop the Gravitino server, please run:
 ./bin/gravitino.sh stop
 ```
 
-Alternatively, to run the Gravitino server in frontend, please run:
+Alternatively, to run the Gravitino server in the frontend, please run:
 
 ```shell
 ./bin/gravitino.sh run
@@ -110,24 +114,26 @@ And press `CTRL+C` to stop the Gravitino server.
 
 ### Gravitino Iceberg REST catalog service
 
-Gravitino provides Iceberg REST catalog service to manage Iceberg, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md) for more details.
+Gravitino provides Iceberg REST catalog service to manage Iceberg efficiently. For more details, refer to [Gravitino Iceberg REST catalog service](https://gravitino.apache.org/docs/latest/iceberg-rest-service/).
 
 ### Using Trino with Apache Gravitino
 
-Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).
+Gravitino provides a Trino connector for accessing metadata within Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](https://gravitino.apache.org/docs/latest/trino-connector/index/).
 
 ## Development guide
 
-1. [How to build Gravitino](docs/how-to-build.md)
-2. [How to test Gravitino](docs/how-to-test.md)
-3. [How to publish Docker images](docs/publish-docker-images.md)
+1. [How to build Gravitino](https://gravitino.apache.org/docs/latest/how-to-build/)
+2. [How to test Gravitino](https://gravitino.apache.org/docs/latest/how-to-test/)
+3. [How to publish Docker images](https://gravitino.apache.org/docs/latest/publish-docker-images)
 
 ## License
 
-Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
+Gravitino is licensed under the Apache License Version 2.0. For details, see the [LICENSE](LICENSE).
 
 ## ASF Incubator disclaimer
 
-Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
+Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required for all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
 
 <sub>Apache®, Apache Gravitino&trade;, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=ReadMe" style="border:0;" alt="" />

@@ -52,4 +52,14 @@ public class CreateCatalogEvent extends CatalogEvent {
   public CatalogInfo createdCatalogInfo() {
     return createdCatalogInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_CATALOG;
+  }
 }

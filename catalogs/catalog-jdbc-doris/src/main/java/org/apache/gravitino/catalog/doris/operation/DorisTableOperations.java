@@ -26,7 +26,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -38,7 +37,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -53,7 +51,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -72,24 +69,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
-
-  @Override
-  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    final List<String> names = Lists.newArrayList();
-
-    try (Connection connection = getConnection(databaseName);
-        ResultSet tables = getTables(connection)) {
-      while (tables.next()) {
-        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
-          names.add(tables.getString("TABLE_NAME"));
-        }
-      }
-      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
-      return names;
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
-    }
-  }
 
   @Override
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
@@ -179,7 +158,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
-    if (!properties.containsKey(REPLICATION_FACTOR)) {
+    if (!resultMap.containsKey(REPLICATION_FACTOR)) {
       // Try to check the number of backend servers.
       String query = "select count(*) from information_schema.backends where Alive = 'true'";
 
@@ -221,7 +200,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     Preconditions.checkArgument(
         Strategy.HASH == distribution.strategy() || Strategy.EVEN == distribution.strategy(),
-        "Doris only supports HASH or EVEN distribution strategy");
+        "Doris only supports HASH or EVEN(RANDOM) distribution strategy");
 
     if (distribution.strategy() == Strategy.HASH) {
       // Check if the distribution column exists
@@ -235,6 +214,10 @@ public class DorisTableOperations extends JdbcTableOperations {
                       "Distribution column "
                           + expression
                           + " does not exist in the table columns"));
+    } else if (distribution.strategy() == Strategy.EVEN) {
+      Preconditions.checkArgument(
+          distribution.expressions().length == 0,
+          "Doris does not support distribution column in EVEN distribution strategy");
     }
   }
 
@@ -494,11 +477,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected String generateDropTableSql(String tableName) {
-    return String.format("DROP TABLE `%s`", tableName);
-  }
-
-  @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
         "Doris does not support purge table in Gravitino, please use drop table");
@@ -589,10 +567,6 @@ public class DorisTableOperations extends JdbcTableOperations {
       alterSql.add("MODIFY COMMENT \"" + newComment + "\"");
     }
 
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
-    }
-
     if (CollectionUtils.isEmpty(alterSql)) {
       return "";
     }
@@ -624,17 +598,14 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
-    return setProperties.stream()
-        .map(
-            setProperty ->
-                String.format("\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
-        .collect(Collectors.joining(",\n"));
-  }
-
-  @Override
-  protected JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-    return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
+    String properties =
+        setProperties.stream()
+            .map(
+                setProperty ->
+                    String.format(
+                        "\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
+            .collect(Collectors.joining(",\n"));
+    return "set (" + properties + ")";
   }
 
   private String updateColumnCommentFieldDefinition(
@@ -805,5 +776,18 @@ public class DorisTableOperations extends JdbcTableOperations {
           "Index does not exist");
     }
     return "DROP INDEX " + deleteIndex.getName();
+  }
+
+  @Override
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+
+    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    try (Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(showCreateTableSql)) {
+      result.next();
+      String createTableSyntax = result.getString("Create Table");
+      return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
+    }
   }
 }

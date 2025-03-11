@@ -63,14 +63,14 @@ To deploy the Gravitino server locally to run the integration tests, follow thes
    in the `distribution` directory.
 3. Use the `./gradlew test [--rerun-tasks] -PskipTests -PtestMode=deploy` command to run the
    integration tests in the `distribution` directory.
-4. Use the `bash integration-test/trino-test-tools/trino_test.sh` command to run all the
-   Trino test sets in the `integration-test/src/test/resources/trino-ci-testset/testsets` directory.
+4. Use the `bash trino-connector/integration-test/trino-test-tools/trino_test.sh` command to run all the
+   Trino test sets in the `trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets` directory.
 
 ## Skip tests
 
 * Skip unit tests by using the `./gradlew build -PskipTests` command.
 * Skip integration tests by using the `./gradlew build -PskipITs` command.
-* Skip web frontend integration tests by using the `./gradlew build -PskipWebITs` command.
+* Skip web frontend integration tests by using the `./gradlew build -x :web:integration-test:test` command.
 * Skip both unit tests and integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
 
 ## Configuring parameters for integration tests
@@ -87,7 +87,7 @@ Some integration test cases depend on the Gravitino CI Docker image.
 If an integration test relies on the specific Gravitino CI Docker image,
 set the `@tag(gravitino-docker-test)` annotation in the test class.
 For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to
-the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
+the `apache/gravitino-ci:hive-{hive-version}` Docker container for testing the Hive data source.
 Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-test)`. This annotation
 helps identify the specific Docker container required for the integration test.
 
@@ -105,6 +105,9 @@ public class CatalogHiveIT extends AbstractIT {
 :::note
 * Make sure that the `Docker server` is running before running all the
   integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-test` tag.
+* To run Docker-related tests, make sure you have installed Docker in your environment and either
+   set skipDockerTests=false in the gradle.properties file (or use `-PskipDockerTests=false` in the command) or
+  (2) export SKIP_DOCKER_TESTS=false in shell. Otherwise, all tests requiring Docker will be skipped.
 * On macOS, be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
   script before running the integration tests; or make sure that
   [OrbStack](https://orbstack.dev/) is running.

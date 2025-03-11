@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from random import randint
@@ -28,6 +26,7 @@ from gravitino import (
 )
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
     CatalogAlreadyExistsException,
     NoSuchCatalogException,
 )
@@ -40,10 +39,12 @@ logger = logging.getLogger(__name__)
 class TestCatalog(IntegrationTestEnv):
     metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
-    catalog_name: str = "testCatalog"
+    catalog_name: str = "testCatalog" + str(randint(1, 10000))
+    catalog_name_bak = catalog_name
     catalog_comment: str = "catalogComment"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
+    catalog_in_use_prop: str = "in-use"
 
     catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
 
@@ -76,22 +77,32 @@ class TestCatalog(IntegrationTestEnv):
         )
 
     def clean_test_data(self):
+        self.gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self.metalake_name
+        )
         try:
-            self.gravitino_client = GravitinoClient(
-                uri="http://localhost:8090", metalake_name=self.metalake_name
-            )
             logger.info(
-                "Drop catalog %s[%s]",
+                "TestCatalog: drop catalog %s[%s]",
                 self.catalog_ident,
-                self.gravitino_client.drop_catalog(name=self.catalog_name),
+                self.gravitino_client.drop_catalog(name=self.catalog_name, force=True),
             )
+        except GravitinoRuntimeException:
+            logger.warning("TestCatalog: failed to drop catalog %s", self.catalog_name)
+
+        try:
             logger.info(
-                "Drop metalake %s[%s]",
+                "TestCatalog: drop metalake %s[%s]",
                 self.metalake_name,
-                self.gravitino_admin_client.drop_metalake(self.metalake_name),
+                self.gravitino_admin_client.drop_metalake(
+                    self.metalake_name, force=True
+                ),
             )
-        except Exception as e:
-            logger.error("Clean test data failed: %s", e)
+        except GravitinoRuntimeException:
+            logger.warning(
+                "TestCatalog: failed to drop metalake %s", self.metalake_name
+            )
+
+        self.catalog_name = self.catalog_name_bak
 
     def test_list_catalogs(self):
         self.create_catalog(self.catalog_name)
@@ -102,13 +113,25 @@ class TestCatalog(IntegrationTestEnv):
         catalog = self.create_catalog(self.catalog_name)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(
-            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
+            catalog.properties(),
+            {
+                self.catalog_location_prop: "/tmp/test_schema",
+                self.catalog_in_use_prop: "true",
+            },
         )
 
     def test_failed_create_catalog(self):
         self.create_catalog(self.catalog_name)
         with self.assertRaises(CatalogAlreadyExistsException):
             _ = self.create_catalog(self.catalog_name)
+
+    def test_nullable_comment_catalog(self):
+        self.create_catalog(self.catalog_name)
+        changes = (CatalogChange.update_comment(None),)
+        null_comment_catalog = self.gravitino_client.alter_catalog(
+            self.catalog_name, *changes
+        )
+        self.assertIsNone(null_comment_catalog.comment())
 
     def test_alter_catalog(self):
         catalog = self.create_catalog(self.catalog_name)
@@ -137,6 +160,7 @@ class TestCatalog(IntegrationTestEnv):
 
     def test_drop_catalog(self):
         self.create_catalog(self.catalog_name)
+        self.gravitino_client.disable_catalog(self.catalog_name)
         self.assertTrue(self.gravitino_client.drop_catalog(name=self.catalog_name))
 
     def test_list_catalogs_info(self):
@@ -151,7 +175,11 @@ class TestCatalog(IntegrationTestEnv):
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(catalog.comment(), self.catalog_comment)
         self.assertEqual(
-            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
+            catalog.properties(),
+            {
+                self.catalog_location_prop: "/tmp/test_schema",
+                self.catalog_in_use_prop: "true",
+            },
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")
 

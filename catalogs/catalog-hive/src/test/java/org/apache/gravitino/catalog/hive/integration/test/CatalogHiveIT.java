@@ -18,17 +18,14 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.NUM_FILES;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_LIB;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TOTAL_SIZE;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
 import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.catalog.hive.TableType.MANAGED_TABLE;
@@ -45,6 +42,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,12 +52,12 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.hive.HiveCatalogOperations;
-import org.apache.gravitino.catalog.hive.HiveClientPool;
 import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
@@ -70,9 +68,10 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -114,29 +113,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class CatalogHiveIT extends AbstractIT {
+public class CatalogHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
-  public static final String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
-  public static final String SCHEMA_PREFIX = "CatalogHiveIT_schema";
-  public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
-  public static final String TABLE_PREFIX = "CatalogHiveIT_table";
-  public static final String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+  public String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
+  public String SCHEMA_PREFIX = "CatalogHiveIT_schema";
+  public String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  public String TABLE_PREFIX = "CatalogHiveIT_table";
+  public String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
   public static final String ALTER_TABLE_NAME = "alert_table_name";
   public static final String TABLE_COMMENT = "table_comment";
   public static final String HIVE_COL_NAME1 = "hive_col_name1";
   public static final String HIVE_COL_NAME2 = "hive_col_name2";
   public static final String HIVE_COL_NAME3 = "hive_col_name3";
-  private static String HIVE_METASTORE_URIS;
-  private static final String provider = "hive";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static HiveClientPool hiveClientPool;
-  private static GravitinoMetalake metalake;
-  private static Catalog catalog;
-  private static SparkSession sparkSession;
-  private static FileSystem hdfs;
-  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
+  protected String HIVE_METASTORE_URIS;
+  protected final String provider = "hive";
+  protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private HiveClientPool hiveClientPool;
+  protected GravitinoMetalake metalake;
+  protected Catalog catalog;
+  protected SparkSession sparkSession;
+  protected FileSystem fileSystem;
+  private final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
 
   private static String getInsertWithoutPartitionSql(
       String dbName, String tableName, String values) {
@@ -161,8 +160,7 @@ public class CatalogHiveIT extends AbstractIT {
           STRING_TYPE_NAME,
           "'gravitino_it_test'");
 
-  @BeforeAll
-  public static void startup() throws Exception {
+  protected void startNecessaryContainer() {
     containerSuite.startHiveContainer();
 
     HIVE_METASTORE_URIS =
@@ -170,15 +168,9 @@ public class CatalogHiveIT extends AbstractIT {
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
+  }
 
-    HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-
-    // Check if Hive client can connect to Hive metastore
-    hiveClientPool = new HiveClientPool(1, hiveConf);
-    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
-    Assertions.assertFalse(dbs.isEmpty());
-
+  protected void initSparkSession() {
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
@@ -194,7 +186,9 @@ public class CatalogHiveIT extends AbstractIT {
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
             .enableHiveSupport()
             .getOrCreate();
+  }
 
+  protected void initFileSystem() throws IOException {
     Configuration conf = new Configuration();
     conf.set(
         "fs.defaultFS",
@@ -202,7 +196,23 @@ public class CatalogHiveIT extends AbstractIT {
             "hdfs://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT));
-    hdfs = FileSystem.get(conf);
+    fileSystem = FileSystem.get(conf);
+  }
+
+  @BeforeAll
+  public void startup() throws Exception {
+    startNecessaryContainer();
+
+    HiveConf hiveConf = new HiveConf();
+    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+
+    // Check if Hive client can connect to Hive metastore
+    hiveClientPool = new HiveClientPool(1, hiveConf);
+    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
+    Assertions.assertFalse(dbs.isEmpty());
+
+    initSparkSession();
+    initFileSystem();
 
     createMetalake();
     createCatalog();
@@ -210,7 +220,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
+  public void stop() throws IOException {
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
           .filter(schema -> !schema.equals("default"))
@@ -220,10 +230,10 @@ public class CatalogHiveIT extends AbstractIT {
               }));
       Arrays.stream(metalake.listCatalogs())
           .forEach(
-              (catalogName -> {
-                metalake.dropCatalog(catalogName);
-              }));
-      client.dropMetalake(metalakeName);
+              catalogName -> {
+                metalake.dropCatalog(catalogName, true);
+              });
+      client.dropMetalake(metalakeName, true);
     }
     if (hiveClientPool != null) {
       hiveClientPool.close();
@@ -233,8 +243,8 @@ public class CatalogHiveIT extends AbstractIT {
       sparkSession.close();
     }
 
-    if (hdfs != null) {
-      hdfs.close();
+    if (fileSystem != null) {
+      fileSystem.close();
     }
     try {
       closer.close();
@@ -242,7 +252,7 @@ public class CatalogHiveIT extends AbstractIT {
       LOG.error("Failed to close CloseableGroup", e);
     }
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   @AfterEach
@@ -254,19 +264,18 @@ public class CatalogHiveIT extends AbstractIT {
     createSchema();
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  protected void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
 
@@ -275,20 +284,10 @@ public class CatalogHiveIT extends AbstractIT {
     catalog = metalake.loadCatalog(catalogName);
   }
 
-  private static void createSchema() throws TException, InterruptedException {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    properties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            schemaName.toLowerCase()));
+  private void createSchema() throws TException, InterruptedException {
+    Map<String, String> schemaProperties = createSchemaProperties();
     String comment = "comment";
-
-    catalog.asSchemas().createSchema(schemaName, comment, properties);
+    catalog.asSchemas().createSchema(schemaName, comment, schemaProperties);
     Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
@@ -335,7 +334,7 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(table.getSd().getLocation());
     FileStatus[] fileStatuses;
     try {
-      fileStatuses = hdfs.listStatus(tableDirectory);
+      fileStatuses = fileSystem.listStatus(tableDirectory);
     } catch (IOException e) {
       LOG.warn("Failed to list status of table directory", e);
       throw new RuntimeException(e);
@@ -346,7 +345,7 @@ public class CatalogHiveIT extends AbstractIT {
     }
   }
 
-  private Map<String, String> createProperties() {
+  protected Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -557,43 +556,32 @@ public class CatalogHiveIT extends AbstractIT {
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
     // test default properties
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(),
-                Transforms.EMPTY_TRANSFORM);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            nameIdentifier, columns, TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+    Table loadedTable1 = catalog.asTableCatalog().loadTable(nameIdentifier);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
-    assertDefaultTableProperties(createdTable, actualTable);
+    assertDefaultTableProperties(loadedTable1, actualTable);
     checkTableReadWrite(actualTable);
 
     // test set properties
+    Map<String, String> properties = createProperties();
+    properties.put(FORMAT, "textfile");
+    properties.put(SERDE_LIB, HiveStorageConstants.OPENCSV_SERDE_CLASS);
+    properties.put(TABLE_TYPE, "external_table");
     String table2 = GravitinoITUtils.genRandomName(TABLE_PREFIX);
-    Table createdTable2 =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(schemaName, table2),
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(
-                    TABLE_TYPE,
-                    "external_table",
-                    LOCATION,
-                    String.format(
-                        "hdfs://%s:%d/tmp",
-                        containerSuite.getHiveContainer().getContainerIpAddress(),
-                        HiveContainer.HDFS_DEFAULTFS_PORT),
-                    FORMAT,
-                    "textfile",
-                    SERDE_LIB,
-                    HiveStorageConstants.OPENCSV_SERDE_CLASS),
-                Transforms.EMPTY_TRANSFORM);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, table2),
+            columns,
+            TABLE_COMMENT,
+            properties,
+            Transforms.EMPTY_TRANSFORM);
+    Table loadedTable2 = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, table2));
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
@@ -611,10 +599,9 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));
-    Assertions.assertTrue(actualTable2.getSd().getLocation().endsWith("/tmp"));
-    Assertions.assertNotNull(createdTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
-    Assertions.assertNotNull(createdTable2.properties().get(NUM_FILES));
-    Assertions.assertNotNull(createdTable2.properties().get(TOTAL_SIZE));
+    Assertions.assertNotNull(loadedTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
+
+    // S3 doesn't support NUM_FILES and TOTAL_SIZE
     checkTableReadWrite(actualTable2);
 
     // test alter properties exception
@@ -631,39 +618,68 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  public void testListTables() {
+    // mock iceberg, paimon, and hudi tables
+    NameIdentifier icebergTable = NameIdentifier.of(schemaName, "iceberg_table");
+    NameIdentifier paimonTable = NameIdentifier.of(schemaName, "paimon_table");
+    NameIdentifier hudiTable = NameIdentifier.of(schemaName, "hudi_table");
+    NameIdentifier hiveTable = NameIdentifier.of(schemaName, "hive_table");
+    catalog
+        .asTableCatalog()
+        .createTable(icebergTable, createColumns(), null, ImmutableMap.of("table_type", "ICEBERG"));
+    catalog
+        .asTableCatalog()
+        .createTable(paimonTable, createColumns(), null, ImmutableMap.of("table_type", "PAIMON"));
+    catalog
+        .asTableCatalog()
+        .createTable(hudiTable, createColumns(), null, ImmutableMap.of("provider", "hudi"));
+    catalog
+        .asTableCatalog()
+        .createTable(hiveTable, createColumns(), null, ImmutableMap.of("provider", "hive"));
+    NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of(schemaName));
+    Assertions.assertEquals(1, tables.length);
+  }
+
+  @Test
   public void testHiveSchemaProperties() throws TException, InterruptedException {
     // test LOCATION property
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
-    Map<String, String> properties = Maps.newHashMap();
-    String expectedSchemaLocation =
-        String.format(
-            "hdfs://%s:%d/tmp",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
 
-    properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
-    catalog.asSchemas().createSchema(schemaName, "comment", properties);
+    Map<String, String> schemaProperties = createSchemaProperties();
+    String expectedHDFSSchemaLocation = schemaProperties.get(HiveSchemaPropertiesMetadata.LOCATION);
+
+    catalog.asSchemas().createSchema(schemaName, "comment", schemaProperties);
 
     Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaName));
     String actualSchemaLocation = actualSchema.getLocationUri();
-    Assertions.assertTrue(actualSchemaLocation.endsWith(expectedSchemaLocation));
+    Assertions.assertTrue(actualSchemaLocation.endsWith(expectedHDFSSchemaLocation));
 
     NameIdentifier tableIdent =
         NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+
+    Map<String, String> tableProperties = createProperties();
+    String expectedSchemaLocation =
+        tableProperties.getOrDefault(
+            HiveSchemaPropertiesMetadata.LOCATION, expectedHDFSSchemaLocation);
+
     catalog
         .asTableCatalog()
         .createTable(
             tableIdent,
             createColumns(),
             TABLE_COMMENT,
-            ImmutableMap.of(),
+            tableProperties,
             Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
     // use `tableIdent.name().toLowerCase()` because HMS will convert table name to lower
-    String expectedTableLocation = expectedSchemaLocation + "/" + tableIdent.name().toLowerCase();
-    Assertions.assertTrue(actualTableLocation.endsWith(expectedTableLocation));
+
+    // actualTable.getSd().getLocation() is null for S3
+    if (!tableProperties.containsKey(HiveTablePropertiesMetadata.LOCATION)) {
+      String expectedTableLocation = expectedSchemaLocation + "/" + tableIdent.name().toLowerCase();
+      Assertions.assertTrue(actualTableLocation.endsWith(expectedTableLocation));
+    }
     checkTableReadWrite(actualTable);
   }
 
@@ -905,7 +921,7 @@ public class CatalogHiveIT extends AbstractIT {
         hiveClientPool.run(client -> client.getTable(schemaName, createdTable.name()));
     Path partitionDirectory = new Path(hiveTab.getSd().getLocation() + identity.name());
     Assertions.assertFalse(
-        hdfs.exists(partitionDirectory), "The partition directory should not exist");
+        fileSystem.exists(partitionDirectory), "The partition directory should not exist");
 
     // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test2"
     String[] field3 = new String[] {"hive_col_name2"};
@@ -957,7 +973,7 @@ public class CatalogHiveIT extends AbstractIT {
                     client.getPartition(schemaName, createdTable.name(), partitionAdded1.name())));
     Path partitionDirectory1 = new Path(hiveTab.getSd().getLocation() + identity1.name());
     Assertions.assertFalse(
-        hdfs.exists(partitionDirectory1), "The partition directory should not exist");
+        fileSystem.exists(partitionDirectory1), "The partition directory should not exist");
     Assertions.assertThrows(
         NoSuchObjectException.class,
         () ->
@@ -966,7 +982,7 @@ public class CatalogHiveIT extends AbstractIT {
                     client.getPartition(schemaName, createdTable.name(), partitionAdded2.name())));
     Path partitionDirectory2 = new Path(hiveTab.getSd().getLocation() + identity2.name());
     Assertions.assertFalse(
-        hdfs.exists(partitionDirectory2), "The partition directory should not exist");
+        fileSystem.exists(partitionDirectory2), "The partition directory should not exist");
 
     // test no-exist partition with ifExist=false
     Assertions.assertFalse(createdTable.supportPartitions().dropPartition(partitionAdded.name()));
@@ -1392,7 +1408,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Schema does not have the rename operation.
     final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
-    catalog.asSchemas().createSchema(schemaName, "", ImmutableMap.of());
+    catalog.asSchemas().createSchema(schemaName, "", createSchemaProperties());
 
     final Catalog cata = catalog;
     // Now try to rename table
@@ -1439,8 +1455,8 @@ public class CatalogHiveIT extends AbstractIT {
     client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
     client.createMetalake(metalakeName2, "comment", Collections.emptyMap());
 
-    client.dropMetalake(metalakeName1);
-    client.dropMetalake(metalakeName2);
+    client.dropMetalake(metalakeName1, true);
+    client.dropMetalake(metalakeName2, true);
 
     client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
 
@@ -1476,19 +1492,23 @@ public class CatalogHiveIT extends AbstractIT {
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
     Assertions.assertFalse(existed, "The Hive table should not exist");
-    Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
+    Assertions.assertFalse(
+        fileSystem.exists(tableDirectory), "The table directory should not exist");
   }
 
   @Test
   public void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
     Column[] columns = createColumns();
+    Map<String, String> properties = createProperties();
+    properties.put(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT));
+
     catalog
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(schemaName, tableName),
             columns,
             TABLE_COMMENT,
-            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            properties,
             new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -1501,7 +1521,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertFalse(existed, "The table should be not exist");
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
-        hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+        fileSystem.listStatus(tableDirectory).length > 0, "The table should not be empty");
   }
 
   @Test
@@ -1529,21 +1549,25 @@ public class CatalogHiveIT extends AbstractIT {
         catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName)),
         "The table should not be found in the catalog");
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
-    Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
-    Path trashDirectory = hdfs.getTrashRoot(tableDirectory);
-    Assertions.assertFalse(hdfs.exists(trashDirectory), "The trash should not exist");
+    Assertions.assertFalse(
+        fileSystem.exists(tableDirectory), "The table directory should not exist");
+    Path trashDirectory = fileSystem.getTrashRoot(tableDirectory);
+    Assertions.assertFalse(fileSystem.exists(trashDirectory), "The trash should not exist");
   }
 
   @Test
   public void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
     Column[] columns = createColumns();
+    Map<String, String> properties = createProperties();
+    properties.put(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT));
+
     catalog
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(schemaName, tableName),
             columns,
             TABLE_COMMENT,
-            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            properties,
             new Transform[] {Transforms.identity(columns[2].name())});
 
     // Directly get table from Hive metastore to check if the table is created successfully.
@@ -1564,7 +1588,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(existed, "The table should be still exist");
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
-        hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+        fileSystem.listStatus(tableDirectory).length > 0, "The table should not be empty");
   }
 
   @Test
@@ -1653,7 +1677,10 @@ public class CatalogHiveIT extends AbstractIT {
     Exception exception =
         Assertions.assertThrows(
             Exception.class,
-            () -> createdCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of()));
+            () ->
+                createdCatalog
+                    .asSchemas()
+                    .createSchema("schema", "comment", createSchemaProperties()));
     Assertions.assertTrue(exception.getMessage().contains("Failed to connect to Hive Metastore"));
 
     Catalog newCatalog =
@@ -1664,14 +1691,14 @@ public class CatalogHiveIT extends AbstractIT {
     // The URI has restored, so it should not throw exception.
     Assertions.assertDoesNotThrow(
         () -> {
-          newCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of());
+          newCatalog.asSchemas().createSchema("schema", "comment", createSchemaProperties());
         });
 
     newCatalog.asSchemas().dropSchema("schema", true);
-    metalake.dropCatalog(nameOfCatalog);
+    metalake.dropCatalog(nameOfCatalog, true);
   }
 
-  private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
+  private void createCatalogWithCustomOperation(String catalogName, String customImpl) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
@@ -1680,5 +1707,19 @@ public class CatalogHiveIT extends AbstractIT {
         metalake.createCatalog(
             catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog.asSchemas().listSchemas();
+  }
+
+  protected Map<String, String> createSchemaProperties() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+    properties.put(
+        "location",
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse/%s.db",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT,
+            schemaName.toLowerCase()));
+    return properties;
   }
 }

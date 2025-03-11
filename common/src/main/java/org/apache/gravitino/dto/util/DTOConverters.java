@@ -32,9 +32,12 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialFactory;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -45,8 +48,11 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
+import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
+import org.apache.gravitino.dto.model.ModelDTO;
+import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -76,6 +82,8 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -516,6 +524,31 @@ public class DTOConverters {
   }
 
   /**
+   * Converts credentials to CredentialDTOs.
+   *
+   * @param credentials the credentials to be converted.
+   * @return The credential DTOs.
+   */
+  public static CredentialDTO[] toDTO(Credential[] credentials) {
+    return Arrays.stream(credentials).map(DTOConverters::toDTO).toArray(CredentialDTO[]::new);
+  }
+
+  /**
+   * Converts a Credential to a CredentialDTO.
+   *
+   * @param credential the credential to be converted.
+   * @return The credential DTO.
+   */
+  public static CredentialDTO toDTO(Credential credential) {
+    CredentialDTO.Builder builder =
+        CredentialDTO.builder()
+            .withCredentialType(credential.credentialType())
+            .withExpireTimeInMs(credential.expireTimeInMs())
+            .withCredentialInfo(credential.credentialInfo());
+    return builder.build();
+  }
+
+  /**
    * Converts an Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
@@ -601,6 +634,39 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a Model to a ModelDTO.
+   *
+   * @param model The model to be converted.
+   * @return The model DTO.
+   */
+  public static ModelDTO toDTO(Model model) {
+    return ModelDTO.builder()
+        .withName(model.name())
+        .withComment(model.comment())
+        .withProperties(model.properties())
+        .withLatestVersion(model.latestVersion())
+        .withAudit(toDTO(model.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a ModelVersion to a ModelVersionDTO.
+   *
+   * @param modelVersion The model version to be converted.
+   * @return The model version DTO.
+   */
+  public static ModelVersionDTO toDTO(ModelVersion modelVersion) {
+    return ModelVersionDTO.builder()
+        .withVersion(modelVersion.version())
+        .withComment(modelVersion.comment())
+        .withAliases(modelVersion.aliases())
+        .withUri(modelVersion.uri())
+        .withProperties(modelVersion.properties())
+        .withAudit(toDTO(modelVersion.auditInfo()))
+        .build();
+  }
+
+  /**
    * Converts an array of Columns to an array of ColumnDTOs.
    *
    * @param columns The columns to be converted.
@@ -676,6 +742,32 @@ public class DTOConverters {
       return new CatalogDTO[0];
     }
     return Arrays.stream(catalogs).map(DTOConverters::toDTO).toArray(CatalogDTO[]::new);
+  }
+
+  /**
+   * Converts an array of Users to an array of UserDTOs.
+   *
+   * @param users The users to be converted.
+   * @return The array of UserDTOs.
+   */
+  public static UserDTO[] toDTOs(User[] users) {
+    if (ArrayUtils.isEmpty(users)) {
+      return new UserDTO[0];
+    }
+    return Arrays.stream(users).map(DTOConverters::toDTO).toArray(UserDTO[]::new);
+  }
+
+  /**
+   * Converts an array of Groups to an array of GroupDTOs.
+   *
+   * @param groups The groups to be converted.
+   * @return The array of GroupDTOs.
+   */
+  public static GroupDTO[] toDTOs(Group[] groups) {
+    if (ArrayUtils.isEmpty(groups)) {
+      return new GroupDTO[0];
+    }
+    return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
   }
 
   /**
@@ -822,7 +914,7 @@ public class DTOConverters {
    */
   public static SortOrder[] fromDTOs(SortOrderDTO[] sortOrderDTO) {
     if (ArrayUtils.isEmpty(sortOrderDTO)) {
-      return new SortOrder[0];
+      return SortOrders.NONE;
     }
 
     return Arrays.stream(sortOrderDTO).map(DTOConverters::fromDTO).toArray(SortOrder[]::new);
@@ -836,7 +928,7 @@ public class DTOConverters {
    */
   public static Transform[] fromDTOs(Partitioning[] partitioning) {
     if (ArrayUtils.isEmpty(partitioning)) {
-      return new Transform[0];
+      return Transforms.EMPTY_TRANSFORM;
     }
     return Arrays.stream(partitioning).map(DTOConverters::fromDTO).toArray(Transform[]::new);
   }
@@ -852,6 +944,30 @@ public class DTOConverters {
       return new Column[0];
     }
     return Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(Column[]::new);
+  }
+
+  /**
+   * Converts CredentialDTO array to credential array.
+   *
+   * @param credentials The credential DTO array to be converted.
+   * @return The credential array.
+   */
+  public static Credential[] fromDTO(CredentialDTO[] credentials) {
+    if (ArrayUtils.isEmpty(credentials)) {
+      return new Credential[0];
+    }
+    return Arrays.stream(credentials).map(DTOConverters::fromDTO).toArray(Credential[]::new);
+  }
+
+  /**
+   * Converts a CredentialDTO to a credential.
+   *
+   * @param credential The credential DTO to be converted.
+   * @return The credential.
+   */
+  public static Credential fromDTO(CredentialDTO credential) {
+    return CredentialFactory.create(
+        credential.credentialType(), credential.credentialInfo(), credential.expireTimeInMs());
   }
 
   /**
@@ -975,6 +1091,20 @@ public class DTOConverters {
             fromFunctionArgs(((FunctionPartitioningDTO) partitioning).args()));
       default:
         throw new IllegalArgumentException("Unsupported partitioning: " + partitioning.strategy());
+    }
+  }
+
+  /**
+   * Converts a Privilege DTO to a Privilege
+   *
+   * @param privilegeDTO The privilege DTO to be converted.
+   * @return The privilege.
+   */
+  public static Privilege fromPrivilegeDTO(PrivilegeDTO privilegeDTO) {
+    if (privilegeDTO.condition().equals(Privilege.Condition.ALLOW)) {
+      return Privileges.allow(privilegeDTO.name());
+    } else {
+      return Privileges.deny(privilegeDTO.name());
     }
   }
 }

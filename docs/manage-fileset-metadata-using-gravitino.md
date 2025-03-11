@@ -15,7 +15,9 @@ filesets to manage non-tabular data like training datasets and other raw data.
 
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
-tabular data in Gravitino in a unified way.
+tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
+HCFS like S3, OSS, GCS, etc, please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
+[hadoop-with-adls](./hadoop-catalog-with-adls.md).
 
 After a fileset is created, users can easily access, manage the files/directories through
 the fileset's identifier, without needing to know the physical path of the managed dataset. Also, with
@@ -25,7 +27,7 @@ control mechanism without needing to set access controls across different storag
 To use fileset, please make sure that:
 
  - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created.
+ - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)
 
 ## Catalog operations
 
@@ -49,9 +51,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "file:/tmp/root"
+    "location": "file:///tmp/root"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+
 ```
 
 </TabItem>
@@ -64,7 +67,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 Map<String, String> properties = ImmutableMap.<String, String>builder()
-    .put("location", "file:/tmp/root")
+    .put("location", "file:///tmp/root")
     // Property "location" is optional. If specified, a managed fileset without
     // a storage location will be stored under this location.
     .build();
@@ -75,6 +78,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
     "This is a Hadoop fileset catalog",
     properties);
 // ...
+
 ```
 
 </TabItem>
@@ -83,7 +87,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 catalog = gravitino_client.create_catalog(name="catalog",
-                                          type=Catalog.Type.FILESET,
+                                          catalog_type=Catalog.Type.FILESET,
                                           provider="hadoop", 
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})
@@ -151,7 +155,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "schema",
   "comment": "comment",
   "properties": {
-    "location": "file:/tmp/root/schema"
+    "location": "file:///tmp/root/schema"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
@@ -173,7 +177,7 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     // Property "location" is optional, if specified all the managed fileset without
     // specifying storage location will be stored under this location.
-    .put("location", "file:/tmp/root/schema")
+    .put("location", "file:///tmp/root/schema")
     .build();
 Schema schema = supportsSchemas.createSchema("schema",
     "This is a schema",
@@ -221,8 +225,10 @@ Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#
 in relational catalog for more details. For a fileset catalog, the schema drop operation is the
 same.
 
-Note that the drop operation will also remove all of the filesets as well as the managed files
-under this schema path if `cascade` is set to `true`.
+Note that the drop operation will delete all the fileset metadata under this schema if `cascade`
+set to `true`. Besides, for `MANAGED` fileset, this drop operation will also **remove** all the
+files/directories of this fileset; for `EXTERNAL` fileset, this drop operation will only delete
+the metadata of this fileset.
 
 ### List all schemas under a catalog
 
@@ -252,7 +258,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "example_fileset",
   "comment": "This is an example fileset",
   "type": "MANAGED",
-  "storageLocation": "file:/tmp/root/schema/example_fileset",
+  "storageLocation": "file:///tmp/root/schema/example_fileset",
   "properties": {
     "k1": "v1"
   }
@@ -279,7 +285,7 @@ filesetCatalog.createFileset(
   NameIdentifier.of("schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
-  "file:/tmp/root/schema/example_fileset",
+  "file:///tmp/root/schema/example_fileset",
   propertiesMap,
 );
 ```
@@ -313,6 +319,10 @@ Currently, Gravitino supports two **types** of filesets:
 
 The `storageLocation` is the physical location of the fileset. Users can specify this location
 when creating a fileset, or follow the rules of the catalog/schema location if not specified.
+
+The value of `storageLocation` depends on the configuration settings of the catalog:
+- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
+- If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
 
 For a `MANAGED` fileset, the storage location is:
 
@@ -389,13 +399,13 @@ fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("sche
 
 Currently, Gravitino supports the following changes to a fileset:
 
-| Supported modification     | JSON                                                         | Java                                          |
-|----------------------------|--------------------------------------------------------------|-----------------------------------------------|
-| Rename a fileset           | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
-| Update a comment           | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
-| Set a fileset property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
-| Remove a fileset property  | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
-| Remove comment             | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
+| Supported modification      | JSON                                                         | Java                                          |
+|-----------------------------|--------------------------------------------------------------|-----------------------------------------------|
+| Rename a fileset            | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
+| Update a comment            | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
+| Set a fileset property      | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
+| Remove a fileset property   | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
+| Remove comment (deprecated) | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
 
 ### Drop a fileset
 

@@ -18,18 +18,14 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
-import static org.apache.gravitino.catalog.hive.HiveTable.ICEBERG_TABLE_TYPE_VALUE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
 import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -71,6 +67,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -94,6 +91,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
@@ -117,7 +115,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private ScheduledThreadPoolExecutor checkTgtExecutor;
   private String kerberosRealm;
   private ProxyPlugin proxyPlugin;
-  boolean listAllTables = true;
+  private boolean listAllTables = true;
+  // The maximum number of tables that can be returned by the listTableNamesByFilter function.
+  // The default value is -1, which means that all tables are returned.
+  private static final short MAX_TABLES = -1;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -167,8 +168,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     initKerberosIfNecessary(conf, hadoopConf);
 
-    this.clientPool =
-        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+    this.clientPool = new CachedClientPool(hiveConf, conf);
 
     this.listAllTables = enableListAllTables(conf);
   }
@@ -200,7 +200,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (String)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMeta.KEY_TAB_URI);
+                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.KEY_TAB_URI);
         Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
@@ -210,7 +210,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (int)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
+                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC);
 
         FetchFileUtils.fetchFileFromUri(
             keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
@@ -244,7 +244,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (int)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
+                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.CHECK_INTERVAL_SEC);
 
         checkTgtExecutor.scheduleAtFixedRate(
             () -> {
@@ -280,19 +280,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @VisibleForTesting
-  int getClientPoolSize(Map<String, String> conf) {
-    return (int)
-        propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, CLIENT_POOL_SIZE);
-  }
-
-  long getCacheEvictionInterval(Map<String, String> conf) {
-    return (long)
-        propertiesMetadata
-            .catalogPropertiesMetadata()
-            .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   boolean enableListAllTables(Map<String, String> conf) {
@@ -372,7 +359,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
-              .withConf(hiveConf)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
@@ -413,7 +399,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database, hiveConf);
+      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
       return hiveSchema;
@@ -477,7 +463,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      return HiveSchema.fromHiveDB(alteredDatabase, hiveConf);
+      return HiveSchema.fromHiveDB(alteredDatabase);
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchSchemaException(
@@ -555,23 +541,32 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // then based on
       // those names we can obtain metadata for each individual table and get the type we needed.
       List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
-      return clientPool.run(
-          c ->
-              c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
-                  .filter(
-                      tb -> {
-                        boolean isSupportTable = SUPPORT_TABLE_TYPES.contains(tb.getTableType());
-                        if (!isSupportTable) {
-                          return false;
-                        }
-                        if (!listAllTables) {
-                          Map<String, String> parameters = tb.getParameters();
-                          return isHiveTable(parameters);
-                        }
-                        return true;
-                      })
-                  .map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
-                  .toArray(NameIdentifier[]::new));
+      if (!listAllTables) {
+        // The reason for using the listTableNamesByFilter function is that the
+        // getTableObjectiesByName function has poor performance. Currently, we focus on the
+        // Iceberg, Paimon and Hudi table. In the future, if necessary, we will need to filter out
+        // other tables. In addition, the current return also includes tables of type VIRTUAL-VIEW.
+        String icebergAndPaimonFilter = getIcebergAndPaimonFilter();
+        List<String> icebergAndPaimonTables =
+            clientPool.run(
+                c ->
+                    c.listTableNamesByFilter(
+                        schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
+        allTables.removeAll(icebergAndPaimonTables);
+
+        // filter out the Hudi tables
+        String hudiFilter =
+            String.format(
+                "%sprovider like \"hudi\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+        List<String> hudiTables =
+            clientPool.run(
+                c -> c.listTableNamesByFilter(schemaIdent.name(), hudiFilter, MAX_TABLES));
+        removeHudiTables(allTables, hudiTables);
+      }
+      return allTables.stream()
+          .map(tbName -> NameIdentifier.of(namespace, tbName))
+          .toArray(NameIdentifier[]::new);
+
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(
           "Schema (database) does not exist %s in Hive Metastore", namespace);
@@ -585,20 +580,24 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  boolean isHiveTable(Map<String, String> tableParameters) {
-    if (isIcebergTable(tableParameters)) return false;
-    return true;
+  private static String getIcebergAndPaimonFilter() {
+    String icebergFilter =
+        String.format(
+            "%stable_type like \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+    String paimonFilter =
+        String.format(
+            "%stable_type like \"PAIMON\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+    return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
-  boolean isIcebergTable(Map<String, String> tableParameters) {
-    if (tableParameters != null) {
-      boolean isIcebergTable =
-          ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableParameters.get(TABLE_TYPE_PROP));
-      if (isIcebergTable) {
-        return true;
-      }
+  private void removeHudiTables(List<String> allTables, List<String> hudiTables) {
+    for (String hudiTable : hudiTables) {
+      allTables.removeIf(
+          t ->
+              t.equals(hudiTable)
+                  || t.startsWith(hudiTable + "_ro")
+                  || t.startsWith(hudiTable + "_rt"));
     }
-    return false;
   }
 
   /**

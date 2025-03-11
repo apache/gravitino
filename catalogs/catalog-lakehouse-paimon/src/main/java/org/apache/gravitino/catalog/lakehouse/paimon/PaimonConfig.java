@@ -50,6 +50,30 @@ public class PaimonConfig extends Config {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<String> CATALOG_JDBC_USER =
+      new ConfigBuilder(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER)
+          .doc("Paimon catalog jdbc user")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  public static final ConfigEntry<String> CATALOG_JDBC_PASSWORD =
+      new ConfigBuilder(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD)
+          .doc("Paimon catalog jdbc password")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  public static final ConfigEntry<String> CATALOG_JDBC_DRIVER =
+      new ConfigBuilder(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER)
+          .doc("The driver of the Jdbc connection")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
   public PaimonConfig() {
     super(false);
   }
@@ -57,5 +81,9 @@ public class PaimonConfig extends Config {
   public PaimonConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  public String getJdbcDriver() {
+    return get(CATALOG_JDBC_DRIVER);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.catalog.CatalogManager.checkCatalogInUse;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -92,6 +93,8 @@ public abstract class OperationDispatcher {
   protected <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
+    checkCatalogInUse(store, ident);
+
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
@@ -112,6 +115,8 @@ public abstract class OperationDispatcher {
       Class<E1> ex1,
       Class<E2> ex2)
       throws E1, E2 {
+    checkCatalogInUse(store, ident);
+
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);

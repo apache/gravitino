@@ -122,10 +122,10 @@ fun generatePypiProjectHomePage() {
     // relative path of the images in the how-to-use-python-client.md file is incorrect. We need
     // to fix the relative path of the images/markdown to the absolute path.
     val content = outputFile.readText()
-    val docsUrl = "https://datastrato.ai/docs/latest"
+    val docsUrl = "https://gravitino.apache.org/docs/latest"
 
     // Use regular expression to match the `[](./a/b/c.md?language=python)` or `[](./a/b/c.md#arg1)` link in the content
-    // Convert `[](./a/b/c.md?language=python)` to `[](https://datastrato.ai/docs/latest/a/b/c/language=python)`
+    // Convert `[](./a/b/c.md?language=python)` to `[](https://gravitino.apache.org/docs/latest/a/b/c/language=python)`
     val patternDocs = Regex("""(?<!!)\[([^\]]+)]\(\.\/([^)]+)\.md([?#][^)]+)?\)""")
     val contentUpdateDocs = patternDocs.replace(content) { matchResult ->
       val text = matchResult.groupValues[1]
@@ -222,7 +222,8 @@ tasks {
       "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
       "START_EXTERNAL_GRAVITINO" to "true",
       "DOCKER_TEST" to dockerTest.toString(),
-      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.13",
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
+      "GRAVITINO_OAUTH2_SAMPLE_SERVER" to "datastrato/sample-authorization-server:0.3.0",
       // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
       // modules from the client-python directory.
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
@@ -271,9 +272,10 @@ tasks {
     }
   }
 
-  val pydoc by registering(VenvTask::class) {
-    venvExec = "python"
-    args = listOf("scripts/generate_doc.py")
+  val doc by registering(VenvTask::class) {
+    workingDir = projectDir.resolve("./docs")
+    venvExec = "make"
+    args = listOf("html")
   }
 
   val distribution by registering(VenvTask::class) {
@@ -282,6 +284,13 @@ tasks {
       delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
+      copy {
+        from("${project.rootDir}/DISCLAIMER.txt") { into("./") }
+        into("${project.rootDir}/clients/client-python")
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
     }
 
     venvExec = "python"
@@ -289,6 +298,7 @@ tasks {
 
     doLast {
       delete("README.md")
+      delete("DISCLAIMER.txt")
     }
   }
 
@@ -303,9 +313,10 @@ tasks {
   val clean by registering(Delete::class) {
     delete("build")
     delete("dist")
-    delete("docs")
+    delete("docs/build")
+    delete("docs/source/generated")
     delete("gravitino/version.ini")
-    delete("gravitino.egg-info")
+    delete("apache_gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
     delete("tests/integration/htmlcov")

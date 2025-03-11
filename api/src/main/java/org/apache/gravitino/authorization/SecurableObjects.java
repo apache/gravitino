@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -31,7 +32,8 @@ import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
 /** The helper class for {@link SecurableObject}. */
 public class SecurableObjects {
 
-  private static final Splitter DOT_SPLITTER = Splitter.on('.');
+  /** The splitter for splitting the names. */
+  public static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
    * Create the metalake {@link SecurableObject} with the given metalake name and privileges.
@@ -103,7 +105,7 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * Create the fileset {@link SecurableObject} with the given securable schema object, fileset name
    * and privileges.
    *
    * @param schema The schema securable object
@@ -124,7 +126,8 @@ public class SecurableObjects {
 
     SecurableObjectImpl(String parent, String name, Type type, List<Privilege> privileges) {
       super(parent, name, type);
-      this.privileges = ImmutableList.copyOf(privileges);
+      // Remove duplicated privileges
+      this.privileges = ImmutableList.copyOf(Sets.newHashSet(privileges));
     }
 
     @Override

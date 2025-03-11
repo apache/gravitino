@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.hive;
 import static org.apache.gravitino.catalog.hive.HiveCatalog.CATALOG_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.hive.HiveCatalog.SCHEMA_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.hive.HiveCatalog.TABLE_PROPERTIES_METADATA;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -29,9 +29,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
-import org.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -65,6 +65,11 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
         @Override
         public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Topic properties are not supported");
+        }
+
+        @Override
+        public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Model properties are not supported");
         }
       };
 

@@ -31,6 +31,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
@@ -53,7 +54,8 @@ import org.apache.gravitino.tag.Tag;
  * create, load, alter and drop a schema with specified identifier.
  */
 abstract class BaseSchemaCatalog extends CatalogDTO
-    implements Catalog, SupportsSchemas, SupportsTags {
+    implements Catalog, SupportsSchemas, SupportsTags, SupportsRoles {
+
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
 
@@ -61,6 +63,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   private final Namespace catalogNamespace;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectRoleOperations objectRoleOperations;
+  protected final MetadataObjectCredentialOperations objectCredentialOperations;
 
   BaseSchemaCatalog(
       Namespace catalogNamespace,
@@ -84,6 +88,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
         MetadataObjects.of(null, this.name(), MetadataObject.Type.CATALOG);
     this.objectTagOperations =
         new MetadataObjectTagOperations(catalogNamespace.level(0), metadataObject, restClient);
+    this.objectRoleOperations =
+        new MetadataObjectRoleOperations(catalogNamespace.level(0), metadataObject, restClient);
+    this.objectCredentialOperations =
+        new MetadataObjectCredentialOperations(
+            catalogNamespace.level(0), metadataObject, restClient);
   }
 
   @Override
@@ -93,6 +102,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
 
   @Override
   public SupportsTags supportsTags() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public SupportsRoles supportsRoles() throws UnsupportedOperationException {
     return this;
   }
 
@@ -130,8 +144,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    SchemaCreateRequest req =
-        new SchemaCreateRequest(RESTUtils.encodeString(schemaName), comment, properties);
+    SchemaCreateRequest req = new SchemaCreateRequest(schemaName, comment, properties);
     req.validate();
 
     SchemaResponse resp =
@@ -239,6 +252,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 
+  @Override
+  public String[] listBindingRoleNames() {
+    return objectRoleOperations.listBindingRoleNames();
+  }
+
   /**
    * Get the namespace of the current catalog, which is "metalake".
    *
@@ -260,9 +278,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   static String formatSchemaRequestPath(Namespace ns) {
     return new StringBuilder()
         .append("api/metalakes/")
-        .append(ns.level(0))
+        .append(RESTUtils.encodeString(ns.level(0)))
         .append("/catalogs/")
-        .append(ns.level(1))
+        .append(RESTUtils.encodeString(ns.level(1)))
         .append("/schemas")
         .toString();
   }
