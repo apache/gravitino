@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.flink.connector.integration.test;
 
-import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -51,6 +50,7 @@ import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -91,6 +91,10 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected boolean supportModifyColumnsMultipleByOneSql() {
     return true;
+  }
+
+  protected boolean defaultValueWithNullLiterals() {
+    return false;
   }
 
   protected String defaultDatabaseName() {
@@ -282,7 +286,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
                 Column.of("double_type", Types.DoubleType.get(), "double_type")
               };
-          assertColumns(columns, table.columns(), getProvider());
+          assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
 
           TestUtils.assertTableResult(
@@ -525,7 +529,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("user_id_new", Types.IntegerType.get(), "USER_ID"),
                 Column.of("order_amount", Types.DoubleType.get(), "ORDER_AMOUNT")
               };
-          assertColumns(expected, actual, getProvider());
+          assertColumns(expected, actual);
         },
         true,
         supportDropCascade());
@@ -624,7 +628,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT"),
                 Column.of("new_column_2", Types.IntegerType.get(), null),
               };
-          assertColumns(expected, actual, getProvider());
+          assertColumns(expected, actual);
         },
         true,
         supportDropCascade());
@@ -656,7 +660,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   .columns();
           Column[] expected =
               new Column[] {Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT")};
-          assertColumns(expected, actual, getProvider());
+          assertColumns(expected, actual);
         },
         true,
         supportDropCascade());
@@ -699,7 +703,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("order_amount", Types.LongType.get(), "new comment2"),
                 Column.of("user_id", Types.LongType.get(), "new comment")
               };
-          assertColumns(expected, actual, getProvider());
+          assertColumns(expected, actual);
         },
         true,
         supportDropCascade());
@@ -743,7 +747,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("order_amount", Types.LongType.get(), "new comment2"),
                 Column.of("user_id", Types.LongType.get(), "new comment")
               };
-          assertColumns(expected, actual, getProvider());
+          assertColumns(expected, actual);
         },
         true,
         supportDropCascade());
@@ -820,5 +824,24 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
         },
         true,
         supportDropCascade());
+  }
+
+  public void assertColumns(Column[] expected, Column[] actual) {
+    Assertions.assertEquals(expected.length, actual.length);
+    for (int i = 0; i < expected.length; i++) {
+      Assertions.assertEquals(expected[i].name(), actual[i].name());
+      Assertions.assertEquals(expected[i].comment(), actual[i].comment());
+      Assertions.assertEquals(
+          expected[i].dataType().simpleString(), actual[i].dataType().simpleString());
+      if (expected[i].defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
+          && expected[i].nullable()
+          && defaultValueWithNullLiterals()) {
+        Assertions.assertEquals(Literals.NULL, actual[i].defaultValue());
+      } else {
+        Assertions.assertEquals(expected[i].defaultValue(), actual[i].defaultValue());
+      }
+      Assertions.assertEquals(expected[i].autoIncrement(), actual[i].autoIncrement());
+      Assertions.assertEquals(expected[i].nullable(), actual[i].nullable());
+    }
   }
 }

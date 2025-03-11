@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.flink.connector.integration.test.hive;
 
-import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
@@ -338,7 +337,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                 Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
                 Column.of("double_type", Types.DoubleType.get(), "double_type")
               };
-          assertColumns(columns, table.columns(), getProvider());
+          assertColumns(columns, table.columns());
           Transform[] partitions =
               new Transform[] {
                 Transforms.identity("string_type"), Transforms.identity("double_type")
@@ -461,7 +460,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                         Types.StructType.Field.nullableField("k2", Types.StringType.get())),
                     null)
               };
-          assertColumns(columns, table.columns(), getProvider());
+          assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
         true);

@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
-import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
@@ -265,7 +264,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
                 Column.of("id", Types.LongType.get(), "unique id", true, false, null),
                 Column.of("data", Types.StringType.get(), null, false, false, null)
               };
-          assertColumns(columns, table.columns(), getProvider());
+          assertColumns(columns, table.columns());
           Transform[] partitions = new Transform[] {Transforms.identity("data")};
           Assertions.assertArrayEquals(partitions, table.partitioning());
 
@@ -364,7 +363,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
                         Types.StructType.Field.nullableField("k2", Types.StringType.get())),
                     null)
               };
-          assertColumns(columns, table.columns(), getProvider());
+          assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
         true,

@@ -94,6 +94,11 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
     return true;
   }
 
+  @Override
+  protected boolean defaultValueWithNullLiterals() {
+    return true;
+  }
+
   private void init() {
     Preconditions.checkNotNull(metalake);
     catalog =

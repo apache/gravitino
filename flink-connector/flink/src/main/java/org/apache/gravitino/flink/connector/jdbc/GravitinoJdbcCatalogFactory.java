@@ -26,6 +26,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.UnsupportPartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
@@ -55,7 +56,7 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
 
   @Override
   public PartitionConverter partitionConverter() {
-    return null;
+    return UnsupportPartitionConverter.INSTANCE;
   }
 
   @Override
