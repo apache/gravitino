@@ -79,5 +79,35 @@ public class TestExtractMetricNameAndLabel {
             + "_"
             + Collector.sanitizeMetricName(MetricNames.HTTP_PROCESS_DURATION),
         ImmutableMap.of("operation", "update-table"));
+
+    checkResult(
+        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
+            + "."
+            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
+        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(
+                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS),
+        ImmutableMap.of());
+
+    checkResult(
+        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
+            + "."
+            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
+        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(
+                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS),
+        ImmutableMap.of());
+
+    checkResult(
+        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
+            + "."
+            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
+        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(
+                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS),
+        ImmutableMap.of());
   }
 }

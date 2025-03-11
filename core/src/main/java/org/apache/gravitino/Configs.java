@@ -310,4 +310,12 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .createWithDefault(SimpleFormatterV2.class.getName());
+
+  public static final ConfigEntry<List<String>> VISIBLE_CONFIGS =
+      new ConfigBuilder("gravitino.server.visibleConfigs")
+          .doc("List of configs that are visible in the config servlet")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
 }

@@ -45,10 +45,9 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration = new Configuration();
-    FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY)
-        .forEach(configuration::set);
-
+    Map<String, String> hadoopConfMap =
+        FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY);
+    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 

@@ -17,10 +17,31 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.hadoop;
+package org.apache.gravitino.listener.api.event;
 
-public class Constants {
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
-  public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
-  public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
+/** Represents an event triggered before getting a model. */
+@DeveloperApi
+public class GetModelPreEvent extends ModelPreEvent {
+  /**
+   * Create a new {@link GetModelPreEvent} instance.
+   *
+   * @param user the user who triggered the event.
+   * @param identifier the identifier of the model being operated on.
+   */
+  public GetModelPreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_MODEL;
+  }
 }

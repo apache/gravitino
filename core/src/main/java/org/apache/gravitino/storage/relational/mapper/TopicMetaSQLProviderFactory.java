@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TopicMetaBaseSQLProvider;
@@ -61,6 +62,10 @@ public class TopicMetaSQLProviderFactory {
 
   public static String listTopicPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTopicPOsBySchemaId(schemaId);
+  }
+
+  public static String listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds) {
+    return getProvider().listTopicPOsByTopicIds(topicIds);
   }
 
   public static String selectTopicMetaBySchemaIdAndName(

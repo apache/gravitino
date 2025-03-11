@@ -47,8 +47,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -84,11 +82,7 @@ public class SchemaOperations {
           httpRequest,
           () -> {
             Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
-            NameIdentifier[] idents =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog),
-                    LockType.READ,
-                    () -> dispatcher.listSchemas(schemaNS));
+            NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
             return response;
@@ -115,12 +109,7 @@ public class SchemaOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSchema(metalake, catalog, request.getName());
             Schema schema =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofCatalog(metalake, catalog),
-                    LockType.WRITE,
-                    () ->
-                        dispatcher.createSchema(
-                            ident, request.getComment(), request.getProperties()));
+                dispatcher.createSchema(ident, request.getComment(), request.getProperties());
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
             LOG.info("Schema created: {}.{}.{}", metalake, catalog, schema.name());
             return response;
@@ -179,11 +168,7 @@ public class SchemaOperations {
                 request.getUpdates().stream()
                     .map(SchemaUpdateRequest::schemaChange)
                     .toArray(SchemaChange[]::new);
-            Schema s =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofCatalog(metalake, catalog),
-                    LockType.WRITE,
-                    () -> dispatcher.alterSchema(ident, changes));
+            Schema s = dispatcher.alterSchema(ident, changes);
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
             LOG.info("Schema altered: {}.{}.{}", metalake, catalog, s.name());
             return response;

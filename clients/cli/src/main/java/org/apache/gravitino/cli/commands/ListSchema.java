@@ -19,7 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -49,8 +50,10 @@ public class ListSchema extends Command {
   @Override
   public void handle() {
     String[] schemas = new String[0];
+    GravitinoClient client;
+
     try {
-      GravitinoClient client = buildClient(metalake);
+      client = buildClient(metalake);
       schemas = client.loadCatalog(catalog).asSchemas().listSchemas();
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -60,8 +63,29 @@ public class ListSchema extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = schemas.length == 0 ? "No schemas exist." : Joiner.on(",").join(schemas);
+    if (schemas.length == 0) {
+      printInformation("No schemas exist.");
+      return;
+    }
 
-    printInformation(all);
+    Schema[] schemaObjects = new Schema[schemas.length];
+    for (int i = 0; i < schemas.length; i++) {
+      String schemaName = schemas[i];
+      Schema gSchema =
+          new Schema() {
+            @Override
+            public String name() {
+              return schemaName;
+            }
+
+            @Override
+            public Audit auditInfo() {
+              return null;
+            }
+          };
+      schemaObjects[i] = gSchema;
+    }
+
+    printResults(schemaObjects);
   }
 }

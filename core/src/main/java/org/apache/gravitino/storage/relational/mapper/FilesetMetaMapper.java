@@ -67,6 +67,31 @@ public interface FilesetMetaMapper {
   @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "listFilesetPOsBySchemaId")
   List<FilesetPO> listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @Results({
+    @Result(property = "filesetId", column = "fileset_id"),
+    @Result(property = "filesetName", column = "fileset_name"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "catalogId", column = "catalog_id"),
+    @Result(property = "schemaId", column = "schema_id"),
+    @Result(property = "type", column = "type"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at"),
+    @Result(property = "filesetVersionPO.id", column = "id"),
+    @Result(property = "filesetVersionPO.metalakeId", column = "version_metalake_id"),
+    @Result(property = "filesetVersionPO.catalogId", column = "version_catalog_id"),
+    @Result(property = "filesetVersionPO.schemaId", column = "version_schema_id"),
+    @Result(property = "filesetVersionPO.filesetId", column = "version_fileset_id"),
+    @Result(property = "filesetVersionPO.version", column = "version"),
+    @Result(property = "filesetVersionPO.filesetComment", column = "fileset_comment"),
+    @Result(property = "filesetVersionPO.properties", column = "properties"),
+    @Result(property = "filesetVersionPO.storageLocation", column = "storage_location"),
+    @Result(property = "filesetVersionPO.deletedAt", column = "version_deleted_at")
+  })
+  @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "listFilesetPOsByFilesetIds")
+  List<FilesetPO> listFilesetPOsByFilesetIds(@Param("filesetIds") List<Long> filesetIds);
+
   @SelectProvider(
       type = FilesetMetaSQLProviderFactory.class,
       method = "selectFilesetIdBySchemaIdAndName")

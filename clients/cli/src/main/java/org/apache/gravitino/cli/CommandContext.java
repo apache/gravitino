@@ -116,6 +116,14 @@ public class CommandContext {
   }
 
   /**
+   * Returns the command line.
+   *
+   * @return The command line.
+   */
+  public CommandLine line() {
+    return line;
+  }
+  /**
    * Retrieves the Gravitino URL from the command line options or the GRAVITINO_URL environment
    * variable or the Gravitino config file.
    *

@@ -39,7 +39,7 @@ public class ErrorMessages {
   public static final String ENTITY_IN_USE = " in use, please disable it first.";
 
   public static final String INVALID_ENABLE_DISABLE =
-      "Unable to us --enable and --disable at the same time";
+      "Unable to use --enable and --disable at the same time.";
   public static final String INVALID_OWNER_COMMAND =
       "Unsupported combination of options either use --user or --group.";
   public static final String INVALID_REMOVE_COMMAND =

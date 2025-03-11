@@ -114,7 +114,7 @@ s3_properties = {
 }
 
 s3_catalog = gravitino_client.create_catalog(name="test_catalog",
-                                             type=Catalog.Type.FILESET,
+                                             catalog_type=Catalog.Type.FILESET,
                                              provider="hadoop",
                                              comment="This is a S3 fileset catalog",
                                              properties=s3_properties)
@@ -341,7 +341,7 @@ fileset_name = "your_s3_fileset"
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.2.0.jar,/path/to/aws-java-sdk-bundle-1.11.375.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
-    .appName("s3_fielset_test")
+    .appName("s3_fileset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")

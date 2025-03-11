@@ -62,18 +62,17 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration = new Configuration();
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
-    hadoopConfMap.forEach(configuration::set);
     if (!hadoopConfMap.containsKey(S3_CREDENTIAL_KEY)) {
-      configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+      hadoopConfMap.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     }
 
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
-    checkAndSetCredentialProvider(configuration);
+    checkAndSetCredentialProvider(hadoopConfMap);
 
+    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return S3AFileSystem.newInstance(path.toUri(), configuration);
   }
 
@@ -89,8 +88,8 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     return result;
   }
 
-  private void checkAndSetCredentialProvider(Configuration configuration) {
-    String provides = configuration.get(S3_CREDENTIAL_KEY);
+  private void checkAndSetCredentialProvider(Map<String, String> configs) {
+    String provides = configs.get(S3_CREDENTIAL_KEY);
     if (provides == null) {
       return;
     }
@@ -115,15 +114,15 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
         LOG.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
             provider);
-        configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+        configs.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
         return;
       }
     }
 
     if (validProviders.isEmpty()) {
-      configuration.set(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+      configs.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
     } else {
-      configuration.set(S3_CREDENTIAL_KEY, joiner.join(validProviders));
+      configs.put(S3_CREDENTIAL_KEY, joiner.join(validProviders));
     }
   }
 

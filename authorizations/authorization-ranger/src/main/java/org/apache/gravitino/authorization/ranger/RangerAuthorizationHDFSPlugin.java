@@ -51,6 +51,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -678,5 +679,46 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       }
     }
     return Boolean.TRUE;
+  }
+
+  @Override
+  protected String getServiceType() {
+    return HDFS_SERVICE_TYPE;
+  }
+
+  @Override
+  protected Map<String, String> getServiceConfigs(Map<String, String> config) {
+    return ImmutableMap.<String, String>builder()
+        .put(
+            RangerAuthorizationProperties.RANGER_USERNAME.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_USERNAME))
+        .put(
+            RangerAuthorizationProperties.RANGER_PASSWORD.substring(getPrefixLength()),
+            config.get(RangerAuthorizationProperties.RANGER_PASSWORD))
+        .put(
+            RangerAuthorizationProperties.HADOOP_SECURITY_AUTHENTICATION.substring(
+                getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.HADOOP_SECURITY_AUTHENTICATION,
+                RangerAuthorizationProperties.DEFAULT_HADOOP_SECURITY_AUTHENTICATION))
+        .put(
+            RangerAuthorizationProperties.HADOOP_RPC_PROTECTION.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.HADOOP_RPC_PROTECTION,
+                RangerAuthorizationProperties.DEFAULT_HADOOP_RPC_PROTECTION))
+        .put(
+            RangerAuthorizationProperties.HADOOP_SECURITY_AUTHORIZATION.substring(
+                getPrefixLength()),
+            getConfValue(
+                config, RangerAuthorizationProperties.HADOOP_SECURITY_AUTHORIZATION, "false"))
+        .put(
+            RangerAuthorizationProperties.FS_DEFAULT_NAME.substring(getPrefixLength()),
+            getConfValue(
+                config,
+                RangerAuthorizationProperties.FS_DEFAULT_NAME,
+                RangerAuthorizationProperties.FS_DEFAULT_VALUE))
+        .build();
   }
 }

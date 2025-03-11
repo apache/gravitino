@@ -111,33 +111,33 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     return System.getenv(HADOOP_USER_NAME);
   }
 
-  public void checkUpdateSQLWithReadWritePrivileges() {
+  public void checkUpdateSQLWithSelectModifyPrivileges() {
     sparkSession.sql(SQL_UPDATE_TABLE);
   }
 
   @Override
-  public void checkUpdateSQLWithReadPrivileges() {
+  public void checkUpdateSQLWithSelectPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  public void checkUpdateSQLWithWritePrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
+  public void checkUpdateSQLWithModifyPrivileges() {
+    sparkSession.sql(SQL_UPDATE_TABLE);
   }
 
   @Override
-  public void checkDeleteSQLWithReadWritePrivileges() {
+  public void checkDeleteSQLWithSelectModifyPrivileges() {
     sparkSession.sql(SQL_DELETE_TABLE);
   }
 
   @Override
-  public void checkDeleteSQLWithReadPrivileges() {
+  public void checkDeleteSQLWithSelectPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
   @Override
-  public void checkDeleteSQLWithWritePrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
+  public void checkDeleteSQLWithModifyPrivileges() {
+    sparkSession.sql(SQL_DELETE_TABLE);
   }
 
   public void checkWithoutPrivileges() {

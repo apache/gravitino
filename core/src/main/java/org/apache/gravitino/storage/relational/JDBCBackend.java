@@ -377,6 +377,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
+    SQLExceptionConverterFactory.close();
 
     if (jdbcDatabase != null) {
       jdbcDatabase.close();
