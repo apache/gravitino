@@ -57,10 +57,6 @@ public class TableColumnSQLProviderFactory {
     return getProvider().listColumnPOsByTableIdAndVersion(tableId, tableVersion);
   }
 
-  public static String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
-    return getProvider().listColumnPOsByColumnIds(columnIds);
-  }
-
   public static String insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs) {
     return getProvider().insertColumnPOs(columnPOs);
   }
