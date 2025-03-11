@@ -279,28 +279,17 @@ public class MetadataObjectService {
       return new HashMap<>();
     }
 
-    List<Long> catalogIds =
-        filesetPOs.stream().map(FilesetPO::getCatalogId).collect(Collectors.toList());
     List<Long> schemaIds =
         filesetPOs.stream().map(FilesetPO::getSchemaId).collect(Collectors.toList());
 
-    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
-    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
 
     HashMap<Long, String> filesetIdAndNameMap = new HashMap<>();
 
     filesetPOs.forEach(
         filesetPO -> {
-          // since the catalog or schema can be deleted, we need to check the null value,
-          // and when catalog or schema is deleted, we will set fullName of filesetPO to
-          // null
-          String catalogName = catalogIdAndNameMap.getOrDefault(filesetPO.getCatalogId(), null);
-          if (catalogName == null) {
-            LOG.warn("The catalog of fileset {} may be deleted", filesetPO.getFilesetId());
-            filesetIdAndNameMap.put(filesetPO.getFilesetId(), null);
-            return;
-          }
-
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of filesetPO to null.
           String schemaName = schemaIdAndNameMap.getOrDefault(filesetPO.getSchemaId(), null);
           if (schemaName == null) {
             LOG.warn("The schema of fileset {} may be deleted", filesetPO.getFilesetId());
@@ -308,7 +297,7 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName = DOT_JOINER.join(catalogName, schemaName, filesetPO.getFilesetName());
+          String fullName = DOT_JOINER.join(schemaName, filesetPO.getFilesetName());
           filesetIdAndNameMap.put(filesetPO.getFilesetId(), fullName);
         });
 
@@ -333,27 +322,16 @@ public class MetadataObjectService {
       return new HashMap<>();
     }
 
-    List<Long> catalogIds =
-        modelPOs.stream().map(ModelPO::getCatalogId).collect(Collectors.toList());
     List<Long> schemaIds = modelPOs.stream().map(ModelPO::getSchemaId).collect(Collectors.toList());
 
-    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
-    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
 
     HashMap<Long, String> modelIdAndNameMap = new HashMap<>();
 
     modelPOs.forEach(
         modelPO -> {
-          // since the catalog or schema can be deleted, we need to check the null value,
-          // and when catalog or schema is deleted, we will set fullName of modelPO to
-          // null
-          String catalogName = catalogIdAndNameMap.getOrDefault(modelPO.getCatalogId(), null);
-          if (catalogName == null) {
-            LOG.warn("The catalog of model {} may be deleted", modelPO.getModelId());
-            modelIdAndNameMap.put(modelPO.getModelId(), null);
-            return;
-          }
-
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of modelPO to null.
           String schemaName = schemaIdAndNameMap.getOrDefault(modelPO.getSchemaId(), null);
           if (schemaName == null) {
             LOG.warn("The schema of model {} may be deleted", modelPO.getModelId());
@@ -361,7 +339,7 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName = DOT_JOINER.join(catalogName, schemaName, modelPO.getModelName());
+          String fullName = DOT_JOINER.join(schemaName, modelPO.getModelName());
           modelIdAndNameMap.put(modelPO.getModelId(), fullName);
         });
 
@@ -386,27 +364,18 @@ public class MetadataObjectService {
       return new HashMap<>();
     }
 
-    List<Long> catalogIds =
-        tablePOs.stream().map(TablePO::getCatalogId).collect(Collectors.toList());
+    tablePOs.stream().map(TablePO::getCatalogId).collect(Collectors.toList());
     List<Long> schemaIds = tablePOs.stream().map(TablePO::getSchemaId).collect(Collectors.toList());
 
-    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
-    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
 
     HashMap<Long, String> tableIdAndNameMap = new HashMap<>();
 
     tablePOs.forEach(
         tablePO -> {
-          // since the catalog or schema can be deleted, we need to check the null value,
-          // and when catalog or schema is deleted, we will set fullName of tablePO to
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of tablePO to
           // null
-          String catalogName = catalogIdAndNameMap.getOrDefault(tablePO.getCatalogId(), null);
-          if (catalogName == null) {
-            LOG.warn("The catalog of table {} may be deleted", tablePO.getTableId());
-            tableIdAndNameMap.put(tablePO.getTableId(), null);
-            return;
-          }
-
           String schemaName = schemaIdAndNameMap.getOrDefault(tablePO.getSchemaId(), null);
           if (schemaName == null) {
             LOG.warn("The schema of table {} may be deleted", tablePO.getTableId());
@@ -414,7 +383,7 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName = DOT_JOINER.join(catalogName, schemaName, tablePO.getTableName());
+          String fullName = DOT_JOINER.join(schemaName, tablePO.getTableName());
           tableIdAndNameMap.put(tablePO.getTableId(), fullName);
         });
 
@@ -439,27 +408,16 @@ public class MetadataObjectService {
       return new HashMap<>();
     }
 
-    List<Long> catalogIds =
-        topicPOs.stream().map(TopicPO::getCatalogId).collect(Collectors.toList());
     List<Long> schemaIds = topicPOs.stream().map(TopicPO::getSchemaId).collect(Collectors.toList());
 
-    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
-    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
 
     HashMap<Long, String> topicIdAndNameMap = new HashMap<>();
 
     topicPOs.forEach(
         topicPO -> {
-          // since the catalog or schema can be deleted, we need to check the null value,
-          // and when catalog or schema is deleted, we will set fullName of topicPO to
-          // null
-          String catalogName = catalogIdAndNameMap.getOrDefault(topicPO.getCatalogId(), null);
-          if (catalogName == null) {
-            LOG.warn("The catalog of topic {} may be deleted", topicPO.getTopicId());
-            topicIdAndNameMap.put(topicPO.getTopicId(), null);
-            return;
-          }
-
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of topicPO to null.
           String schemaName = schemaIdAndNameMap.getOrDefault(topicPO.getSchemaId(), null);
           if (schemaName == null) {
             LOG.warn("The schema of topic {} may be deleted", topicPO.getTopicId());
@@ -467,7 +425,7 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName = DOT_JOINER.join(catalogName, schemaName, topicPO.getTopicName());
+          String fullName = DOT_JOINER.join(schemaName, topicPO.getTopicName());
           topicIdAndNameMap.put(topicPO.getTopicId(), fullName);
         });
 
@@ -492,37 +450,16 @@ public class MetadataObjectService {
       return new HashMap<>();
     }
 
-    List<Long> catalogIds =
-        columnPOs.stream().map(ColumnPO::getCatalogId).collect(Collectors.toList());
-    List<Long> schemaIds =
-        columnPOs.stream().map(ColumnPO::getSchemaId).collect(Collectors.toList());
     List<Long> tableIds = columnPOs.stream().map(ColumnPO::getTableId).collect(Collectors.toList());
 
-    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
-    Map<Long, String> schemaIdAndNameMap = getSchemaIdAndNameMap(schemaIds);
-    Map<Long, String> tableIdAndNameMap = getTableIdAndNameMap(tableIds);
+    Map<Long, String> tableIdAndNameMap = getTableObjectsFullName(tableIds);
 
     HashMap<Long, String> columnIdAndNameMap = new HashMap<>();
 
     columnPOs.forEach(
         columnPO -> {
-          // since the catalog or schema or table can be deleted, we need to check the
-          // null value, and when catalog or schema or table is deleted, we will set
-          // fullName of columnPO to null
-          String catalogName = catalogIdAndNameMap.getOrDefault(columnPO.getCatalogId(), null);
-          if (catalogName == null) {
-            LOG.warn("The catalog of column {} may be deleted", columnPO.getColumnId());
-            columnIdAndNameMap.put(columnPO.getColumnId(), null);
-            return;
-          }
-
-          String schemaName = schemaIdAndNameMap.getOrDefault(columnPO.getSchemaId(), null);
-          if (schemaName == null) {
-            LOG.warn("The schema of column {} may be deleted", columnPO.getColumnId());
-            columnIdAndNameMap.put(columnPO.getColumnId(), null);
-            return;
-          }
-
+          // since the table can be deleted, we need to check the
+          // null value, and when table is deleted, we will set fullName of columnPO to null
           String tableName = tableIdAndNameMap.getOrDefault(columnPO.getTableId(), null);
           if (tableName == null) {
             LOG.warn("The table of column {} may be deleted", columnPO.getColumnId());
@@ -530,8 +467,7 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName =
-              DOT_JOINER.join(catalogName, schemaName, tableName, columnPO.getColumnName());
+          String fullName = DOT_JOINER.join(tableName, columnPO.getColumnName());
           columnIdAndNameMap.put(columnPO.getColumnId(), fullName);
         });
 
@@ -559,9 +495,7 @@ public class MetadataObjectService {
     HashMap<Long, String> catalogIdAndNameMap = new HashMap<>();
 
     catalogPOs.forEach(
-        catalogPO ->
-            catalogIdAndNameMap.put(
-                catalogPO.getCatalogId(), catalogPO.getCatalogName()));
+        catalogPO -> catalogIdAndNameMap.put(catalogPO.getCatalogId(), catalogPO.getCatalogName()));
 
     return catalogIdAndNameMap;
   }
@@ -587,7 +521,7 @@ public class MetadataObjectService {
     List<Long> catalogIds =
         schemaPOs.stream().map(SchemaPO::getCatalogId).collect(Collectors.toList());
 
-    Map<Long, String> catalogIdAndNameMap = getCatalogIdAndNameMap(catalogIds);
+    Map<Long, String> catalogIdAndNameMap = getCatalogObjectsFullName(catalogIds);
 
     HashMap<Long, String> schemaIdAndNameMap = new HashMap<>();
 
@@ -606,28 +540,5 @@ public class MetadataObjectService {
         });
 
     return schemaIdAndNameMap;
-  }
-
-  private static Map<Long, String> getCatalogIdAndNameMap(List<Long> catalogIds) {
-    List<CatalogPO> catalogPOs =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
-    return catalogPOs.stream()
-        .collect(Collectors.toMap(CatalogPO::getCatalogId, CatalogPO::getCatalogName));
-  }
-
-  private static Map<Long, String> getSchemaIdAndNameMap(List<Long> schemaIds) {
-    List<SchemaPO> schemaPOS =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
-    return schemaPOS.stream()
-        .collect(Collectors.toMap(SchemaPO::getSchemaId, SchemaPO::getSchemaName));
-  }
-
-  private static Map<Long, String> getTableIdAndNameMap(List<Long> tableIds) {
-    List<TablePO> tablePOS =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
-    return tablePOS.stream().collect(Collectors.toMap(TablePO::getTableId, TablePO::getTableName));
   }
 }
