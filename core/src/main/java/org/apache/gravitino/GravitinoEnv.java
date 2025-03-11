@@ -94,6 +94,8 @@ public class GravitinoEnv {
 
   private CatalogManager catalogManager;
 
+  private MetalakeManager metalakeManager;
+
   private SchemaDispatcher schemaDispatcher;
 
   private TableDispatcher tableDispatcher;
@@ -390,6 +392,10 @@ public class GravitinoEnv {
       eventListenerManager.stop();
     }
 
+    if (metalakeManager != null) {
+      metalakeManager.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -414,10 +420,13 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
+    // Tree lock
+    this.lockManager = new LockManager(config);
+
     // Create and initialize metalake related modules, the operation chain is:
     // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
     // MetalakeManager
-    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
@@ -497,9 +506,6 @@ public class GravitinoEnv {
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(config);
-
-    // Tree lock
-    this.lockManager = new LockManager(config);
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));

@@ -32,6 +32,11 @@ on:
         description: 'Publish Docker token'
         required: true
         type: string
+      pat:
+        description: 'GitHub private access token'
+        required: true
+        type: string
+
       publish-latest-tag:
         description: 'Whether to update the latest tag. This operation is only applicable to official releases and should not be used for Release Candidate (RC).'
         required: false
@@ -131,6 +136,8 @@ jobs:
           else
             full_tag_name="${{ github.event.inputs.version }}"
           fi
+          
+          export PRIVATE_ACCESS_TOKEN=${{ github.event.inputs.pat }}
           
           if [[ "${publish_latest}" == "true" ]]; then
             echo "Publish tag ${full_tag_name}, and update latest too."

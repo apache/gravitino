@@ -21,7 +21,7 @@ Once you have identified the internal address, edit the Gravitino configuration 
 Open the file `<gravitino-home>/conf/gravitino.conf` and change the `gravitino.server.webserver.host`
 parameter from `127.0.0.1` to your AWS instance's private IP4 address;
 or you can use '0.0.0.0'. '0.0.0.0' in this context means the host's IP address.
-Restart the Gravitino server for the change to take effect.
+Restart the Gravitino server so the change takes effect.
 
 ```shell
 <gravitino-home>/bin/gravitino.sh restart
@@ -30,7 +30,7 @@ Restart the Gravitino server for the change to take effect.
 You'll also need to open port 8090 in the security group of your AWS instance to access Gravitino.
 To access Hive you need to open port 10000 in the security group.
 
-After completing these steps, you should be able to access the Gravitino REST interface
-from either the command line or a web browser on your local computer.
+After completing these steps, you can access the Gravitino REST interface
+from the command line or a web browser on your local computer.
 You can also connect to Hive via DBeaver or any other database IDE.
 

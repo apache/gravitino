@@ -369,6 +369,7 @@ public class BaseIT {
       client.close();
     }
     customConfigs.clear();
+
     LOG.info("Tearing down Gravitino Server");
   }
 
