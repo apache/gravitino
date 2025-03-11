@@ -294,7 +294,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     Preconditions.checkArgument(
         authzMetadataObject.type() == SCHEMA, "The metadata object type must be a schema");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1, "The metadata object name size must be 1");
+        authzMetadataObject.names().size() == 1, "The metadata object's name size must be 1");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Delete metalake or catalog policies in this Ranger service
       try {
