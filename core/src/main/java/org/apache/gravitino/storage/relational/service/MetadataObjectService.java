@@ -255,13 +255,8 @@ public class MetadataObjectService {
     HashMap<Long, String> metalakeIdAndNameMap = new HashMap<>();
 
     metalakePOs.forEach(
-        metalakePO -> {
-          if (metalakePO.getMetalakeId() == null) {
-            metalakeIdAndNameMap.put(metalakePO.getMetalakeId(), null);
-            return;
-          }
-          metalakeIdAndNameMap.put(metalakePO.getMetalakeId(), metalakePO.getMetalakeName());
-        });
+        metalakePO ->
+            metalakeIdAndNameMap.put(metalakePO.getMetalakeId(), metalakePO.getMetalakeName()));
 
     return metalakeIdAndNameMap;
   }
