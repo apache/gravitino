@@ -54,12 +54,9 @@ spec:
         - name: {{ include "gravitino.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
-          {{- if .Values.command }}
           command:
-            {{- range .Values.command }}
-            - {{ . | quote }}
-            {{- end }}
-          {{- end }}
+            - "/bin/bash"
+            - "/root/gravitino/tmp/conf/init.sh"
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -72,6 +69,10 @@ spec:
             {{- if .Values.env }}
               {{- toYaml .Values.env | nindent 12 }}
               {{- end }}
+          ports:
+            - name: {{ .Values.service.portName }}
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
           volumeMounts:
             - name: gravitino-conf
               mountPath:  /root/gravitino/tmp/conf

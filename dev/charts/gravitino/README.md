@@ -25,6 +25,12 @@ for data and AI assets.
 
 **Homepage:** <https://gravitino.apache.org/>
 
+## Maintainers
+
+| Name      | Email                    | Url                          |
+|-----------|--------------------------|------------------------------|
+| Gravitino | dev@gravitino.apache.org | https://gravitino.apache.org |
+
 ## Source Code
 
 * <https://github.com/apache/gravitino>

@@ -140,7 +140,7 @@ service:
   ## Service annotations. Can be templated.
   annotations: {}
   labels: {}
-  portName: service
+  portName: http
 
 extraPorts: []
 ## Additional ports to the gravitino services. Useful to expose extra container ports.
@@ -161,22 +161,17 @@ replicas: 1
 ## Pod Labels
 # podLabels: {}
 
-## Define command to be executed at startup by gravitino container
-command:
-- "/bin/bash"
-- "/root/gravitino/tmp/conf/init.sh"
-
 readinessProbe:
   httpGet:
     path: /
-    port: 8090
+    port: http
   initialDelaySeconds: 10
   timeoutSeconds: 5
 
 livenessProbe:
   httpGet:
     path: /
-    port: 8090
+    port: http
   initialDelaySeconds: 10
   timeoutSeconds: 5
 
