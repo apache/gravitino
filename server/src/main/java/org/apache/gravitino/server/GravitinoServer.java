@@ -43,6 +43,7 @@ import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.VersioningFilter;
+import org.apache.gravitino.server.web.auth.AuthorizerFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
@@ -131,7 +132,7 @@ public class GravitinoServer extends ResourceConfig {
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);
     }
-
+    register(AuthorizerFilter.class);
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();

@@ -88,4 +88,7 @@ public interface UserMetaMapper {
       method = "deleteUserMetasByLegacyTimeline")
   Integer deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "selectByUserId")
+  UserPO selectByUserId(@Param("userId") long id);
 }

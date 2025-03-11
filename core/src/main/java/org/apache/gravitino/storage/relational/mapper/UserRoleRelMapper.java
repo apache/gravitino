@@ -24,6 +24,7 @@ import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
@@ -73,4 +74,7 @@ public interface UserRoleRelMapper {
       method = "deleteUserRoleRelMetasByLegacyTimeline")
   Integer deleteUserRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = UserRoleRelSQLProviderFactory.class, method = "listAll")
+  List<UserRoleRelPO> listAll();
 }

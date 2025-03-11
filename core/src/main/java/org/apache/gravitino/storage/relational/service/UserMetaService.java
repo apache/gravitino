@@ -99,6 +99,10 @@ public class UserMetaService {
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
 
+  public UserPO getUserById(long id) {
+    return SessionUtils.getWithoutCommit(UserMetaMapper.class, mapper -> mapper.selectByUserId(id));
+  }
+
   public List<UserEntity> listUsersByRoleIdent(NameIdentifier roleIdent) {
     RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
     List<UserPO> userPOs =

@@ -93,4 +93,8 @@ public class SecurableObjectSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteSecurableObjectsByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String listAll() {
+    return getProvider().listAll();
+  }
 }

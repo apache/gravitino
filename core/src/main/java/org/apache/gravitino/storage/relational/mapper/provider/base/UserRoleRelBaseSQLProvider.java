@@ -123,4 +123,8 @@ public class UserRoleRelBaseSQLProvider {
         + USER_ROLE_RELATION_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String listAll() {
+    return "SELECT user_id as userId,role_id as roleId FROM user_role_rel";
+  }
 }

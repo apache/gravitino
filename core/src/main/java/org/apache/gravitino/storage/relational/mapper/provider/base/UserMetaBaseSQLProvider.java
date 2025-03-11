@@ -187,4 +187,10 @@ public class UserMetaBaseSQLProvider {
         + USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String selectByUserId(@Param("userId") Long userId) {
+    return "SELECT user_id as userId,user_name as userName,metalake_id as metalakeId FROM "
+        + USER_TABLE_NAME
+        + " WHERE user_id = #{userId}";
+  }
 }

@@ -177,4 +177,13 @@ public class SecurableObjectBaseSQLProvider {
         + SECURABLE_OBJECT_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String listAll() {
+    return "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
+        + " type as type, privilege_names as privilegeNames,"
+        + " privilege_conditions as privilegeConditions, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + SECURABLE_OBJECT_TABLE_NAME;
+  }
 }

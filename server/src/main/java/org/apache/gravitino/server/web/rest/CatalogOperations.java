@@ -41,6 +41,7 @@ import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
@@ -55,6 +56,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.auth.ResponseFilter;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -99,8 +101,12 @@ public class CatalogOperations {
                 () -> {
                   if (verbose) {
                     Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
-                    Response response =
-                        Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
+                    CatalogDTO[] catalogDtos = DTOConverters.toDTOs(catalogs);
+                    catalogDtos =
+                        ResponseFilter.filter(
+                                catalogDtos, metalake, "USE_CATALOG", CatalogDTO::name)
+                            .toArray(new CatalogDTO[0]);
+                    Response response = Utils.ok(new CatalogListResponse(catalogDtos));
                     LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
                     return response;
                   } else {

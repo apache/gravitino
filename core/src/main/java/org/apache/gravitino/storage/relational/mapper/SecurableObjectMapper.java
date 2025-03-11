@@ -88,4 +88,7 @@ public interface SecurableObjectMapper {
       method = "deleteSecurableObjectsByLegacyTimeline")
   Integer deleteSecurableObjectsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = SecurableObjectSQLProviderFactory.class, method = "listAll")
+  List<SecurableObjectPO> listAll();
 }

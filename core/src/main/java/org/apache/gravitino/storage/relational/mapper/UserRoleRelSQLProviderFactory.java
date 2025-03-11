@@ -84,4 +84,8 @@ public class UserRoleRelSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String listAll() {
+    return getProvider().listAll();
+  }
 }
