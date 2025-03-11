@@ -561,8 +561,7 @@ public class MetadataObjectService {
     catalogPOs.forEach(
         catalogPO ->
             catalogIdAndNameMap.put(
-                catalogPO.getCatalogId(),
-                catalogPO.getCatalogId() == null ? null : catalogPO.getCatalogName()));
+                catalogPO.getCatalogId(), catalogPO.getCatalogName()));
 
     return catalogIdAndNameMap;
   }
