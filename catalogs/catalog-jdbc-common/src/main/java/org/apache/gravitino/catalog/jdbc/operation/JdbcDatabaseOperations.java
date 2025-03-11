@@ -113,15 +113,12 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
       String query = generateDatabaseExistSql(databaseName);
       try (Statement statement = connection.createStatement()) {
         try (ResultSet resultSet = statement.executeQuery(query)) {
-          if (resultSet.next()) {
-            return true;
-          }
+          return resultSet.next();
         }
       }
     } catch (SQLException sqlException) {
       throw this.exceptionMapper.toGravitinoException(sqlException);
     }
-    return false;
   }
 
   protected String generateDatabaseExistSql(String databaseName) {
