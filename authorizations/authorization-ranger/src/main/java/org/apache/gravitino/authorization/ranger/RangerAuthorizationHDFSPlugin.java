@@ -360,7 +360,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 3, "The metadata's object size must be 3");
+        authzMetadataObject.names().size() == 3, "The metadata object's name size must be 3");
     Preconditions.checkArgument(
         authzMetadataObject.type() == PATH, "The metadata object type must be a path");
     removePolicyByMetadataObject(authzMetadataObject);
