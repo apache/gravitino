@@ -105,7 +105,7 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * Create the fileset {@link SecurableObject} with the given securable schema object, fileset name
    * and privileges.
    *
    * @param schema The schema securable object

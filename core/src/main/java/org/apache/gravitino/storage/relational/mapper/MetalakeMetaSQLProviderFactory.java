@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.MetalakeMetaBaseSQLProvider;
@@ -66,6 +67,10 @@ public class MetalakeMetaSQLProviderFactory {
 
   public static String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
     return getProvider().selectMetalakeIdMetaByName(metalakeName);
+  }
+
+  public static String listMetalakePOsByMetalakeIds(@Param("metalakeIds") List<Long> metalakeIds) {
+    return getProvider().listMetalakePOsByMetalakeIds(metalakeIds);
   }
 
   public static String insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO) {
