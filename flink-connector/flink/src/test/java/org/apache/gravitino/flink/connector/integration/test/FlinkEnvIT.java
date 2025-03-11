@@ -102,6 +102,8 @@ public abstract class FlinkEnvIT extends BaseIT {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
   }
 
+  protected abstract String getProvider();
+
   private void initIcebergRestServiceEnv() {
     ignoreIcebergRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
@@ -262,6 +264,4 @@ public abstract class FlinkEnvIT extends BaseIT {
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }
-
-  protected abstract String getProvider();
 }
