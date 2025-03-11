@@ -237,16 +237,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Metalake object IDs to their full names.
    *
-   * @param ids A list of Metalake object IDs to fetch names for.
+   * @param metalakeIds A list of Metalake object IDs to fetch names for.
    * @return A Map where the key is the Metalake ID and the value is the Metalake full name. The map
    *     may contain null values for the names if its parent object is deleted. Returns an empty map
    *     if no Metalake objects are found for the given IDs. {@code @example} value of metalake full
    *     name: "metalake1.catalog1.schema1.table1"
    */
-  public static Map<Long, String> getMetalakeObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getMetalakeObjectsFullName(List<Long> metalakeIds) {
     List<MetalakePO> metalakePOs =
         SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.listMetalakePOsByMetalakeIds(ids));
+            MetalakeMetaMapper.class, mapper -> mapper.listMetalakePOsByMetalakeIds(metalakeIds));
 
     if (metalakePOs == null || metalakePOs.isEmpty()) {
       return new HashMap<>();
@@ -264,16 +264,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Fileset object IDs to their full names.
    *
-   * @param ids A list of Fileset object IDs to fetch names for.
+   * @param filesetIds A list of Fileset object IDs to fetch names for.
    * @return A Map where the key is the Fileset ID and the value is the Fileset full name. The map
    *     may contain null values for the names if its parent object is deleted. Returns an empty map
    *     if no Fileset objects are found for the given IDs. {@code @example} value of fileset full
    *     name: "catalog1.schema1.fileset1"
    */
-  public static Map<Long, String> getFilesetObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getFilesetObjectsFullName(List<Long> filesetIds) {
     List<FilesetPO> filesetPOs =
         SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsByFilesetIds(ids));
+            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsByFilesetIds(filesetIds));
 
     if (filesetPOs == null || filesetPOs.isEmpty()) {
       return new HashMap<>();
@@ -318,16 +318,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Model object IDs to their full names.
    *
-   * @param ids A list of Model object IDs to fetch names for.
+   * @param modelIds A list of Model object IDs to fetch names for.
    * @return A Map where the key is the Model ID and the value is the Model full name. The map may
    *     contain null values for the names if its parent object is deleted. Returns an empty map if
    *     no Model objects are found for the given IDs. {@code @example} value of model full name:
    *     "catalog1.schema1.model1"
    */
-  public static Map<Long, String> getModelObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getModelObjectsFullName(List<Long> modelIds) {
     List<ModelPO> modelPOs =
         SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class, mapper -> mapper.listModelPOsByModelIds(ids));
+            ModelMetaMapper.class, mapper -> mapper.listModelPOsByModelIds(modelIds));
 
     if (modelPOs == null || modelPOs.isEmpty()) {
       return new HashMap<>();
@@ -371,16 +371,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Table object IDs to their full names.
    *
-   * @param ids A list of Table object IDs to fetch names for.
+   * @param tableIds A list of Table object IDs to fetch names for.
    * @return A Map where the key is the Table ID and the value is the Table full name. The map may
    *     contain null values for the names if its parent object is deleted. Returns an empty map if
    *     no Table objects are found for the given IDs. {@code @example} value of table full name:
    *     "catalog1.schema1.table1"
    */
-  public static Map<Long, String> getTableObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getTableObjectsFullName(List<Long> tableIds) {
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(ids));
+            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
 
     if (tablePOs == null || tablePOs.isEmpty()) {
       return new HashMap<>();
@@ -424,16 +424,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Topic object IDs to their full names.
    *
-   * @param ids A list of Topic object IDs to fetch names for.
+   * @param topicIds A list of Topic object IDs to fetch names for.
    * @return A Map where the key is the Topic ID and the value is the Topic full name. The map may
    *     contain null values for the names if its parent object is deleted. Returns an empty map if
    *     no Topic objects are found for the given IDs. {@code @example} value of topic full name:
    *     "catalog1.schema1.topic1"
    */
-  public static Map<Long, String> getTopicObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getTopicObjectsFullName(List<Long> topicIds) {
     List<TopicPO> topicPOs =
         SessionUtils.getWithoutCommit(
-            TopicMetaMapper.class, mapper -> mapper.listTopicPOsByTopicIds(ids));
+            TopicMetaMapper.class, mapper -> mapper.listTopicPOsByTopicIds(topicIds));
 
     if (topicPOs == null || topicPOs.isEmpty()) {
       return new HashMap<>();
@@ -477,16 +477,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Column object IDs to their full names.
    *
-   * @param ids A list of Column object IDs to fetch names for.
+   * @param columnIds A list of Column object IDs to fetch names for.
    * @return A Map where the key is the Column ID and the value is the Column full name. The map may
    *     contain null values for the names if its parent object is deleted. Returns an empty map if
    *     no Column objects are found for the given IDs. {@code @example} value of column full name:
    *     "catalog1.schema1.table1.column1"
    */
-  public static Map<Long, String> getColumnObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getColumnObjectsFullName(List<Long> columnIds) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
-            TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(ids));
+            TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(columnIds));
 
     if (columnPOs == null || columnPOs.isEmpty()) {
       return new HashMap<>();
@@ -541,16 +541,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Catalog object IDs to their full names.
    *
-   * @param ids A list of Catalog object IDs to fetch names for.
+   * @param catalogIds A list of Catalog object IDs to fetch names for.
    * @return A Map where the key is the Catalog ID and the value is the Catalog full name. The map
    *     may contain null values for the names if its parent object is deleted. Returns an empty map
    *     if no Catalog objects are found for the given IDs. {@code @example} value of catalog full
    *     name: "catalog1"
    */
-  public static Map<Long, String> getCatalogObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getCatalogObjectsFullName(List<Long> catalogIds) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(ids));
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByCatalogIds(catalogIds));
 
     if (catalogPOs == null || catalogPOs.isEmpty()) {
       return new HashMap<>();
@@ -570,16 +570,16 @@ public class MetadataObjectService {
   /**
    * Retrieves a map of Schema object IDs to their full names.
    *
-   * @param ids A list of Schema object IDs to fetch names for.
+   * @param schemaIds A list of Schema object IDs to fetch names for.
    * @return A Map where the key is the Schema ID and the value is the Schema full name. The map may
    *     contain null values for the names if its parent object is deleted. Returns an empty map if
    *     no Schema objects are found for the given IDs. {@code @example} value of schema full name:
    *     "catalog1.schema1"
    */
-  public static Map<Long, String> getSchemaObjectsFullName(List<Long> ids) {
+  public static Map<Long, String> getSchemaObjectsFullName(List<Long> schemaIds) {
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(ids));
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
 
     if (schemaPOs == null || schemaPOs.isEmpty()) {
       return new HashMap<>();
