@@ -310,3 +310,9 @@
 
    Kyligence/kylinpy
    ./clients/client-python/gravitino/utils/http_client.py
+
+    This product bundles a third-party component under the
+    BSD License.
+   .dev/docker/kerberos-hive/kadm5.acl
+   .dev/docker/kerberos-hive/kdc.acl
+   .dev/docker/kerberos-hive/krb5.acl
