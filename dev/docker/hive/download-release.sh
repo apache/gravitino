@@ -69,4 +69,4 @@ fi;
 
 echo $2
 
-curl -sL --header "Authorization: token $TOKEN" --header 'Accept: application/octet-stream' https://$TOKEN:@api.github.com/repos/$REPO/releases/assets/$asset_id -o $2
+curl -sL --header "Authorization: token $TOKEN" --header 'Accept: application/octet-stream' https://$TOKEN:@api.github.com/repos/$REPO/releases/assets/$asset_id -o $3
