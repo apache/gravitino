@@ -45,7 +45,7 @@ public interface BaseCatalogFactory extends CatalogFactory {
    *
    * @return The requested property converter.
    */
-  PropertiesConverter propertiesConverter();
+  PropertiesConverter propertiesConverter(Context context);
 
   /**
    * Define partition converter.

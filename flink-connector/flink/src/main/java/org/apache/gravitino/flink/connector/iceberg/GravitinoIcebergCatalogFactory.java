@@ -38,7 +38,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
     return new GravitinoIcebergCatalog(
         context.getName(),
         helper.getOptions().get(GravitinoIcebergCatalogFactoryOptions.DEFAULT_DATABASE),
-        propertiesConverter(),
+        propertiesConverter(context),
         partitionConverter(),
         context.getOptions());
   }
@@ -84,7 +84,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
    * @return
    */
   @Override
-  public PropertiesConverter propertiesConverter() {
+  public PropertiesConverter propertiesConverter(Context context) {
     return IcebergPropertiesConverter.INSTANCE;
   }
 

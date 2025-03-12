@@ -19,13 +19,20 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 
 public abstract class JdbcPropertiesConverter implements PropertiesConverter {
 
-  protected JdbcPropertiesConverter() {}
+  private final CatalogFactory.Context context;
+
+  protected JdbcPropertiesConverter(CatalogFactory.Context context) {
+    this.context = context;
+  }
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
@@ -43,6 +50,22 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
   @Override
   public String transformPropertyToFlinkCatalog(String configKey) {
     return JdbcPropertiesConstants.gravitinoToFlinkMap.get(configKey);
+  }
+
+  @Override
+  public Map<String, String> toFlinkTableProperties(
+      Map<String, String> gravitinoProperties, ObjectPath tablePath) {
+    Map<String, String> catalogOptions = context.getOptions();
+    Map<String, String> tableOptions = new HashMap<>();
+    tableOptions.put(
+        "url",
+        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL)
+            + "/"
+            + tablePath.getDatabaseName());
+    tableOptions.put("table-name", tablePath.getObjectName());
+    tableOptions.put("username", catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
+    tableOptions.put("password", catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+    return tableOptions;
   }
 
   protected abstract String driverName();

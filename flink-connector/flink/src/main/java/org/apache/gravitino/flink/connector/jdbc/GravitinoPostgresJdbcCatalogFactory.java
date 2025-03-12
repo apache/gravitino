@@ -29,8 +29,8 @@ public class GravitinoPostgresJdbcCatalogFactory extends GravitinoJdbcCatalogFac
   }
 
   @Override
-  public PropertiesConverter propertiesConverter() {
-    return PostgresqlPropertiesConverter.INSTANCE;
+  public PropertiesConverter propertiesConverter(Context context) {
+    return new PostgresqlPropertiesConverter(context);
   }
 
   @Override

@@ -43,7 +43,7 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
     String defaultDatabase =
         helper.getOptions().get(GravitinoPaimonCatalogFactoryOptions.DEFAULT_DATABASE);
     return new GravitinoPaimonCatalog(
-        context, defaultDatabase, propertiesConverter(), partitionConverter());
+        context, defaultDatabase, propertiesConverter(context), partitionConverter());
   }
 
   @Override
@@ -72,7 +72,7 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
   }
 
   @Override
-  public PropertiesConverter propertiesConverter() {
+  public PropertiesConverter propertiesConverter(Context context) {
     return PaimonPropertiesConverter.INSTANCE;
   }
 

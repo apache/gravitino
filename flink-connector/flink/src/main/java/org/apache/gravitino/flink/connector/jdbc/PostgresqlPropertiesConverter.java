@@ -19,11 +19,13 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import org.apache.flink.table.factories.CatalogFactory;
+
 public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
 
-  public static final PostgresqlPropertiesConverter INSTANCE = new PostgresqlPropertiesConverter();
-
-  private PostgresqlPropertiesConverter() {}
+  protected PostgresqlPropertiesConverter(CatalogFactory.Context context) {
+    super(context);
+  }
 
   @Override
   protected String driverName() {

@@ -19,11 +19,13 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import org.apache.flink.table.factories.CatalogFactory;
+
 public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
 
-  public static final MysqlPropertiesConverter INSTANCE = new MysqlPropertiesConverter();
-
-  private MysqlPropertiesConverter() {}
+  protected MysqlPropertiesConverter(CatalogFactory.Context context) {
+    super(context);
+  }
 
   @Override
   public String driverName() {
