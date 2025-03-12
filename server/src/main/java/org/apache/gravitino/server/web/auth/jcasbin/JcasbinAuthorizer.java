@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.web.auth;
+package org.apache.gravitino.server.web.auth.jcasbin;
 
+import org.apache.gravitino.server.web.auth.GravitinoAuthorizer;
 import org.casbin.jcasbin.main.Enforcer;
 
 public class JcasbinAuthorizer implements GravitinoAuthorizer {

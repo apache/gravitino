@@ -51,6 +51,8 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.auth.annotations.AuthorizeApi;
+import org.apache.gravitino.server.web.auth.annotations.AuthorizeResource;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -76,8 +78,10 @@ public class SchemaOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-schema", absolute = true)
+  @AuthorizeApi(privilege = "USE_CATALOG", resourceType = "CATALOG")
   public Response listSchemas(
-      @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
+      @PathParam("metalake") @AuthorizeResource("metalake") String metalake,
+      @AuthorizeResource("catalog") @PathParam("catalog") String catalog) {
     LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
     try {
       return Utils.doAs(

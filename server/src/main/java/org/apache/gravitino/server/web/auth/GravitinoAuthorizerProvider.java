@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.auth;
 
+import org.apache.gravitino.server.web.auth.jcasbin.JcasbinAuthorizer;
+
 public class GravitinoAuthorizerProvider {
   public static GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
 

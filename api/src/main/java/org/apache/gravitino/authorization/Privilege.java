@@ -50,7 +50,7 @@ public interface Privilege {
   boolean canBindTo(MetadataObject.Type type);
 
   /** The name of this privilege. */
-  enum Name {
+  public enum Name {
     /** The privilege to create a catalog. */
     CREATE_CATALOG(0L, 1L),
     /** The privilege to use a catalog. */
