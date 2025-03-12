@@ -34,14 +34,14 @@ public class UnsupportPartitionConverter implements PartitionConverter {
   @Override
   public List<String> toFlinkPartitionKeys(Transform[] partitions) {
     Preconditions.checkArgument(
-        partitions != null && partitions.length > 0, "Partition key conversion is not supported.");
+        partitions == null || partitions.length == 0, "Partition key conversion is not supported.");
     return Collections.emptyList();
   }
 
   @Override
   public Transform[] toGravitinoPartitions(List<String> partitionsKey) {
     Preconditions.checkArgument(
-        partitionsKey != null && !partitionsKey.isEmpty(),
+        partitionsKey == null || partitionsKey.isEmpty(),
         "Partition key conversion is not supported.");
     return new Transform[0];
   }
