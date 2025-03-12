@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.Map;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 
 public class GravitinoMysqlJdbcCatalogFactory extends GravitinoJdbcCatalogFactory {
@@ -29,8 +30,8 @@ public class GravitinoMysqlJdbcCatalogFactory extends GravitinoJdbcCatalogFactor
   }
 
   @Override
-  public PropertiesConverter propertiesConverter(Context context) {
-    return new MysqlPropertiesConverter(context);
+  public PropertiesConverter propertiesConverter(Map<String, String> catalogOptions) {
+    return new MysqlPropertiesConverter(catalogOptions);
   }
 
   @Override

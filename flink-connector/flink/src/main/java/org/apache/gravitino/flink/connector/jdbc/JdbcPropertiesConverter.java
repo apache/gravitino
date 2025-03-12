@@ -23,15 +23,14 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 
 public abstract class JdbcPropertiesConverter implements PropertiesConverter {
 
-  private final CatalogFactory.Context context;
+  private final Map<String, String> catalogOptions;
 
-  protected JdbcPropertiesConverter(CatalogFactory.Context context) {
-    this.context = context;
+  protected JdbcPropertiesConverter(Map<String, String> catalogOptions) {
+    this.catalogOptions = catalogOptions;
   }
 
   @Override
@@ -55,7 +54,6 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
   @Override
   public Map<String, String> toFlinkTableProperties(
       Map<String, String> gravitinoProperties, ObjectPath tablePath) {
-    Map<String, String> catalogOptions = context.getOptions();
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         "url",
@@ -69,4 +67,8 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
   }
 
   protected abstract String driverName();
+
+  public Map<String, String> getCatalogOptions() {
+    return catalogOptions;
+  }
 }

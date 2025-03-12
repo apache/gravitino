@@ -33,21 +33,24 @@ public abstract class AbstractJdbcPropertiesConverter {
   String url = "testUrl";
   String defaultDatabase = "test";
 
-  protected abstract JdbcPropertiesConverter getConverter();
+  Map<String, String> catalogProperties =
+      ImmutableMap.of(
+          JdbcPropertiesConstants.GRAVITINO_JDBC_USER,
+          username,
+          JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD,
+          password,
+          JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
+          url,
+          JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE,
+          defaultDatabase);
+
+  protected abstract JdbcPropertiesConverter getConverter(Map<String, String> catalogOptions);
 
   @Test
   public void testToPaimonFileSystemCatalog() {
-    Map<String, String> catalogProperties =
-        ImmutableMap.of(
-            JdbcPropertiesConstants.GRAVITINO_JDBC_USER,
-            username,
-            JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD,
-            password,
-            JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
-            url,
-            JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE,
-            defaultDatabase);
-    Map<String, String> properties = getConverter().toFlinkCatalogProperties(catalogProperties);
+
+    Map<String, String> properties =
+        getConverter(catalogProperties).toFlinkCatalogProperties(catalogProperties);
     Assertions.assertEquals(username, properties.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
     Assertions.assertEquals(password, properties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
     Assertions.assertEquals(url, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
@@ -68,7 +71,8 @@ public abstract class AbstractJdbcPropertiesConverter {
                 url,
                 JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE,
                 defaultDatabase));
-    Map<String, String> properties = getConverter().toGravitinoCatalogProperties(configuration);
+    Map<String, String> properties =
+        getConverter(catalogProperties).toGravitinoCatalogProperties(configuration);
 
     Assertions.assertEquals(username, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
     Assertions.assertEquals(
@@ -77,6 +81,7 @@ public abstract class AbstractJdbcPropertiesConverter {
     Assertions.assertEquals(
         defaultDatabase, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
     Assertions.assertEquals(
-        getConverter().driverName(), properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
+        getConverter(catalogProperties).driverName(),
+        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
 }

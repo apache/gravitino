@@ -19,12 +19,12 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
-import org.apache.flink.table.factories.CatalogFactory;
+import java.util.Map;
 
 public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
 
-  protected MysqlPropertiesConverter(CatalogFactory.Context context) {
-    super(context);
+  protected MysqlPropertiesConverter(Map<String, String> catalogOptions) {
+    super(catalogOptions);
   }
 
   @Override

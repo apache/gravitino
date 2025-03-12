@@ -19,10 +19,12 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.Map;
+
 public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesConverter {
 
   @Override
-  protected JdbcPropertiesConverter getConverter() {
-    return PostgresqlPropertiesConverter.INSTANCE;
+  protected JdbcPropertiesConverter getConverter(Map<String, String> catalogOptions) {
+    return new PostgresqlPropertiesConverter(catalogOptions);
   }
 }

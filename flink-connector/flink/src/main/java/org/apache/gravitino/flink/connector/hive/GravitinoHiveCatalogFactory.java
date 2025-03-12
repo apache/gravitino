@@ -22,6 +22,7 @@ package org.apache.gravitino.flink.connector.hive;
 import static org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions.IDENTIFIER;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
@@ -63,7 +64,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
-        propertiesConverter(context),
+        propertiesConverter(context.getOptions()),
         partitionConverter(),
         hiveConf,
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
@@ -113,7 +114,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
    * @return The requested property converter.
    */
   @Override
-  public PropertiesConverter propertiesConverter(Context context) {
+  public PropertiesConverter propertiesConverter(Map<String, String> catalogOptions) {
     return HivePropertiesConverter.INSTANCE;
   }
 

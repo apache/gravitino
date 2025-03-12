@@ -19,6 +19,7 @@
 package org.apache.gravitino.flink.connector.iceberg;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
@@ -38,7 +39,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
     return new GravitinoIcebergCatalog(
         context.getName(),
         helper.getOptions().get(GravitinoIcebergCatalogFactoryOptions.DEFAULT_DATABASE),
-        propertiesConverter(context),
+        propertiesConverter(context.getOptions()),
         partitionConverter(),
         context.getOptions());
   }
@@ -84,7 +85,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
    * @return
    */
   @Override
-  public PropertiesConverter propertiesConverter(Context context) {
+  public PropertiesConverter propertiesConverter(Map<String, String> catalogOptions) {
     return IcebergPropertiesConverter.INSTANCE;
   }
 

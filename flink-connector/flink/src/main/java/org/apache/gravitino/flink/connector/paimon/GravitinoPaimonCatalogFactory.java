@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.paimon;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
@@ -43,7 +44,7 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
     String defaultDatabase =
         helper.getOptions().get(GravitinoPaimonCatalogFactoryOptions.DEFAULT_DATABASE);
     return new GravitinoPaimonCatalog(
-        context, defaultDatabase, propertiesConverter(context), partitionConverter());
+        context, defaultDatabase, propertiesConverter(context.getOptions()), partitionConverter());
   }
 
   @Override
@@ -72,7 +73,7 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
   }
 
   @Override
-  public PropertiesConverter propertiesConverter(Context context) {
+  public PropertiesConverter propertiesConverter(Map<String, String> catalogOptions) {
     return PaimonPropertiesConverter.INSTANCE;
   }
 

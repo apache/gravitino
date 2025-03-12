@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.flink.connector.catalog;
 
+import java.util.Map;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
@@ -45,7 +46,7 @@ public interface BaseCatalogFactory extends CatalogFactory {
    *
    * @return The requested property converter.
    */
-  PropertiesConverter propertiesConverter(Context context);
+  PropertiesConverter propertiesConverter(Map<String, String> catalogOptions);
 
   /**
    * Define partition converter.
