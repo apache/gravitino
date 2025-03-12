@@ -358,7 +358,20 @@ fn directory_entry_to_desc_str(entry: &DirectoryEntry) -> String {
 /// ```
 fn directory_entry_plus_to_desc_str(entry: &DirectoryEntryPlus) -> String {
     let mut output = String::new();
-    write!(output, "{{ inode: {}, generation: {}, kind: {:?}, name: {}, offset: {}, attr: {}, entry_ttl: {:?}, attr_ttl: {:?} }}", entry.inode, entry.generation, entry.kind, entry.name.to_string_lossy(), entry.offset, file_attr_to_desc_str(&entry.attr), entry.entry_ttl, entry.attr_ttl).unwrap();
+    write!(
+        output,
+        "{{ inode: {}, generation: {}, kind: {:?}, name: {}, offset: {}, \
+         attr: {}, entry_ttl: {:?}, attr_ttl: {:?} }}",
+        entry.inode,
+        entry.generation,
+        entry.kind,
+        entry.name.to_string_lossy(),
+        entry.offset,
+        file_attr_to_desc_str(&entry.attr),
+        entry.entry_ttl,
+        entry.attr_ttl
+    )
+    .unwrap();
 
     output
 }
