@@ -185,6 +185,12 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+
+- apache/gravitino-ci:hive-0.1.18
+  - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
+    For more information, please see [PR](https://github.com/apache/gravitino/pull/6625)
+  - Change ranger-hive-plugin and ranger-hdfs-plugin download URL. 
+
 - apache/gravitino-ci:hive-0.1.17
   - Add support for JDBC SQL standard authorization
     - Add JDBC SQL standard authorization related configuration in the `hive-site-for-sql-base-auth.xml` and `hiveserver2-site-for-sql-base-auth.xml`
