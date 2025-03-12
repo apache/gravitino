@@ -38,15 +38,12 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   private final JdbcCatalog jdbcCatalog;
 
-  private final CatalogFactory.Context context;
-
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
       String defaultDatabase,
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter) {
     super(context.getName(), defaultDatabase, propertiesConverter, partitionConverter);
-    this.context = context;
     JdbcCatalogFactory jdbcCatalogFactory = new JdbcCatalogFactory();
     this.jdbcCatalog = (JdbcCatalog) jdbcCatalogFactory.createCatalog(context);
   }

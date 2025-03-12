@@ -57,7 +57,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     Map<String, String> gravitino = configuration.toMap();
     BaseCatalogFactory catalogFactory = getCatalogFactory(gravitino);
     Map<String, String> gravitinoProperties =
-        catalogFactory.propertiesConverter().toGravitinoCatalogProperties(configuration);
+        catalogFactory.propertiesConverter(gravitino).toGravitinoCatalogProperties(configuration);
     gravitinoCatalogManager.createCatalog(
         catalogName,
         catalogFactory.gravitinoCatalogType(),
@@ -80,7 +80,8 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     try {
       Catalog catalog = gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
       BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
-      PropertiesConverter propertiesConverter = catalogFactory.propertiesConverter();
+      PropertiesConverter propertiesConverter =
+          catalogFactory.propertiesConverter(catalog.properties());
       Map<String, String> flinkCatalogProperties =
           propertiesConverter.toFlinkCatalogProperties(catalog.properties());
       CatalogDescriptor descriptor =

@@ -27,7 +27,6 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
-import org.apache.gravitino.flink.connector.jdbc.MysqlPropertiesConverter;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -166,7 +165,6 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
         mysqlDefaultDatabase,
         properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
     Assertions.assertEquals(
-        "com.mysql.jdbc.Driver",
-        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
+        "com.mysql.jdbc.Driver", properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
 }

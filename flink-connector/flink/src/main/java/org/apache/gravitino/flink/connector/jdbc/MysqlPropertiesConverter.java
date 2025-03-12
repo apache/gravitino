@@ -23,8 +23,6 @@ import java.util.Map;
 
 public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
 
-
-
   protected MysqlPropertiesConverter(Map<String, String> catalogOptions) {
     super(catalogOptions);
   }
