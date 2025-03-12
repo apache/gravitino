@@ -15,34 +15,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
-# gh-dl-release! It works!
-# 
-# This script downloads an asset from latest or specific Github release of a
-# private repo. Feel free to extract more of the variables into command line
-# parameters.
-#
-# PREREQUISITES
-#
-# curl, wget, jq
-#
-# USAGE
-#
-# Set all the variables inside the script, make sure you chmod +x it, then
-# to download specific version to my_app.tar.gz:
-#
-#     gh-dl-release 2.1.1 my_app.tar.gz
-#
-# to download latest version:
-#
-#     gh-dl-release latest latest.tar.gz
-#
-# If your version/tag doesn't match, the script will exit with error.
+# The first parameter is the version of the release, e.g. 2.4.0
+# The second parameter is the name of the asset file, e.g. ranger-2.4.0-admin.tar.gz
+# The third parameter is the location and name of the output file, e.g. /tmp/ranger-2.4.0-admin.tar.gz
+
 set -ex
+
+if [ $# -ne 3 ]; then
+  echo "Usage: $0 <version> <asset-file> <output-file>"
+  exit 1
+fi
+
 
 TOKEN=${PRIVATE_ACCESS_TOKEN}
 REPO="datastrato/ranger"
-FILE=$2 #"ranger-2.4.0-admin.tar.gz"      # the name of your release asset file, e.g. build.tar.gz
+FILE=$2                          # the name of your release asset file, e.g. build.tar.gz
 VERSION=$1                       # tag name or the word "latest"
 GITHUB="https://api.github.com"
 
