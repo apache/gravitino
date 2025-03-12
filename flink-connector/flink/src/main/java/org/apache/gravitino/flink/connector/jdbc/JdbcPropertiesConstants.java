@@ -30,7 +30,7 @@ public class JdbcPropertiesConstants {
   public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
   public static final String GRAVITINO_JDBC_URL = "jdbc-url";
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
-  public static final String GRAVITINO_JDBC_DEFAULT_DATABASE = "default-database";
+  public static final String GRAVITINO_JDBC_DEFAULT_DATABASE = "flink.bypass.default-database";
 
   public static final String FLINK_JDBC_URL = "base-url";
   public static final String FLINK_JDBC_USER = "username";
