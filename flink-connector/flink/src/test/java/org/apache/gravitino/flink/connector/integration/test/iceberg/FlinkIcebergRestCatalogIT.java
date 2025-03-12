@@ -24,13 +24,10 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.types.Row;
-import org.apache.gravitino.Schema;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
@@ -85,45 +82,6 @@ public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
             catalog.asSchemas().dropSchema(schema3, supportDropCascade());
             // TODO: The check cannot pass in CI, but it can be successful locally.
             // Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
-          }
-        });
-  }
-
-  @Test
-  @EnabledIf("supportSchemaOperationWithCommentAndOptions")
-  public void testAlterSchemaWithCommentAndOptions() {
-    doWithCatalog(
-        currentCatalog(),
-        catalog -> {
-          String schema = "test_alter_schema";
-          try {
-            TestUtils.assertTableResult(
-                sql(
-                    "CREATE DATABASE IF NOT EXISTS %s "
-                        + "COMMENT 'test comment'"
-                        + "WITH ('key1' = 'value1', 'key2'='value2')",
-                    schema),
-                ResultKind.SUCCESS);
-
-            Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
-            Assertions.assertEquals(schema, loadedSchema.name());
-            Assertions.assertEquals("test comment", loadedSchema.comment());
-            Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
-            Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
-
-            // TODO: The check cannot pass in CI, but it can be successful locally.
-            // Assertions.assertNotNull(loadedSchema.properties().get("location"));
-
-            TestUtils.assertTableResult(
-                sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
-                ResultKind.SUCCESS);
-            Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
-            Assertions.assertEquals(schema, reloadedSchema.name());
-            Assertions.assertEquals("test comment", reloadedSchema.comment());
-            Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
-            Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
-          } finally {
-            catalog.asSchemas().dropSchema(schema, supportDropCascade());
           }
         });
   }

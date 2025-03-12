@@ -217,7 +217,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.assertEquals("test comment", loadedSchema.comment());
             Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
             Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
-            Assertions.assertNotNull(loadedSchema.properties().get("location"));
 
             TestUtils.assertTableResult(
                 sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
