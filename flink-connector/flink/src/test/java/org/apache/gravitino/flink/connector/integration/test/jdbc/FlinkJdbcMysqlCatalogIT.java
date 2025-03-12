@@ -166,7 +166,7 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
         mysqlDefaultDatabase,
         properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
     Assertions.assertEquals(
-        MysqlPropertiesConverter.INSTANCE.driverName(),
+        "com.mysql.jdbc.Driver",
         properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
 }
