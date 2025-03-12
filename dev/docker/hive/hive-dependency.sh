@@ -89,7 +89,7 @@ if [ ! -f "${hive_dir}/packages/${ZOOKEEPER_PACKAGE_NAME}" ]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ]; then
-  bash ${hive_dir}/download-release.sh "v${RANGER_VERSION}" ${RANGER_HDFS_PACKAGE_NAME}
+  bash ${hive_dir}/hive/download-release.sh "v${RANGER_VERSION}" ${RANGER_HDFS_PACKAGE_NAME}
 fi
 
 if [[ $? -ne 0 ]]; then
@@ -98,7 +98,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ]; then
-  bash ${hive_dir}/download-release.sh "v${RANGER_VERSION}" ${RANGER_HIVE_PACKAGE_NAME}
+  bash ${hive_dir}/hive/download-release.sh "v${RANGER_VERSION}" ${RANGER_HIVE_PACKAGE_NAME}
 fi
 
 if [[ $? -ne 0 ]]; then
