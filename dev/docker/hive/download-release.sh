@@ -33,7 +33,7 @@ FILE=$2                          # the name of your release asset file, e.g. bui
 VERSION=$1                       # tag name or the word "latest"
 GITHUB="https://api.github.com"
 
-alias errcho='>&2 echo'
+alias err_echo='>&2 echo'
 
 function gh_curl() {
   curl -H "Authorization: token $TOKEN" \
@@ -50,7 +50,7 @@ fi;
 
 asset_id=`gh_curl -s $GITHUB/repos/$REPO/releases | jq "$parser"`
 if [ "$asset_id" = "null" ]; then
-  errcho "ERROR: version not found $VERSION"
+  err_echo "ERROR: version not found $VERSION"
   exit 1
 fi;
 
