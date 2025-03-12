@@ -674,7 +674,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           store.list(schemaNamespace, SchemaEntity.class, EntityType.SCHEMA);
       CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
 
-      if (containsUserCreatedSchemas(schemaEntities, catalogEntity, catalogWrapper) && !force) {
+      if (!force && containsUserCreatedSchemas(schemaEntities, catalogEntity, catalogWrapper)) {
         throw new NonEmptyCatalogException(
             "Catalog %s has schemas, please drop them first or use force option", ident);
       }
