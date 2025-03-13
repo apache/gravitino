@@ -92,8 +92,8 @@ public abstract class FlinkEnvIT extends BaseIT {
   }
 
   @AfterAll
-  void stop() throws IOException, InterruptedException {
-      stopCatalogEnv();
+  void stop() throws Exception {
+    stopCatalogEnv();
     stopFlinkEnv();
     stopHdfsEnv();
     super.stopIntegrationTest();
