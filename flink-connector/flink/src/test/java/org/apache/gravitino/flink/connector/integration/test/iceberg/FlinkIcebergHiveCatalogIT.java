@@ -40,7 +40,13 @@ public class FlinkIcebergHiveCatalogIT extends FlinkIcebergCatalogIT {
     return catalogProperties;
   }
 
+  @Override
   protected String getCatalogBackend() {
     return "hive";
+  }
+
+  @Override
+  protected String getUri() {
+    return hiveMetastoreUri;
   }
 }
