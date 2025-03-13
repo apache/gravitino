@@ -44,6 +44,10 @@ public interface BaseCatalogFactory extends CatalogFactory {
   /**
    * Define properties converter {@link PropertiesConverter}.
    *
+   * @param catalogOptions Some catalogs (such as {@link
+   *     org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalog}) require the use of catalog
+   *     options when creating a table, as these options will not be returned by the
+   *     GravitinoServer.
    * @return The requested property converter.
    */
   PropertiesConverter propertiesConverter(Map<String, String> catalogOptions);
