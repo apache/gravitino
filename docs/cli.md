@@ -20,7 +20,7 @@ You can configure an alias for the CLI for ease of use, with the following comma
 alias gcli='sh $GRAVITINO_HOME/bin/gcli.sh'
 ```
 
-Or you use the `gcli.sh` script found in the `/path/to/gravitino/bin/` directory to run the CLI.
+Or you use the `gcli.sh` script found in the Gravitino's bin directory to run.
 
 ## Usage
 
