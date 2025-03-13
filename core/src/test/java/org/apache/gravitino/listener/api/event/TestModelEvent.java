@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -61,23 +62,24 @@ public class TestModelEvent {
   @BeforeAll
   void init() {
     this.namespace = Namespace.of("metalake", "catalog", "schema");
+    this.existingIdentA = NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "modelA");
+    this.existingIdentB = NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "modelB");
+
     this.modelA = getMockModel("modelA", "commentA");
     this.modelB = getMockModel("modelB", "commentB");
+
     this.firstModelVersion =
         mockModelVersion("uriA", new String[] {"aliasProduction"}, "versionInfoA");
     this.secondModelVersion = mockModelVersion("uriB", new String[] {"aliasTest"}, "versionInfoB");
-    System.out.println(secondModelVersion.toString());
-    this.existingIdentA = NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "modelA");
-    this.existingIdentB = NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "modelB");
+
     this.notExistingIdent =
         NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "not_exist");
+
     this.dummyEventListener = new DummyEventListener();
 
     EventBus eventBus = new EventBus(Collections.singletonList(dummyEventListener));
     this.dispatcher = new ModelEventDispatcher(eventBus, mockTagDispatcher());
     this.failureDispatcher = new ModelEventDispatcher(eventBus, mockExceptionModelDispatcher());
-    // TODO: add failure dispatcher tests.
-    System.out.println(this.failureDispatcher.toString());
   }
 
   @Test
@@ -85,19 +87,7 @@ public class TestModelEvent {
     Model mockModel = getMockModel("model", "comment");
     ModelInfo modelInfo = new ModelInfo(mockModel);
 
-    Assertions.assertEquals("model", modelInfo.name());
-    Assertions.assertEquals(1, modelInfo.properties().size());
-    Assertions.assertEquals("#FFFFFF", modelInfo.properties().get("color"));
-
-    Assertions.assertTrue(modelInfo.comment().isPresent());
-    String comment = modelInfo.comment().get();
-    Assertions.assertEquals("comment", comment);
-
-    Assertions.assertFalse(modelInfo.audit().isPresent());
-
-    Assertions.assertTrue(modelInfo.lastVersion().isPresent());
-    int lastVersion = modelInfo.lastVersion().get();
-    Assertions.assertEquals(1, lastVersion);
+    checkModelInfo(modelInfo, mockModel);
   }
 
   @Test
@@ -105,7 +95,7 @@ public class TestModelEvent {
     Model mockModel = getMockModel("model", null);
     ModelInfo modelInfo = new ModelInfo(mockModel);
 
-    Assertions.assertFalse(modelInfo.comment().isPresent());
+    checkModelInfo(modelInfo, mockModel);
   }
 
   @Test
@@ -113,20 +103,33 @@ public class TestModelEvent {
     Model mockModel = getMockModelWithAudit("model", "comment");
     ModelInfo modelInfo = new ModelInfo(mockModel);
 
-    Assertions.assertEquals("model", modelInfo.name());
-    Assertions.assertEquals(1, modelInfo.properties().size());
-    Assertions.assertEquals("#FFFFFF", modelInfo.properties().get("color"));
+    checkModelInfo(modelInfo, mockModel);
+  }
 
-    Assertions.assertTrue(modelInfo.comment().isPresent());
-    String comment = modelInfo.comment().get();
-    Assertions.assertEquals("comment", comment);
+  @Test
+  void testModelVersionInfo() {
+    ModelVersion modelVersion =
+        mockModelVersion("uriA", new String[] {"aliasProduction"}, "versionInfoA");
+    ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
 
-    Assertions.assertTrue(modelInfo.audit().isPresent());
-    Audit audit = modelInfo.audit().get();
-    Assertions.assertEquals("demo_user", audit.creator());
-    Assertions.assertEquals(1611111111111L, audit.createTime().toEpochMilli());
-    Assertions.assertEquals("demo_user", audit.lastModifier());
-    Assertions.assertEquals(1611111111111L, audit.lastModifiedTime().toEpochMilli());
+    checkModelVersionInfo(modelVersionInfo, modelVersion);
+  }
+
+  @Test
+  void testModelVersionInfoWithoutComment() {
+    ModelVersion modelVersion = mockModelVersion("uriA", new String[] {"aliasProduction"}, null);
+    ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
+
+    checkModelVersionInfo(modelVersionInfo, modelVersion);
+  }
+
+  @Test
+  void testModelVersionInfoWithAudit() {
+    ModelVersion modelVersion =
+        getMockModelWithAudit("uriA", new String[] {"aliasProduction"}, "versionInfoA");
+    ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
+
+    checkModelVersionInfo(modelVersionInfo, modelVersion);
   }
 
   @Test
@@ -144,13 +147,30 @@ public class TestModelEvent {
     Assertions.assertEquals(existingIdentA, registerModelPreEvent.identifier());
     ModelInfo modelInfoPreEvent = registerModelPreEvent.registerModelRequest();
 
-    Assertions.assertEquals("modelA", modelInfoPreEvent.name());
-    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelInfoPreEvent.properties());
-    Assertions.assertTrue(modelInfoPreEvent.comment().isPresent());
-    String comment = modelInfoPreEvent.comment().get();
-    Assertions.assertEquals("commentA", comment);
-    Assertions.assertFalse(modelInfoPreEvent.audit().isPresent());
-    Assertions.assertFalse(modelInfoPreEvent.lastVersion().isPresent());
+    checkModelInfo(modelInfoPreEvent, modelA);
+  }
+
+  @Test
+  void testRegisterModelFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.registerModel(
+                existingIdentA, "commentA", ImmutableMap.of("color", "#FFFFFF")));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(existingIdentA, event.identifier());
+    Assertions.assertEquals(RegisterModelFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((RegisterModelFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.REGISTER_MODEL, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    ModelInfo registerModelRequest = ((RegisterModelFailureEvent) event).registerModelRequest();
+
+    // check model-info
+    checkModelInfo(registerModelRequest, modelA);
   }
 
   @Test
@@ -158,7 +178,7 @@ public class TestModelEvent {
     dispatcher.registerModel(
         existingIdentA,
         "uriA",
-        new String[] {"aliasProduction", "aliasTest"},
+        new String[] {"aliasProduction"},
         "commentA",
         ImmutableMap.of("color", "#FFFFFF"));
     // validate pre-event
@@ -173,23 +193,54 @@ public class TestModelEvent {
         (RegisterAndLinkModelPreEvent) preEvent;
     ModelInfo registerModelRequest = registerAndLinkModelPreEvent.registerModelRequest();
 
-    Assertions.assertEquals("modelA", registerModelRequest.name());
-    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), registerModelRequest.properties());
-    Assertions.assertTrue(registerModelRequest.comment().isPresent());
-    String comment = registerModelRequest.comment().get();
-    Assertions.assertEquals("commentA", comment);
-    Assertions.assertFalse(registerModelRequest.audit().isPresent());
-    Assertions.assertFalse(registerModelRequest.lastVersion().isPresent());
+    checkModelInfo(registerModelRequest, modelA);
 
     // validate pre-event model version info
-    ModelVersionInfo modelVersionInfoPreEvent =
+    ModelVersionInfo linkModelVersionRequest =
         registerAndLinkModelPreEvent.linkModelVersionRequest();
-    Assertions.assertEquals("uriA", modelVersionInfoPreEvent.uri());
-    Assertions.assertTrue(modelVersionInfoPreEvent.aliases().isPresent());
-    String[] aliases = modelVersionInfoPreEvent.aliases().get();
-    Assertions.assertEquals(2, aliases.length);
-    Assertions.assertEquals("aliasProduction", aliases[0]);
-    Assertions.assertEquals("aliasTest", aliases[1]);
+
+    Assertions.assertEquals(firstModelVersion.uri(), linkModelVersionRequest.uri());
+    Assertions.assertEquals("commentA", linkModelVersionRequest.comment().orElse(null));
+    checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
+    checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
+    checkAudit(firstModelVersion.auditInfo(), linkModelVersionRequest.audit());
+  }
+
+  @Test
+  void testRegisterAndLinkModelFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.registerModel(
+                existingIdentA,
+                "uriA",
+                new String[] {"aliasProduction"},
+                "commentA",
+                ImmutableMap.of("color", "#FFFFFF")));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(RegisterAndLinkModelFailureEvent.class, event.getClass());
+    Assertions.assertEquals(existingIdentA, event.identifier());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((RegisterAndLinkModelFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.REGISTER_AND_LINK_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    // validate model info
+    RegisterAndLinkModelFailureEvent registerAndLinkModelFailureEvent =
+        (RegisterAndLinkModelFailureEvent) event;
+    ModelInfo registerModelRequest = registerAndLinkModelFailureEvent.registerModelRequest();
+    ModelVersionInfo linkModelVersionRequest =
+        registerAndLinkModelFailureEvent.linkModelVersionRequest();
+
+    checkModelInfo(registerModelRequest, modelA);
+    Assertions.assertEquals(firstModelVersion.uri(), linkModelVersionRequest.uri());
+    Assertions.assertEquals("commentA", linkModelVersionRequest.comment().orElse(null));
+    checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
+    checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
+    checkAudit(firstModelVersion.auditInfo(), linkModelVersionRequest.audit());
   }
 
   @Test
@@ -207,7 +258,24 @@ public class TestModelEvent {
   }
 
   @Test
-  void testDeleteExistsModelEvent() {
+  void testGetModelFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.getModel(notExistingIdent));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(GetModelFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class, ((GetModelFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    GetModelFailureEvent getModelFailureEvent = (GetModelFailureEvent) event;
+    Assertions.assertEquals(notExistingIdent, getModelFailureEvent.identifier());
+  }
+
+  @Test
+  void testDeleteModelEvent() {
     dispatcher.deleteModel(existingIdentA);
 
     // validate pre-event
@@ -218,6 +286,23 @@ public class TestModelEvent {
 
     DeleteModelPreEvent deleteModelPreEvent = (DeleteModelPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, deleteModelPreEvent.identifier());
+  }
+
+  @Test
+  void testDeleteModelFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.deleteModel(notExistingIdent));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(DeleteModelFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class, ((DeleteModelFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    DeleteModelFailureEvent deleteModelFailureEvent = (DeleteModelFailureEvent) event;
+    Assertions.assertEquals(notExistingIdent, deleteModelFailureEvent.identifier());
   }
 
   @Test
@@ -235,11 +320,28 @@ public class TestModelEvent {
   }
 
   @Test
+  void testListModelFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listModels(namespace));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(ListModelFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class, ((ListModelFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    ListModelFailureEvent listModelFailureEvent = (ListModelFailureEvent) event;
+    checkArray(namespace.levels(), listModelFailureEvent.namespace().levels());
+  }
+
+  @Test
   void testLinkModelVersionEvent() {
     dispatcher.linkModelVersion(
         existingIdentA,
         "uriA",
-        new String[] {"aliasProduction", "aliasTest"},
+        new String[] {"aliasProduction"},
         "versionInfoA",
         ImmutableMap.of("color", "#FFFFFF"));
 
@@ -253,21 +355,35 @@ public class TestModelEvent {
     Assertions.assertEquals(existingIdentA, linkModelVersionPreEvent.identifier());
     ModelVersionInfo modelVersionInfo = linkModelVersionPreEvent.linkModelVersionRequest();
 
-    Assertions.assertEquals(1, modelVersionInfo.properties().size());
-    Assertions.assertEquals("#FFFFFF", modelVersionInfo.properties().get("color"));
+    checkModelVersionInfo(modelVersionInfo, firstModelVersion);
+  }
 
-    Assertions.assertEquals("uriA", modelVersionInfo.uri());
-    Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
-    String[] aliases = modelVersionInfo.aliases().get();
-    Assertions.assertEquals(2, aliases.length);
-    Assertions.assertEquals("aliasProduction", aliases[0]);
-    Assertions.assertEquals("aliasTest", aliases[1]);
+  @Test
+  void testLinkModelVersionFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.linkModelVersion(
+                existingIdentA,
+                "uriA",
+                new String[] {"aliasProduction"},
+                "versionInfoA",
+                ImmutableMap.of("color", "#FFFFFF")));
 
-    Assertions.assertTrue(modelVersionInfo.comment().isPresent());
-    String comment = modelVersionInfo.comment().get();
-    Assertions.assertEquals("versionInfoA", comment);
+    Event event = dummyEventListener.popPostEvent();
 
-    Assertions.assertFalse(modelVersionInfo.audit().isPresent());
+    Assertions.assertEquals(LinkModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((LinkModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LINK_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    LinkModelVersionFailureEvent linkModelVersionFailureEvent =
+        (LinkModelVersionFailureEvent) event;
+    ModelVersionInfo modelVersionInfo = linkModelVersionFailureEvent.linkModelVersionRequest();
+
+    checkModelVersionInfo(modelVersionInfo, firstModelVersion);
   }
 
   @Test
@@ -282,6 +398,32 @@ public class TestModelEvent {
 
     GetModelVersionPreEvent getModelVersionPreEvent = (GetModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, getModelVersionPreEvent.identifier());
+
+    // validate pre-event fields
+    Assertions.assertTrue(getModelVersionPreEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionPreEvent.version().get());
+    Assertions.assertFalse(getModelVersionPreEvent.alias().isPresent());
+  }
+
+  @Test
+  void testGetModelVersionFailureEventViaVersion() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getModelVersion(existingIdentA, 3));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(GetModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((GetModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    GetModelVersionFailureEvent getModelVersionFailureEvent = (GetModelVersionFailureEvent) event;
+    Assertions.assertTrue(getModelVersionFailureEvent.version().isPresent());
+    Assertions.assertEquals(3, getModelVersionFailureEvent.version().get());
+    Assertions.assertFalse(getModelVersionFailureEvent.alias().isPresent());
   }
 
   @Test
@@ -294,11 +436,33 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationType.GET_MODEL_VERSION, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
+    // validate pre-event fields
     GetModelVersionPreEvent getModelVersionPreEvent = (GetModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentB, getModelVersionPreEvent.identifier());
     Assertions.assertTrue(getModelVersionPreEvent.alias().isPresent());
     Assertions.assertEquals("aliasTest", getModelVersionPreEvent.alias().get());
     Assertions.assertFalse(getModelVersionPreEvent.version().isPresent());
+  }
+
+  @Test
+  void testGetModelVersionFailureEventViaAlias() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getModelVersion(existingIdentB, "aliasNotExist"));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(GetModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((GetModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    GetModelVersionFailureEvent getModelVersionFailureEvent = (GetModelVersionFailureEvent) event;
+    Assertions.assertTrue(getModelVersionFailureEvent.alias().isPresent());
+    Assertions.assertEquals("aliasNotExist", getModelVersionFailureEvent.alias().get());
+    Assertions.assertFalse(getModelVersionFailureEvent.version().isPresent());
   }
 
   @Test
@@ -319,6 +483,28 @@ public class TestModelEvent {
   }
 
   @Test
+  void testDeleteModelVersionFailureEventViaVersion() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.deleteModelVersion(existingIdentA, 3));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(DeleteModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((DeleteModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    DeleteModelVersionFailureEvent deleteModelVersionFailureEvent =
+        (DeleteModelVersionFailureEvent) event;
+    Assertions.assertTrue(deleteModelVersionFailureEvent.version().isPresent());
+    Assertions.assertEquals(3, deleteModelVersionFailureEvent.version().get());
+    Assertions.assertFalse(deleteModelVersionFailureEvent.alias().isPresent());
+  }
+
+  @Test
   void testDeleteModelVersionEventViaAlias() {
     dispatcher.deleteModelVersion(existingIdentB, "aliasTest");
 
@@ -336,6 +522,28 @@ public class TestModelEvent {
   }
 
   @Test
+  void testDeleteModelVersionFailureEventViaAlias() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.deleteModelVersion(existingIdentB, "aliasNotExist"));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(DeleteModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((DeleteModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    DeleteModelVersionFailureEvent deleteModelVersionFailureEvent =
+        (DeleteModelVersionFailureEvent) event;
+    Assertions.assertTrue(deleteModelVersionFailureEvent.alias().isPresent());
+    Assertions.assertEquals("aliasNotExist", deleteModelVersionFailureEvent.alias().get());
+    Assertions.assertFalse(deleteModelVersionFailureEvent.version().isPresent());
+  }
+
+  @Test
   void testListModelVersionsEvent() {
     dispatcher.listModelVersions(existingIdentA);
 
@@ -347,6 +555,25 @@ public class TestModelEvent {
 
     ListModelVersionPreEvent listModelVersionsPreEvent = (ListModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, listModelVersionsPreEvent.identifier());
+  }
+
+  @Test
+  void testListModelVersionsFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listModelVersions(existingIdentA));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(ListModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((ListModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    ListModelVersionFailureEvent listModelVersionsFailureEvent =
+        (ListModelVersionFailureEvent) event;
+    Assertions.assertEquals(existingIdentA, listModelVersionsFailureEvent.identifier());
   }
 
   private ModelDispatcher mockExceptionModelDispatcher() {
@@ -419,9 +646,80 @@ public class TestModelEvent {
     when(modelVersion.version()).thenReturn(1);
     when(modelVersion.uri()).thenReturn(uri);
     when(modelVersion.aliases()).thenReturn(aliases);
-    when(modelVersion.comment()).thenReturn("model version " + comment);
+    when(modelVersion.comment()).thenReturn(comment);
     when(modelVersion.properties()).thenReturn(ImmutableMap.of("color", "#FFFFFF"));
 
     return modelVersion;
+  }
+
+  private ModelVersion getMockModelWithAudit(String uri, String[] aliases, String comment) {
+    ModelVersion modelVersion = mockModelVersion(uri, aliases, comment);
+    Audit mockAudit = mock(Audit.class);
+
+    when(mockAudit.creator()).thenReturn("demo_user");
+    when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(mockAudit.lastModifier()).thenReturn("demo_user");
+    when(mockAudit.lastModifiedTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
+    when(modelVersion.auditInfo()).thenReturn(mockAudit);
+
+    return modelVersion;
+  }
+
+  private void checkModelInfo(ModelInfo modelInfo, Model model) {
+    // check normal fields
+    Assertions.assertEquals(model.name(), modelInfo.name());
+    Assertions.assertEquals(model.comment(), modelInfo.comment().orElse(null));
+
+    // check properties
+    checkProperties(model.properties(), modelInfo.properties());
+
+    // check audit
+    checkAudit(model.auditInfo(), modelInfo.audit());
+  }
+
+  private void checkModelVersionInfo(ModelVersionInfo modelVersionInfo, ModelVersion modelVersion) {
+    // check normal fields
+    Assertions.assertEquals(modelVersion.uri(), modelVersionInfo.uri());
+    Assertions.assertEquals(modelVersion.comment(), modelVersionInfo.comment().orElse(null));
+
+    // check aliases
+    checkArray(modelVersion.aliases(), modelVersionInfo.aliases().orElse(null));
+
+    // check properties
+    checkProperties(modelVersion.properties(), modelVersionInfo.properties());
+
+    // check audit
+    checkAudit(modelVersion.auditInfo(), modelVersionInfo.audit());
+  }
+
+  private void checkProperties(
+      Map<String, String> expectedProperties, Map<String, String> properties) {
+    Assertions.assertEquals(expectedProperties.size(), properties.size());
+    expectedProperties.forEach(
+        (key, value) -> {
+          Assertions.assertTrue(properties.containsKey(key));
+          Assertions.assertEquals(value, properties.get(key));
+        });
+  }
+
+  private void checkAudit(Audit expectedAudit, Optional<Audit> audit) {
+    if (expectedAudit == null) {
+      Assertions.assertFalse(audit.isPresent());
+      return;
+    }
+
+    Assertions.assertTrue(audit.isPresent());
+    Audit auditInfo = audit.get();
+
+    Assertions.assertEquals(auditInfo.creator(), auditInfo.creator());
+    Assertions.assertEquals(auditInfo.createTime(), auditInfo.createTime());
+    Assertions.assertEquals(auditInfo.lastModifier(), auditInfo.lastModifier());
+    Assertions.assertEquals(auditInfo.lastModifiedTime(), auditInfo.lastModifiedTime());
+  }
+
+  private void checkArray(String[] expected, String[] actual) {
+    Assertions.assertNotNull(actual);
+    Assertions.assertEquals(expected.length, actual.length);
+    Assertions.assertArrayEquals(expected, actual);
   }
 }
