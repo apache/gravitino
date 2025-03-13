@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
@@ -574,8 +575,7 @@ public abstract class RangerAuthorizationPlugin
         break;
       default:
         throw new AuthorizationPluginException(
-            "The owner privilege is not supported for the securable object: %s",
-            metadataObject.type());
+            ErrorMessages.OWNER_PRIVILEGE_NOT_SUPPORTED, metadataObject.type());
     }
 
     return Boolean.TRUE;

@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
@@ -36,7 +37,9 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
       String metalake, String catalogProvider, Map<String, String> properties) {
     Preconditions.checkArgument(
         properties.containsKey(RangerAuthorizationProperties.RANGER_SERVICE_TYPE),
-        String.format("%s is required", RangerAuthorizationProperties.RANGER_SERVICE_TYPE));
+        String.format(
+            ErrorMessages.MISSING_REQUIRED_ARGUMENT,
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE));
     String serviceType =
         properties.get(RangerAuthorizationProperties.RANGER_SERVICE_TYPE).toUpperCase();
     switch (serviceType) {
