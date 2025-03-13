@@ -150,7 +150,7 @@ public class OwnerManager {
 
       if (entities.size() != 1) {
         throw new IllegalStateException(
-            String.format("The number of the owner %s must be 1", metadataObject.fullName()));
+            String.format("The size of the owner's name %s must be 1", metadataObject.fullName()));
       }
 
       Entity entity = entities.get(0);

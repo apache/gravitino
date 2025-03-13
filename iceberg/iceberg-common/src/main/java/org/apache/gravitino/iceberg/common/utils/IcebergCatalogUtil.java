@@ -59,7 +59,9 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
-    resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
+    if (!resultProperties.containsKey(IcebergConstants.WAREHOUSE)) {
+      resultProperties.put(IcebergConstants.WAREHOUSE, "/tmp");
+    }
     memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }

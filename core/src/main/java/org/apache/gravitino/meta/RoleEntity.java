@@ -31,6 +31,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.utils.CollectionUtils;
 
 public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
 
@@ -142,7 +143,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(securableObjects, that.securableObjects);
+        && CollectionUtils.isEqualCollection(securableObjects, that.securableObjects);
   }
 
   @Override

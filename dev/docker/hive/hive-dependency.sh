@@ -54,10 +54,10 @@ ZOOKEEPER_PACKAGE_NAME="zookeeper-${ZOOKEEPER_VERSION}.tar.gz"
 ZOOKEEPER_DOWNLOAD_URL="https://archive.apache.org/dist/zookeeper/zookeeper-${ZOOKEEPER_VERSION}/${ZOOKEEPER_PACKAGE_NAME}"
 
 RANGER_HIVE_PACKAGE_NAME="ranger-${RANGER_VERSION}-hive-plugin.tar.gz"
-RANGER_HIVE_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-hive-plugin.tar.gz
+RANGER_HIVE_DOWNLOAD_URL=https://github.com/datastrato/ranger/releases/download/v${RANGER_VERSION}/ranger-${RANGER_VERSION}-hive-plugin.tar.gz
 
 RANGER_HDFS_PACKAGE_NAME="ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz"
-RANGER_HDFS_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz
+RANGER_HDFS_DOWNLOAD_URL=https://github.com/datastrato/ranger/releases/download/v${RANGER_VERSION}/ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz
 
 # Prepare download packages
 if [[ ! -d "${hive_dir}/packages" ]]; then
@@ -89,11 +89,21 @@ if [ ! -f "${hive_dir}/packages/${ZOOKEEPER_PACKAGE_NAME}" ]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ${RANGER_HDFS_DOWNLOAD_URL}
+  bash ${hive_dir}/download-release.sh "v${RANGER_VERSION}" ${RANGER_HDFS_PACKAGE_NAME} "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}"
+fi
+
+if [[ $? -ne 0 ]]; then
+  echo "Failed to download Ranger HDFS plugin package"
+  exit 1
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ${RANGER_HIVE_DOWNLOAD_URL}
+  bash ${hive_dir}/download-release.sh "v${RANGER_VERSION}" ${RANGER_HIVE_PACKAGE_NAME} "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}"
+fi
+
+if [[ $? -ne 0 ]]; then
+  echo "Failed to download Ranger Hive plugin package"
+  exit 1
 fi
 
 if [ ! -f "${hive_dir}/packages/${HADOOP2_GCS_PACKAGE_NAME}" ]; then

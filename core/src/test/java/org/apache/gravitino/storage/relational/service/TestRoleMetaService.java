@@ -57,6 +57,7 @@ import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.CollectionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -623,13 +624,14 @@ class TestRoleMetaService extends TestJDBCBackend {
     Assertions.assertEquals(grantRole.name(), roleEntity.name());
     Assertions.assertEquals("creator", grantRole.auditInfo().creator());
     Assertions.assertEquals("grantRole", grantRole.auditInfo().lastModifier());
-    Assertions.assertEquals(
-        Lists.newArrayList(
-            SecurableObjects.ofCatalog(
-                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
-            SecurableObjects.ofMetalake(
-                metalakeName, Lists.newArrayList(Privileges.CreateTable.allow()))),
-        grantRole.securableObjects());
+    Assertions.assertTrue(
+        CollectionUtils.isEqualCollection(
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+                SecurableObjects.ofMetalake(
+                    metalakeName, Lists.newArrayList(Privileges.CreateTable.allow()))),
+            grantRole.securableObjects()));
 
     // revoke privileges from the role
     Function<RoleEntity, RoleEntity> revokeUpdater =
@@ -643,7 +645,10 @@ class TestRoleMetaService extends TestJDBCBackend {
                   .build();
 
           List<SecurableObject> securableObjects = Lists.newArrayList(role.securableObjects());
-          securableObjects.remove(0);
+          securableObjects.removeIf(
+              securableObject ->
+                  securableObject.type() == SecurableObject.Type.CATALOG
+                      && securableObject.privileges().contains(Privileges.UseCatalog.allow()));
 
           return RoleEntity.builder()
               .withId(role.id())

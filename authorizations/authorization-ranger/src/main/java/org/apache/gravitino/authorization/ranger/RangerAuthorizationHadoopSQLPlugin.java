@@ -121,7 +121,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     try {
       return rangerClient.findPolicies(searchFilters);
     } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(e, "Failed to find the policies in the Ranger");
+      throw new AuthorizationPluginException(e, "Failed to find policies in Ranger");
     }
   }
 
@@ -229,7 +229,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                           AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
                   Preconditions.checkArgument(
                       policyNames.size() >= oldAuthzMetaObject.names().size(),
-                      String.format("The policy name(%s) is invalid!", policyName));
+                      String.format("The policy name (%s) is invalid!", policyName));
                   if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
                     // Doesn't need to rename the policy `*`
                     return;
@@ -253,7 +253,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                     || existNewPolicy.getResources().equals(policy.getResources()));
                 if (alreadyExist) {
                   LOG.warn(
-                      "The Ranger policy for the metadata object({}) already exists!",
+                      "The Ranger policy for the metadata object ({}) already exists!",
                       newAuthzMetaObject);
                   return;
                 }
@@ -295,9 +295,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
    */
   private void doRemoveSchemaMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(
-        authzMetadataObject.type() == SCHEMA, "The metadata object type must be SCHEMA");
+        authzMetadataObject.type() == SCHEMA, "The metadata object type must be a schema");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1, "The metadata object names must be 1");
+        authzMetadataObject.names().size() == 1, "The metadata object's name size must be 1");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Delete metalake or catalog policies in this Ranger service
       try {
@@ -700,16 +700,14 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     default:
                       LOG.warn(
-                          "RangerAuthorizationHivePlugin -> privilege {} is not supported for the securable object: {}",
-                          gravitinoPrivilege.name(),
-                          securableObject.type());
+                          "The privilege %s is not supported for the securable object: %s",
+                          gravitinoPrivilege.name(), securableObject.type());
                   }
                   break;
                 default:
                   LOG.warn(
-                      "RangerAuthorizationHivePlugin -> privilege {} is not supported for the securable object: {}",
-                      gravitinoPrivilege.name(),
-                      securableObject.type());
+                      "The privilege %s is not supported for the securable object: %s",
+                      gravitinoPrivilege.name(), securableObject.type());
               }
             });
 
@@ -724,7 +722,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   public List<AuthorizationMetadataObject> translateMetadataObject(MetadataObject metadataObject) {
     Preconditions.checkArgument(
         !(metadataObject instanceof RangerPrivileges),
-        "The metadata object must be not a RangerPrivileges object.");
+        "The metadata object must not be a RangerPrivileges object.");
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     Preconditions.checkArgument(
@@ -760,7 +758,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
             ((MetadataObjectChange.RenameMetadataObject) change).newMetadataObject();
         Preconditions.checkArgument(
             metadataObject.type() == newMetadataObject.type(),
-            "The old and new metadata object type must be equal!");
+            "The old and new metadata object types must be equal!");
         if (metadataObject.type() == MetadataObject.Type.METALAKE) {
           // Rename the metalake name
           this.metalake = newMetadataObject.name();
@@ -776,13 +774,13 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
             translateMetadataObject(newMetadataObject);
         Preconditions.checkArgument(
             oldAuthzMetadataObjects.size() == newAuthzMetadataObjects.size(),
-            "The old and new metadata objects size must be equal!");
+            "The old and new metadata objects sizes must be equal!");
         for (int i = 0; i < oldAuthzMetadataObjects.size(); i++) {
           AuthorizationMetadataObject oldAuthMetadataObject = oldAuthzMetadataObjects.get(i);
           AuthorizationMetadataObject newAuthzMetadataObject = newAuthzMetadataObjects.get(i);
           if (oldAuthMetadataObject.equals(newAuthzMetadataObject)) {
             LOG.info(
-                "The metadata object({}) and new metadata object({}) are equal, so ignore rename!",
+                "The metadata object({}) and new metadata object({}) are equal, so ignoring rename!",
                 oldAuthMetadataObject.fullName(),
                 newAuthzMetadataObject.fullName());
             continue;
