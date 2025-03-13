@@ -20,12 +20,14 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 
 /**
  * Represents an event that is generated when an attempt to register a model fails due to an
  * exception.
  */
+@DeveloperApi
 public class RegisterModelFailureEvent extends ModelFailureEvent {
   private final ModelInfo registerModelRequest;
   /**

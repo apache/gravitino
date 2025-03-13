@@ -21,11 +21,13 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to get a model version fails due to an
  * exception.
  */
+@DeveloperApi
 public class GetModelVersionFailureEvent extends ModelFailureEvent {
   private final Optional<String> alias;
   private final Optional<Integer> version;

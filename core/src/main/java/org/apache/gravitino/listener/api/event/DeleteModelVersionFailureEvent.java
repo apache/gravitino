@@ -21,11 +21,13 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to delete a model version from a model
  * fails due to an exception.
  */
+@DeveloperApi
 public class DeleteModelVersionFailureEvent extends ModelFailureEvent {
   private final Optional<String> alias;
   private final Optional<Integer> version;

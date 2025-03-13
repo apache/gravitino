@@ -20,11 +20,13 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to list versions of a model fails due to an
  * exception.
  */
+@DeveloperApi
 public class ListModelVersionFailureEvent extends ModelFailureEvent {
 
   /**

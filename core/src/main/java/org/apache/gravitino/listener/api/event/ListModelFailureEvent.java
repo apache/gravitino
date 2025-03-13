@@ -21,11 +21,13 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is triggered when an attempt to list models within a namespace fails due
  * to an exception.
  */
+@DeveloperApi
 public class ListModelFailureEvent extends ModelFailureEvent {
   private final Namespace namespace;
 

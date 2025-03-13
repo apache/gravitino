@@ -20,10 +20,12 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to get a model fails due to an exception.
  */
+@DeveloperApi
 public class GetModelFailureEvent extends ModelFailureEvent {
   /**
    * Construct a new {@link GetModelFailureEvent} instance, capturing detailed information about the

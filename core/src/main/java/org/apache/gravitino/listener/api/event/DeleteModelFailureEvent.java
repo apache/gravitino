@@ -20,11 +20,13 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to drop a model from the schema fails due
  * to an exception.
  */
+@DeveloperApi
 public class DeleteModelFailureEvent extends ModelFailureEvent {
   /**
    * Construct a new {@link DeleteModelFailureEvent} instance, capturing detailed information about

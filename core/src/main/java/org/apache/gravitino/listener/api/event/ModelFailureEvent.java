@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * An abstract class representing events that are triggered when a model operation fails due to an
@@ -31,7 +32,8 @@ import org.apache.gravitino.NameIdentifier;
  * operations such as creating, updating, deleting, or querying tables, making it easier to diagnose
  * and respond to issues.
  */
-public class ModelFailureEvent extends FailureEvent {
+@DeveloperApi
+public abstract class ModelFailureEvent extends FailureEvent {
 
   /**
    * Creates a new instance of {@code ModelFailureEvent}, capturing information about the failed

@@ -20,12 +20,14 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 
 /**
  * Represents an event that is triggered when an attempt to link a model version fails due to an
  * exception.
  */
+@DeveloperApi
 public class LinkModelVersionFailureEvent extends ModelFailureEvent {
   private final ModelVersionInfo linkModelVersionRequest;
   /**
