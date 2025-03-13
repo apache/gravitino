@@ -819,6 +819,12 @@ tasks {
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
+
+    dependsOn("clients:cli:build")
+    from("clients/cli/build/libs")
+    into("distribution/package/libs")
+    include("*.jar")
+    setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
   }
 
   register("copyCatalogLibAndConfigs", Copy::class) {
