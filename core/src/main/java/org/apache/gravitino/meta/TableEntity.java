@@ -30,7 +30,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a table entity in Apache Gravitino. */
 @ToString
