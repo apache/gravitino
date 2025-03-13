@@ -35,6 +35,7 @@ public class JdbcPropertiesConstants {
   public static final String FLINK_JDBC_URL = "base-url";
   public static final String FLINK_JDBC_USER = "username";
   public static final String FLINK_JDBC_PASSWORD = "password";
+  public static final String FLINK_DRIVER = "driver";
   public static final String FLINK_JDBC_DEFAULT_DATABASE = "default-database";
 
   public static Map<String, String> flinkToGravitinoMap = new HashMap<>();
@@ -44,11 +45,10 @@ public class JdbcPropertiesConstants {
     flinkToGravitinoMap.put(FLINK_JDBC_URL, GRAVITINO_JDBC_URL);
     flinkToGravitinoMap.put(FLINK_JDBC_USER, GRAVITINO_JDBC_USER);
     flinkToGravitinoMap.put(FLINK_JDBC_PASSWORD, GRAVITINO_JDBC_PASSWORD);
-    flinkToGravitinoMap.put(FLINK_JDBC_DEFAULT_DATABASE, GRAVITINO_JDBC_DEFAULT_DATABASE);
+    flinkToGravitinoMap.put(FLINK_DRIVER, GRAVITINO_JDBC_DRIVER);
 
     gravitinoToFlinkMap.put(GRAVITINO_JDBC_URL, FLINK_JDBC_URL);
     gravitinoToFlinkMap.put(GRAVITINO_JDBC_USER, FLINK_JDBC_USER);
     gravitinoToFlinkMap.put(GRAVITINO_JDBC_PASSWORD, FLINK_JDBC_PASSWORD);
-    gravitinoToFlinkMap.put(GRAVITINO_JDBC_DEFAULT_DATABASE, FLINK_JDBC_DEFAULT_DATABASE);
   }
 }

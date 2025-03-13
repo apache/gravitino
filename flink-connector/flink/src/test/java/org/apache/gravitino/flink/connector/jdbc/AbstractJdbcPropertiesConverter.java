@@ -81,7 +81,7 @@ public abstract class AbstractJdbcPropertiesConverter {
     Assertions.assertEquals(
         defaultDatabase, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
     Assertions.assertEquals(
-        getConverter(catalogProperties).driverName(),
+        getConverter(catalogProperties).defaultDriverName(),
         properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
 }

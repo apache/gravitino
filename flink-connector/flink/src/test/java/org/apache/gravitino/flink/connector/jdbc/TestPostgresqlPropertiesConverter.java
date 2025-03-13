@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.jdbc;
 
 import java.util.Map;
+import org.apache.gravitino.flink.connector.jdbc.postgresql.PostgresqlPropertiesConverter;
 
 public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesConverter {
 

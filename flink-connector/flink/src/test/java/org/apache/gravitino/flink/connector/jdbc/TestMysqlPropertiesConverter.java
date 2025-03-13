@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.jdbc;
 
 import java.util.Map;
+import org.apache.gravitino.flink.connector.jdbc.mysql.MysqlPropertiesConverter;
 
 public class TestMysqlPropertiesConverter extends AbstractJdbcPropertiesConverter {
 

@@ -17,10 +17,12 @@
  * under the License.
  */
 
-package org.apache.gravitino.flink.connector.jdbc;
+package org.apache.gravitino.flink.connector.jdbc.postgresql;
 
 import java.util.Map;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactory;
+import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
 
 public class GravitinoPostgresJdbcCatalogFactory extends GravitinoJdbcCatalogFactory {
 

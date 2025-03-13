@@ -17,23 +17,25 @@
  * under the License.
  */
 
-package org.apache.gravitino.flink.connector.jdbc;
+package org.apache.gravitino.flink.connector.jdbc.postgresql;
 
 import java.util.Map;
+import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConverter;
 
-public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
+public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
 
-  protected MysqlPropertiesConverter(Map<String, String> catalogOptions) {
+  public PostgresqlPropertiesConverter(Map<String, String> catalogOptions) {
     super(catalogOptions);
   }
 
   @Override
-  public String driverName() {
-    return "com.mysql.jdbc.Driver";
+  protected String defaultDriverName() {
+    return "org.postgresql.Driver";
   }
 
   @Override
   public String getFlinkCatalogType() {
-    return GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER;
+    return GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER;
   }
 }

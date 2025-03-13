@@ -24,6 +24,7 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
@@ -166,5 +167,49 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
         properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
     Assertions.assertEquals(
         "com.mysql.jdbc.Driver", properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
+  }
+
+  @Test
+  public void testCreateGravitinoJdbcCatalogUsingSQLWithDriver() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    int numCatalogs = tableEnv.listCatalogs().length;
+    String catalogName = "gravitino_mysql_jdbc_catalog_with_driver";
+    String driver = "com.mysql.cj.jdbc.Driver";
+    tableEnv.executeSql(
+        String.format(
+            "create catalog %s with ("
+                + "'type'='gravitino-jdbc-mysql', "
+                + "'base-url'='%s',"
+                + "'username'='%s',"
+                + "'password'='%s',"
+                + "'driver'='%s',"
+                + "'default-database'='%s'"
+                + ")",
+            catalogName, mysqlUrl, mysqlUsername, mysqlPassword, driver, mysqlDefaultDatabase));
+    String[] catalogs = tableEnv.listCatalogs();
+    Assertions.assertEquals(numCatalogs + 1, catalogs.length, "Should create a new catalog");
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    Map<String, String> properties = gravitinoCatalog.properties();
+    Assertions.assertEquals(driver, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
+  }
+
+  @Test
+  public void testCreateGravitinoJdbcCatalogUsingSQLMissingOptions() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "gravitino_mysql_jdbc_catalog_missing_options";
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            tableEnv.executeSql(
+                String.format(
+                    "create catalog %s with ("
+                        + "'type'='gravitino-jdbc-mysql', "
+                        + "'base-url'='%s',"
+                        + "'username'='%s',"
+                        + "'default-database'='%s'"
+                        + ")",
+                    catalogName, mysqlUrl, mysqlUsername, mysqlDefaultDatabase)),
+        "Missing required options are:\n" + "\n" + "password");
   }
 }

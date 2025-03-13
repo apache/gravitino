@@ -37,8 +37,16 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
     Map<String, String> gravitinoCatalogProperties =
         PropertiesConverter.super.toGravitinoCatalogProperties(flinkConf);
-    gravitinoCatalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, driverName());
+    if (!gravitinoCatalogProperties.containsKey(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER)) {
+      gravitinoCatalogProperties.put(
+          JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, defaultDriverName());
+    }
     return gravitinoCatalogProperties;
+  }
+
+  @Override
+  public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
+    return PropertiesConverter.super.toFlinkCatalogProperties(gravitinoProperties);
   }
 
   @Override
@@ -66,7 +74,7 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
     return tableOptions;
   }
 
-  protected abstract String driverName();
+  protected abstract String defaultDriverName();
 
   public Map<String, String> getCatalogOptions() {
     return catalogOptions;
