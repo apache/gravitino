@@ -39,24 +39,40 @@ public class ModelInfo {
   private final Optional<Integer> lastVersion;
 
   /**
-   * Constructs model information based on a given model.
+   * Constructs a {@link ModelInfo} instance based on a given model.
    *
    * @param model the model to expose information for.
    */
   public ModelInfo(Model model) {
-    this.name = model.name();
-    this.properties =
-        model.properties() == null ? ImmutableMap.of() : ImmutableMap.copyOf(model.properties());
-
-    this.comment = Optional.ofNullable(model.comment());
-    this.audit = Optional.ofNullable(model.auditInfo());
-    this.lastVersion = Optional.ofNullable(model.latestVersion());
+    this(
+        model.name(),
+        model.properties(),
+        model.comment(),
+        model.auditInfo(),
+        model.latestVersion());
   }
 
+  /**
+   * Constructs a {@link ModelInfo} instance based on name, properties, and comment.
+   *
+   * @param name the name of the model.
+   * @param properties the properties of the model.
+   * @param comment the comment of the model.
+   */
   public ModelInfo(String name, Map<String, String> properties, String comment) {
     this(name, properties, comment, null, null);
   }
 
+  /**
+   * Constructs a {@link ModelInfo} instance based on name, properties, comment, audit, and last
+   * version.
+   *
+   * @param name the name of the model.
+   * @param properties the properties of the model.
+   * @param comment the comment of the model.
+   * @param audit the audit information of the model.
+   * @param lastVersion the last version of the model.
+   */
   public ModelInfo(
       String name,
       Map<String, String> properties,

@@ -38,7 +38,7 @@ public class ModelVersionInfo {
   private final Optional<Audit> auditInfo;
 
   /**
-   * Constructs model version information based on a given {@link ModelVersion}.
+   * Constructs a {@link ModelVersionInfo} instance based on a given {@link ModelVersion}.
    *
    * @param modelVersion the model version to expose information for.
    */
@@ -51,18 +51,29 @@ public class ModelVersionInfo {
         modelVersion.auditInfo());
   }
 
+  /**
+   * Constructs a {@link ModelVersionInfo} instance based on given URI, comment, properties, and
+   * aliases.
+   *
+   * @param uri The URI of the model version.
+   * @param comment The comment of the model version.
+   * @param properties The properties of the model version.
+   * @param aliases The aliases of the model version.
+   */
   public ModelVersionInfo(
       String uri, String comment, Map<String, String> properties, String[] aliases) {
     this(uri, comment, properties, aliases, null);
   }
 
   /**
-   * Constructs model version information based on a given arguments.
+   * Constructs a {@link ModelVersionInfo} instance based on given uri, comment, properties,
+   * aliases, and audit information.
    *
-   * @param uri
-   * @param aliases
-   * @param comment
-   * @param properties
+   * @param uri The URI of the model version.
+   * @param comment The comment of the model version.
+   * @param properties The properties of the model version.
+   * @param aliases The aliases of the model version.
+   * @param auditInfo The audit information of the model version.
    */
   public ModelVersionInfo(
       String uri,
