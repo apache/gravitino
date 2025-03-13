@@ -23,25 +23,35 @@ import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before deleting a model version. */
+/**
+ * Represents an event that is generated after a model version is successfully deleted from the
+ * model.
+ */
 @DeveloperApi
-public class DeleteModelVersionPreEvent extends ModelPreEvent {
+public class DeleteModelVersionEvent extends ModelEvent {
+
+  private final boolean isExists;
   private final Optional<String> alias;
   private final Optional<Integer> version;
 
   /**
-   * Create a new {@link DeleteModelVersionPreEvent} instance. only one of alias or version are
-   * valid.
+   * Constructs a new {@code DeleteModelVersionEvent} instance, encapsulating information about the
+   * outcome of a model version drop operation.
    *
-   * @param user The username of the individual who initiated the model version deleted.
-   * @param identifier The unique identifier of the model that was deleted.
-   * @param alias The alias of the model version to be deleted.
-   * @param version The version of the model version to be deleted.
+   * @param user The user who initiated the drop model version operation.
+   * @param identifier The identifier of the model that was attempted to be dropped a version.
+   * @param isExists A boolean flag indicating whether the model version existed at the time of the
+   *     drop operation.
+   * @param alias The alias of the model version to be deleted. If the alias is not provided, the
+   *     value will be an empty {@link Optional}.
+   * @param version The version of the model version to be deleted. If the version is not provided,
+   *     the value will be an empty {@link Optional}.
    */
-  public DeleteModelVersionPreEvent(
-      String user, NameIdentifier identifier, String alias, Integer version) {
+  public DeleteModelVersionEvent(
+      String user, NameIdentifier identifier, boolean isExists, String alias, Integer version) {
     super(user, identifier);
 
+    this.isExists = isExists;
     this.alias = Optional.ofNullable(alias);
     this.version = Optional.ofNullable(version);
   }
@@ -67,6 +77,16 @@ public class DeleteModelVersionPreEvent extends ModelPreEvent {
   }
 
   /**
+   * Retrieves the existence status of the model version at the time of the drop operation.
+   *
+   * @return A boolean value indicating whether the model version existed. {@code true} if the model
+   *     version existed, otherwise {@code false}.
+   */
+  public boolean isExists() {
+    return isExists;
+  }
+
+  /**
    * Returns the type of operation.
    *
    * @return the operation type.
@@ -74,5 +94,10 @@ public class DeleteModelVersionPreEvent extends ModelPreEvent {
   @Override
   public OperationType operationType() {
     return OperationType.DELETE_MODEL_VERSION;
+  }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return isExists() ? OperationStatus.SUCCESS : OperationStatus.UNPROCESSED;
   }
 }
