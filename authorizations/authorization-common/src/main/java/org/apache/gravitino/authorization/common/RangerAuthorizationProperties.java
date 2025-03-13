@@ -82,30 +82,34 @@ public class RangerAuthorizationProperties extends AuthorizationProperties {
   public void validate() {
     Preconditions.checkArgument(
         properties.containsKey(RANGER_ADMIN_URL),
-        String.format("%s is required", RANGER_ADMIN_URL));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_ADMIN_URL));
     Preconditions.checkArgument(
         properties.containsKey(RANGER_SERVICE_TYPE),
-        String.format("%s is required", RANGER_SERVICE_TYPE));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_SERVICE_TYPE));
     Preconditions.checkArgument(
         properties.containsKey(RANGER_AUTH_TYPE),
-        String.format("%s is required", RANGER_AUTH_TYPE));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_AUTH_TYPE));
     Preconditions.checkArgument(
-        properties.containsKey(RANGER_USERNAME), String.format("%s is required", RANGER_USERNAME));
+        properties.containsKey(RANGER_USERNAME),
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_USERNAME));
     Preconditions.checkArgument(
-        properties.containsKey(RANGER_PASSWORD), String.format("%s is required", RANGER_PASSWORD));
+        properties.containsKey(RANGER_PASSWORD),
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_PASSWORD));
     Preconditions.checkArgument(
         properties.get(RANGER_ADMIN_URL) != null,
-        String.format("%s is required", RANGER_ADMIN_URL));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_ADMIN_URL));
     Preconditions.checkArgument(
         properties.get(RANGER_AUTH_TYPE) != null,
-        String.format("%s is required", RANGER_AUTH_TYPE));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_AUTH_TYPE));
     Preconditions.checkArgument(
-        properties.get(RANGER_USERNAME) != null, String.format("%s is required", RANGER_USERNAME));
+        properties.get(RANGER_USERNAME) != null,
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_USERNAME));
     Preconditions.checkArgument(
-        properties.get(RANGER_PASSWORD) != null, String.format("%s is required", RANGER_PASSWORD));
+        properties.get(RANGER_PASSWORD) != null,
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_PASSWORD));
 
     Preconditions.checkArgument(
         properties.get(RANGER_SERVICE_NAME) != null,
-        String.format("%s is required", RANGER_SERVICE_NAME));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, RANGER_SERVICE_NAME));
   }
 }
