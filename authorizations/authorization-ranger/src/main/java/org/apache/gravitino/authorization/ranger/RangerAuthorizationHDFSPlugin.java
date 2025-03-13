@@ -49,6 +49,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
@@ -475,8 +476,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case CREATE_SCHEMA:
@@ -505,8 +507,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case SELECT_TABLE:
@@ -543,14 +546,16 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 default:
                   throw new AuthorizationPluginException(
-                      "The privilege %s is not supported for the securable object: %s",
-                      gravitinoPrivilege.name(), securableObject.type());
+                      ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                      gravitinoPrivilege.name(),
+                      securableObject.type());
               }
             });
 
@@ -584,8 +589,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         break;
       default:
         throw new AuthorizationPluginException(
-            "The owner privilege is not supported for the securable object: %s",
-            gravitinoMetadataObject.type());
+            ErrorMessages.OWNER_PRIVILEGE_NOT_SUPPORTED, gravitinoMetadataObject.type());
     }
 
     return rangerSecurableObjects;

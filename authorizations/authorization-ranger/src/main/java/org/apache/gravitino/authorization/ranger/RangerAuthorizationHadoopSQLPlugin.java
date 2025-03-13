@@ -45,6 +45,7 @@ import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
@@ -229,7 +230,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                           AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
                   Preconditions.checkArgument(
                       policyNames.size() >= oldAuthzMetaObject.names().size(),
-                      String.format("The policy name (%s) is invalid!", policyName));
+                      String.format(ErrorMessages.INVALID_POLICY_NAME, policyName));
                   if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
                     // Doesn't need to rename the policy `*`
                     return;
@@ -527,8 +528,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         break;
       default:
         throw new AuthorizationPluginException(
-            "The owner privilege is not supported for the securable object: %s",
-            gravitinoMetadataObject.type());
+            ErrorMessages.OWNER_PRIVILEGE_NOT_SUPPORTED, gravitinoMetadataObject.type());
     }
 
     return rangerSecurableObjects;
@@ -574,8 +574,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case CREATE_SCHEMA:
@@ -592,8 +593,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case USE_SCHEMA:
@@ -619,8 +621,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case CREATE_TABLE:
@@ -672,8 +675,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     case TABLE:
                       if (gravitinoPrivilege.name() == Privilege.Name.CREATE_TABLE) {
                         throw new AuthorizationPluginException(
-                            "The privilege %s is not supported for the securable object: %s",
-                            gravitinoPrivilege.name(), securableObject.type());
+                            ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                            gravitinoPrivilege.name(),
+                            securableObject.type());
                       } else {
                         translateMetadataObject(securableObject).stream()
                             .forEach(
@@ -700,14 +704,16 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       break;
                     default:
                       LOG.warn(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 default:
                   LOG.warn(
-                      "The privilege %s is not supported for the securable object: %s",
-                      gravitinoPrivilege.name(), securableObject.type());
+                      ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                      gravitinoPrivilege.name(),
+                      securableObject.type());
               }
             });
 
