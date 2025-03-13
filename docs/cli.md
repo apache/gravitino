@@ -17,10 +17,10 @@ Currently, the CLI allows users to view metadata information for metalakes, cata
 You can configure an alias for the CLI for ease of use, with the following command:
 
 ```bash
-alias gcli='java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
+alias gcli='sh $GRAVITINO_HOME/bin/gcli.sh'
 ```
 
-Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run the CLI.
+Or you use the `gcli.sh` script found in the `/path/to/gravitino/bin/` directory to run the CLI.
 
 ## Usage
 
