@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -40,10 +41,12 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -470,6 +473,34 @@ public class TestCatalogManager {
 
     // Drop operation will update the cache
     Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(ident));
+  }
+
+  @Test
+  public void testForceDropCatalog() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test41");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+    String comment = "comment";
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("test_schema1")
+            .withNamespace(Namespace.of("metalake", "test41"))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+    entityStore.put(schemaEntity);
+    CatalogManager.CatalogWrapper catalogWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doThrow(new RuntimeException("Failed connect"))
+        .when(catalogWrapper)
+        .doWithSchemaOps(any());
+    Assertions.assertTrue(catalogManager.dropCatalog(ident, true));
   }
 
   @Test

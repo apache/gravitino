@@ -29,6 +29,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a table entity in Apache Gravitino. */
 @ToString
@@ -135,7 +136,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equal(name, baseTable.name)
         && Objects.equal(namespace, baseTable.namespace)
         && Objects.equal(auditInfo, baseTable.auditInfo)
-        && Objects.equal(columns, baseTable.columns);
+        && CollectionUtils.isEqualCollection(columns, baseTable.columns);
   }
 
   @Override

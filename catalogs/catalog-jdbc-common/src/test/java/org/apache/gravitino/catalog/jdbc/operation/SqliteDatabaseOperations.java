@@ -67,6 +67,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
     Preconditions.checkArgument(exist(databaseName), "Database %s does not exist", databaseName);
   }
 
+  @Override
   public boolean exist(String databaseName) {
     return new File(dbPath + "/" + databaseName).exists();
   }

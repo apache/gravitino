@@ -49,6 +49,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
@@ -169,7 +170,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     try {
       return rangerClient.findPolicies(searchFilters);
     } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(e, "Failed to find the policies in the Ranger");
+      throw new AuthorizationPluginException(e, "Failed to find policies in Ranger");
     }
   }
 
@@ -279,10 +280,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
     Preconditions.checkArgument(
-        authzMetadataObject.type() == SCHEMA, "The metadata object type must be SCHEMA");
+        authzMetadataObject.type() == SCHEMA, "The metadata object type must be a schema");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1,
-        "The size of the metadata object's name must be 1.");
+        authzMetadataObject.names().size() == 1, "The metadata object's size must be 1.");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Remove all schema in this catalog
       String catalogName = authzMetadataObject.names().get(0);
@@ -362,9 +362,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 3, "The metadata object names must be 3");
+        authzMetadataObject.names().size() == 3, "The metadata object's name size must be 3");
     Preconditions.checkArgument(
-        authzMetadataObject.type() == PATH, "The metadata object type must be PATH");
+        authzMetadataObject.type() == PATH, "The metadata object type must be a path");
     removePolicyByMetadataObject(authzMetadataObject);
   }
 
@@ -476,8 +476,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case CREATE_SCHEMA:
@@ -506,8 +507,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 case SELECT_TABLE:
@@ -544,14 +546,16 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       break;
                     default:
                       throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          gravitinoPrivilege.name(), securableObject.type());
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 default:
                   throw new AuthorizationPluginException(
-                      "The privilege %s is not supported for the securable object: %s",
-                      gravitinoPrivilege.name(), securableObject.type());
+                      ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                      gravitinoPrivilege.name(),
+                      securableObject.type());
               }
             });
 
@@ -585,8 +589,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         break;
       default:
         throw new AuthorizationPluginException(
-            "The owner privilege is not supported for the securable object: %s",
-            gravitinoMetadataObject.type());
+            ErrorMessages.OWNER_PRIVILEGE_NOT_SUPPORTED, gravitinoMetadataObject.type());
     }
 
     return rangerSecurableObjects;
@@ -626,7 +629,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             ((MetadataObjectChange.RenameMetadataObject) change).newMetadataObject();
         Preconditions.checkArgument(
             metadataObject.type() == newMetadataObject.type(),
-            "The old and new metadata object type must be equal!");
+            "The old and new metadata object types must be equal!");
         if (metadataObject.type() == MetadataObject.Type.METALAKE) {
           // Rename the metalake name
           this.metalake = newMetadataObject.name();
@@ -642,13 +645,13 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             translateMetadataObject(newMetadataObject);
         Preconditions.checkArgument(
             oldAuthzMetadataObjects.size() == newAuthzMetadataObjects.size(),
-            "The old and new metadata objects size must be equal!");
+            "The old and new metadata objects sizes must be equal!");
         for (int i = 0; i < oldAuthzMetadataObjects.size(); i++) {
           AuthorizationMetadataObject oldAuthMetadataObject = oldAuthzMetadataObjects.get(i);
           AuthorizationMetadataObject newAuthzMetadataObject = newAuthzMetadataObjects.get(i);
           if (oldAuthMetadataObject.equals(newAuthzMetadataObject)) {
             LOG.info(
-                "The metadata object({}) and new metadata object({}) are equal, so ignore rename!",
+                "The metadata object({}) and new metadata object({}) are equal, so ignoring rename!",
                 oldAuthMetadataObject.fullName(),
                 newAuthzMetadataObject.fullName());
             continue;
