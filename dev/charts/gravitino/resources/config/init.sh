@@ -27,6 +27,7 @@ cp /root/gravitino/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar /roo
 echo "Finish downloading"
 cp /root/gravitino/tmp/conf/* /root/gravitino/conf
 # Redirect log files to container stdout and stderr
+ln -sf /dev/stdout /root/gravitino/logs/gravitino_audit.log
 ln -sf /dev/stdout /root/gravitino/logs/gravitino-server.log
 ln -sf /dev/stderr /root/gravitino/logs/gravitino-server.out
 echo "Start the Gravitino Server"
