@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -33,6 +34,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -153,6 +155,22 @@ public class ModelMetaService {
     }
 
     return modelId;
+  }
+
+  public Long getModelIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkModel(identifier);
+    EntityIdentifier modelIdent = EntityIdentifier.of(identifier, EntityType.MODEL);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            modelIdent,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+
+              return getModelIdBySchemaIdAndModelName(schemaId, ident.ident.name());
+            });
   }
 
   ModelPO getModelPOById(Long modelId) {

@@ -18,14 +18,20 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.Entity.ROLE_SCHEMA_NAME;
+import static org.apache.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -60,46 +66,43 @@ public class MetadataObjectService {
   private MetadataObjectService() {}
 
   public static long getMetadataObjectId(
-      long metalakeId, String fullName, MetadataObject.Type type) {
+      String metalakeName, String fullName, MetadataObject.Type type) {
     if (type == MetadataObject.Type.METALAKE) {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
     }
 
     if (type == MetadataObject.Type.ROLE) {
-      return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, fullName);
+      NameIdentifier nameIdentifier =
+          NameIdentifier.of(metalakeName, SYSTEM_CATALOG_RESERVED_NAME, ROLE_SCHEMA_NAME, fullName);
+      return RoleMetaService.getInstance().getRoleIdByNameIdentifier(nameIdentifier);
     }
+
     List<String> names = DOT_SPLITTER.splitToList(fullName);
+    List<String> realNames = Lists.newArrayList(metalakeName);
+    realNames.addAll(names);
+    NameIdentifier nameIdentifier = NameIdentifier.of(realNames.toArray(new String[0]));
 
-    long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
     if (type == MetadataObject.Type.CATALOG) {
-      return catalogId;
-    }
-
-    long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, names.get(1));
-    if (type == MetadataObject.Type.SCHEMA) {
-      return schemaId;
-    }
-
-    if (type == MetadataObject.Type.FILESET) {
-      return FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaId, names.get(2));
+      return CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
+    } else if (type == MetadataObject.Type.SCHEMA) {
+      return SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(nameIdentifier);
+    } else if (type == MetadataObject.Type.FILESET) {
+      return FilesetMetaService.getInstance().getFilesetIdByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.TOPIC) {
-      return TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, names.get(2));
+      return TopicMetaService.getInstance().getTopicIdByNameIdentifier(nameIdentifier);
+    } else if (type == MetadataObject.Type.TABLE) {
+      return TableMetaService.getInstance().getTableByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.MODEL) {
-      return ModelMetaService.getInstance()
-          .getModelIdBySchemaIdAndModelName(schemaId, names.get(2));
+      return ModelMetaService.getInstance().getModelIdByNameIdentifier(nameIdentifier);
     }
-
-    long tableId =
-        TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, names.get(2));
-    if (type == MetadataObject.Type.TABLE) {
-      return tableId;
-    }
-
     if (type == MetadataObject.Type.COLUMN) {
+      long tableId =
+          TableMetaService.getInstance()
+              .getTableByNameIdentifier(
+                  NameIdentifier.of(
+                      ArrayUtils.remove(realNames.toArray(new String[0]), realNames.size() - 1)));
       return TableColumnMetaService.getInstance()
-          .getColumnIdByTableIdAndName(tableId, names.get(3));
+          .getColumnIdByTableIdAndName(tableId, names.get(4));
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -47,6 +48,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -90,6 +92,7 @@ public class CatalogMetaService {
     return catalogPO;
   }
 
+  @VisibleForTesting
   public Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
     Long catalogId =
         SessionUtils.getWithoutCommit(
@@ -103,6 +106,22 @@ public class CatalogMetaService {
           catalogName);
     }
     return catalogId;
+  }
+
+  public Long getCatalogIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkCatalog(identifier);
+    EntityIdentifier catalogIdent = EntityIdentifier.of(identifier, Entity.EntityType.CATALOG);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            catalogIdent,
+            ident -> {
+              String catalogName = ident.ident.name();
+              Long metalakeId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+              return getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+            });
   }
 
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
@@ -198,10 +217,7 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
-    Long metalakeId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    Long catalogId = getCatalogIdByNameIdentifier(identifier);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -296,8 +312,6 @@ public class CatalogMetaService {
   public int deleteCatalogMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         CatalogMetaMapper.class,
-        mapper -> {
-          return mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
-        });
+        mapper -> mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit));
   }
 }
