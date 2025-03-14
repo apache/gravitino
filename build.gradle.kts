@@ -600,6 +600,7 @@ tasks {
       "copyCatalogLibAndConfigs",
       "copySubprojectDependencies",
       "copySubprojectLib",
+      "copyCliLib",
       ":authorizations:copyLibAndConfig",
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":web:web:build"
@@ -815,6 +816,14 @@ tasks {
         into("distribution/package/libs")
       }
     }
+  }
+
+  register("copyCliLib", Copy::class) {
+    dependsOn("clients:cli:build")
+    from("clients/cli/build/libs")
+    into("distribution/package/auxlib")
+    include("gravitino-cli-*.jar")
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
   register("copySubprojectLib", Copy::class) {
