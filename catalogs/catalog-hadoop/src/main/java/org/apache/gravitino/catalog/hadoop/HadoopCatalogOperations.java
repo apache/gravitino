@@ -32,9 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
@@ -84,9 +84,13 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, FilesetCatalog {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
-  private static final ExecutorService FILE_SYSTEM_EXECUTOR =
-      Executors.newFixedThreadPool(
+  private static final ThreadPoolExecutor FILE_SYSTEM_EXECUTOR =
+      new ThreadPoolExecutor(
+          2,
           Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+          60L,
+          TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(100),
           r -> {
             Thread thread = new Thread(r, "FileSystem-Get-Thread");
             thread.setDaemon(true);
@@ -109,6 +113,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
+
+  static {
+    FILE_SYSTEM_EXECUTOR.allowCoreThreadTimeOut(true);
+  }
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
