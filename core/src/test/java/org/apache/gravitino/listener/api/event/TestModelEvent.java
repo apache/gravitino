@@ -78,7 +78,7 @@ public class TestModelEvent {
     this.dummyEventListener = new DummyEventListener();
 
     EventBus eventBus = new EventBus(Collections.singletonList(dummyEventListener));
-    this.dispatcher = new ModelEventDispatcher(eventBus, mockTagDispatcher());
+    this.dispatcher = new ModelEventDispatcher(eventBus, mockModelDispatcher());
     this.failureDispatcher = new ModelEventDispatcher(eventBus, mockExceptionModelDispatcher());
   }
 
@@ -148,6 +148,19 @@ public class TestModelEvent {
     ModelInfo modelInfoPreEvent = registerModelPreEvent.registerModelRequest();
 
     checkModelInfo(modelInfoPreEvent, modelA);
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RegisterModelEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.REGISTER_MODEL, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    // validate post-event model info
+    RegisterModelEvent registerModelEvent = (RegisterModelEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, registerModelEvent.identifier());
+    ModelInfo modelInfo = registerModelEvent.registeredModelInfo();
+
+    checkModelInfo(modelInfo, modelA);
   }
 
   @Test
@@ -204,6 +217,27 @@ public class TestModelEvent {
     checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
     checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
     checkAudit(firstModelVersion.auditInfo(), linkModelVersionRequest.audit());
+
+    // valiate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RegisterAndLinkModelEvent.class, postEvent.getClass());
+    Assertions.assertEquals(
+        OperationType.REGISTER_AND_LINK_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    // validate post-event model info
+    RegisterAndLinkModelEvent registerAndLinkModelEvent = (RegisterAndLinkModelEvent) postEvent;
+    ModelInfo modelInfo = registerAndLinkModelEvent.registeredModelInfo();
+
+    checkModelInfo(modelInfo, modelA);
+
+    // validate post-event model version info
+    ModelVersionInfo modelVersionInfo = registerAndLinkModelEvent.linkedModelVersionInfo();
+    Assertions.assertEquals(firstModelVersion.uri(), modelVersionInfo.uri());
+    Assertions.assertEquals("commentA", modelVersionInfo.comment().orElse(null));
+    checkArray(firstModelVersion.aliases(), modelVersionInfo.aliases().orElse(null));
+    checkProperties(firstModelVersion.properties(), modelVersionInfo.properties());
+    checkAudit(firstModelVersion.auditInfo(), modelVersionInfo.audit());
   }
 
   @Test
@@ -255,6 +289,18 @@ public class TestModelEvent {
 
     GetModelPreEvent getModelPreEvent = (GetModelPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, getModelPreEvent.identifier());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    GetModelEvent getModelEvent = (GetModelEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, getModelEvent.identifier());
+    ModelInfo modelInfo = getModelEvent.modelInfo();
+
+    checkModelInfo(modelInfo, modelA);
   }
 
   @Test
@@ -286,6 +332,16 @@ public class TestModelEvent {
 
     DeleteModelPreEvent deleteModelPreEvent = (DeleteModelPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, deleteModelPreEvent.identifier());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(DeleteModelEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    DeleteModelEvent deleteModelEvent = (DeleteModelEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, deleteModelEvent.identifier());
+    Assertions.assertTrue(deleteModelEvent.isExists());
   }
 
   @Test
@@ -317,6 +373,15 @@ public class TestModelEvent {
 
     ListModelPreEvent listModelPreEvent = (ListModelPreEvent) preEvent;
     Assertions.assertEquals(namespace, listModelPreEvent.namespace());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListModelEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    ListModelEvent listModelEvent = (ListModelEvent) postEvent;
+    checkArray(namespace.levels(), listModelEvent.namespace().levels());
   }
 
   @Test
@@ -356,6 +421,18 @@ public class TestModelEvent {
     ModelVersionInfo modelVersionInfo = linkModelVersionPreEvent.linkModelVersionRequest();
 
     checkModelVersionInfo(modelVersionInfo, firstModelVersion);
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(LinkModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.LINK_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    LinkModelVersionEvent linkModelVersionEvent = (LinkModelVersionEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, linkModelVersionEvent.identifier());
+    ModelVersionInfo postEventModelVersionInfo = linkModelVersionEvent.linkedModelVersionInfo();
+
+    checkModelVersionInfo(postEventModelVersionInfo, firstModelVersion);
   }
 
   @Test
@@ -403,6 +480,23 @@ public class TestModelEvent {
     Assertions.assertTrue(getModelVersionPreEvent.version().isPresent());
     Assertions.assertEquals(1, getModelVersionPreEvent.version().get());
     Assertions.assertFalse(getModelVersionPreEvent.alias().isPresent());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    GetModelVersionEvent getModelVersionEvent = (GetModelVersionEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionEvent.identifier());
+    ModelVersionInfo modelVersionInfo = getModelVersionEvent.modelVersionInfo();
+
+    // validate post-event fields
+    Assertions.assertTrue(getModelVersionEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionEvent.version().get());
+    Assertions.assertFalse(getModelVersionEvent.alias().isPresent());
+
+    checkModelVersionInfo(modelVersionInfo, firstModelVersion);
   }
 
   @Test
@@ -442,6 +536,21 @@ public class TestModelEvent {
     Assertions.assertTrue(getModelVersionPreEvent.alias().isPresent());
     Assertions.assertEquals("aliasTest", getModelVersionPreEvent.alias().get());
     Assertions.assertFalse(getModelVersionPreEvent.version().isPresent());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    // validate post-event fields
+    GetModelVersionEvent getModelVersionEvent = (GetModelVersionEvent) postEvent;
+    ModelVersionInfo modelVersionInfo = getModelVersionEvent.modelVersionInfo();
+    Assertions.assertTrue(getModelVersionEvent.alias().isPresent());
+    Assertions.assertEquals("aliasTest", getModelVersionEvent.alias().get());
+    Assertions.assertFalse(getModelVersionEvent.version().isPresent());
+
+    checkModelVersionInfo(modelVersionInfo, secondModelVersion);
   }
 
   @Test
@@ -480,6 +589,18 @@ public class TestModelEvent {
     Assertions.assertTrue(deleteModelVersionPreEvent.version().isPresent());
     Assertions.assertEquals(1, deleteModelVersionPreEvent.version().get());
     Assertions.assertFalse(deleteModelVersionPreEvent.alias().isPresent());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(DeleteModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    DeleteModelVersionEvent deleteModelVersionEvent = (DeleteModelVersionEvent) postEvent;
+    Assertions.assertTrue(deleteModelVersionEvent.version().isPresent());
+    Assertions.assertEquals(1, deleteModelVersionEvent.version().get());
+    Assertions.assertFalse(deleteModelVersionEvent.alias().isPresent());
+    Assertions.assertTrue(deleteModelVersionEvent.isExists());
   }
 
   @Test
@@ -519,6 +640,18 @@ public class TestModelEvent {
     Assertions.assertTrue(deleteModelVersionPreEvent.alias().isPresent());
     Assertions.assertEquals("aliasTest", deleteModelVersionPreEvent.alias().get());
     Assertions.assertFalse(deleteModelVersionPreEvent.version().isPresent());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(DeleteModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.DELETE_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    DeleteModelVersionEvent deleteModelVersionEvent = (DeleteModelVersionEvent) postEvent;
+    Assertions.assertTrue(deleteModelVersionEvent.alias().isPresent());
+    Assertions.assertEquals("aliasTest", deleteModelVersionEvent.alias().get());
+    Assertions.assertFalse(deleteModelVersionEvent.version().isPresent());
+    Assertions.assertTrue(deleteModelVersionEvent.isExists());
   }
 
   @Test
@@ -555,6 +688,17 @@ public class TestModelEvent {
 
     ListModelVersionPreEvent listModelVersionsPreEvent = (ListModelVersionPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, listModelVersionsPreEvent.identifier());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListModelVersionsEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    ListModelVersionsEvent listModelVersionsEvent = (ListModelVersionsEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, listModelVersionsEvent.identifier());
+    Assertions.assertEquals(2, listModelVersionsEvent.versions().length);
+    Assertions.assertArrayEquals(new int[] {1, 2}, listModelVersionsEvent.versions());
   }
 
   @Test
@@ -584,13 +728,20 @@ public class TestModelEvent {
         });
   }
 
-  private ModelDispatcher mockTagDispatcher() {
+  private ModelDispatcher mockModelDispatcher() {
     ModelDispatcher dispatcher = mock(ModelDispatcher.class);
 
     when(dispatcher.registerModel(existingIdentA, "commentA", ImmutableMap.of("color", "#FFFFFF")))
         .thenReturn(modelA);
     when(dispatcher.registerModel(existingIdentB, "commentB", ImmutableMap.of("color", "#FFFFFF")))
         .thenReturn(modelB);
+    when(dispatcher.registerModel(
+            existingIdentA,
+            "uriA",
+            new String[] {"aliasProduction"},
+            "commentA",
+            ImmutableMap.of("color", "#FFFFFF")))
+        .thenReturn(modelA);
 
     when(dispatcher.getModel(existingIdentA)).thenReturn(modelA);
     when(dispatcher.getModel(existingIdentB)).thenReturn(modelB);
