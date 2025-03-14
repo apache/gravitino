@@ -48,6 +48,8 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
 
   protected static final String CATALOG_NAME = "test_flink_jdbc_catalog";
 
+  private static final String FLINK_BYPASS_DEFAULT_DATABASE = "flink.bypass.default-database";
+
   @Override
   protected boolean supportTablePropertiesOperation() {
     return false;
@@ -116,7 +118,7 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
                 mysqlUrl,
                 JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER,
                 mysqlDriver,
-                JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE,
+                FLINK_BYPASS_DEFAULT_DATABASE,
                 mysqlDefaultDatabase));
   }
 
@@ -162,9 +164,7 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
         mysqlUsername, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
     Assertions.assertEquals(
         mysqlPassword, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
-    Assertions.assertEquals(
-        mysqlDefaultDatabase,
-        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DEFAULT_DATABASE));
+    Assertions.assertEquals(mysqlDefaultDatabase, properties.get(FLINK_BYPASS_DEFAULT_DATABASE));
     Assertions.assertEquals(
         "com.mysql.jdbc.Driver", properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }

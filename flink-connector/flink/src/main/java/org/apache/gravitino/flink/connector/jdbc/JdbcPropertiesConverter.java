@@ -21,6 +21,8 @@ package org.apache.gravitino.flink.connector.jdbc;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
@@ -28,6 +30,8 @@ import org.apache.gravitino.flink.connector.PropertiesConverter;
 public abstract class JdbcPropertiesConverter implements PropertiesConverter {
 
   private final Map<String, String> catalogOptions;
+
+  private static final Pattern jdbcUrlPattern = Pattern.compile("(jdbc:\\w+://[^:/]+(?::\\d+)?)");
 
   protected JdbcPropertiesConverter(Map<String, String> catalogOptions) {
     this.catalogOptions = catalogOptions;
@@ -46,7 +50,22 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
-    return PropertiesConverter.super.toFlinkCatalogProperties(gravitinoProperties);
+    Map<String, String> flinkCatalogProperties =
+        PropertiesConverter.super.toFlinkCatalogProperties(gravitinoProperties);
+    String gravitinoJdbcUrl = gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL);
+    // The URL in FlinkJdbcCatalog does not support database and other parameters.
+    flinkCatalogProperties.put(
+        JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
+    return flinkCatalogProperties;
+  }
+
+  private static String getBaseUrlFromJdbcUrl(String jdbcUrl) {
+    Matcher matcher = jdbcUrlPattern.matcher(jdbcUrl);
+    if (matcher.find()) {
+      return matcher.group(1) + "/";
+    } else {
+      throw new IllegalArgumentException("Invalid JDBC URL format.");
+    }
   }
 
   @Override
@@ -64,13 +83,15 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
       Map<String, String> gravitinoProperties, ObjectPath tablePath) {
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
-        "url",
-        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL)
-            + "/"
-            + tablePath.getDatabaseName());
-    tableOptions.put("table-name", tablePath.getObjectName());
-    tableOptions.put("username", catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
-    tableOptions.put("password", catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+        JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
+        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL) + tablePath.getDatabaseName());
+    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, tablePath.getObjectName());
+    tableOptions.put(
+        JdbcPropertiesConstants.FLINK_JDBC_USER,
+        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
+    tableOptions.put(
+        JdbcPropertiesConstants.FLINK_JDBC_PASSWORD,
+        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
     return tableOptions;
   }
 

@@ -38,6 +38,8 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
 
   @Override
   public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
+    // FlinkJdbcCatalog does not support 'driver' as an option, but Gravitino JdbcCatalog requires
+    // it.
     context.getOptions().remove(JdbcPropertiesConstants.FLINK_DRIVER);
     final FactoryUtil.CatalogFactoryHelper helper =
         FactoryUtils.createCatalogFactoryHelper(this, context);
