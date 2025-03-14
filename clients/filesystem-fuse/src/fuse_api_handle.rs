@@ -18,6 +18,7 @@
  */
 
 use crate::config::AppConfig;
+use crate::filesystem;
 use crate::filesystem::{FileStat, FileSystemContext, RawFileSystem};
 use fuse3::path::prelude::{ReplyData, ReplyOpen, ReplyStatFs, ReplyWrite};
 use fuse3::path::Request;
@@ -75,6 +76,10 @@ impl<T: RawFileSystem> FuseApiHandle<T> {
         };
 
         Ok(file_stat)
+    }
+
+    pub async fn get_file_path(&self, file_id: u64) -> filesystem::Result<String> {
+        self.fs.get_file_path(file_id).await
     }
 }
 

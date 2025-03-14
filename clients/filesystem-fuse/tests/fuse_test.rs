@@ -21,7 +21,6 @@ use fuse3::Errno;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::RUN_TEST_WITH_FUSE;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, test_enable_with};
-use log::{error, info};
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
@@ -32,6 +31,8 @@ use std::{env, fs};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
+use tracing::{error, info};
+use tracing_subscriber::EnvFilter;
 
 static ASYNC_RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
@@ -472,7 +473,9 @@ fn test_manually() {
 #[test]
 fn fuse_it_test_fuse() {
     test_enable_with!(RUN_TEST_WITH_FUSE);
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     let mount_point = Path::new("target/gvfs");
     let test_dir = mount_point.join("test_dir");
@@ -482,7 +485,9 @@ fn fuse_it_test_fuse() {
 
 #[test]
 fn test_fuse_with_memory_fs() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     let mount_point = "target/gvfs";
     let _ = fs::create_dir_all(mount_point);
