@@ -84,10 +84,16 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, FilesetCatalog {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
+  private static final ExecutorService FILE_SYSTEM_EXECUTOR =
+      Executors.newFixedThreadPool(
+          Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+          r -> {
+            Thread thread = new Thread(r, "FileSystem-Get-Thread");
+            thread.setDaemon(true);
+            return thread;
+          });
   private static final String SLASH = "/";
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
-  private static final int TERMINATION_AWAIT_TIMEOUT_SECONDS = 5;
-
   private final EntityStore store;
 
   private HasPropertyMetadata propertiesMetadata;
@@ -769,19 +775,11 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
                 .getOrDefault(
                     config, HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
-    ExecutorService executor =
-        Executors.newSingleThreadExecutor(
-            r -> {
-              Thread thread = new Thread(r, "FileSystem-Get-Thread");
-              thread.setDaemon(true);
-              return thread;
-            });
-
     Future<FileSystem> future = null;
 
     try {
       future =
-          executor.submit(
+          FILE_SYSTEM_EXECUTOR.submit(
               () -> {
                 try {
                   return provider.getFileSystem(path, config);
@@ -832,19 +830,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       if (future != null && !future.isDone()) {
         future.cancel(true);
       }
-
-      executor.shutdown();
-      try {
-        if (!executor.awaitTermination(TERMINATION_AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          executor.shutdownNow();
-          if (!executor.awaitTermination(TERMINATION_AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            LOG.error("ExecutorService did not terminate");
-          }
-        }
-      } catch (InterruptedException ie) {
-        executor.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
+      LOG.debug("FileSystem getting task completed");
     }
   }
 }
