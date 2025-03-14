@@ -17,39 +17,49 @@
  * under the License.
  */
 
-package org.apache.gravitino.flink.connector.paimon;
+package org.apache.gravitino.flink.connector.jdbc;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
+import org.apache.flink.util.Preconditions;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.UnsupportPartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
 /**
- * Factory for creating instances of {@link GravitinoPaimonCatalog}. It will be created by SPI
+ * Factory for creating instances of {@link GravitinoJdbcCatalog}. It will be created by SPI
  * discovery in Flink.
  */
-public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
+public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
 
   @Override
-  public Catalog createCatalog(Context context) {
+  public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
+    // FlinkJdbcCatalog does not support 'driver' as an option, but Gravitino JdbcCatalog requires
+    // it.
+    context.getOptions().remove(JdbcPropertiesConstants.FLINK_DRIVER);
     final FactoryUtil.CatalogFactoryHelper helper =
         FactoryUtils.createCatalogFactoryHelper(this, context);
     String defaultDatabase =
-        helper.getOptions().get(GravitinoPaimonCatalogFactoryOptions.DEFAULT_DATABASE);
-    return new GravitinoPaimonCatalog(
+        helper.getOptions().get(GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE);
+    Preconditions.checkNotNull(
+        defaultDatabase,
+        GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE.key() + " should not be null.");
+    return new GravitinoJdbcCatalog(
         context, defaultDatabase, propertiesConverter(context.getOptions()), partitionConverter());
   }
 
   @Override
-  public String factoryIdentifier() {
-    return GravitinoPaimonCatalogFactoryOptions.IDENTIFIER;
+  public Catalog.Type gravitinoCatalogType() {
+    return Catalog.Type.RELATIONAL;
+  }
+
+  @Override
+  public PartitionConverter partitionConverter() {
+    return UnsupportPartitionConverter.INSTANCE;
   }
 
   @Override
@@ -60,25 +70,5 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
     return Collections.emptySet();
-  }
-
-  @Override
-  public String gravitinoCatalogProvider() {
-    return "lakehouse-paimon";
-  }
-
-  @Override
-  public org.apache.gravitino.Catalog.Type gravitinoCatalogType() {
-    return org.apache.gravitino.Catalog.Type.RELATIONAL;
-  }
-
-  @Override
-  public PropertiesConverter propertiesConverter(Map<String, String> catalogOptions) {
-    return PaimonPropertiesConverter.INSTANCE;
-  }
-
-  @Override
-  public PartitionConverter partitionConverter() {
-    return DefaultPartitionConverter.INSTANCE;
   }
 }

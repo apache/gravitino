@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.flink.table.catalog.ObjectPath;
 
 /**
  * PropertiesConverter is used to convert properties between Flink properties and Apache Gravitino
@@ -134,9 +135,12 @@ public interface PropertiesConverter {
    * Converts properties from Gravitino table properties to Flink connector table properties.
    *
    * @param gravitinoProperties The table properties provided by Gravitino.
+   * @param tablePath The tablePath provides the database and table for some catalogs, such as the
+   *     {@link org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalog}.
    * @return The table properties for the Flink connector.
    */
-  default Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
+  default Map<String, String> toFlinkTableProperties(
+      Map<String, String> gravitinoProperties, ObjectPath tablePath) {
     return gravitinoProperties;
   }
 
