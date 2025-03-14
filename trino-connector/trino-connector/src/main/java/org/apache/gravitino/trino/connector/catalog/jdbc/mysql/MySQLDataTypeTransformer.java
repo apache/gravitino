@@ -45,16 +45,64 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      if (timestampType.hasTimeZone()) {
-        return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
-      } else {
-        return TimestampType.TIMESTAMP_SECONDS;
-      }
+      return timestampType.hasTimeZone()
+          ? getTimestampWithTimeZoneType(timestampType.precision())
+          : getTimestampType(timestampType.precision());
     } else if (Name.TIME == type.name()) {
-      return TimeType.TIME_SECONDS;
+      return getTimeType(((Types.TimeType) type).precision());
     }
-
     return super.getTrinoType(type);
+  }
+
+  private static TimestampWithTimeZoneType getTimestampWithTimeZoneType(int precision) {
+    switch (precision) {
+      case 0:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
+      case 3:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
+      case 6:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
+      case 9:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_NANOS;
+      default:
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Invalid timestamp precision: " + precision + ". Valid values are 0, 3, 6, 9");
+    }
+  }
+
+  private static TimestampType getTimestampType(int precision) {
+    switch (precision) {
+      case 0:
+        return TimestampType.TIMESTAMP_SECONDS;
+      case 3:
+        return TimestampType.TIMESTAMP_MILLIS;
+      case 6:
+        return TimestampType.TIMESTAMP_MICROS;
+      case 9:
+        return TimestampType.TIMESTAMP_NANOS;
+      default:
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Invalid timestamp precision: " + precision + ". Valid values are 0, 3, 6, 9");
+    }
+  }
+
+  private static TimeType getTimeType(int precision) {
+    switch (precision) {
+      case 0:
+        return TimeType.TIME_SECONDS;
+      case 3:
+        return TimeType.TIME_MILLIS;
+      case 6:
+        return TimeType.TIME_MICROS;
+      case 9:
+        return TimeType.TIME_NANOS;
+      default:
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Invalid time precision: " + precision + ". Valid values are 0, 3, 6, 9");
+    }
   }
 
   @Override
