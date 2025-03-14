@@ -43,7 +43,7 @@ public class TopicDetails extends Command {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param topic The name of the topic.
    */
   public TopicDetails(
@@ -60,9 +60,8 @@ public class TopicDetails extends Command {
   public void handle() {
     Topic gTopic = null;
 
-    try {
+    try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, topic);
-      GravitinoClient client = buildClient(metalake);
       gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -76,6 +75,10 @@ public class TopicDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    printResults(gTopic.name() + "," + gTopic.comment());
+    if (gTopic == null) {
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+    }
+
+    printResults("Topic Name: " + gTopic.name() + ", Comment: " + gTopic.comment());
   }
 }
