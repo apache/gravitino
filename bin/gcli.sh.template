@@ -21,31 +21,44 @@
 set -e
 
 if [ -L "${BASH_SOURCE-$0}" ]; then
-    FWDIR=$(dirname "$(readlink "${BASH_SOURCE-$0}")")
+    BIN_DIR=$(dirname "$(readlink "${BASH_SOURCE-$0}")")
 else
-    FWDIR=$(dirname "${BASH_SOURCE-$0}")
+    BIN_DIR=$(dirname "${BASH_SOURCE-$0}")
 fi
 
-FWDIR=$(
-    cd "$FWDIR" || exit 2
+BIN_DIR=$(
+    cd "$BIN_DIR" || exit 2
     pwd
 )
 
-ROOT_DIR=$(dirname "$FWDIR")
-ROOT_DIR=$(
-    cd "$ROOT_DIR" || exit 2
-    pwd
-)
+. "${BIN_DIR}/common.sh"
 
-. "${FWDIR}/common.sh"
+AUXLIB_DIR="${GRAVITINO_HOME}/auxlib"
 
-CLI_JAR=$(find "$ROOT_DIR/libs" -name "gravitino-cli-*-incubating-SNAPSHOT.jar" 2>/dev/null)
-VERSION=$(basename "$CLI_JAR" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+# Search strategy for finding the Gravitino CLI JAR:
+# 1. First try to find the development snapshot version in auxlib
+CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*-incubating-SNAPSHOT.jar" 2>/dev/null)
+# 2. If not found, try to find the release version (without SNAPSHOT)
 if [ -z "$CLI_JAR" ]; then
-    echo "Could not find CLI jar in $ROOT_DIR/libs "
+    CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*-incubating.jar" 2>/dev/null)
+fi
+
+# 3. Last resort: try to find any CLI JAR with any suffix pattern
+if [ -z "$CLI_JAR" ]; then
+    CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*.jar" 2>/dev/null)
+fi
+
+# 4. If still not found, exit with an error
+if [ -z "$CLI_JAR" ]; then
+    echo "ERROR: Could not find CLI jar in ${AUXLIB_DIR}"
     exit 1
 fi
 
+VERSION=$(basename "$CLI_JAR" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+if [ -z "$VERSION" ]; then
+    echo "WARNING: Could not extract version from JAR filename: $(basename "$CLI_JAR")"
+else
+    echo "Find CLI jar version: $VERSION"
+fi
 
-echo "Find CLI jar version: $VERSION"
-java -jar "$CLI_JAR" "$@"
+$JAVA_RUNNER -jar "$CLI_JAR" "$@"

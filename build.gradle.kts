@@ -593,7 +593,15 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", ":authorizations:copyLibAndConfig", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn(
+      ":web:web:build",
+      "copySubprojectDependencies",
+      "copyCatalogLibAndConfigs",
+      ":authorizations:copyLibAndConfig",
+      "copySubprojectLib",
+      "copyCliLib",
+      "iceberg:iceberg-rest-server:copyLibAndConfigs"
+    )
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -819,12 +827,14 @@ tasks {
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
+  }
 
+  register("copyCliLib", Copy::class) {
     dependsOn("clients:cli:build")
     from("clients/cli/build/libs")
-    into("distribution/package/libs")
-    include("*.jar")
-    setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+    into("distribution/package/auxlib")
+    include("gravitino-cli-*.jar")
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
   register("copyCatalogLibAndConfigs", Copy::class) {
