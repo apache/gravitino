@@ -578,4 +578,53 @@ public class AccessControlIT extends BaseIT {
       }
     }
   }
+
+  @Test
+  void testRevokeRolePermissions() {
+    // remove privilege_names and privilege_conditions check when delete secruable objects of a
+    // role.
+    String roleName = "role#124";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    metalake.createRole(roleName, properties, Lists.newArrayList());
+
+    MetadataObject metadataObject =
+        MetadataObjects.of("fileset_catalog", "fileset_schema", MetadataObject.Type.SCHEMA);
+
+    // grant a metadata(schema) privilege to a role
+    // multiple privileges (CreateFileset、ReadFileset、WriteFileset) are granted to the role here to
+    // better detect errors
+    // see (#6682).
+    Role role =
+        metalake.grantPrivilegesToRole(
+            roleName,
+            metadataObject,
+            Sets.newHashSet(
+                Privileges.CreateFileset.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // then revoke
+    Role revokedRole =
+        metalake.revokePrivilegesFromRole(
+            roleName,
+            metadataObject,
+            Sets.newHashSet(
+                Privileges.CreateFileset.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow()));
+
+    // confirm the role has no securable objects
+    Assertions.assertEquals(0, revokedRole.securableObjects().size());
+
+    // confirm the role securable objects in memory has been actually removed
+    // with the conditions of privilege_names and privilege_conditions, the securable objects may
+    // not be removed.
+    Role newRole = metalake.getRole(roleName);
+    Assertions.assertEquals(0, newRole.securableObjects().size());
+
+    // Cleanup
+    metalake.deleteRole(roleName);
+  }
 }
