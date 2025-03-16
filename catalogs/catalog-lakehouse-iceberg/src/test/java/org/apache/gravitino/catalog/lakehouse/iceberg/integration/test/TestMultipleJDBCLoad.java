@@ -53,14 +53,42 @@ public class TestMultipleJDBCLoad extends BaseIT {
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
 
-  public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
-
   @BeforeAll
   public void startup() throws IOException {
     containerSuite.startMySQLContainer(TEST_DB_NAME);
     mySQLContainer = containerSuite.getMySQLContainer();
     containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
     postgreSQLContainer = containerSuite.getPostgreSQLContainer();
+  }
+
+  @Test
+  public void testJdbcCatalogCreationWithUrlCredentials() throws Exception {
+    String metalakeName = RandomNameUtils.genRandomName("it_metalake");
+    GravitinoMetalake metalake =
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+
+    Map<String, String> icebergMysqlConf = Maps.newHashMap();
+
+    String jdbcUrl =
+        mySQLContainer.getJdbcUrl(TEST_DB_NAME)
+            + "?user="
+            + mySQLContainer.getUsername()
+            + "&password="
+            + mySQLContainer.getPassword();
+
+    icebergMysqlConf.put(IcebergConfig.CATALOG_URI.getKey(), jdbcUrl);
+    icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
+    icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
+    icebergMysqlConf.put(
+        IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
+    String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");
+    metalake.testConnection(
+        mysqlCatalogName,
+        Catalog.Type.RELATIONAL,
+        "lakehouse-iceberg",
+        "comment",
+        icebergMysqlConf);
+    Assertions.assertTrue(true);
   }
 
   @Test
