@@ -169,15 +169,12 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
     ))
 }
 
-/// init tracing subscriber with given max_level and directives,
-/// if `RUST_LOG` is set, then the directives in it will be applied.
-fn init_tracing_subscriber(max_level: LevelFilter, directives: &str) {
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::builder()
-            .with_default_directive(max_level.into())
-            .parse(directives)
-            .unwrap()
-    });
+/// init tracing subscriber with directives.
+fn init_tracing_subscriber(directives: &str) {
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .parse(directives)
+        .unwrap();
 
     // Initialize the subscriber
     tracing_subscriber::registry()
@@ -187,13 +184,14 @@ fn init_tracing_subscriber(max_level: LevelFilter, directives: &str) {
 }
 
 fn main() -> Result<(), i32> {
+    let directives = env::var("RUST_LOG").unwrap_or("".to_string());
     let args = command_args::Arguments::parse();
     match args.command {
         Commands::Mount {
             mount_point,
             fileset_location,
             config,
-            debug,
+            debug: debug_level,
             foreground,
         } => {
             let app_config = AppConfig::from_file(config);
@@ -213,30 +211,22 @@ fn main() -> Result<(), i32> {
                 path.to_string_lossy().to_string()
             };
 
-            if env::var("RUST_LOG").is_ok() {
-                init_tracing_subscriber(LevelFilter::INFO, "");
-            } else {
-                // if debug > 0, it means that we needs fuse_debug.
-                app_config.fuse.fuse_debug = debug > 0 || app_config.fuse.fuse_debug;
-                match debug {
-                    0 => {
-                        init_tracing_subscriber(LevelFilter::INFO, "");
-                    }
-                    1 => {
-                        // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
-                        init_tracing_subscriber(
-                            LevelFilter::DEBUG,
-                            "info,gvfs_fuse::fuse_api_handle_debug=debug",
-                        );
-                    }
-                    _ => {
-                        // `INFO` level logging with `DEBUG` level logging for FuseApiHandleDebug
-                        // TODO: log FuseApiHandleDebug and other module like PathFileSystemDebugLog
-                        init_tracing_subscriber(
-                            LevelFilter::DEBUG,
-                            "info,gvfs_fuse::fuse_api_handle_debug=debug",
-                        );
-                    }
+            // if debug > 0, it means that we needs fuse_debug.
+            app_config.fuse.fuse_debug = debug_level > 0 || app_config.fuse.fuse_debug;
+            match debug_level {
+                0 => {
+                    // Use the value in RUST_LOG
+                    init_tracing_subscriber(directives.as_str());
+                }
+                1 => {
+                    // debug feature of gvfs_fuse is enabled.
+                    init_tracing_subscriber(
+                        [directives.as_str(), "gvfs_fuse=debug"].join(",").as_str(),
+                    );
+                }
+                _ => {
+                    error!("Unsupported debug level: {}", debug_level);
+                    return Err(-1);
                 }
             }
 
@@ -265,7 +255,7 @@ fn main() -> Result<(), i32> {
             Ok(())
         }
         Commands::Umount { mount_point, force } => {
-            init_tracing_subscriber(LevelFilter::INFO, "");
+            init_tracing_subscriber(directives.as_str());
 
             let result = do_umount(&mount_point, force);
             if let Err(e) = result {
