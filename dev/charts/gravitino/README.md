@@ -16,7 +16,7 @@
   specific language governing permissions and limitations
   under the License.
 -->
-# gravitino
+# Apache Gravitino
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in
@@ -52,7 +52,7 @@ for data and AI assets.
 | env                 | `HADOOP_USER_NAME: hdfs `     | Environment variables to pass to the container                        |
 | resources           | `{}            `              | esource requests and limits for the container                         |
 
-## Deploy gravitino to your cluster
+## Deploy Gravitino to your cluster
 
 ### Update chart dependency
 
@@ -73,7 +73,7 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set "key1=val1,key2=val2,..."
 ```
 
-## Deploy gravitino and MySQL, MySQL is the gravitino storage backend
+## Deploy Gravitino and MySQL, MySQL is the Gravitino storage backend
 
 ```bash
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set mysql.enabled=true
@@ -85,7 +85,7 @@ To disable dynamic provisioning (The default STORAGECLASS is local-path)
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set mysql.enabled=true --set global.defaultStorageClass="-"
 ```
 
-## Deploy gravitino, use the existed MySQL as the gravitino storage backend
+## Deploy Gravitino, use the existed MySQL as the Gravitino storage backend
 
 ```bash
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" --set entity.jdbcUser=admin --set entity.jdbcPassword=admin123
@@ -105,7 +105,7 @@ To see the "gravitino.conf", run the following command:
 kubectl get cm gravitino -n gravitino -o json | jq -r '.data["gravitino.conf"]'
 ```
 
-To uninstall the gravitino, run the following command:
+To uninstall the Gravitino, run the following command:
 
 ```bash
 helm uninstall gravitino -n gravitino
