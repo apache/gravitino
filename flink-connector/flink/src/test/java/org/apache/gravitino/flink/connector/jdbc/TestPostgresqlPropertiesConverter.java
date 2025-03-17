@@ -26,6 +26,6 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
 
   @Override
   protected JdbcPropertiesConverter getConverter(Map<String, String> catalogOptions) {
-    return new PostgresqlPropertiesConverter(catalogOptions);
+    return PostgresqlPropertiesConverter.INSTANCE;
   }
 }

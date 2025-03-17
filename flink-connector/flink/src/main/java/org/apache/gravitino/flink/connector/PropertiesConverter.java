@@ -134,14 +134,19 @@ public interface PropertiesConverter {
   /**
    * Converts properties from Gravitino table properties to Flink connector table properties.
    *
-   * @param gravitinoProperties The table properties provided by Gravitino.
+   * @param flinkCatalogProperties The flinkCatalogProperties are either the converted properties
+   *     obtained through the toFlinkCatalogProperties method in GravitinoCatalogStore, or the
+   *     options passed when writing a CREATE CATALOG statement in Flink SQL.
+   * @param gravitinoTableProperties The table properties provided by Gravitino.
    * @param tablePath The tablePath provides the database and table for some catalogs, such as the
    *     {@link org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalog}.
    * @return The table properties for the Flink connector.
    */
   default Map<String, String> toFlinkTableProperties(
-      Map<String, String> gravitinoProperties, ObjectPath tablePath) {
-    return gravitinoProperties;
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoTableProperties,
+      ObjectPath tablePath) {
+    return gravitinoTableProperties;
   }
 
   /**

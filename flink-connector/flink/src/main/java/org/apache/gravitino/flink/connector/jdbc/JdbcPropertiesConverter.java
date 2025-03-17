@@ -29,13 +29,7 @@ import org.apache.gravitino.flink.connector.PropertiesConverter;
 
 public abstract class JdbcPropertiesConverter implements PropertiesConverter {
 
-  private final Map<String, String> catalogOptions;
-
   private static final Pattern jdbcUrlPattern = Pattern.compile("(jdbc:\\w+://[^:/]+(?::\\d+)?)");
-
-  protected JdbcPropertiesConverter(Map<String, String> catalogOptions) {
-    this.catalogOptions = catalogOptions;
-  }
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
@@ -59,15 +53,6 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
     return flinkCatalogProperties;
   }
 
-  private static String getBaseUrlFromJdbcUrl(String jdbcUrl) {
-    Matcher matcher = jdbcUrlPattern.matcher(jdbcUrl);
-    if (matcher.find()) {
-      return matcher.group(1) + "/";
-    } else {
-      throw new IllegalArgumentException("Invalid JDBC URL format.");
-    }
-  }
-
   @Override
   public String transformPropertyToGravitinoCatalog(String configKey) {
     return JdbcPropertiesConstants.flinkToGravitinoMap.get(configKey);
@@ -80,24 +65,32 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toFlinkTableProperties(
-      Map<String, String> gravitinoProperties, ObjectPath tablePath) {
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoProperties,
+      ObjectPath tablePath) {
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
-        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL) + tablePath.getDatabaseName());
+        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_URL)
+            + tablePath.getDatabaseName());
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, tablePath.getObjectName());
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_USER,
-        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
+        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_PASSWORD,
-        catalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
     return tableOptions;
   }
 
   protected abstract String defaultDriverName();
 
-  public Map<String, String> getCatalogOptions() {
-    return catalogOptions;
+  private static String getBaseUrlFromJdbcUrl(String jdbcUrl) {
+    Matcher matcher = jdbcUrlPattern.matcher(jdbcUrl);
+    if (matcher.find()) {
+      return matcher.group(1) + "/";
+    } else {
+      throw new IllegalArgumentException("Invalid JDBC URL format.");
+    }
   }
 }

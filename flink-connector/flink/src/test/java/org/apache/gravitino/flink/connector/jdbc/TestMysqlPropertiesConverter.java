@@ -26,6 +26,6 @@ public class TestMysqlPropertiesConverter extends AbstractJdbcPropertiesConverte
 
   @Override
   protected JdbcPropertiesConverter getConverter(Map<String, String> catalogOptions) {
-    return new MysqlPropertiesConverter(catalogOptions);
+    return MysqlPropertiesConverter.INSTANCE;
   }
 }

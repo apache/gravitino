@@ -90,15 +90,18 @@ import org.apache.gravitino.rel.indexes.Indexes;
 public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
   private final PartitionConverter partitionConverter;
+  private final Map<String, String> catalogOptions;
 
   protected BaseCatalog(
       String catalogName,
+      Map<String, String> catalogOptions,
       String defaultDatabase,
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter) {
     super(catalogName, defaultDatabase);
     this.propertiesConverter = propertiesConverter;
     this.partitionConverter = partitionConverter;
+    this.catalogOptions = catalogOptions;
   }
 
   protected abstract AbstractCatalog realCatalog();
@@ -561,7 +564,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
     flinkPrimaryKey.ifPresent(builder::primaryKey);
     Map<String, String> flinkTableProperties =
-        propertiesConverter.toFlinkTableProperties(table.properties(), tablePath);
+        propertiesConverter.toFlinkTableProperties(catalogOptions, table.properties(), tablePath);
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }

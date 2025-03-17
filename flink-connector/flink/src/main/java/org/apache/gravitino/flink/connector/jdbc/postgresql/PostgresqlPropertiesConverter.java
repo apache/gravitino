@@ -19,15 +19,14 @@
 
 package org.apache.gravitino.flink.connector.jdbc.postgresql;
 
-import java.util.Map;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConverter;
 
 public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
 
-  public PostgresqlPropertiesConverter(Map<String, String> catalogOptions) {
-    super(catalogOptions);
-  }
+  private PostgresqlPropertiesConverter() {}
+
+  public static final PostgresqlPropertiesConverter INSTANCE = new PostgresqlPropertiesConverter();
 
   @Override
   protected String defaultDriverName() {

@@ -19,15 +19,14 @@
 
 package org.apache.gravitino.flink.connector.jdbc.mysql;
 
-import java.util.Map;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConverter;
 
 public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
 
-  public MysqlPropertiesConverter(Map<String, String> catalogOptions) {
-    super(catalogOptions);
-  }
+  public static final MysqlPropertiesConverter INSTANCE = new MysqlPropertiesConverter();
+
+  private MysqlPropertiesConverter() {}
 
   @Override
   public String defaultDriverName() {

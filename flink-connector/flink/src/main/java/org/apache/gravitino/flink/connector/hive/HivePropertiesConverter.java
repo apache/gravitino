@@ -49,7 +49,9 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toFlinkTableProperties(
-      Map<String, String> gravitinoProperties, ObjectPath tablePath) {
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoProperties,
+      ObjectPath tablePath) {
     Map<String, String> properties =
         gravitinoProperties.entrySet().stream()
             .collect(
