@@ -90,7 +90,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
           60L,
           TimeUnit.SECONDS,
-          new LinkedBlockingQueue<>(100),
+          new LinkedBlockingQueue<>(500),
           r -> {
             Thread thread = new Thread(r, "FileSystem-Get-Thread");
             thread.setDaemon(true);
