@@ -23,10 +23,7 @@ import org.casbin.jcasbin.main.Enforcer;
 
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
-  private Enforcer e =
-      new Enforcer(
-          "/Users/zhongyangyang/IdeaProjects/gravitino/server/src/main/resources/rbac_modal.conf",
-          new GravitinoAdapter());
+  private Enforcer e = new Enforcer("./src/main/resource/rbac_modal.conf", new GravitinoAdapter());
 
   @Override
   public boolean authorize(String userId, String metalake, String resourceId, String action) {

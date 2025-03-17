@@ -33,7 +33,7 @@ import org.apache.gravitino.server.web.auth.annotations.AuthorizeApi;
 import org.apache.gravitino.server.web.auth.annotations.AuthorizeResource;
 
 @Provider
-public class AuthorizerFilter implements ContainerRequestFilter {
+public class AuthorizeFilter implements ContainerRequestFilter {
 
   GravitinoAuthorizer gravitinoAuthorizer =
       GravitinoAuthorizerProvider.INSTANCE.getGravitinoAuthorizer();

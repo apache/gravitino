@@ -43,13 +43,11 @@ import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.VersioningFilter;
-import org.apache.gravitino.server.web.auth.AuthorizerFilter;
+import org.apache.gravitino.server.web.auth.AuthorizeFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
-import org.apache.gravitino.server.web.rest.SchemaOperations;
-import org.apache.gravitino.server.web.rest.SchemaOperationsProxy;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -111,7 +109,6 @@ public class GravitinoServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bindFactory(SchemaOperationsProxy.class).to(SchemaOperations.class).ranked(1);
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
@@ -135,7 +132,7 @@ public class GravitinoServer extends ResourceConfig {
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);
     }
-    register(AuthorizerFilter.class);
+    register(AuthorizeFilter.class);
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
