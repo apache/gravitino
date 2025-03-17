@@ -50,8 +50,8 @@ for data and AI assets.
 | entity.jdbcDriver   | `"org.h2.Driver"`             | The JDBC driver class name                                            |
 | entity.jdbcUser     | `"gravitino"`                 | The username for the JDBC connection                                  |
 | entity.jdbcPassword | `"gravitino"`                 | The password for the JDBC connection                                  |
-| env                 | ``                            | Environment variables to pass to the container                        |
-| resources           | `{}            `              | esource requests and limits for the container                         |
+| env                 | `            `                | Environment variables to pass to the container                        |
+| resources           | `{}          `                | resource requests and limits for the container                        |
 
 ## Deploy Gravitino to your cluster
 
