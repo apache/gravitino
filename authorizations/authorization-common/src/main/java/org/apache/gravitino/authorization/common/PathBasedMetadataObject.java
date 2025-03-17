@@ -19,6 +19,8 @@
 package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
@@ -27,11 +29,23 @@ import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 public class PathBasedMetadataObject implements AuthorizationMetadataObject {
   /**
    * The type of metadata object in the underlying system. Every type will map one kind of the
-   * entity of the Gravitino type system.
+   * entity of the Gravitino type system. When we store a Hive table, first, we will store the
+   * metadata in the MySQL, and then we will store the data in the HDFS location. For Hive, there is
+   * a default location for the cluster level. We can also specify other locations for schema and
+   * table levels. So a path may not be fileset
    */
   public enum Type implements AuthorizationMetadataObject.Type {
     /** A path is mapped the path of storages like HDFS, S3 etc. */
-    PATH(MetadataObject.Type.FILESET);
+    FILESET_PATH(MetadataObject.Type.FILESET),
+    /** A path is mapped the path of table storage like Hive. */
+    TABLE_PATH(MetadataObject.Type.TABLE),
+    /** A path is mapped the path of schema storage like Hive. */
+    SCHEMA_PATH(MetadataObject.Type.SCHEMA),
+    /** A path is mapped the path of cluster storage like Hive. */
+    CATALOG_PATH(MetadataObject.Type.CATALOG),
+    /** A path is mapped the path of all cluster storages like Hive. */
+    METALAKE_PATH(MetadataObject.Type.METALAKE);
+
     private final MetadataObject.Type metadataType;
 
     Type(MetadataObject.Type type) {
@@ -89,8 +103,10 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         "Cannot create a path based metadata object with no names");
     Preconditions.checkArgument(
         path != null && !path.isEmpty(), "Cannot create a path based metadata object with no path");
-    Preconditions.checkArgument(
-        type == PathBasedMetadataObject.Type.PATH, "it must be the PATH type");
+
+    HashSet<AuthorizationMetadataObject.Type> typeSet =
+        Sets.newHashSet(PathBasedMetadataObject.Type.values());
+    Preconditions.checkArgument(typeSet.contains(type), "it must be the PATH type");
 
     for (String name : names) {
       Preconditions.checkArgument(
