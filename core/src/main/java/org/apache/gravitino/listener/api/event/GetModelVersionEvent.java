@@ -22,26 +22,37 @@ package org.apache.gravitino.listener.api.event;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.ModelInfo;
+import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 
-/** Represents an event triggered before deleting a model version. */
+/** Represents an event that is generated after a model version is successfully retrieved. */
 @DeveloperApi
-public class DeleteModelVersionPreEvent extends ModelPreEvent {
+public class GetModelVersionEvent extends ModelEvent {
+  private final ModelVersionInfo modelVersionInfo;
   private final Optional<String> alias;
   private final Optional<Integer> version;
 
   /**
-   * Create a new {@link DeleteModelVersionPreEvent} instance. only one of alias or version are
-   * valid.
+   * Constructs an instance of {@code GetModelVersionEvent}, containing the details of the event.
+   * only one of alias or version are valid.
    *
-   * @param user The username of the individual who initiated the model version deleted.
-   * @param identifier The unique identifier of the model that was deleted.
-   * @param alias The alias of the model version to be deleted.
-   * @param version The version of the model version to be deleted.
+   * @param user The username of the individual who initiated the get model version event.
+   * @param identifier The unique identifier of the model that was getting the version.
+   * @param modelVersionInfo The state of the model after the version was loaded.
+   * @param alias The alias of the model version to be deleted. If the alias is not provided, the
+   *     value will be an empty {@link Optional}.
+   * @param version The version of the model version to be deleted. If the version is not provided,
+   *     the value will be an empty {@link Optional}.
    */
-  public DeleteModelVersionPreEvent(
-      String user, NameIdentifier identifier, String alias, Integer version) {
+  public GetModelVersionEvent(
+      String user,
+      NameIdentifier identifier,
+      ModelVersionInfo modelVersionInfo,
+      String alias,
+      Integer version) {
     super(user, identifier);
 
+    this.modelVersionInfo = modelVersionInfo;
     this.alias = Optional.ofNullable(alias);
     this.version = Optional.ofNullable(version);
   }
@@ -67,12 +78,22 @@ public class DeleteModelVersionPreEvent extends ModelPreEvent {
   }
 
   /**
+   * Retrieves the state of the model as it was made available to the user after successful getting
+   * the version.
+   *
+   * @return A {@link ModelInfo} instance encapsulating the details of the model version.
+   */
+  public ModelVersionInfo modelVersionInfo() {
+    return modelVersionInfo;
+  }
+
+  /**
    * Returns the type of operation.
    *
-   * @return the operation type.
+   * @return The operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_MODEL_VERSION;
+    return OperationType.GET_MODEL_VERSION;
   }
 }

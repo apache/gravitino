@@ -35,7 +35,7 @@ public class ModelVersionInfo {
 
   private final Optional<String[]> aliases;
   private final Optional<String> comment;
-  private final Optional<Audit> auditInfo;
+  private final Optional<Audit> audit;
 
   /**
    * Constructs a {@link ModelVersionInfo} instance based on a given {@link ModelVersion}.
@@ -85,7 +85,7 @@ public class ModelVersionInfo {
 
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.comment = Optional.ofNullable(comment);
-    this.auditInfo = Optional.ofNullable(auditInfo);
+    this.audit = Optional.ofNullable(auditInfo);
     this.aliases = Optional.ofNullable(aliases);
   }
 
@@ -132,6 +132,6 @@ public class ModelVersionInfo {
    * @return the audit information of the model version or null if not set.
    */
   public Optional<Audit> audit() {
-    return auditInfo;
+    return audit;
   }
 }
