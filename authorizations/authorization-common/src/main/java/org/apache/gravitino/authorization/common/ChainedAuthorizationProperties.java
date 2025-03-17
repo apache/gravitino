@@ -77,7 +77,7 @@ public class ChainedAuthorizationProperties extends AuthorizationProperties {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY)
             && properties.get(CHAIN_PLUGINS_PROPERTIES_KEY) != null,
-        String.format("%s is required", CHAIN_PLUGINS_PROPERTIES_KEY));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, CHAIN_PLUGINS_PROPERTIES_KEY));
 
     String[] pluginNames = properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER);
     Preconditions.checkArgument(
@@ -113,7 +113,7 @@ public class ChainedAuthorizationProperties extends AuthorizationProperties {
   public void validate() {
     Preconditions.checkArgument(
         properties.containsKey(CHAIN_PLUGINS_PROPERTIES_KEY),
-        String.format("%s is required", CHAIN_PLUGINS_PROPERTIES_KEY));
+        String.format(ErrorMessages.MISSING_REQUIRED_ARGUMENT, CHAIN_PLUGINS_PROPERTIES_KEY));
     List<String> pluginNames =
         Arrays.stream(properties.get(CHAIN_PLUGINS_PROPERTIES_KEY).split(PLUGINS_SPLITTER))
             .map(String::trim)

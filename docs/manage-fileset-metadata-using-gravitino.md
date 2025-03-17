@@ -87,7 +87,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 catalog = gravitino_client.create_catalog(name="catalog",
-                                          type=Catalog.Type.FILESET,
+                                          catalog_type=Catalog.Type.FILESET,
                                           provider="hadoop", 
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})

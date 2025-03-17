@@ -202,11 +202,11 @@ and `USE_SCHEMA` privileges on its parent schema.
 
 ### Table privileges
 
-| Name         | Supports Securable Object         | Operation                                        |
-|--------------|-----------------------------------|--------------------------------------------------|
-| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                   |
-| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Write data to a table or modify the table schema |
-| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                         |
+| Name         | Supports Securable Object         | Operation                                                                 |
+|--------------|-----------------------------------|---------------------------------------------------------------------------|
+| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                                            |
+| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Select data from a data, write data to a table or modify the table schema |
+| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
 ### Topic privileges
 
