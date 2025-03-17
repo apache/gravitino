@@ -86,8 +86,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final ThreadPoolExecutor FILE_SYSTEM_EXECUTOR =
       new ThreadPoolExecutor(
-          2,
-          Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+          Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 4),
+          Math.max(Runtime.getRuntime().availableProcessors() * 4, 400),
           60L,
           TimeUnit.SECONDS,
           new LinkedBlockingQueue<>(500),
@@ -95,7 +95,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             Thread thread = new Thread(r, "FileSystem-Get-Thread");
             thread.setDaemon(true);
             return thread;
-          });
+          },
+          new ThreadPoolExecutor.CallerRunsPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+      };
   private static final String SLASH = "/";
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
   private final EntityStore store;
@@ -113,10 +118,6 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
-
-  static {
-    FILE_SYSTEM_EXECUTOR.allowCoreThreadTimeOut(true);
-  }
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
