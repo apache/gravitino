@@ -390,10 +390,10 @@ impl<T: RawFileSystem> FuseApiHandleDebug<T> {
     /// Wrapper for get_file_path that returns an empty string on error
     /// instead of propagating the error
     async fn get_file_path_or_empty(&self, inode: Inode) -> String {
-        match self.inner.get_file_path(inode).await {
-            Ok(path) => path,
-            Err(_) => "".to_string(),
-        }
+        self.inner
+            .get_file_path(inode)
+            .await
+            .unwrap_or_else(|_| "".to_string())
     }
 }
 
