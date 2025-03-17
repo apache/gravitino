@@ -60,14 +60,4 @@ public class DeleteModelEvent extends ModelEvent {
   public OperationType operationType() {
     return OperationType.DELETE_MODEL;
   }
-
-  /**
-   * The status of the operation.
-   *
-   * @return The operation status.
-   */
-  @Override
-  public OperationStatus operationStatus() {
-    return isExists() ? OperationStatus.SUCCESS : OperationStatus.UNPROCESSED;
-  }
 }

@@ -125,8 +125,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     try {
       Model registeredModel = dispatcher.registerModel(ident, uri, aliases, comment, properties);
       ModelInfo registeredModelInfo = new ModelInfo(registeredModel);
-      eventBus.dispatchEvent(
-          new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, linkModelVersionRequest));
+      eventBus.dispatchEvent(new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, uri));
       return registeredModel;
     } catch (Exception e) {
       eventBus.dispatchEvent(

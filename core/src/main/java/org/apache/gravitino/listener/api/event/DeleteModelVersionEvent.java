@@ -95,9 +95,4 @@ public class DeleteModelVersionEvent extends ModelEvent {
   public OperationType operationType() {
     return OperationType.DELETE_MODEL_VERSION;
   }
-
-  @Override
-  public OperationStatus operationStatus() {
-    return isExists() ? OperationStatus.SUCCESS : OperationStatus.UNPROCESSED;
-  }
 }

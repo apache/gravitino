@@ -231,13 +231,9 @@ public class TestModelEvent {
 
     checkModelInfo(modelInfo, modelA);
 
-    // validate post-event model version info
-    ModelVersionInfo modelVersionInfo = registerAndLinkModelEvent.linkedModelVersionInfo();
-    Assertions.assertEquals(firstModelVersion.uri(), modelVersionInfo.uri());
-    Assertions.assertEquals("commentA", modelVersionInfo.comment().orElse(null));
-    checkArray(firstModelVersion.aliases(), modelVersionInfo.aliases().orElse(null));
-    checkProperties(firstModelVersion.properties(), modelVersionInfo.properties());
-    checkAudit(firstModelVersion.auditInfo(), modelVersionInfo.audit());
+    // validate post-event model uri info
+    String versionUri = registerAndLinkModelEvent.uri();
+    Assertions.assertEquals(firstModelVersion.uri(), versionUri);
   }
 
   @Test

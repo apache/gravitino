@@ -21,7 +21,6 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.info.ModelInfo;
-import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 
 /**
  * Represents an event that is generated after a model is successfully registered and a model
@@ -29,7 +28,7 @@ import org.apache.gravitino.listener.api.info.ModelVersionInfo;
  */
 public class RegisterAndLinkModelEvent extends ModelEvent {
   private final ModelInfo registeredModelInfo;
-  private final ModelVersionInfo linkedModelVersionInfo;
+  private final String uri;
 
   /**
    * Constructs a new instance of {@link RegisterAndLinkModelEvent}, capturing the user, identifier,
@@ -39,17 +38,14 @@ public class RegisterAndLinkModelEvent extends ModelEvent {
    * @param identifier The identifier of the Model involved in the operation. This encapsulates some
    *     information.
    * @param registeredModelInfo The final state of the model post-creation.
-   * @param linkedModelVersionInfo The final state of the model version post-linking.
+   * @param uri The uri of the linked model version.
    */
   public RegisterAndLinkModelEvent(
-      String user,
-      NameIdentifier identifier,
-      ModelInfo registeredModelInfo,
-      ModelVersionInfo linkedModelVersionInfo) {
+      String user, NameIdentifier identifier, ModelInfo registeredModelInfo, String uri) {
     super(user, identifier);
 
     this.registeredModelInfo = registeredModelInfo;
-    this.linkedModelVersionInfo = linkedModelVersionInfo;
+    this.uri = uri;
   }
 
   /**
@@ -62,12 +58,12 @@ public class RegisterAndLinkModelEvent extends ModelEvent {
   }
 
   /**
-   * Retrieves the linked model version information.
+   * Retrieves the uri of the linked model version.
    *
-   * @return The model version information.
+   * @return
    */
-  public ModelVersionInfo linkedModelVersionInfo() {
-    return linkedModelVersionInfo;
+  public String uri() {
+    return uri;
   }
 
   /**
