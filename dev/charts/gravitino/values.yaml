@@ -180,9 +180,9 @@ containerSecurityContext:
   runAsUser: 0
 
 # Extra env variables to pass to the gravitino container
-env:
-  - name: HADOOP_USER_NAME
-    value: "hdfs"
+#env:
+#  - name: ENVARIABLE_NAME
+#    value: "test"
 
 resources: {}
 #  limits:

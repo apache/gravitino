@@ -16,6 +16,7 @@
   specific language governing permissions and limitations
   under the License.
 -->
+
 # Apache Gravitino
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
@@ -49,7 +50,7 @@ for data and AI assets.
 | entity.jdbcDriver   | `"org.h2.Driver"`             | The JDBC driver class name                                            |
 | entity.jdbcUser     | `"gravitino"`                 | The username for the JDBC connection                                  |
 | entity.jdbcPassword | `"gravitino"`                 | The password for the JDBC connection                                  |
-| env                 | `HADOOP_USER_NAME: hdfs `     | Environment variables to pass to the container                        |
+| env                 | ``                            | Environment variables to pass to the container                        |
 | resources           | `{}            `              | esource requests and limits for the container                         |
 
 ## Deploy Gravitino to your cluster
