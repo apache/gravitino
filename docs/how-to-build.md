@@ -25,6 +25,7 @@ license: "This software is licensed under the Apache License version 2."
 + Gravitino excludes all Docker-related tests by default. To run Docker-related tests, make sure you have installed Docker in your environment and either (1) set `skipDockerTests=false` in the `gradle.properties` file (or use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in the shell. Otherwise, all tests requiring Docker will be skipped.
 + macOS uses `docker-connector` to make the Gravitino Trino connector work with Docker for macOS. See [docker-connector](https://github.com/wenjunxiao/mac-docker-connector), `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
 + You can use OrbStack as a replacement for Docker for macOS. See [OrbStack](https://orbstack.dev/). With OrbStack, you can run Gravitino integration tests without needing to install `docker-connector`.
++ Depending on how you deploy Gravitino, other software used in conjunction with Gravitino may contain known security vulnerabilities.
 :::
 
 ## Quick start

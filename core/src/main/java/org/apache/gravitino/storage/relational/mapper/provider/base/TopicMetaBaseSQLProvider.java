@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -88,6 +89,24 @@ public class TopicMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  public String listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds) {
+    return "<script>"
+        + " SELECT topic_id as topicId, topic_name as topicName, metalake_id as metalakeId,"
+        + " catalog_id as catalogId, schema_id as schemaId,"
+        + " comment as comment, properties as properties, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND topic_id in ("
+        + "<foreach collection='topicIds' item='topicId' separator=','>"
+        + "#{topicId}"
+        + "</foreach>"
+        + ") "
+        + "</script>";
   }
 
   public String selectTopicMetaBySchemaIdAndName(

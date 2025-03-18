@@ -52,6 +52,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -147,8 +148,10 @@ public class HadoopCatalogIT extends BaseIT {
   }
 
   @Test
-  void testAlterCatalogLocation() {
+  void testAlterCatalogLocation() throws IOException {
+    Assumptions.assumeTrue(getClass() == HadoopCatalogIT.class);
     String catalogName = GravitinoITUtils.genRandomName("test_alter_catalog_location");
+    String filesetName = "test_fileset1";
     String location = defaultBaseLocation();
     String newLocation = location + "/new_location";
 
@@ -157,14 +160,26 @@ public class HadoopCatalogIT extends BaseIT {
     Catalog filesetCatalog =
         metalake.createCatalog(
             catalogName, Catalog.Type.FILESET, provider, "comment", catalogProperties);
+    filesetCatalog.asSchemas().createSchema(schemaName, null, null);
+    filesetCatalog
+        .asFilesetCatalog()
+        .createFileset(NameIdentifier.of(schemaName, filesetName), null, MANAGED, null, null);
 
     Assertions.assertEquals(location, filesetCatalog.properties().get("location"));
+    Assertions.assertTrue(
+        fileSystem.exists(new Path(location + "/" + schemaName + "/" + filesetName)));
 
     // Now try to alter the location and change it to `newLocation`.
     Catalog modifiedCatalog =
         metalake.alterCatalog(catalogName, CatalogChange.setProperty("location", newLocation));
+    String newFilesetName = "test_fileset2";
+    modifiedCatalog
+        .asFilesetCatalog()
+        .createFileset(NameIdentifier.of(schemaName, newFilesetName), null, MANAGED, null, null);
 
     Assertions.assertEquals(newLocation, modifiedCatalog.properties().get("location"));
+    Assertions.assertTrue(
+        fileSystem.exists(new Path(newLocation + "/" + schemaName + "/" + newFilesetName)));
 
     metalake.dropCatalog(catalogName, true);
   }

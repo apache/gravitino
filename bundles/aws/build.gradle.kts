@@ -59,6 +59,10 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+  }
+
   relocate("org.apache.commons.lang3", "org.apache.gravitino.aws.shaded.org.apache.commons.lang3")
   relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")

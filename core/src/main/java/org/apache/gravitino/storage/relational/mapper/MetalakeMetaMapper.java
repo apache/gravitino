@@ -49,6 +49,11 @@ public interface MetalakeMetaMapper {
 
   @SelectProvider(
       type = MetalakeMetaSQLProviderFactory.class,
+      method = "listMetalakePOsByMetalakeIds")
+  List<MetalakePO> listMetalakePOsByMetalakeIds(@Param("metalakeIds") List<Long> metalakeIds);
+
+  @SelectProvider(
+      type = MetalakeMetaSQLProviderFactory.class,
       method = "selectMetalakeIdMetaByName")
   Long selectMetalakeIdMetaByName(@Param("metalakeName") String name);
 
