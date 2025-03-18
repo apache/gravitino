@@ -27,6 +27,10 @@ public class GravitinoAuthorizerProvider {
 
   public volatile GravitinoAuthorizer gravitinoAuthorizer;
 
+  public void init() {
+    // TODO
+  }
+
   public GravitinoAuthorizer getGravitinoAuthorizer() {
     if (gravitinoAuthorizer == null) {
       synchronized (this) {

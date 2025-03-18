@@ -67,6 +67,7 @@ public class SchemaOperations {
 
   private final SchemaDispatcher dispatcher;
 
+  /** Question: The dynamic proxy loses the httpRequest */
   @Context private HttpServletRequest httpRequest;
 
   @Inject

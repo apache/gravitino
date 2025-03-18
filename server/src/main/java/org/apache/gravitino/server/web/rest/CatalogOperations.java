@@ -56,7 +56,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.server.web.auth.ResponseFilter;
+import org.apache.gravitino.server.web.auth.ResponseFilterUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -103,7 +103,7 @@ public class CatalogOperations {
                     Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
                     CatalogDTO[] catalogDtos = DTOConverters.toDTOs(catalogs);
                     catalogDtos =
-                        ResponseFilter.filter(
+                        ResponseFilterUtil.filter(
                                 catalogDtos, metalake, "USE_CATALOG", CatalogDTO::name)
                             .toArray(new CatalogDTO[0]);
                     Response response = Utils.ok(new CatalogListResponse(catalogDtos));

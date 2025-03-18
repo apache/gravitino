@@ -32,6 +32,7 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.server.web.auth.annotations.AuthorizeApi;
 import org.apache.gravitino.server.web.auth.annotations.AuthorizeResource;
 
+/** Perform authentication in the filter */
 @Provider
 public class AuthorizeFilter implements ContainerRequestFilter {
 
@@ -52,6 +53,7 @@ public class AuthorizeFilter implements ContainerRequestFilter {
     MultivaluedMap<String, String> queryParameters =
         containerRequestContext.getUriInfo().getQueryParameters();
     Map<String, Object> resourceContext = getResourceContext(parameters, queryParameters);
+    // Question: How to obtain the parameters from the containerRequestContext?
     gravitinoAuthorizer.authorize(
         "3606534323078438382",
         String.valueOf(resourceContext.get("metalake")),

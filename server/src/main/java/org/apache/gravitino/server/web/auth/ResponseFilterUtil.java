@@ -23,7 +23,11 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class ResponseFilter {
+/**
+ * The ResponseFilterUtil uses GravitinoAuthorizer to filter the returned result array to ensure
+ * that only elements with access rights are returned.
+ */
+public class ResponseFilterUtil {
 
   public static <E> List<E> filter(
       List<E> list, String metalake, String act, Function<E, String> coverToResourceId) {

@@ -37,16 +37,20 @@ import org.casbin.jcasbin.persist.Adapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * The GravitinoAdapter reads the privilege policy from the database and adds it to the model of
+ * JCasbin.
+ */
 public class GravitinoAdapter implements Adapter {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdapter.class);
 
   @Override
   public void loadPolicy(Model model) {
-    loadSecurableObject(model);
-    loadRoleUserRel(model);
-    loadGroupUserRel(model);
-    loadGroupRoleRel(model);
+    loadSecurableObject(model); // p
+    loadRoleUserRel(model); // g
+    loadGroupUserRel(model); // g
+    loadGroupRoleRel(model); // g
   }
 
   private void loadGroupRoleRel(Model model) {

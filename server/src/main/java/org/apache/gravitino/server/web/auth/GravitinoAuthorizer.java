@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.web.auth;
 
+/** The definition of an authorizer for Gravitino. */
 public interface GravitinoAuthorizer {
 
   boolean authorize(String userId, String metalake, String resourceId, String action);

@@ -21,9 +21,15 @@ package org.apache.gravitino.server.web.auth.jcasbin;
 import org.apache.gravitino.server.web.auth.GravitinoAuthorizer;
 import org.casbin.jcasbin.main.Enforcer;
 
+/**
+ * An authorizer that uses the JCasbin library to enforce access control policies.
+ *
+ * <p>Jcasbin implementation of metadata authentication
+ */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
-  private Enforcer e = new Enforcer("./src/main/resource/rbac_modal.conf", new GravitinoAdapter());
+  private Enforcer e =
+      new Enforcer("server/src/main/resources/rbac_modal.conf", new GravitinoAdapter());
 
   @Override
   public boolean authorize(String userId, String metalake, String resourceId, String action) {

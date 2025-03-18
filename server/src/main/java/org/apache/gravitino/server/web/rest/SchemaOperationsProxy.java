@@ -15,6 +15,7 @@ import org.apache.gravitino.server.web.auth.annotations.AuthorizeApi;
 import org.apache.gravitino.server.web.auth.annotations.AuthorizeResource;
 import org.glassfish.hk2.api.Factory;
 
+/** Use Cglib to implement dynamic proxy to call GravitinoAuthorizer for authentication */
 public class SchemaOperationsProxy implements Factory<SchemaOperations> {
 
   private final SchemaDispatcher dispatcher;
