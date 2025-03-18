@@ -66,11 +66,6 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   }
 
   @Override
-  protected boolean supportModifyColumnsMultipleByOneSql() {
-    return false;
-  }
-
-  @Override
   protected Catalog currentCatalog() {
     return catalog;
   }

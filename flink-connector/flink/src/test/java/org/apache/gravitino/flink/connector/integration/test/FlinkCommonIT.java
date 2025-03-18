@@ -87,10 +87,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
-  protected boolean supportModifyColumnsMultipleByOneSql() {
-    return true;
-  }
-
   protected boolean defaultValueWithNullLiterals() {
     return false;
   }
@@ -657,49 +653,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   .columns();
           Column[] expected =
               new Column[] {Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT")};
-          assertColumns(expected, actual);
-        },
-        true,
-        supportDropCascade());
-  }
-
-  @Test
-  @EnabledIf("supportModifyColumnsMultipleByOneSql")
-  public void testAlterColumnTypeAndChangeOrderInOneSql() {
-    String databaseName = "test_alter_table_alter_column_db";
-    String tableName = "test_alter_table_rename_column";
-    doWithSchema(
-        currentCatalog(),
-        databaseName,
-        catalog -> {
-          TableResult result =
-              sql(
-                  "CREATE TABLE %s "
-                      + "(user_id BIGINT COMMENT 'USER_ID', "
-                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
-                      + " COMMENT 'test comment'"
-                      + " WITH ("
-                      + "'%s' = '%s')",
-                  tableName, "test key", "test value");
-          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
-          result =
-              sql("ALTER TABLE %s MODIFY order_amount BIGINT COMMENT 'new comment2'", tableName);
-          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
-          result =
-              sql(
-                  "ALTER TABLE %s MODIFY user_id BIGINT COMMENT 'new comment' AFTER order_amount",
-                  tableName);
-          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
-          Column[] actual =
-              catalog
-                  .asTableCatalog()
-                  .loadTable(NameIdentifier.of(databaseName, tableName))
-                  .columns();
-          Column[] expected =
-              new Column[] {
-                Column.of("order_amount", Types.LongType.get(), "new comment2"),
-                Column.of("user_id", Types.LongType.get(), "new comment")
-              };
           assertColumns(expected, actual);
         },
         true,

@@ -25,6 +25,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 
 public abstract class JdbcPropertiesConverter implements PropertiesConverter {
@@ -68,18 +69,20 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
       Map<String, String> flinkCatalogProperties,
       Map<String, String> gravitinoProperties,
       ObjectPath tablePath) {
+    String jdbcUser = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_USER);
+    String jdbcPassword = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
+    Preconditions.checkNotNull(
+        jdbcUser, JdbcPropertiesConstants.FLINK_JDBC_USER + " should not be null.");
+    Preconditions.checkNotNull(
+        jdbcPassword, JdbcPropertiesConstants.FLINK_JDBC_PASSWORD + " should not be null.");
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
         flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_URL)
             + tablePath.getDatabaseName());
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, tablePath.getObjectName());
-    tableOptions.put(
-        JdbcPropertiesConstants.FLINK_JDBC_USER,
-        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
-    tableOptions.put(
-        JdbcPropertiesConstants.FLINK_JDBC_PASSWORD,
-        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcUser);
+    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, jdbcPassword);
     return tableOptions;
   }
 
