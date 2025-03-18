@@ -83,7 +83,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       default:
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Invalid mysql datetime precision: " + precision + ". Valid values are 0, 3, 6");
+            "Invalid MySQL datetime precision: " + precision + ". Valid values are 0, 3, 6");
     }
   }
 

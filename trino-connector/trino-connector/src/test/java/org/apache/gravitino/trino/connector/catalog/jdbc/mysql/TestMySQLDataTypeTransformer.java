@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import io.trino.spi.TrinoException;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -115,8 +117,10 @@ public class TestMySQLDataTypeTransformer {
     Assertions.assertEquals(
         transformer.getTrinoType(Types.TimeType.of(6)), io.trino.spi.type.TimeType.TIME_MICROS);
 
+    Exception exception =
+        assertThrows(TrinoException.class, () -> transformer.getTrinoType(Types.TimeType.of(9)));
     Assertions.assertEquals(
-        transformer.getTrinoType(Types.TimeType.of(9)), io.trino.spi.type.TimeType.TIME_NANOS);
+        exception.getMessage(), "Invalid MySQL time precision: 9. Valid values are 0, 3, 6");
   }
 
   @Test
@@ -135,9 +139,12 @@ public class TestMySQLDataTypeTransformer {
         transformer.getTrinoType(Types.TimestampType.withoutTimeZone(6)),
         io.trino.spi.type.TimestampType.TIMESTAMP_MICROS);
 
+    Exception exception =
+        assertThrows(
+            TrinoException.class,
+            () -> transformer.getTrinoType(Types.TimestampType.withoutTimeZone(9)));
     Assertions.assertEquals(
-        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(9)),
-        io.trino.spi.type.TimestampType.TIMESTAMP_NANOS);
+        exception.getMessage(), "Invalid MySQL datetime precision: 9. Valid values are 0, 3, 6");
 
     Assertions.assertEquals(
         transformer.getTrinoType(Types.TimestampType.withTimeZone(0)),
@@ -151,8 +158,11 @@ public class TestMySQLDataTypeTransformer {
         transformer.getTrinoType(Types.TimestampType.withTimeZone(6)),
         io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS);
 
+    exception =
+        assertThrows(
+            TrinoException.class,
+            () -> transformer.getTrinoType(Types.TimestampType.withTimeZone(9)));
     Assertions.assertEquals(
-        transformer.getTrinoType(Types.TimestampType.withTimeZone(9)),
-        io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_NANOS);
+        exception.getMessage(), "Invalid MySQL timestamp precision: 9. Valid values are 0, 3, 6");
   }
 }
