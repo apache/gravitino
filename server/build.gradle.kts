@@ -41,6 +41,8 @@ dependencies {
   implementation(libs.metrics.jersey2)
   implementation(libs.mysql.driver)
   implementation(libs.cglib)
+  implementation("org.aspectj:aspectjrt:1.9.7")
+  implementation("org.aspectj:aspectjweaver:1.9.7")
 
   // As of Java 9 or newer, the javax.activation package (needed by the jetty server) is no longer part of the JDK. It was removed because it was part of the
   // JavaBeans Activation Framework (JAF) which has been removed from Java SE. So we need to add it as a dependency. For more,
