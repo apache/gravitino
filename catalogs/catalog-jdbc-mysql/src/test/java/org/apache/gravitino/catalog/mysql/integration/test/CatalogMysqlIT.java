@@ -183,9 +183,10 @@ public class CatalogMysqlIT extends BaseIT {
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
-            0,
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                0,
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"))
+            + "?useSSL=false&allowPublicKeyRetrieval=true");
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
@@ -284,9 +285,10 @@ public class CatalogMysqlIT extends BaseIT {
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
-            0,
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                0,
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"))
+            + "?useSSL=false&allowPublicKeyRetrieval=true");
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
@@ -2055,9 +2057,10 @@ public class CatalogMysqlIT extends BaseIT {
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
-            0,
-            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                0,
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"))
+            + "?useSSL=false&allowPublicKeyRetrieval=true");
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
