@@ -20,18 +20,10 @@
 
 set -e
 
-if [ -L "${BASH_SOURCE-$0}" ]; then
-    BIN_DIR=$(dirname "$(readlink "${BASH_SOURCE-$0}")")
-else
-    BIN_DIR=$(dirname "${BASH_SOURCE-$0}")
-fi
+bin="$(dirname "${BASH_SOURCE-$0}")"
+bin="$(cd "${bin}">/dev/null; pwd)"
 
-BIN_DIR=$(
-    cd "$BIN_DIR" || exit 2
-    pwd
-)
-
-. "${BIN_DIR}/common.sh"
+. "${bin}/common.sh"
 
 AUXLIB_DIR="${GRAVITINO_HOME}/auxlib"
 
@@ -52,13 +44,6 @@ fi
 if [ -z "$CLI_JAR" ]; then
     echo "ERROR: Could not find CLI jar in ${AUXLIB_DIR}"
     exit 1
-fi
-
-VERSION=$(basename "$CLI_JAR" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
-if [ -z "$VERSION" ]; then
-    echo "WARNING: Could not extract version from JAR filename: $(basename "$CLI_JAR")"
-else
-    echo "Find CLI jar version: $VERSION"
 fi
 
 $JAVA_RUNNER -jar "$CLI_JAR" "$@"
