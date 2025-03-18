@@ -32,7 +32,7 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.server.web.auth.annotations.AuthorizeApi;
 import org.apache.gravitino.server.web.auth.annotations.AuthorizeResource;
 
-/** Perform authentication in the filter */
+/** Perform authentication in the filter. */
 @Provider
 public class AuthorizeFilter implements ContainerRequestFilter {
 
