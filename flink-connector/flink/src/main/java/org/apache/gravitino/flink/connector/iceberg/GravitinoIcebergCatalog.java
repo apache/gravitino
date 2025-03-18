@@ -38,10 +38,16 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
       String defaultDatabase,
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter,
-      Map<String, String> properties) {
-    super(catalogName, properties, defaultDatabase, propertiesConverter, partitionConverter);
+      Map<String, String> flinkCatalogProperties) {
+    super(
+        catalogName,
+        flinkCatalogProperties,
+        defaultDatabase,
+        propertiesConverter,
+        partitionConverter);
     FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
-    this.icebergCatalog = (FlinkCatalog) flinkCatalogFactory.createCatalog(catalogName, properties);
+    this.icebergCatalog =
+        (FlinkCatalog) flinkCatalogFactory.createCatalog(catalogName, flinkCatalogProperties);
   }
 
   @Override
