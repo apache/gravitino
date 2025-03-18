@@ -90,5 +90,11 @@ data:
     #Metrics configuration
     gravitino.metrics.timeSlidingWindowSecs	= {{ .Values.metrics.timeSlidingWindowSecs }}
 
+    {{- if .Values.visibleConfigs }}
+    gravitino.server.visibleConfigs = {{ .Values.visibleConfigs }}
+    {{- range $key, $val := .Values.visibleConfigsItems }}
+    {{ $key }} = {{ tpl $val $ }}
+    {{- end }}
+    {{- end }}
   init.sh: |-
     {{- tpl (.Files.Get "resources/config/init.sh") . | nindent 4 }}

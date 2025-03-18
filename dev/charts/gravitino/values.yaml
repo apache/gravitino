@@ -114,6 +114,14 @@ audit:
 metrics:
   timeSlidingWindowSecs: 60
 
+# visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
+
+# visibleConfigsItems:
+#   gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
+#   gravitino.datastrato.custom.authorization.ranger.username: "admin"
+#   gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
+#   gravitino.datastrato.custom.authorization.ranger.auth.type: "simple"
+
 ## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 ## If you set enabled as "True", you need :
 ## - create a pv which above 10Gi
@@ -180,9 +188,9 @@ containerSecurityContext:
   runAsUser: 0
 
 # Extra env variables to pass to the gravitino container
-#env:
-#  - name: ENVARIABLE_NAME
-#    value: "test"
+# env:
+#   - name: ENVARIABLE_NAME
+#     value: "test"
 
 resources: {}
 #  limits:
