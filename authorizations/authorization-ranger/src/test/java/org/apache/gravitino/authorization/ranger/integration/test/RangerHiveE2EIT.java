@@ -237,6 +237,41 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    // Test to create a catalog with wrong properties
+    Map<String, String> wrongProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+
+    int catalogSize = metalake.listCatalogs().length;
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            metalake.createCatalog(
+                "wrongTestProperties",
+                Catalog.Type.RELATIONAL,
+                provider,
+                "comment",
+                wrongProperties));
+
+    Assertions.assertEquals(catalogSize, metalake.listCatalogs().length);
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {

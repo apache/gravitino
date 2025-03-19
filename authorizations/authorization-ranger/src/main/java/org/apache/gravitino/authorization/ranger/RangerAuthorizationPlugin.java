@@ -786,7 +786,7 @@ public abstract class RangerAuthorizationPlugin
     try {
       rangerClient.getService(serviceName);
     } catch (RangerServiceException rse) {
-      if (rse.getStatus().equals(ClientResponse.Status.NOT_FOUND)) {
+      if (ClientResponse.Status.NOT_FOUND.equals(rse.getStatus())) {
         try {
           RangerService rangerService = new RangerService();
           rangerService.setType(getServiceType());
