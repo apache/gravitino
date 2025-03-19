@@ -16,47 +16,50 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.flink.connector.iceberg;
 
-import java.util.Map;
+package org.apache.gravitino.flink.connector.jdbc;
+
 import java.util.Optional;
+import org.apache.flink.connector.jdbc.catalog.JdbcCatalog;
+import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
+import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
-import org.apache.iceberg.flink.FlinkCatalog;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
 
-/** Gravitino Iceberg Catalog. */
-public class GravitinoIcebergCatalog extends BaseCatalog {
+/**
+ * The GravitinoJdbcCatalog class is an implementation of the BaseCatalog class that is used to
+ * proxy the JdbcCatalog class.
+ */
+public class GravitinoJdbcCatalog extends BaseCatalog {
 
-  private final FlinkCatalog icebergCatalog;
+  private final JdbcCatalog jdbcCatalog;
 
-  protected GravitinoIcebergCatalog(
-      String catalogName,
+  protected GravitinoJdbcCatalog(
+      CatalogFactory.Context context,
       String defaultDatabase,
       PropertiesConverter propertiesConverter,
-      PartitionConverter partitionConverter,
-      Map<String, String> flinkCatalogProperties) {
+      PartitionConverter partitionConverter) {
     super(
-        catalogName,
-        flinkCatalogProperties,
+        context.getName(),
+        context.getOptions(),
         defaultDatabase,
         propertiesConverter,
         partitionConverter);
-    FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
-    this.icebergCatalog =
-        (FlinkCatalog) flinkCatalogFactory.createCatalog(catalogName, flinkCatalogProperties);
-  }
-
-  @Override
-  public Optional<Factory> getFactory() {
-    return icebergCatalog.getFactory();
+    JdbcCatalogFactory jdbcCatalogFactory = new JdbcCatalogFactory();
+    this.jdbcCatalog = (JdbcCatalog) jdbcCatalogFactory.createCatalog(context);
   }
 
   @Override
   protected AbstractCatalog realCatalog() {
-    return icebergCatalog;
+    return jdbcCatalog;
+  }
+
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new JdbcDynamicTableFactory());
   }
 }

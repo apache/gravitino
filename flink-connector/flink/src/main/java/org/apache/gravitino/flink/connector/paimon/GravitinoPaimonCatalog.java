@@ -46,7 +46,12 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       String defaultDatabase,
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter) {
-    super(context.getName(), defaultDatabase, propertiesConverter, partitionConverter);
+    super(
+        context.getName(),
+        context.getOptions(),
+        defaultDatabase,
+        propertiesConverter,
+        partitionConverter);
     FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
     this.paimonCatalog = flinkCatalogFactory.createCatalog(context);
   }
