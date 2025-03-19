@@ -37,7 +37,7 @@ spec:
           elapsedTime=0
           echo "Checking for all pods in namespace {{ .Release.Namespace }} 'Running'..."
           while true; do
-            notRunningPods=$(kubectl get pods -n {{ .Release.Namespace }} -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' | grep -v "Running\|Evicted\|Completed")
+            notRunningPods=$(kubectl get pods -n {{ .Release.Namespace }} -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' | grep -v "Running\|Evicted\|Completed\|Succeeded")
             if [ -z "$notRunningPods" ]; then
               echo "All pods are running."
               break
