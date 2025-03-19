@@ -28,14 +28,6 @@ bin="$(cd "${bin}">/dev/null; pwd)"
 AUXLIB_DIR="${GRAVITINO_HOME}/auxlib"
 
 # Search strategy for finding the Gravitino CLI JAR:
-# 1. First try to find the development snapshot version in auxlib
-CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*-incubating-SNAPSHOT.jar" 2>/dev/null)
-# 2. If not found, try to find the release version (without SNAPSHOT)
-if [ -z "$CLI_JAR" ]; then
-    CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*-incubating.jar" 2>/dev/null)
-fi
-
-# 3. Last resort: try to find any CLI JAR with any suffix pattern
 if [ -z "$CLI_JAR" ]; then
     CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*.jar" 2>/dev/null)
 fi
