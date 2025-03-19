@@ -59,6 +59,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
@@ -93,6 +94,8 @@ public class GravitinoEnv {
   private CatalogDispatcher catalogDispatcher;
 
   private CatalogManager catalogManager;
+
+  private MetalakeManager metalakeManager;
 
   private SchemaDispatcher schemaDispatcher;
 
@@ -390,6 +393,10 @@ public class GravitinoEnv {
       eventListenerManager.stop();
     }
 
+    if (metalakeManager != null) {
+      metalakeManager.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -414,10 +421,13 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
+    // Tree lock
+    this.lockManager = new LockManager(config);
+
     // Create and initialize metalake related modules, the operation chain is:
     // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
     // MetalakeManager
-    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
@@ -472,12 +482,12 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
-    // TODO(jerryshao). Add Hook and event dispatcher support for Model.
+    // TODO(jerryshao). Add Hook support for Model.
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
-    this.modelDispatcher = modelNormalizeDispatcher;
+    this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
@@ -497,9 +507,6 @@ public class GravitinoEnv {
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(config);
-
-    // Tree lock
-    this.lockManager = new LockManager(config);
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));

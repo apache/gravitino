@@ -36,6 +36,10 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+  }
+
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
