@@ -7,15 +7,16 @@ public class PackageNameFilter implements Filter {
   private final String packagePrefix;
 
   public PackageNameFilter(String packagePrefix) {
-    // 确保包名以 '.' 结尾，以便正确匹配子包
+    // Make sure the package name ends with '.' in order to correctly match sub-packages
     this.packagePrefix = packagePrefix.endsWith(".") ? packagePrefix : packagePrefix + ".";
   }
 
   @Override
   public boolean matches(Descriptor descriptor) {
-    // 获取服务的实现类名称
+    // Get the name of the service's implementation class
     String implementation = descriptor.getImplementation();
-    // 检查该实现类是否属于指定的包或其子包
+    // Checks if the implementation class belongs to the 
+    // specified package or its subpackages
     return implementation.startsWith(packagePrefix);
   }
 }
