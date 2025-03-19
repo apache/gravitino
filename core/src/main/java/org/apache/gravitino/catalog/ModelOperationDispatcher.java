@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.IdGenerator;
 
@@ -207,6 +208,31 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 getCatalogIdentifier(ident),
                 c -> c.doWithModelOps(m -> m.deleteModelVersion(ident, alias)),
                 RuntimeException.class));
+  }
+
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+    Model alteredModel =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithModelOps(f -> f.alterModel(ident, changes)),
+                    NoSuchModelException.class,
+                    IllegalArgumentException.class));
+
+    return EntityCombinedModel.of(alteredModel)
+        .withHiddenProperties(
+            getHiddenPropertyNames(
+                catalogIdent,
+                HasPropertyMetadata::modelPropertiesMetadata,
+                alteredModel.properties()));
   }
 
   private ModelVersion internalGetModelVersion(

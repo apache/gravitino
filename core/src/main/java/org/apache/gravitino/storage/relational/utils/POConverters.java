@@ -1392,4 +1392,23 @@ public class POConverters {
                     .build())
         .collect(Collectors.toList());
   }
+
+  public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
+    try {
+      return ModelPO.builder()
+          .withModelId(newModel.id())
+          .withModelName(newModel.name())
+          .withMetalakeId(oldModelPO.getMetalakeId())
+          .withCatalogId(oldModelPO.getCatalogId())
+          .withSchemaId(oldModelPO.getSchemaId())
+          .withModelComment(newModel.comment())
+          .withModelLatestVersion(newModel.latestVersion())
+          .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModel.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
 }

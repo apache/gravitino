@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -252,6 +253,25 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertThrows(
         NoSuchModelVersionException.class,
         () -> modelOperationDispatcher.getModelVersion(modelIdent, "alias2"));
+  }
+
+  @Test
+  public void testAlterModel() {
+    String schemaName = "test_alter_schema";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+
+    String modelName = "test_model";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, "initial comment", props);
+
+    ModelChange[] changeComment = new ModelChange[] {ModelChange.updateComment("updated comment")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, changeComment);
+    Assertions.assertEquals(model.name(), alteredModel.name());
+    Assertions.assertEquals("updated comment", alteredModel.comment());
+    Assertions.assertEquals(model.properties(), alteredModel.properties());
   }
 
   private String randomSchemaName() {

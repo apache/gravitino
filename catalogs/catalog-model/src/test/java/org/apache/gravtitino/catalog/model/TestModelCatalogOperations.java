@@ -65,6 +65,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -650,6 +651,34 @@ public class TestModelCatalogOperations {
 
     // Test list model versions after deletion
     Assertions.assertThrows(NoSuchModelException.class, () -> ops.listModelVersions(modelIdent));
+  }
+
+  @Test
+  public void testUpdateFilesetComment() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model1";
+    String comment = "comment01";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+
+    String alteredComment = "comment01";
+    ModelChange change = ModelChange.updateComment(alteredComment);
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(alteredComment, alteredModel.comment());
   }
 
   private String randomSchemaName() {

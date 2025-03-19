@@ -19,12 +19,16 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -195,5 +199,39 @@ public class ModelMetaService {
           ident.toString());
     }
     return modelPO;
+  }
+
+  public <E extends Entity & HasIdentifier> ModelEntity updateModel(
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    NameIdentifierUtil.checkModel(identifier);
+
+    ModelPO oldModelPO = getModelPOByIdentifier(identifier);
+    ModelEntity oldModelEntity = POConverters.fromModelPO(oldModelPO, identifier.namespace());
+    ModelEntity newEntity = (ModelEntity) updater.apply((E) oldModelEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldModelEntity.id(), newEntity.id()),
+        "The updated model entity id: %s should be same with the table entity id before: %s",
+        newEntity.id(),
+        oldModelEntity.id());
+
+    Integer updateResult;
+    try {
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              ModelMetaMapper.class,
+              mapper ->
+                  mapper.updateModelMeta(
+                      POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+
+    if (updateResult > 0) {
+      return newEntity;
+    } else {
+      throw new IOException("Failed to update the entity: " + identifier);
+    }
   }
 }

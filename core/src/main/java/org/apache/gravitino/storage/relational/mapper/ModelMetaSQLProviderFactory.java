@@ -101,4 +101,9 @@ public class ModelMetaSQLProviderFactory {
   public static String updateModelLatestVersion(@Param("modelId") Long modelId) {
     return getProvider().updateModelLatestVersion(modelId);
   }
+
+  public static String updateModelMeta(
+      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
+    return getProvider().updateModelMeta(newModelPO, oldModelPO);
+  }
 }

@@ -236,4 +236,19 @@ public interface ModelCatalog {
    * @return True if the model version is deleted, false if the model version does not exist.
    */
   boolean deleteModelVersion(NameIdentifier ident, String alias);
+
+  /**
+   * Applies the {@link ModelChange changes} to a model in the catalog.
+   *
+   * <p>Implementations may reject the changes. If any change is rejected, no changes should be
+   * applied to the model.
+   *
+   * @param ident A model identifier
+   * @param changes The changes to apply to the model
+   * @return The altered model metadata
+   * @throws NoSuchModelException If the model does not exist
+   * @throws IllegalArgumentException If the change is rejected by the implementation
+   */
+  Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException;
 }

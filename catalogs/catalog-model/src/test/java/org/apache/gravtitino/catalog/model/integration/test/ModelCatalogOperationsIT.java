@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -179,6 +180,41 @@ public class ModelCatalogOperationsIT extends BaseIT {
     // Test delete model from non-existent schema
     NameIdentifier nonExistentSchemaIdent = NameIdentifier.of("non_existent_schema", modelName);
     Assertions.assertFalse(gravitinoCatalog.asModelCatalog().deleteModel(nonExistentSchemaIdent));
+  }
+
+  @Test
+  public void testRegisterAndUpdateModel() {
+    String modelName = RandomNameUtils.genRandomName("alter_comment_model");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> properties = ImmutableMap.of("owner", "data-team");
+
+    Model createdModel =
+        gravitinoCatalog.asModelCatalog().registerModel(modelIdent, "initial comment", properties);
+
+    ModelChange updateComment = ModelChange.updateComment("updated model comment");
+    Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, updateComment);
+
+    Assertions.assertEquals("updated model comment", alteredModel.comment());
+    Assertions.assertEquals(createdModel.properties(), alteredModel.properties());
+    Assertions.assertEquals(createdModel.name(), alteredModel.name());
+
+    ModelChange removeComment = ModelChange.updateComment(null);
+    Model clearedCommentModel =
+        gravitinoCatalog.asModelCatalog().alterModel(modelIdent, removeComment);
+
+    Assertions.assertNull(clearedCommentModel.comment());
+
+    NameIdentifier nonExistIdent = NameIdentifier.of(schemaName, "non_exist_model");
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> gravitinoCatalog.asModelCatalog().alterModel(nonExistIdent, updateComment));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gravitinoCatalog
+                .asModelCatalog()
+                .alterModel(NameIdentifier.of(schemaName, null), updateComment));
   }
 
   @Test
