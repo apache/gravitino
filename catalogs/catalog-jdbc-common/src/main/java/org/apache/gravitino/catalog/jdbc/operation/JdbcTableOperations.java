@@ -404,10 +404,10 @@ public abstract class JdbcTableOperations implements TableOperation {
       String indexName = indexInfo.getString("INDEX_NAME");
       String loadedTableName = indexInfo.getString("TABLE_NAME");
       // The primary key is also the unique key, so we need to filter the primary key here.
-        if (loadedTableName.equals(tableName)
+      if (loadedTableName.equals(tableName)
           && !indexInfo.getBoolean("NON_UNIQUE")
-          && !primaryIndexNames.contains(indexName)) { 
-       jdbcIndexBeans.add(
+          && !primaryIndexNames.contains(indexName)) {
+        jdbcIndexBeans.add(
             new JdbcIndexBean(
                 Index.IndexType.UNIQUE_KEY,
                 indexInfo.getString("COLUMN_NAME"),
