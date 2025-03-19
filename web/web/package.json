@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@iconify/react": "^4.1.1",
-    "@iconify/tools": "^4.0.4",
+    "@iconify/tools": "^4.1.2",
     "@iconify/utils": "^2.1.25",
     "@next/bundle-analyzer": "^14.2.4",
     "@types/lodash-es": "^4.17.12",
