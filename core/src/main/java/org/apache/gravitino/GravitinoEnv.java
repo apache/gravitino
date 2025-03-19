@@ -59,6 +59,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
@@ -481,12 +482,12 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
-    // TODO(jerryshao). Add Hook and event dispatcher support for Model.
+    // TODO(jerryshao). Add Hook support for Model.
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
-    this.modelDispatcher = modelNormalizeDispatcher;
+    this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
