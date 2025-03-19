@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
@@ -42,7 +43,8 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           JdbcConfig.USERNAME.getKey(),
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
-          JdbcConfig.POOL_MAX_SIZE.getKey());
+          JdbcConfig.POOL_MAX_SIZE.getKey(),
+          JdbcConfig.TEST_ON_BORROW.getKey());
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -99,6 +101,14 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
+                true /* hidden */,
+                false /* reserved */),
+            booleanPropertyEntry(
+                JdbcConfig.TEST_ON_BORROW.getKey(),
+                JdbcConfig.TEST_ON_BORROW.getDoc(),
+                false /* required */,
+                false /* immutable */,
+                JdbcConfig.TEST_ON_BORROW.getDefaultValue(),
                 true /* hidden */,
                 false /* reserved */));
     PROPERTIES_METADATA =

@@ -90,24 +90,31 @@ import org.apache.gravitino.rel.indexes.Indexes;
 public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
   private final PartitionConverter partitionConverter;
+  private final Map<String, String> catalogOptions;
 
   protected BaseCatalog(
       String catalogName,
+      Map<String, String> catalogOptions,
       String defaultDatabase,
       PropertiesConverter propertiesConverter,
       PartitionConverter partitionConverter) {
     super(catalogName, defaultDatabase);
     this.propertiesConverter = propertiesConverter;
     this.partitionConverter = partitionConverter;
+    this.catalogOptions = catalogOptions;
   }
 
   protected abstract AbstractCatalog realCatalog();
 
   @Override
-  public void open() throws CatalogException {}
+  public void open() throws CatalogException {
+    realCatalog().open();
+  }
 
   @Override
-  public void close() throws CatalogException {}
+  public void close() throws CatalogException {
+    realCatalog().close();
+  }
 
   @Override
   public List<String> listDatabases() throws CatalogException {
@@ -207,7 +214,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
           catalog()
               .asTableCatalog()
               .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
-      return toFlinkTable(table);
+      return toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
       throw new TableNotExistException(catalogName(), tablePath, e);
     } catch (Exception e) {
@@ -545,7 +552,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     throw new UnsupportedOperationException();
   }
 
-  protected CatalogBaseTable toFlinkTable(Table table) {
+  protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
     for (Column column : table.columns()) {
@@ -557,7 +564,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
     flinkPrimaryKey.ifPresent(builder::primaryKey);
     Map<String, String> flinkTableProperties =
-        propertiesConverter.toFlinkTableProperties(table.properties());
+        propertiesConverter.toFlinkTableProperties(catalogOptions, table.properties(), tablePath);
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
