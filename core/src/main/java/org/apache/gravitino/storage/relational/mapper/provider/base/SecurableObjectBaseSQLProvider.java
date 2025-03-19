@@ -63,9 +63,7 @@ public class SecurableObjectBaseSQLProvider {
         + " WHERE FALSE "
         + "<foreach collection='securableObjects' item='item' separator=' '>"
         + " OR (metadata_object_id = #{item.metadataObjectId} AND"
-        + " role_id = #{item.roleId} AND deleted_at = 0 AND"
-        + " privilege_names = #{item.privilegeNames} AND"
-        + " privilege_conditions = #{item.privilegeConditions})"
+        + " role_id = #{item.roleId} AND deleted_at = 0 )"
         + "</foreach>"
         + "</script>";
   }

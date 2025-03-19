@@ -578,4 +578,47 @@ public class AccessControlIT extends BaseIT {
       }
     }
   }
+
+  @Test
+  void testRevokeRolePermissions() {
+    String roleName = "role#124";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    metalake.createRole(roleName, properties, Lists.newArrayList());
+
+    MetadataObject metadataObject =
+        MetadataObjects.of("fileset_catalog", "fileset_schema", MetadataObject.Type.SCHEMA);
+
+    // Multiple privileges (CreateFileset、ReadFileset、WriteFileset) are granted
+    // to the role here to better find errors, see (#6682).
+    Role role =
+        metalake.grantPrivilegesToRole(
+            roleName,
+            metadataObject,
+            Sets.newHashSet(
+                Privileges.CreateFileset.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // Then revoke
+    Role revokedRole =
+        metalake.revokePrivilegesFromRole(
+            roleName,
+            metadataObject,
+            Sets.newHashSet(
+                Privileges.CreateFileset.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow()));
+
+    // Confirm the return data has no securable objects.
+    Assertions.assertEquals(0, revokedRole.securableObjects().size());
+
+    // Confirm the role securable objects in memory has been actually soft deleted.
+    Role newRole = metalake.getRole(roleName);
+    Assertions.assertEquals(0, newRole.securableObjects().size());
+
+    // Cleanup.
+    metalake.deleteRole(roleName);
+  }
 }
