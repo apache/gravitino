@@ -581,8 +581,6 @@ public class AccessControlIT extends BaseIT {
 
   @Test
   void testRevokeRolePermissions() {
-    // remove privilege_names and privilege_conditions check when delete secruable objects of a
-    // role.
     String roleName = "role#124";
     Map<String, String> properties = Maps.newHashMap();
     properties.put("k1", "v1");
@@ -591,10 +589,8 @@ public class AccessControlIT extends BaseIT {
     MetadataObject metadataObject =
         MetadataObjects.of("fileset_catalog", "fileset_schema", MetadataObject.Type.SCHEMA);
 
-    // grant a metadata(schema) privilege to a role
-    // multiple privileges (CreateFileset、ReadFileset、WriteFileset) are granted to the role here to
-    // better detect errors
-    // see (#6682).
+    // Multiple privileges (CreateFileset、ReadFileset、WriteFileset) are granted
+    // to the role here to better find errors, see (#6682).
     Role role =
         metalake.grantPrivilegesToRole(
             roleName,
@@ -605,7 +601,7 @@ public class AccessControlIT extends BaseIT {
                 Privileges.WriteFileset.allow()));
     Assertions.assertEquals(1, role.securableObjects().size());
 
-    // then revoke
+    // Then revoke
     Role revokedRole =
         metalake.revokePrivilegesFromRole(
             roleName,
@@ -615,16 +611,14 @@ public class AccessControlIT extends BaseIT {
                 Privileges.ReadFileset.allow(),
                 Privileges.WriteFileset.allow()));
 
-    // confirm the role has no securable objects
+    // Confirm the return data has no securable objects.
     Assertions.assertEquals(0, revokedRole.securableObjects().size());
 
-    // confirm the role securable objects in memory has been actually removed
-    // with the conditions of privilege_names and privilege_conditions, the securable objects may
-    // not be removed.
+    // Confirm the role securable objects in memory has been actually soft deleted.
     Role newRole = metalake.getRole(roleName);
     Assertions.assertEquals(0, newRole.securableObjects().size());
 
-    // Cleanup
+    // Cleanup.
     metalake.deleteRole(roleName);
   }
 }
