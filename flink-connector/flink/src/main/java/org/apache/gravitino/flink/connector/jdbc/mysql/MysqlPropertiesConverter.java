@@ -17,15 +17,24 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.mysql.integration.test;
+package org.apache.gravitino.flink.connector.jdbc.mysql;
 
-import org.junit.jupiter.api.Tag;
+import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConverter;
 
-@Tag("gravitino-docker-test")
-public class CatalogMysqlDriverIT extends CatalogMysqlIT {
-  public CatalogMysqlDriverIT() {
-    super();
-    DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
-        "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar";
+public class MysqlPropertiesConverter extends JdbcPropertiesConverter {
+
+  public static final MysqlPropertiesConverter INSTANCE = new MysqlPropertiesConverter();
+
+  private MysqlPropertiesConverter() {}
+
+  @Override
+  public String defaultDriverName() {
+    return "com.mysql.jdbc.Driver";
+  }
+
+  @Override
+  public String getFlinkCatalogType() {
+    return GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER;
   }
 }
