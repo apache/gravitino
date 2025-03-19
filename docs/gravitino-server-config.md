@@ -143,7 +143,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | Gravitino server fileset operation   | `CreateFilesetPreEvent`, `AlterFilesetPreEvent`, `DropFilesetPreEvent`, `LoadFilesetPreEvent`,`ListFilesetPreEvent`,`GetFileLocationPreEvent`                                                                                                                                                                           | 0.8.0-incubating |
 | Gravitino server model operation     | `DeleteModelPreEvent`, `DeleteModelVersionPreEvent`, `RegisterAndLinkModelPreEvent`,`GetModelPreEvent`, `GetModelVersionPreEvent`,`LinkModelVersionPreEvent`,`ListModelPreEvent`,`RegisterModelPreEvent`                                                                                                                                             | 0.9.0-incubating |
 | Gravitino server tag operation       | `ListTagsPreEvent`, `ListTagsInfoPreEvent`, `CreateTagPreEvent`, `GetTagPreEvent`, `AlterTagPreEvent`, `DeleteTagPreEvent`, `ListMetadataObjectsForTagPreEvent`, `ListTagsForMetadataObjectPreEvent`, `ListTagsInfoForMetadataObjectPreEvent`, `AssociateTagsForMetadataObjectPreEvent`, `GetTagForMetadataObjectPreEvent` | 0.9.0-incubating |
-| Gravitino server tag operation       | `AddUserPreEvent`, `GetUserPreEvent`, `ListUserNamesPreEvent`, `ListUserPreEvent`, `RemoveUserPreEvent` | 0.9.0-incubating |
+| Gravitino server user operation      | `AddUserPreEvent`, `GetUserPreEvent`, `ListUserNamesPreEvent`, `ListUserPreEvent`, `RemoveUserPreEvent` | 0.9.0-incubating |
 
 #### Event listener plugin
 
