@@ -94,6 +94,8 @@ public abstract class RangerAuthorizationPlugin
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
+    createRangerServiceIfNecessary(config, rangerServiceName);
+
     rangerHelper =
         new RangerHelper(
             rangerClient,
@@ -743,6 +745,36 @@ public abstract class RangerAuthorizationPlugin
       return Boolean.FALSE;
     }
     return Boolean.TRUE;
+  }
+
+  private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {
+    try {
+      rangerClient.getService(serviceName);
+    } catch (RangerServiceException rse) {
+      if (Boolean.parseBoolean(
+              config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))
+          && ClientResponse.Status.NOT_FOUND.equals(rse.getStatus())) {
+        try {
+          RangerService rangerService = new RangerService();
+          rangerService.setType(getServiceType());
+          rangerService.setName(serviceName);
+          rangerService.setConfigs(getServiceConfigs(config));
+          rangerClient.createService(rangerService);
+          // We should remove some default policies, they will cause users to get more policies
+          // than they should do.
+          List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
+          for (RangerPolicy policy : policies) {
+            rangerClient.deletePolicy(policy.getId());
+          }
+        } catch (RangerServiceException crse) {
+          throw new AuthorizationPluginException(
+              "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
+        }
+      } else {
+        throw new AuthorizationPluginException(
+            "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
+      }
+    }
   }
 
   /**

@@ -196,6 +196,84 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
+
+    // Test to create catalog automatically
+    Map<String, String> uuidProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
+            "test555",
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+
+    try {
+      List<RangerService> serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
+      int expectServiceCount = serviceList.size() + 1;
+      Catalog catalogTest =
+          metalake.createCatalog(
+              "test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
+      Map<String, String> newProperties = catalogTest.properties();
+      Assertions.assertTrue(newProperties.containsKey("authorization.ranger.service.name"));
+      serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
+      Assertions.assertEquals(expectServiceCount, serviceList.size());
+      metalake.dropCatalog("test", true);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    // Test to create a catalog with wrong properties which lacks Ranger service name,
+    // It will throw RuntimeException with message that Ranger service name is required.
+    Map<String, String> wrongProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+
+    int catalogSize = metalake.listCatalogs().length;
+    Exception exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                metalake.createCatalog(
+                    "wrongTestProperties",
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    wrongProperties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("authorization.ranger.service.name is required"));
+
+    Assertions.assertEquals(catalogSize, metalake.listCatalogs().length);
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {
