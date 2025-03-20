@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.utils.NameIdentifierUtil.getMetalake;
+
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -44,10 +47,8 @@ public class OwnerMetaService {
   }
 
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
-    long metalakeId =
-        MetalakeMetaService.getInstance()
-            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
-    Long entityId = getEntityId(metalakeId, identifier, type);
+    String metalakeName = getMetalake(identifier);
+    Long entityId = getEntityId(metalakeName, identifier, type);
 
     UserPO userPO =
         SessionUtils.getWithoutCommit(
@@ -59,7 +60,7 @@ public class OwnerMetaService {
           POConverters.fromUserPO(
               userPO,
               Collections.emptyList(),
-              AuthorizationUtils.ofUserNamespace(NameIdentifierUtil.getMetalake(identifier))));
+              AuthorizationUtils.ofUserNamespace(getMetalake(identifier))));
     }
 
     GroupPO groupPO =
@@ -72,7 +73,7 @@ public class OwnerMetaService {
           POConverters.fromGroupPO(
               groupPO,
               Collections.emptyList(),
-              AuthorizationUtils.ofGroupNamespace(NameIdentifierUtil.getMetalake(identifier))));
+              AuthorizationUtils.ofGroupNamespace(getMetalake(identifier))));
     }
 
     return Optional.empty();
@@ -83,12 +84,11 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-    long metalakeId =
-        MetalakeMetaService.getInstance()
-            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(entity));
-
-    Long entityId = getEntityId(metalakeId, entity, entityType);
-    Long ownerId = getEntityId(metalakeId, owner, ownerType);
+    String metalakeName = getMetalake(entity);
+    Long metalakeId =
+        getEntityId(metalakeName, NameIdentifier.of(metalakeName), EntityType.METALAKE);
+    Long entityId = getEntityId(metalakeName, entity, entityType);
+    Long ownerId = getEntityId(metalakeName, owner, ownerType);
 
     OwnerRelPO ownerRelPO =
         POConverters.initializeOwnerRelPOsWithVersion(
@@ -107,18 +107,16 @@ public class OwnerMetaService {
   }
 
   private static long getEntityId(
-      long metalakeId, NameIdentifier identifier, Entity.EntityType type) {
+      String metalake, NameIdentifier identifier, Entity.EntityType type) {
     switch (type) {
       case USER:
-        return UserMetaService.getInstance()
-            .getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+        return UserMetaService.getInstance().getUserIdByNameIdentifier(identifier);
       case GROUP:
-        return GroupMetaService.getInstance()
-            .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+        return GroupMetaService.getInstance().getGroupIdByNameIdentifier(identifier);
       default:
         MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
         return MetadataObjectService.getMetadataObjectId(
-            metalakeId, object.fullName(), object.type());
+            metalake, object.fullName(), object.type());
     }
   }
 }

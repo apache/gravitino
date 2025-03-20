@@ -35,6 +35,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -175,12 +176,7 @@ public class TopicMetaService {
   public boolean deleteTopic(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
-    String topicName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
+    Long topicId = getTopicIdByNameIdentifier(identifier);
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -216,7 +212,22 @@ public class TopicMetaService {
         });
   }
 
-  public Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
+  public Long getTopicIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTopic(identifier);
+
+    EntityIdentifier topicEntity = EntityIdentifier.of(identifier, Entity.EntityType.TOPIC);
+    return NameIdMappingService.getInstance()
+        .get(
+            topicEntity,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+              return getTopicIdBySchemaIdAndName(schemaId, ident.ident.name());
+            });
+  }
+
+  private Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
     Long topicId =
         SessionUtils.getWithoutCommit(
             TopicMetaMapper.class,

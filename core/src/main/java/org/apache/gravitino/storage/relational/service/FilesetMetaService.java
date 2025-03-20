@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -37,6 +38,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -83,7 +85,22 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
-  public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
+  public Long getFilesetIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkFileset(identifier);
+
+    EntityIdentifier fileIdentifier = EntityIdentifier.of(identifier, EntityType.FILESET);
+    return NameIdMappingService.getInstance()
+        .get(
+            fileIdentifier,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+              return getFilesetIdBySchemaIdAndName(schemaId, ident.ident.name());
+            });
+  }
+
+  private Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
     Long filesetId =
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class,
@@ -225,12 +242,7 @@ public class FilesetMetaService {
   public boolean deleteFileset(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
-    String filesetName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
+    Long filesetId = getFilesetIdByNameIdentifier(identifier);
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(
