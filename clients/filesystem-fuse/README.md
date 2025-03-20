@@ -31,7 +31,7 @@ Gvfs-fuse is the Fuse client for Gravitino fileset. It allows users to mount Gra
 
 ## Environment setup and build instructions
 
-### Prerequisites
+### Prerequisite****s
 
 You need to install the following software before you can build gvfs-fuse:
 
@@ -96,6 +96,14 @@ target/debug/gvfs-fuse mount target/gvfs gvfs://fileset/test/c1/s1/fileset1 -c c
 # Execute the mount command in the background
 # mount the fileset uri to the local directory target/gvfs
 target/debug/gvfs-fuse mount target/gvfs gvfs://fileset/test/c1/s1/fileset1 -c conf/gvfs_fuse.toml
+
+# Execute the mount command in the background with debug logging of gvfs_fuse package (this is equivalent to setting environment variable: `RUST_LOG=gvfs_fuse=debug`)
+target/debug/gvfs-fuse mount target/gvfs gvfs://fileset/test/c1/s1/fileset1 -c conf/gvfs_fuse.toml -d 1
+
+# You can also specify custom log filter by providing `RUST_LOG` environment variable,
+# Note that no matter which `RUST_LOG` is provided, if `-d` is `1`, logging of `gvfs_fuse` will always be `DEBUG` level.
+# See [tracing-subscriber](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives) documentation for more details
+RUST_LOG=info,gvfs_fuse::memory_filesystem=trace target/debug/gvfs-fuse mount target/gvfs gvfs://fileset/test/c1/s1/fileset1 -c conf/gvfs_fuse.toml -d 1
 
 # Execute the umount command
 # unmount the fileset from the local directory target/gvfs
