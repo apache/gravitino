@@ -31,7 +31,7 @@ Gvfs-fuse is the Fuse client for Gravitino fileset. It allows users to mount Gra
 
 ## Environment setup and build instructions
 
-### Prerequisite****s
+### Prerequisites
 
 You need to install the following software before you can build gvfs-fuse:
 
