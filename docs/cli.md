@@ -10,11 +10,11 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, modules, columns, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
+Currently, the CLI allows users to view, create and update metadata information for metalakes, catalogs, schemas, tables, models, columns, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
-To run the Gravitino CLI, please use the `gcli.sh` script located in Gravitino's bin directory. if you define the `GRAVITINO_HOME` environment variable, which allows you to run the script from any location using `$GRAVITINO_HOME/bin/gcli.sh`.
+To run the Gravitino CLI, please use the `gcli.sh` script located in Gravitino's bin directory. If you define the `GRAVITINO_HOME` environment variable, you can run the script from any location using `$GRAVITINO_HOME/bin/gcli.sh`.
 
 ## Usage
 
