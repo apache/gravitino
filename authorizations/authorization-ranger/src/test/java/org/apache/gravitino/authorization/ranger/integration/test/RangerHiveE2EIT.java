@@ -271,7 +271,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
                     provider,
                     "comment",
                     wrongProperties));
-    Assertions.assertEquals("xxx", exception.getMessage());
+    Assertions.assertTrue(exception.getMessage().contains("is required"));
 
     Assertions.assertEquals(catalogSize, metalake.listCatalogs().length);
   }
