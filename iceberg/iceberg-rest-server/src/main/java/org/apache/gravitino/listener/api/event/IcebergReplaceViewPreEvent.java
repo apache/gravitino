@@ -21,23 +21,28 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /** Represent a pre event before updating Iceberg view. */
 @DeveloperApi
 public class IcebergReplaceViewPreEvent extends IcebergViewPreEvent {
-  private final UpdateTableRequest replaceViewRequest;
+  private final ObjectWrapper<UpdateTableRequest> replaceViewRequestWrapper;
 
   public IcebergReplaceViewPreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      UpdateTableRequest replaceViewRequest) {
+      ObjectWrapper<UpdateTableRequest> replaceViewRequestWrapper) {
     super(icebergRequestContext, viewIdentifier);
-    this.replaceViewRequest = replaceViewRequest;
+    this.replaceViewRequestWrapper = replaceViewRequestWrapper;
   }
 
   public UpdateTableRequest replaceViewRequest() {
-    return replaceViewRequest;
+    return replaceViewRequestWrapper.get();
+  }
+
+  public ObjectWrapper<UpdateTableRequest> replaceViewRequestWrapper() {
+    return replaceViewRequestWrapper;
   }
 
   /**
