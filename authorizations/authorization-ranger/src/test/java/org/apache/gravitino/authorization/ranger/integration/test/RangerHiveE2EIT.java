@@ -238,7 +238,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
       throw new RuntimeException(e);
     }
 
-    // Test to create a catalog with wrong properties
+    // Test to create a catalog with wrong properties which lacks Ranger service name
     Map<String, String> wrongProperties =
         ImmutableMap.of(
             HiveConstants.METASTORE_URIS,
