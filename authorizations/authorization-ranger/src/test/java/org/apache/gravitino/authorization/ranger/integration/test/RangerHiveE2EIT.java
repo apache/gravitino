@@ -261,15 +261,17 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             "true");
 
     int catalogSize = metalake.listCatalogs().length;
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () ->
-            metalake.createCatalog(
-                "wrongTestProperties",
-                Catalog.Type.RELATIONAL,
-                provider,
-                "comment",
-                wrongProperties));
+    Exception exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                metalake.createCatalog(
+                    "wrongTestProperties",
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    wrongProperties));
+    Assertions.assertTrue(exception.getMessage().contains("xxx"));
 
     Assertions.assertEquals(catalogSize, metalake.listCatalogs().length);
   }
