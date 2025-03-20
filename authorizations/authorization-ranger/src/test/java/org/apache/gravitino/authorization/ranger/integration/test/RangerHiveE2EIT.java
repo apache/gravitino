@@ -238,7 +238,8 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
       throw new RuntimeException(e);
     }
 
-    // Test to create a catalog with wrong properties which lacks Ranger service name
+    // Test to create a catalog with wrong properties which lacks Ranger service name,
+    // It will throw RuntimeException with message that Ranger service name is required.
     Map<String, String> wrongProperties =
         ImmutableMap.of(
             HiveConstants.METASTORE_URIS,
@@ -271,7 +272,8 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
                     provider,
                     "comment",
                     wrongProperties));
-    Assertions.assertTrue(exception.getMessage().contains("is required"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("authorization.ranger.service.name is required"));
 
     Assertions.assertEquals(catalogSize, metalake.listCatalogs().length);
   }
