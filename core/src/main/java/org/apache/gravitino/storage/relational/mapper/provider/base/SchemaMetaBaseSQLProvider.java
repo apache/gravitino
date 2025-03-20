@@ -190,4 +190,21 @@ public class SchemaMetaBaseSQLProvider {
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return "SELECT metalake_meta.metalake_id as metalakeId, catalog_meta.catalog_id as catalogId, "
+        + " schema_id as schemaId"
+        + " FROM metalake_meta"
+        + " JOIN catalog_meta ON metalake_meta.metalake_id = catalog_meta.metalake_id"
+        + " JOIN schema_meta ON catalog_meta.catalog_id = schema_meta.catalog_id"
+        + " WHERE metalake_name = #{metalakeName}"
+        + " AND catalog_name = #{catalogName}"
+        + " AND schema_name = #{schemaName}"
+        + " AND schema_meta.deleted_at = 0"
+        + " AND catalog_meta.deleted_at = 0"
+        + " AND metalake_meta.deleted_at = 0";
+  }
 }
