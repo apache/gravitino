@@ -38,12 +38,14 @@ import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -353,6 +355,17 @@ class DTOConverters {
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static ModelUpdateRequest toModelUpdateRequest(ModelChange change) {
+    if (change instanceof ModelChange.UpdateModelComment) {
+      return new ModelUpdateRequest.UpdateModelCommentRequest(
+          ((ModelChange.UpdateModelComment) change).getNewComment());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown model change type: " + change.getClass().getSimpleName());
     }
   }
 }
