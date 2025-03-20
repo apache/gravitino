@@ -32,7 +32,6 @@ if [ -z "$CLI_JAR" ]; then
     CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*.jar" 2>/dev/null)
 fi
 
-# 4. If still not found, exit with an error
 if [ -z "$CLI_JAR" ]; then
     echo "ERROR: Could not find CLI jar in ${AUXLIB_DIR}"
     exit 1
