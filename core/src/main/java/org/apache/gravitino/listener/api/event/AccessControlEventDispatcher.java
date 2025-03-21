@@ -119,7 +119,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public User[] listUsers(String metalake) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new ListUserPreEvent(initiator, NameIdentifier.of(metalake)));
+    eventBus.dispatchEvent(new ListUsersPreEvent(initiator, NameIdentifier.of(metalake)));
     try {
       // TODO: add Event
       return dispatcher.listUsers(metalake);

@@ -20,9 +20,11 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.UserInfo;
 
 /** Represents an event triggered before add a user to a metalake. */
+@DeveloperApi
 public class AddUserPreEvent extends UserPreEvent {
   private final UserInfo addUserRequest;
 
