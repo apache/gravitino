@@ -31,8 +31,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -73,8 +77,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.awaitility.Awaitility;
-import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,9 +84,25 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, FilesetCatalog {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
+  private static final ThreadPoolExecutor FILE_SYSTEM_EXECUTOR =
+      new ThreadPoolExecutor(
+          Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 4),
+          Math.max(Runtime.getRuntime().availableProcessors() * 4, 400),
+          60L,
+          TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(500),
+          r -> {
+            Thread thread = new Thread(r, "FileSystem-Get-Thread");
+            thread.setDaemon(true);
+            return thread;
+          },
+          new ThreadPoolExecutor.CallerRunsPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+      };
   private static final String SLASH = "/";
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
-
   private final EntityStore store;
 
   private HasPropertyMetadata propertiesMetadata;
@@ -259,9 +277,9 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     try {
       // formalize the path to avoid path without scheme, uri, authority, etc.
-      filesetPath = formalizePath(filesetPath, conf);
-
       FileSystem fs = getFileSystem(filesetPath, conf);
+      filesetPath = filesetPath.makeQualified(fs.getUri(), fs.getWorkingDirectory());
+
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
           throw new RuntimeException(
@@ -765,29 +783,63 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
                 .catalogPropertiesMetadata()
                 .getOrDefault(
                     config, HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+
+    Future<FileSystem> future = null;
+
     try {
-      AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
-      Awaitility.await()
-          .atMost(timeoutSeconds, TimeUnit.SECONDS)
-          .until(
+      future =
+          FILE_SYSTEM_EXECUTOR.submit(
               () -> {
-                fileSystem.set(provider.getFileSystem(path, config));
-                return true;
+                try {
+                  return provider.getFileSystem(path, config);
+                } catch (IOException e) {
+                  throw e;
+                } catch (Exception e) {
+                  throw new IOException("Unexpected error getting FileSystem", e);
+                }
               });
-      return fileSystem.get();
-    } catch (ConditionTimeoutException e) {
-      throw new IOException(
-          String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s "
-                  + "seconds, please check the configuration or increase the "
-                  + "file system connection timeout time by setting catalog property: %s",
-              path,
-              scheme,
-              provider,
-              config,
-              timeoutSeconds,
-              HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
-          e);
+
+      try {
+        return future.get(timeoutSeconds, TimeUnit.SECONDS);
+      } catch (TimeoutException e) {
+        LOG.error("FileSystem connection timed out", e);
+
+        if (future != null) {
+          future.cancel(true);
+        }
+
+        throw new IOException(
+            String.format(
+                "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s "
+                    + "seconds, please check the configuration or increase the "
+                    + "file system connection timeout time by setting catalog property: %s",
+                path,
+                scheme,
+                provider,
+                config,
+                timeoutSeconds,
+                HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
+            e);
+      } catch (ExecutionException e) {
+        LOG.error("Error executing FileSystem getting task", e);
+        Throwable cause = e.getCause();
+        if (cause instanceof IOException) {
+          throw (IOException) cause;
+        } else if (cause instanceof RuntimeException) {
+          throw (RuntimeException) cause;
+        } else {
+          throw new IOException("Error getting FileSystem: " + cause.getMessage(), cause);
+        }
+      } catch (InterruptedException e) {
+        LOG.error("FileSystem getting task interrupted", e);
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted while getting FileSystem", e);
+      }
+    } finally {
+      if (future != null && !future.isDone()) {
+        future.cancel(true);
+      }
+      LOG.debug("FileSystem getting task completed");
     }
   }
 }
