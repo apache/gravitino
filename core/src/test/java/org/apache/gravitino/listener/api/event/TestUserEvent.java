@@ -103,9 +103,8 @@ public class TestUserEvent {
 
     AddUserPreEvent addUserPreEvent = (AddUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, addUserPreEvent.identifier());
-    UserInfo addUserRequest = addUserPreEvent.addUserRequest();
-    Assertions.assertEquals(otherUserName, addUserRequest.name());
-    Assertions.assertFalse(addUserRequest.roles().isPresent());
+    String userName = addUserPreEvent.addUserRequest();
+    Assertions.assertEquals(otherUserName, userName);
   }
 
   @Test
@@ -120,9 +119,8 @@ public class TestUserEvent {
 
     GetUserPreEvent getUserPreEvent = (GetUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, getUserPreEvent.identifier());
-    UserInfo getUserRequest = getUserPreEvent.getUserRequest();
-    Assertions.assertEquals(userName, getUserRequest.name());
-    Assertions.assertFalse(getUserRequest.roles().isPresent());
+    String requestedUserName = getUserPreEvent.getUserRequest();
+    Assertions.assertEquals(userName, requestedUserName);
   }
 
   @Test
@@ -169,9 +167,8 @@ public class TestUserEvent {
 
     RemoveUserPreEvent removeUserPreEvent = (RemoveUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, removeUserPreEvent.identifier());
-    UserInfo removeUserRequest = removeUserPreEvent.removeUserRequest();
-    Assertions.assertEquals(userName, removeUserRequest.name());
-    Assertions.assertFalse(removeUserRequest.roles().isPresent());
+    String removedUserName = removeUserPreEvent.removeUserRequest();
+    Assertions.assertEquals(userName, removedUserName);
   }
 
   private AccessControlEventDispatcher mockUserDispatcher() {

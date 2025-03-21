@@ -21,33 +21,32 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.UserInfo;
 
 /** Represents an event triggered before remove a user from specific metalake. */
 @DeveloperApi
 public class RemoveUserPreEvent extends UserPreEvent {
-  private final UserInfo removeUserRequest;
+  private final String removedUserName;
 
   /**
    * Construct a new {@link RemoveUserPreEvent} instance with the specified user and identifier.
    *
    * @param user the user who initiated the remove user operation.
    * @param identifier the identifier of the metalake where the user is removed.
-   * @param removeUserRequest the user information to be removed from the metalake.
+   * @param removedUserName the username which is requested to be removed from the metalake.
    */
-  protected RemoveUserPreEvent(String user, NameIdentifier identifier, UserInfo removeUserRequest) {
+  protected RemoveUserPreEvent(String user, NameIdentifier identifier, String removedUserName) {
     super(user, identifier);
 
-    this.removeUserRequest = removeUserRequest;
+    this.removedUserName = removedUserName;
   }
 
   /**
    * Returns the user information of the user which is to be removed from the metalake.
    *
-   * @return the user information.
+   * @return the username which is requested to be removed from the metalake.
    */
-  public UserInfo removeUserRequest() {
-    return removeUserRequest;
+  public String removeUserRequest() {
+    return removedUserName;
   }
 
   /**
