@@ -65,6 +65,7 @@ import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
+import org.apache.gravitino.listener.api.event.AccessControlEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
@@ -492,11 +493,12 @@ public class GravitinoEnv {
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
+      AccessControlManager accessControlManager =
+          new AccessControlManager(entityStore, idGenerator, config);
       AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(
-              new AccessControlManager(entityStore, idGenerator, config));
-
-      this.accessControlDispatcher = accessControlHookDispatcher;
+          new AccessControlHookDispatcher(accessControlManager);
+      this.accessControlDispatcher =
+          new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
       this.ownerManager = new OwnerManager(entityStore);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
