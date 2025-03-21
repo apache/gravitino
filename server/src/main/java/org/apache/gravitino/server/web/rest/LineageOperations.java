@@ -54,7 +54,7 @@ public class LineageOperations {
   @ResponseMetered(name = "update-lineage", absolute = true)
   public Response updateLineage(OpenLineage.RunEvent event) {
     LOG.info(
-        "open lineage event:{}, run id:{}, job name:{}",
+        "Open lineage event:{}, run id:{}, job name:{}",
         event,
         event.getRun().getRunId(),
         event.getJob().getName());
@@ -63,7 +63,7 @@ public class LineageOperations {
       Utils.doAs(
           httpRequest,
           () -> {
-            lineageService.updateLineage(event);
+            lineageService.dispatchLineageEvent(event);
             return Utils.ok();
           });
     } catch (Exception e) {

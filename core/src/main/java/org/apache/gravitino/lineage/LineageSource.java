@@ -21,7 +21,9 @@ package org.apache.gravitino.lineage;
 
 import java.util.Map;
 
-public interface LineageSourcer {
+public interface LineageSource {
+  String shortName();
+
   default void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
 
   default void stop() {}

@@ -24,6 +24,8 @@ import java.util.Map;
 
 public interface LineageSinker {
   default void initialize(Map<String, String> configs) {}
+
   default void stop() {}
+
   void sink(OpenLineage.RunEvent event);
 }

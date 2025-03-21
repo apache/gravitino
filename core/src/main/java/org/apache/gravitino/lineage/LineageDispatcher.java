@@ -22,5 +22,5 @@ package org.apache.gravitino.lineage;
 import io.openlineage.server.OpenLineage.RunEvent;
 
 public interface LineageDispatcher {
-  void dispatchLineageEvent(RunEvent runEvent);
+  boolean dispatchLineageEvent(RunEvent runEvent);
 }

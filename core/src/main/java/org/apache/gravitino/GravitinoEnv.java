@@ -54,6 +54,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.lineage.LineageConfig;
 import org.apache.gravitino.lineage.LineageService;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
@@ -518,10 +519,13 @@ public class GravitinoEnv {
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
-    this.auxServiceManager.serviceInit(config);
+    auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+
     this.lineageService = new LineageService();
+    lineageService.initialize(
+        new LineageConfig(config.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
   }
 }

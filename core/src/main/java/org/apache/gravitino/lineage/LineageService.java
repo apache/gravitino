@@ -19,23 +19,89 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
 import io.openlineage.server.OpenLineage;
 import io.openlineage.server.OpenLineage.RunEvent;
+import java.util.List;
+import java.util.ServiceLoader;
+import java.util.stream.Collectors;
 import org.apache.gravitino.listener.EventBus;
 
 public class LineageService implements LineageDispatcher {
-  private LineageSinker sinker;
+  private LineageSinkManager sinkManager;
+  private LineageSource source;
   private LineageProcessor processor;
   private EventBus eventBus;
 
-  public LineageService() {
-    this.sinker = new LineageLogSinker();
+  public void initialize(LineageConfig lineageConfig) {
+    String sourceName = lineageConfig.source();
+    this.source = loadLineageSource(lineageConfig.source());
+    List<String> sinks = lineageConfig.sinks();
+    this.sinkManager = new LineageSinkManager(sinks, lineageConfig.getAllConfig());
+
+    String processorClassName = lineageConfig.processor();
+    this.processor = loadLineageProcessor(processorClassName);
+
+    sinkManager.initialize();
+    source.initialize(lineageConfig.getConfigsWithPrefix(sourceName), this);
+  }
+
+  public void stop() {
+    source.stop();
+    sinkManager.stop();
   }
 
   @Override
-  public void dispatchLineageEvent(OpenLineage.RunEvent runEvent) {
+  public boolean dispatchLineageEvent(OpenLineage.RunEvent runEvent) {
+
+    if (isBufferFull()) {
+      return false;
+    }
+
     RunEvent newEvent = processor.process(runEvent);
-    eventBus.dispatchEvent(newEvent);
-    //sinker.sink(newEvent);
+    // eventBus.dispatchEvent(null);
+    sinkManager.sink(newEvent);
+    return true;
+  }
+
+  private boolean isBufferFull() {
+    return false;
+  }
+
+  private LineageSource loadLineageSource(String source) {
+    try {
+      Class<? extends LineageSource> clz =
+          lookupLineageSource(source, this.getClass().getClassLoader());
+      return clz.getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Class<? extends LineageSource> lookupLineageSource(String provider, ClassLoader cl) {
+    ServiceLoader<LineageSource> loader = ServiceLoader.load(LineageSource.class, cl);
+    List<Class<? extends LineageSource>> providers =
+        Streams.stream(loader.iterator())
+            .filter(p -> p.shortName().equalsIgnoreCase(provider))
+            .map(LineageSource::getClass)
+            .collect(Collectors.toList());
+
+    if (providers.isEmpty()) {
+      throw new IllegalArgumentException("No GravitinoAuxiliaryService found for: " + provider);
+    } else if (providers.size() > 1) {
+      throw new IllegalArgumentException(
+          "Multiple GravitinoAuxiliaryService found for: " + provider);
+    } else {
+      return Iterables.getOnlyElement(providers);
+    }
+  }
+
+  private LineageProcessor loadLineageProcessor(String processor) {
+    try {
+      return (LineageProcessor) Class.forName(processor).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }
