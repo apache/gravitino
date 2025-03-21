@@ -71,35 +71,52 @@ class Fileset(Auditable):
 
     @abstractmethod
     def storage_location(self) -> str:
-        """Get the storage location of the file or directory path that is managed by this fileset object.
+        """Get the storage location of the file or directory path managed by this fileset object.
 
-        The returned storageLocation can either be the one specified when creating the fileset
-        object, or the one specified in the catalog / schema level if the fileset object is created
-        under this catalog / schema.
+        The returned storageLocation can be either the one specified when creating the fileset object,
+        or the one specified at the catalog/schema level if the fileset object is created under this
+        catalog/schema.
+
+        The storageLocation at each level can contain placeholders, formatted as {{name}}, which will
+        be replaced by the corresponding fileset property value when the fileset object is created.
+        The placeholder property in the fileset object is formed as "placeholder-{{name}}". For example,
+        if the storageLocation is "file:///path/{{schema}}-{{fileset}}-{{version}}", and the fileset
+        object "catalog1.schema1.fileset1" has the property "placeholder-version" set to "v1",
+        then the storageLocation will be "file:///path/schema1-fileset1-v1".
 
         For managed fileset, the storageLocation can be:
 
-        1) The one specified when creating the fileset object.
+        1) The one specified when creating the fileset object, and the placeholders in the
+           storageLocation will be replaced by the placeholder value specified in the fileset properties.
 
-        2) When catalog property "location" is specified but schema property "location" is not
-        specified, then the storageLocation will be "{catalog location}/schemaName/filesetName".
+        2) When catalog property "location" is specified but schema property "location" is not specified,
+           then the storageLocation will be:
+            a. "{catalog location}/schemaName/filesetName" - if {catalog location} has no placeholders
+            b. "{catalog location}" - placeholders in {catalog location} will be replaced by values
+               specified in fileset properties
 
-        3) When catalog property "location" is not specified but schema property "location" is
-        specified, then the storageLocation will be "{schema location}/filesetName".
+        3) When catalog property "location" is not specified but schema property "location" is specified,
+           then the storageLocation will be:
+            a. "{schema location}/filesetName" - if {schema location} has no placeholders
+            b. "{schema location}" - placeholders in {schema location} will be replaced by values
+               specified in fileset properties
 
-        4) When both catalog property "location" and schema property "location" are specified, then
-        the storageLocation will be "{schema location}/filesetName".
+        4) When both catalog property "location" and schema property "location" are specified,
+           then the storageLocation will be:
+            a. "{schema location}/filesetName" - if {schema location} has no placeholders
+            b. "{schema location}" - placeholders in {schema location} will be replaced by values
+               specified in fileset properties
 
         5) When both catalog property "location" and schema property "location" are not specified,
-        and storageLocation specified when creating the fileset object is null, this situation is
-        illegal.
+           and storageLocation specified when creating the fileset object is null, this situation
+           is illegal.
 
         For external fileset, the storageLocation can be:
-
-        1) The one specified when creating the fileset object.
+        1) The one specified when creating the fileset object, and the placeholders in the
+           storageLocation will be replaced by the placeholder value specified in the fileset properties.
 
         Returns:
-             The storage location of the fileset object.
+            str: The storage location of the fileset object.
         """
         pass
 
