@@ -72,15 +72,18 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return Types.TimeType.get();
+        return Types.TimeType.of(
+            typeBean.getDatetimePrecision() != null ? typeBean.getDatetimePrecision() : 0);
         // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
         // from UTC to the current time zone for retrieval. (This does not occur for other types
         // such as DATETIME.) see more details:
         // https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       case TIMESTAMP:
-        return Types.TimestampType.withTimeZone();
+        return Types.TimestampType.withTimeZone(
+            typeBean.getDatetimePrecision() != null ? typeBean.getDatetimePrecision() : 0);
       case DATETIME:
-        return Types.TimestampType.withoutTimeZone();
+        return Types.TimestampType.withoutTimeZone(
+            typeBean.getDatetimePrecision() != null ? typeBean.getDatetimePrecision() : 0);
       case DECIMAL:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
@@ -136,7 +139,11 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
       // from UTC to the current time zone for retrieval. (This does not occur for other types
       // such as DATETIME.) see more details: https://dev.mysql.com/doc/refman/8.0/en/datetime.html
-      return ((Types.TimestampType) type).hasTimeZone() ? TIMESTAMP : DATETIME;
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
+      return timestampType.precision() > 0
+          ? String.format("%s(%d)", baseType, timestampType.precision())
+          : baseType;
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {

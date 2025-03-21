@@ -588,10 +588,14 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected JdbcColumn.Builder getBasicJdbcColumnInfo(ResultSet column) throws SQLException {
-    JdbcTypeConverter.JdbcTypeBean typeBean =
-        new JdbcTypeConverter.JdbcTypeBean(column.getString("TYPE_NAME"));
-    typeBean.setColumnSize(column.getInt("COLUMN_SIZE"));
+    String typeName = column.getString("TYPE_NAME");
+    int columnSize = column.getInt("COLUMN_SIZE");
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
+    typeBean.setColumnSize(columnSize);
     typeBean.setScale(column.getInt("DECIMAL_DIGITS"));
+    int datetimePrecision = calculateDatetimePrecision(typeName, columnSize);
+    typeBean.setDatetimePrecision(datetimePrecision);
+
     String comment = column.getString("REMARKS");
     boolean nullable = column.getBoolean("NULLABLE");
 
@@ -606,5 +610,16 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
         .withNullable(nullable)
         .withDefaultValue(defaultValue);
+  }
+
+  /**
+   * Calculate the precision for time/datetime/timestamp types.
+   *
+   * @param typeName the type name from database
+   * @param columnSize the column size from database
+   * @return the precision of the time/datetime/timestamp type
+   */
+  public int calculateDatetimePrecision(String typeName, int columnSize) {
+    return 0;
   }
 }
