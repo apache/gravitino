@@ -21,33 +21,32 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.UserInfo;
 
 /** Represents an event triggered before add a user to a metalake. */
 @DeveloperApi
 public class AddUserPreEvent extends UserPreEvent {
-  private final UserInfo addUserRequest;
+  private final String addUserName;
 
   /**
    * Construct a new {@link AddUserPreEvent} instance.
    *
    * @param user the user who initiated the add-user request.
    * @param identifier the identifier of the metalake which the user is being added to.
-   * @param addUserRequest the user information which is being added to the metalake.
+   * @param addUserName the username which is requested to be added to the metalake.
    */
-  public AddUserPreEvent(String user, NameIdentifier identifier, UserInfo addUserRequest) {
+  public AddUserPreEvent(String user, NameIdentifier identifier, String addUserName) {
     super(user, identifier);
 
-    this.addUserRequest = addUserRequest;
+    this.addUserName = addUserName;
   }
 
   /**
    * Returns the user information which is being added to the metalake.
    *
-   * @return the user information.
+   * @return the username which is requested to be added to the metalake.
    */
-  public UserInfo addUserRequest() {
-    return addUserRequest;
+  public String addUserRequest() {
+    return addUserName;
   }
 
   /**

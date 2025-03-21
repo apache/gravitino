@@ -40,7 +40,6 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.listener.EventBus;
-import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -69,9 +68,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public User addUser(String metalake, String user)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
-    UserInfo userInfo = new UserInfo(user);
 
-    eventBus.dispatchEvent(new AddUserPreEvent(initiator, NameIdentifier.of(metalake), userInfo));
+    eventBus.dispatchEvent(new AddUserPreEvent(initiator, NameIdentifier.of(metalake), user));
     try {
       // TODO add Event
       return dispatcher.addUser(metalake, user);
@@ -85,10 +83,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
-    UserInfo userInfo = new UserInfo(user);
 
-    eventBus.dispatchEvent(
-        new RemoveUserPreEvent(initiator, NameIdentifier.of(metalake), userInfo));
+    eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, NameIdentifier.of(metalake), user));
     try {
       // TODO: add Event
       return dispatcher.removeUser(metalake, user);
@@ -103,9 +99,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
-    UserInfo userInfo = new UserInfo(user);
 
-    eventBus.dispatchEvent(new GetUserPreEvent(initiator, NameIdentifier.of(metalake), userInfo));
+    eventBus.dispatchEvent(new GetUserPreEvent(initiator, NameIdentifier.of(metalake), user));
     try {
       return dispatcher.getUser(metalake, user);
     } catch (Exception e) {
