@@ -20,17 +20,19 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered before list user from specific metalake */
-public class ListUserPreEvent extends UserPreEvent {
+@DeveloperApi
+public class ListUsersPreEvent extends UserPreEvent {
 
   /**
-   * Construct a new {@link ListUserPreEvent} instance with the specified user and identifier.
+   * Construct a new {@link ListUsersPreEvent} instance with the specified user and identifier.
    *
    * @param user the user who initiated the list-user request.
    * @param identifier the identifier of the metalake which is being listed.
    */
-  protected ListUserPreEvent(String user, NameIdentifier identifier) {
+  protected ListUsersPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
 

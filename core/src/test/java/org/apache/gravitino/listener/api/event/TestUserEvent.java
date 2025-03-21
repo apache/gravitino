@@ -137,11 +137,11 @@ public class TestUserEvent {
 
     // validate pre-event
     PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(ListUserPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(ListUsersPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    ListUserPreEvent listUserPreEvent = (ListUserPreEvent) preEvent;
-    Assertions.assertEquals(identifier, listUserPreEvent.identifier());
+    ListUsersPreEvent listUsersPreEvent = (ListUsersPreEvent) preEvent;
+    Assertions.assertEquals(identifier, listUsersPreEvent.identifier());
   }
 
   @Test
