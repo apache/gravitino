@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
+import java.util.Collections;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -59,10 +59,12 @@ public class ListFilesetProperties extends ListProperties {
   @Override
   public void handle() {
     Fileset gFileset = null;
-    try {
+
+    try (GravitinoClient client = buildClient(metalake)) {
       NameIdentifier name = NameIdentifier.of(schema, fileset);
-      GravitinoClient client = buildClient(metalake);
       gFileset = client.loadCatalog(catalog).asFilesetCatalog().loadFileset(name);
+    } catch (IllegalArgumentException exp) {
+      exitWithError("Invalid schema or fileset name: " + exp.getMessage());
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -73,7 +75,10 @@ public class ListFilesetProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    Map<String, String> properties = gFileset.properties();
-    printProperties(properties);
+    if (gFileset == null) {
+      exitWithError("Failed to load fileset: " + fileset);
+    }
+
+    printProperties(gFileset.properties() != null ? gFileset.properties() : Collections.emptyMap());
   }
 }
