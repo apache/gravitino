@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.Type.FILESET_PATH;
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.Type.SCHEMA_PATH;
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.Type.TABLE_PATH;
+import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.PathType.FILESET_PATH;
+import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.PathType.SCHEMA_PATH;
+import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.PathType.TABLE_PATH;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -539,7 +539,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     generateAuthorizationSecurableObject(
                                         pathBasedMetadataObject.names(),
                                         getAuthorizationPath(pathBasedMetadataObject),
-                                        PathBasedMetadataObject.Type.FILESET_PATH,
+                                        PathBasedMetadataObject.PathType.FILESET_PATH,
                                         rangerPrivileges));
                               });
                       break;
@@ -582,7 +582,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       generateAuthorizationSecurableObject(
                           pathBasedMetadataObject.names(),
                           getAuthorizationPath(pathBasedMetadataObject),
-                          PathBasedMetadataObject.Type.FILESET_PATH,
+                          PathBasedMetadataObject.PathType.FILESET_PATH,
                           ownerMappingRule()));
                 });
         break;
@@ -667,7 +667,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                           changeMetadataObject.metadataObject().parent(),
                           changeMetadataObject.metadataObject().name(),
                           locationPath,
-                          PathBasedMetadataObject.Type.FILESET_PATH);
+                          PathBasedMetadataObject.PathType.FILESET_PATH);
                   pathBaseMetadataObject.validateAuthorizationMetadataObject();
                   authzMetadataObjects.add(pathBaseMetadataObject);
                 });
@@ -723,8 +723,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private static AuthorizationMetadataObject.Type getType(MetadataObject metadataObject) {
-
-    for (PathBasedMetadataObject.Type value : PathBasedMetadataObject.Type.values()) {
+    for (PathBasedMetadataObject.PathType value : PathBasedMetadataObject.PathType.values()) {
       if (value.metadataObjectType() == metadataObject.type()) {
         return value;
       }

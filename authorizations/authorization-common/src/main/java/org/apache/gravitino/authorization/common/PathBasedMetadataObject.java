@@ -30,30 +30,41 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
   /**
    * The type of metadata object in the underlying system. Every type will map one kind of the
    * entity of the Gravitino type system. When we store a Hive table, first, we will store the
-   * metadata in the MySQL, and then we will store the data in the HDFS location. For Hive, there is
-   * a default location for the cluster level. We can also specify other locations for schema and
-   * table levels. So a path may not be fileset
+   * metadata in the JDBC database like MySQL, and then we will store the data in the HDFS location.
+   * For Hive, there is a default location for the cluster level.
+   * We can also specify other locations for schema and table levels. So a path may not be fileset
    */
-  public enum Type implements AuthorizationMetadataObject.Type {
-    /** A path is mapped the path of storages like HDFS, S3 etc. */
-    FILESET_PATH(MetadataObject.Type.FILESET),
-    /** A path is mapped the path of table storage like Hive. */
-    TABLE_PATH(MetadataObject.Type.TABLE),
-    /** A path is mapped the path of schema storage like Hive. */
-    SCHEMA_PATH(MetadataObject.Type.SCHEMA),
-    /** A path is mapped the path of cluster storage like Hive. */
-    CATALOG_PATH(MetadataObject.Type.CATALOG),
-    /** A path is mapped the path of all cluster storages like Hive. */
-    METALAKE_PATH(MetadataObject.Type.METALAKE);
+  public static final class PathType implements AuthorizationMetadataObject.Type {
 
     private final MetadataObject.Type metadataType;
 
-    Type(MetadataObject.Type type) {
+    public static PathType get(MetadataObject.Type type) {
+      return new PathType(type);
+    }
+
+    private PathType(MetadataObject.Type type) {
       this.metadataType = type;
     }
 
     public MetadataObject.Type metadataObjectType() {
       return metadataType;
+    }
+
+    @Override
+    public int hashCode() {
+      return metadataType.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (!(obj instanceof PathType)) {
+        return false;
+      }
+
+      return this.metadataType.equals(((PathType) obj).metadataType);
     }
   }
 
@@ -105,7 +116,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         path != null && !path.isEmpty(), "Cannot create a path based metadata object with no path");
 
     HashSet<AuthorizationMetadataObject.Type> typeSet =
-        Sets.newHashSet(PathBasedMetadataObject.Type.values());
+        Sets.newHashSet(PathType.values());
     Preconditions.checkArgument(typeSet.contains(type), "it must be the PATH type");
 
     for (String name : names) {
