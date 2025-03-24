@@ -30,6 +30,7 @@ import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.EventWrapper;
 
 public class LineageSinkManager {
+
   private EventBus eventBus;
   private EventListenerManager eventListenerManager;
 
@@ -43,6 +44,7 @@ public class LineageSinkManager {
     Map<String, String> eventListenerConfigs = transformToEventListenerConfigs(config);
     eventListenerManager.init(eventListenerConfigs);
     this.eventBus = eventListenerManager.createEventBus();
+    eventListenerManager.start();
   }
 
   public boolean isHighWaterMark() {
@@ -51,8 +53,7 @@ public class LineageSinkManager {
 
   private Map<String, String> transformToEventListenerConfigs(Map<String, String> lineageConfigs) {
     Map<String, String> eventListenerConfigs = new HashMap<>();
-    Preconditions.checkArgument(
-        lineageConfigs.containsKey(LineageConfig.LINEAGE_SINK_CLASS_NAME), "");
+
     for (Entry<String, String> entry : lineageConfigs.entrySet()) {
       if (entry.getKey().equalsIgnoreCase(LineageConfig.LINEAGE_CONFIG_SINKS)) {
         String sinks = entry.getValue();
@@ -63,10 +64,15 @@ public class LineageSinkManager {
             .trimResults()
             .splitToStream(sinks)
             .forEach(
-                sinkName ->
-                    eventListenerConfigs.put(
-                        sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
-                        LineageSinkEventListener.class.getName()));
+                sinkName -> {
+                  Preconditions.checkArgument(
+                      lineageConfigs.containsKey(
+                          sinkName + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME),
+                      "");
+                  eventListenerConfigs.put(
+                      sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
+                      LineageSinkEventListener.class.getName());
+                });
       } else {
         eventListenerConfigs.put(entry.getKey(), entry.getValue());
       }
