@@ -22,7 +22,7 @@ package org.apache.gravitino.lineage;
 import io.openlineage.server.OpenLineage;
 import java.util.Map;
 
-public interface LineageSinker {
+public interface LineageSink {
   default void initialize(Map<String, String> configs) {}
 
   default void stop() {}

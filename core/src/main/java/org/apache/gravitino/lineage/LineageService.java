@@ -26,24 +26,21 @@ import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
-import org.apache.gravitino.listener.EventBus;
 
 public class LineageService implements LineageDispatcher {
   private LineageSinkManager sinkManager;
   private LineageSource source;
   private LineageProcessor processor;
-  private EventBus eventBus;
 
   public void initialize(LineageConfig lineageConfig) {
     String sourceName = lineageConfig.source();
     this.source = loadLineageSource(lineageConfig.source());
-    List<String> sinks = lineageConfig.sinks();
-    this.sinkManager = new LineageSinkManager(sinks, lineageConfig.getAllConfig());
+    this.sinkManager = new LineageSinkManager();
 
     String processorClassName = lineageConfig.processor();
     this.processor = loadLineageProcessor(processorClassName);
 
-    sinkManager.initialize();
+    sinkManager.initialize(lineageConfig.getAllConfig());
     source.initialize(lineageConfig.getConfigsWithPrefix(sourceName), this);
   }
 
@@ -55,18 +52,13 @@ public class LineageService implements LineageDispatcher {
   @Override
   public boolean dispatchLineageEvent(OpenLineage.RunEvent runEvent) {
 
-    if (isBufferFull()) {
+    if (sinkManager.isHighWaterMark()) {
       return false;
     }
 
     RunEvent newEvent = processor.process(runEvent);
-    // eventBus.dispatchEvent(null);
     sinkManager.sink(newEvent);
     return true;
-  }
-
-  private boolean isBufferFull() {
-    return false;
   }
 
   private LineageSource loadLineageSource(String source) {

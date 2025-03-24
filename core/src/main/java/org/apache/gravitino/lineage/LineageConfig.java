@@ -29,6 +29,9 @@ import org.apache.gravitino.config.ConfigEntry;
 
 public class LineageConfig extends Config {
   public static final String LINEAGE_CONFIG_PREFIX = "gravitino.lineage.";
+  public static final String LINEAGE_CONFIG_SINKS = "sinks";
+  public static final String LINEAGE_SINK_CLASS_NAME = "sink-class";
+
   public static final ConfigEntry<String> SOURCE =
       new ConfigBuilder("source")
           .doc("The source of lineage event")
@@ -44,7 +47,7 @@ public class LineageConfig extends Config {
           .createWithDefault("http");
 
   public static final ConfigEntry<String> SINKS =
-      new ConfigBuilder("sinks")
+      new ConfigBuilder(LINEAGE_CONFIG_SINKS)
           .doc("The sinks of lineage event")
           .version(ConfigConstants.VERSION_0_9_0)
           .stringConf()

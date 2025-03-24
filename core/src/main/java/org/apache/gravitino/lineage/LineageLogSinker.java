@@ -31,7 +31,7 @@ import io.openlineage.server.OpenLineage.RunEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LineageLogSinker implements LineageSinker {
+public class LineageLogSinker implements LineageSink {
   private static final Logger LOG = LoggerFactory.getLogger(LineageLogSinker.class);
   private ObjectMapper objectMapper =
       JsonMapper.builder()

@@ -19,16 +19,66 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import io.openlineage.server.OpenLineage.RunEvent;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.EventListenerManager;
+import org.apache.gravitino.listener.api.event.EventWrapper;
 
 public class LineageSinkManager {
-  public LineageSinkManager(List<String> sinks, Map<String, String> config) {}
+  private EventBus eventBus;
+  private EventListenerManager eventListenerManager;
 
-  public void initialize() {}
+  private static final Splitter splitter = Splitter.on(",");
 
-  public void sink(RunEvent runEvent) {}
+  public LineageSinkManager() {
+    this.eventListenerManager = new EventListenerManager();
+  }
 
-  public void stop() {}
+  public void initialize(Map<String, String> config) {
+    Map<String, String> eventListenerConfigs = transformToEventListenerConfigs(config);
+    eventListenerManager.init(eventListenerConfigs);
+    this.eventBus = eventListenerManager.createEventBus();
+  }
+
+  public boolean isHighWaterMark() {
+    return false;
+  }
+
+  private Map<String, String> transformToEventListenerConfigs(Map<String, String> lineageConfigs) {
+    Map<String, String> eventListenerConfigs = new HashMap<>();
+    Preconditions.checkArgument(
+        lineageConfigs.containsKey(LineageConfig.LINEAGE_SINK_CLASS_NAME), "");
+    for (Entry<String, String> entry : lineageConfigs.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(LineageConfig.LINEAGE_CONFIG_SINKS)) {
+        String sinks = entry.getValue();
+        eventListenerConfigs.put(
+            EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, entry.getValue());
+        splitter
+            .omitEmptyStrings()
+            .trimResults()
+            .splitToStream(sinks)
+            .forEach(
+                sinkName ->
+                    eventListenerConfigs.put(
+                        sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
+                        LineageSinkEventListener.class.getName()));
+      } else {
+        eventListenerConfigs.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return eventListenerConfigs;
+  }
+
+  public void sink(RunEvent runEvent) {
+    eventBus.dispatchEvent(new EventWrapper(runEvent));
+  }
+
+  public void stop() {
+    eventListenerManager.stop();
+  }
 }
