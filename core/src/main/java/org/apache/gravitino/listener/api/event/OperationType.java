@@ -112,5 +112,16 @@ public enum OperationType {
   LIST_MODEL_VERSIONS,
   REGISTER_AND_LINK_MODEL_VERSION,
 
+  // User
+  ADD_USER,
+  REMOVE_USER,
+  GET_USER,
+  LIST_USERS,
+  LIST_USER_NAMES,
+
+  // TODO GROUP
+
+  // TODO ROLE
+
   UNKNOWN,
 }
