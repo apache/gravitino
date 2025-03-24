@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event triggered before add a user to a metalake. */
 @DeveloperApi
 public class AddUserPreEvent extends UserPreEvent {
-  private final String addUserName;
+  private final String userName;
 
   /**
    * Construct a new {@link AddUserPreEvent} instance.
@@ -37,7 +37,7 @@ public class AddUserPreEvent extends UserPreEvent {
   public AddUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
     super(initiator, identifier);
 
-    this.addUserName = userName;
+    this.userName = userName;
   }
 
   /**
@@ -46,7 +46,7 @@ public class AddUserPreEvent extends UserPreEvent {
    * @return the username which is requested to be added to the metalake.
    */
   public String userName() {
-    return addUserName;
+    return userName;
   }
 
   /**

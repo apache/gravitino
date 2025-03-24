@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event triggered before get a user from specific metalake */
 @DeveloperApi
 public class GetUserPreEvent extends UserPreEvent {
-  private final String getUserName;
+  private final String userName;
 
   /**
    * Construct a new {@link GetUserPreEvent} instance with the specified user, identifier and user
@@ -37,7 +37,7 @@ public class GetUserPreEvent extends UserPreEvent {
    */
   public GetUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
     super(initiator, identifier);
-    this.getUserName = userName;
+    this.userName = userName;
   }
 
   /**
@@ -46,7 +46,7 @@ public class GetUserPreEvent extends UserPreEvent {
    * @return the username which is requested to be retrieved.
    */
   public String userName() {
-    return getUserName;
+    return userName;
   }
 
   /**

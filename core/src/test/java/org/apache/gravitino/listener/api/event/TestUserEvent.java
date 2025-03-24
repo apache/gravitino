@@ -31,7 +31,6 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
-import org.apache.gravitino.listener.api.info.UserInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -70,25 +69,6 @@ public class TestUserEvent {
     System.out.println(dispatcher);
     System.out.println(failureDispatcher);
     System.out.println(otherIdentifier);
-  }
-
-  @Test
-  void testUserInfo() {
-    User mockUser = getMockUser("mock_user", ImmutableList.of("admin"));
-    UserInfo info = new UserInfo(mockUser);
-
-    Assertions.assertEquals("mock_user", info.name());
-    Assertions.assertTrue(info.roles().isPresent());
-    Assertions.assertEquals(ImmutableList.of("admin"), info.roles().get());
-
-    UserInfo emptyInfo = new UserInfo("user_without_roles");
-    Assertions.assertEquals("user_without_roles", emptyInfo.name());
-    Assertions.assertFalse(emptyInfo.roles().isPresent());
-
-    UserInfo withRolesInfo = new UserInfo("user_with_roles", ImmutableList.of("admin", "user"));
-    Assertions.assertEquals("user_with_roles", withRolesInfo.name());
-    Assertions.assertTrue(withRolesInfo.roles().isPresent());
-    Assertions.assertEquals(ImmutableList.of("admin", "user"), withRolesInfo.roles().get());
   }
 
   @Test

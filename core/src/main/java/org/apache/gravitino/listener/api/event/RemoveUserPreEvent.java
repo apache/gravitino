@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event triggered before remove a user from specific metalake. */
 @DeveloperApi
 public class RemoveUserPreEvent extends UserPreEvent {
-  private final String removedUserName;
+  private final String userName;
 
   /**
    * Construct a new {@link RemoveUserPreEvent} instance with the specified user and identifier.
@@ -37,7 +37,7 @@ public class RemoveUserPreEvent extends UserPreEvent {
   protected RemoveUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
     super(initiator, identifier);
 
-    this.removedUserName = userName;
+    this.userName = userName;
   }
 
   /**
@@ -46,7 +46,7 @@ public class RemoveUserPreEvent extends UserPreEvent {
    * @return the username which is requested to be removed from the metalake.
    */
   public String userName() {
-    return removedUserName;
+    return userName;
   }
 
   /**
