@@ -25,7 +25,7 @@
     "@mui/lab": "5.0.0-alpha.175",
     "@mui/material": "^5.16.14",
     "@mui/x-data-grid": "^6.20.3",
-    "@reduxjs/toolkit": "^1.9.7",
+    "@reduxjs/toolkit": "^2.6.1",
     "antd": "^5.24.2",
     "axios": "^1.7.4",
     "chroma-js": "^2.4.2",
