@@ -23,10 +23,14 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 
 ## Table of Contents
 
-- [Installation](#installation)
-- [Running Tests](#running-tests)
-- [Contributing](#contributing)
-- [License](#license)
+- [Apache Gravitino Command Line Interface](#apache-gravitino-command-line-interface)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Build the Project](#build-the-project)
+  - [Running Tests](#running-tests)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## Installation
 
@@ -49,14 +53,12 @@ Before you can build and run this project, it is suggested you have the followin
     ```bash
     ./gradlew :clients:cli:build
     ```
-3. Create an alias:
+
+3. Test the command:
 
     ```bash
-    alias gcli='java -jar clients/cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
-    ```
-3. Test the command:
-    ```bash
-    gcli --help
+    cd /path/to/gravitino
+    bin/gcli.sh --help
     ```
 
 ## Running Tests
