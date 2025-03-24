@@ -19,12 +19,17 @@
 
 # Apache Gravitino
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in
 different sources, types, and regions. It also provides users with unified metadata access
 for data and AI assets.
 
 **Homepage:** <https://gravitino.apache.org/>
+
+## Prerequisites
+
+- Kubernetes 1.30+
+- Helm 3+
 
 ## Maintainers
 
@@ -37,83 +42,98 @@ for data and AI assets.
 * <https://github.com/apache/gravitino>
 * <https://github.com/apache/gravitino-playground>
 
-## Values
+## Update Chart Dependency
 
-| Key                 | Default                       | Description                                                           |
-|---------------------|-------------------------------|-----------------------------------------------------------------------|
-| image.repository    | `"apache/gravitino"`          |                                                                       |
-| image.tag           | `"0.9.0-incubating-SNAPSHOT"` |                                                                       |
-| image.pullPolicy    | `"IfNotPresent"`              |                                                                       |
-| image.pullSecrets   | `[]       `                   | Optionally specify secrets for pulling images from a private registry |                            
-| mysql.enabled       | `false`                       | Flag to enable MySQL as the storage backend for Gravitino             |
-| entity.jdbcUrl      | `"jdbc:h2"`                   | The JDBC URL for the database                                         |
-| entity.jdbcDriver   | `"org.h2.Driver"`             | The JDBC driver class name                                            |
-| entity.jdbcUser     | `"gravitino"`                 | The username for the JDBC connection                                  |
-| entity.jdbcPassword | `"gravitino"`                 | The password for the JDBC connection                                  |
-| env                 | `            `                | Environment variables to pass to the container                        |
-| resources           | `{}          `                | resource requests and limits for the container                        |
+If the chart has not been released yet, navigate to the chart directory and update its dependencies:
 
-## Deploy Gravitino to your cluster
-
-### Update chart dependency
-
-```bash
-cd charts/gravitino
+```console
+cd /path/to/chart
 helm dependency update
 ```
 
-### Deploy with default config
+## View Chart values
 
-```bash
+To display the default values of the Gravitino chart, run:
+
+```console
+helm show values gravitino
+```
+
+## Install Helm Chart
+
+```console
+helm install [RELEASE_NAME] [CHART] [flags]
+```
+
+### Deploy with Default Configuration
+
+Run the following command to deploy Gravitino using the default settings:
+
+```console
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 ```
 
-### Deploy with custom config
+### Deploy with Custom Configuration
 
-```bash
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set "key1=val1,key2=val2,..."
+To customize the deployment, use the --set flag to override specific values:
+
+```console
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
+  --set key1=val1,key2=val2,...
 ```
 
-## Deploy Gravitino and MySQL, MySQL is the Gravitino storage backend
+## Deploying Gravitino with MySQL as the Storage Backend
 
-```bash
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set mysql.enabled=true
+To deploy both Gravitino and MySQL, where MySQL is used as the storage backend, enable the built-in MySQL instance:
+
+```console
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
+  --set mysql.enabled=true
 ```
 
-To disable dynamic provisioning (The default STORAGECLASS is local-path)
+## Disable Dynamic Storage Provisioning
 
-```bash
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set mysql.enabled=true --set global.defaultStorageClass="-"
+By default, the storage class is local-path. To disable dynamic provisioning, set the storage class to "-":
+
+```console
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
+  --set mysql.enabled=true \
+  --set global.defaultStorageClass="-"
 ```
 
-## Deploy Gravitino, use the existed MySQL as the Gravitino storage backend
+## Deploy Gravitino using an existed MySQL Database
 
-```bash
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" --set entity.jdbcUser=admin --set entity.jdbcPassword=admin123
-```
+Ensure you have the following MySQL credentials ready: Username, Password, Database Name
 
-## Others
+Initialize your existing MySQL instance
 
-To init the existed MySQL, run the following command:
-
-```bash
+```console
 mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
 ```
 
-To see the "gravitino.conf", run the following command:
+Use Helm to install or upgrade Gravitino,specifying the MySQL connection details
 
-```bash
-kubectl get cm gravitino -n gravitino -o json | jq -r '.data["gravitino.conf"]'
+```console
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
+  --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" \
+  --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" \
+  --set entity.jdbcUser="admin" \
+  --set entity.jdbcPassword="admin123"
 ```
 
-To uninstall the Gravitino, run the following command:
+_Note: \
+Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
+Change admin and admin123 to your actual MySQL username and password. \
+Ensure the target MySQL database (gravitino) exists before deployment._
 
-```bash
-helm uninstall gravitino -n gravitino
+## Uninstall Helm Chart
+
+```console
+helm uninstall [RELEASE_NAME] -n [NAMESPACE]
 ```
 
-To package chart
+## Package Helm Chart
 
-```bash
-helm package gravitino
+```console
+helm package [CHART_PATH]
 ```

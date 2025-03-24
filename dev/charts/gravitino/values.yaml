@@ -20,7 +20,7 @@ image:
   repository: apache/gravitino
   tag: 0.9.0-incubating-SNAPSHOT
   pullPolicy: IfNotPresent
-  ## Optionally specify an array of imagePullSecrets (secrets must be manually created in the namespace)
+  ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   ## Example:
   ## pullSecrets:
@@ -28,32 +28,30 @@ image:
   ##
   pullSecrets: []
 
-# Deploy mysql on K8S cluster as gravitino storage backend.
+# Deploy MySQL instance on K8S cluster as Gravitino storage backend.
 mysql:
   enabled: false
-  image:
-    pullSecrets: []
   initdbScriptsConfigMap: gravitino-mysql-init
   auth:
-    rootPassword: "admin"
+    rootPassword: admin
     createDatabase: true
-    database: "gravitino"
-    username: "gravitino"
-    password: "gravitino"
+    database: gravitino
+    username: gravitino
+    password: gravitino
 
 # Use H2 as the default embedded database, or set up an external database for enhanced scalability and performance.
 # schema-0.*.0-mysql.sql is the data init script that should be executed in the external database manually.
 entity:
-  store: "relational"
+  store: relational
   maxTransactionSkewTimeMs: 2000
   deleteAfterTimeMs: 604800000
   versionRetentionCount: 1
-  relationalBackend: "JDBCBackend"
+  relationalBackend: JDBCBackend
   jdbcUrl: jdbc:h2
   jdbcDriver: org.h2.Driver
   jdbcUser: gravitino
   jdbcPassword: gravitino
-  storagePath: /root/gravitino/data
+  storagePath: /root/gravitino/data/jdbc
 
 server:
   shutdownTimeout: 3000
@@ -61,7 +59,7 @@ server:
     extensionPackages: ""
 
 webserver:
-  host: "0.0.0.0"
+  host: 0.0.0.0
   httpPort: 8090
   minThreads: 24
   maxThreads: 200
@@ -79,17 +77,17 @@ catalog:
 
 authorization:
   enable: false
-  serviceAdmins: "anonymous"
+  serviceAdmins: anonymous
 
 auxService:
-  names: "iceberg-rest"
+  names: iceberg-rest
 
 icebergRest:
   classpath: "iceberg-rest-server/libs, iceberg-rest-server/conf"
-  host: "0.0.0.0"
+  host: 0.0.0.0
   httpPort: 9001
-  catalogBackend: "memory"
-  warehouse: "/tmp/"
+  catalogBackend: memory
+  warehouse: /gravitino.conf/
 
 authenticators: simple
 
@@ -103,24 +101,36 @@ authenticator:
 audit:
   enabled: false
   writer:
-    className: "org.apache.gravitino.audit.FileAuditWriter"
+    className: org.apache.gravitino.audit.FileAuditWriter
     file:
-      fileName: "gravitino_audit.log"
+      fileName: gravitino_audit.log
       flushIntervalSecs: 10
       append: true
   formatter:
-    className: "org.apache.gravitino.audit.SimpleFormatter"
+    className: org.apache.gravitino.audit.SimpleFormatter
 
 metrics:
   timeSlidingWindowSecs: 60
 
+visibleConfigs: ""
 # visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
 
-# visibleConfigsItems:
-#   gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
-#   gravitino.datastrato.custom.authorization.ranger.username: "admin"
-#   gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
-#   gravitino.datastrato.custom.authorization.ranger.auth.type: "simple"
+visibleConfigsItems: {}
+  # gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
+  # gravitino.datastrato.custom.authorization.ranger.username: admin
+  # gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
+  # gravitino.datastrato.custom.authorization.ranger.auth.type: simple
+
+additionalConfigItems: {}
+#  gravitino.eventListener.names: "audit,sync"
+
+extraVolumes:
+  - name: gravitino-log
+    emptyDir: {}
+
+extraVolumeMounts:
+  - name: gravitino-log
+    mountPath: /root/gravitino/logs
 
 ## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 ## If you set enabled as "True", you need :
@@ -136,6 +146,16 @@ persistence:
   # existingClaim:
   # storageClassName:
 
+log:
+  containerStdout: false
+
+log4j2Properties: {}
+  # status: warn
+  # strategyDeleteIfLastModifiedAge: 30d
+  # rootLoggerLevel: info
+
+additionalLog4j2Properties: {}
+
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
 ## ref: http://kubernetes.io/docs/user-guide/services/
@@ -145,60 +165,70 @@ service:
   type: ClusterIP
   port: 8090
   targetPort: 8090
-  ## Service annotations. Can be templated.
   annotations: {}
   labels: {}
   portName: http
+  nodePort: ""
 
-extraPorts: []
 ## Additional ports to the gravitino services. Useful to expose extra container ports.
-# - port: 9001
-#   protocol: TCP
-#   name: http
-#   targetPort: http
+extraExposePorts:
+  - port: 9001
+    protocol: TCP
+    name: http2
+    targetPort: 9001
 
 ## Deployment annotations
-# annotations: {}
+annotations: {}
 
 # Deployment replicas
 replicas: 1
 
 ## Pod Annotations
-# podAnnotations: {}
+podAnnotations: {}
 
 ## Pod Labels
-# podLabels: {}
+podLabels: {}
 
 readinessProbe:
   httpGet:
     path: /
     port: http
-  initialDelaySeconds: 10
+  initialDelaySeconds: 20
   timeoutSeconds: 5
 
 livenessProbe:
   httpGet:
     path: /
     port: http
-  initialDelaySeconds: 10
+  initialDelaySeconds: 20
   timeoutSeconds: 5
 
 containerSecurityContext:
   runAsNonRoot: false
   runAsUser: 0
 
-# Extra env variables to pass to the gravitino container
-# env:
-#   - name: ENVARIABLE_NAME
-#     value: "test"
+env:
+  - name: GRAVITINO_HOME
+    value: /root/gravitino
+
+# The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
+# This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"
+# https://helm.sh/docs/howto/charts_tips_and_tricks/#using-the-tpl-function
+envWithTpl: []
+#  - name: FOO_2
+#    value: "{{ .Values.foo2 }}"
+
+# foo2: bar2
+
+envFrom: []
 
 resources: {}
-#  limits:
-#    cpu: 100m
-#    memory: 128Mi
-#  requests:
-#    cpu: 100m
-#    memory: 128Mi
+  # limits:
+  #   cpu: 500m
+  #   memory: 512Mi
+  # requests:
+  #   cpu: 500m
+  #   memory: 512Mi
 
 ## Node labels for pod assignment
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/

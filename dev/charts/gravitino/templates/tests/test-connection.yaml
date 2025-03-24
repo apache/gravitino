@@ -33,7 +33,7 @@ spec:
         - /bin/sh
         - -c
         - |
-          max_attempts=3
+          max_attempts=10
           attempt=0
           success=false
 

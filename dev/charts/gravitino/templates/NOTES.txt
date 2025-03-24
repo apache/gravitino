@@ -16,4 +16,10 @@
   specific language governing permissions and limitations
   under the License.
   */}}
-The gravitino has been deployed to your cluster.
+{{ $.Chart.Name }} has been installed. Check its status by running:
+
+  kubectl get pods --namespace {{ include "gravitino.namespace" . }}
+
+Check the "gravitino.conf" by running:
+
+  kubectl get cm {{ include "gravitino.fullname" . }} -n {{ include "gravitino.namespace" . }} -o json | jq -r '.data["gravitino.conf"]'
