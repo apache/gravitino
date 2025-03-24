@@ -195,7 +195,7 @@ RUN chown -R datastrato:hadoop /home/datastrato
 
 ################################################################################
 # removed install packages and cache
-RUN rm -rf /gravitino.conf/packages
+RUN rm -rf /tmp/packages
 RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################

@@ -118,7 +118,7 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 ################################################################################
 # install hadoop
 RUN mkdir ${HADOOP_HOME}
-RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /gravitino.conf/packages/${HADOOP_PACKAGE_NAME}
+RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -139,7 +139,7 @@ ADD check-status.sh /tmp/check-status.sh
 ################################################################################
 # install hive
 RUN mkdir ${HIVE_HOME}
-RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /gravitino.conf/packages/${HIVE_PACKAGE_NAME}
+RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 RUN mkdir ${HIVE_HOME}/conf1 && cp ${HIVE_HOME}/conf/* ${HIVE_HOME}/conf1/
 ADD hive-site1.xml ${HIVE_HOME}/conf1/hive-site.xml
@@ -157,7 +157,7 @@ RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/
 
 ################################################################################
 # add mysql jdbc driver
-RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /gravitino.conf/packages/${JDBC_DIVER_PACKAGE_NAME}
+RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
 
 ################################################################################
 # add users and groups
@@ -176,7 +176,7 @@ RUN chown -R datastrato:hadoop /home/datastrato
 
 ################################################################################
 # removed install packages
-RUN rm -rf /gravitino.conf/packages
+RUN rm -rf /tmp/packages
 
 ################################################################################
 # expose port

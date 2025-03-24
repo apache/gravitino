@@ -33,7 +33,7 @@ ARG LOG4JDBC_PACKAGE_NAME
 
 COPY init-mysql.sql.template /tmp/
 COPY start-ranger-services.sh /tmp/
-RUN chmod +x /gravitino.conf/start-ranger-services.sh
+RUN chmod +x /tmp/start-ranger-services.sh
 
 ENV JAVA_HOME=/usr/local/jdk
 RUN ARCH=$(uname -m) && \
