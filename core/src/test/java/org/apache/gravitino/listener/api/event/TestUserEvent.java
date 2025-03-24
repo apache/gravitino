@@ -103,7 +103,7 @@ public class TestUserEvent {
 
     AddUserPreEvent addUserPreEvent = (AddUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, addUserPreEvent.identifier());
-    String userName = addUserPreEvent.addUserRequest();
+    String userName = addUserPreEvent.userName();
     Assertions.assertEquals(otherUserName, userName);
   }
 
@@ -119,7 +119,7 @@ public class TestUserEvent {
 
     GetUserPreEvent getUserPreEvent = (GetUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, getUserPreEvent.identifier());
-    String requestedUserName = getUserPreEvent.getUserRequest();
+    String requestedUserName = getUserPreEvent.userName();
     Assertions.assertEquals(userName, requestedUserName);
   }
 
@@ -167,7 +167,7 @@ public class TestUserEvent {
 
     RemoveUserPreEvent removeUserPreEvent = (RemoveUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, removeUserPreEvent.identifier());
-    String removedUserName = removeUserPreEvent.removeUserRequest();
+    String removedUserName = removeUserPreEvent.userName();
     Assertions.assertEquals(userName, removedUserName);
   }
 

@@ -31,13 +31,13 @@ public class GetUserPreEvent extends UserPreEvent {
    * Construct a new {@link GetUserPreEvent} instance with the specified user, identifier and user
    * info.
    *
-   * @param user the user who initiated the add-user request.
+   * @param initiator the user who initiated the add-user request.
    * @param identifier the identifier of the metalake which the user is being added to.
-   * @param getUserName the username which is requested to be retrieved.
+   * @param userName the username which is requested to be retrieved.
    */
-  public GetUserPreEvent(String user, NameIdentifier identifier, String getUserName) {
-    super(user, identifier);
-    this.getUserName = getUserName;
+  public GetUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+    super(initiator, identifier);
+    this.getUserName = userName;
   }
 
   /**
@@ -45,7 +45,7 @@ public class GetUserPreEvent extends UserPreEvent {
    *
    * @return the username which is requested to be retrieved.
    */
-  public String getUserRequest() {
+  public String userName() {
     return getUserName;
   }
 

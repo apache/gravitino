@@ -30,14 +30,14 @@ public class RemoveUserPreEvent extends UserPreEvent {
   /**
    * Construct a new {@link RemoveUserPreEvent} instance with the specified user and identifier.
    *
-   * @param user the user who initiated the remove user operation.
+   * @param initiator the user who initiated the remove user operation.
    * @param identifier the identifier of the metalake where the user is removed.
-   * @param removedUserName the username which is requested to be removed from the metalake.
+   * @param userName the username which is requested to be removed from the metalake.
    */
-  protected RemoveUserPreEvent(String user, NameIdentifier identifier, String removedUserName) {
-    super(user, identifier);
+  protected RemoveUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+    super(initiator, identifier);
 
-    this.removedUserName = removedUserName;
+    this.removedUserName = userName;
   }
 
   /**
@@ -45,7 +45,7 @@ public class RemoveUserPreEvent extends UserPreEvent {
    *
    * @return the username which is requested to be removed from the metalake.
    */
-  public String removeUserRequest() {
+  public String userName() {
     return removedUserName;
   }
 

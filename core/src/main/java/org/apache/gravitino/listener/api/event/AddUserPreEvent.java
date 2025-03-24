@@ -30,14 +30,14 @@ public class AddUserPreEvent extends UserPreEvent {
   /**
    * Construct a new {@link AddUserPreEvent} instance.
    *
-   * @param user the user who initiated the add-user request.
+   * @param initiator the user who initiated the add-user request.
    * @param identifier the identifier of the metalake which the user is being added to.
-   * @param addUserName the username which is requested to be added to the metalake.
+   * @param userName the username which is requested to be added to the metalake.
    */
-  public AddUserPreEvent(String user, NameIdentifier identifier, String addUserName) {
-    super(user, identifier);
+  public AddUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+    super(initiator, identifier);
 
-    this.addUserName = addUserName;
+    this.addUserName = userName;
   }
 
   /**
@@ -45,7 +45,7 @@ public class AddUserPreEvent extends UserPreEvent {
    *
    * @return the username which is requested to be added to the metalake.
    */
-  public String addUserRequest() {
+  public String userName() {
     return addUserName;
   }
 

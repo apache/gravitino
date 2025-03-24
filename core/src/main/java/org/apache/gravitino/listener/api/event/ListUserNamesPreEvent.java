@@ -29,11 +29,11 @@ public class ListUserNamesPreEvent extends UserPreEvent {
   /**
    * Construct a new {@link ListUserNamesPreEvent} instance with the specified user and identifier.
    *
-   * @param user the user who initiated the list-user request.
+   * @param initiator the user who initiated the list-user request.
    * @param identifier the identifier of the metalake which is being listed.
    */
-  protected ListUserNamesPreEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
+  protected ListUserNamesPreEvent(String initiator, NameIdentifier identifier) {
+    super(initiator, identifier);
   }
 
   /**

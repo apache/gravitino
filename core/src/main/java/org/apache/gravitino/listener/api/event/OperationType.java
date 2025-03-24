@@ -116,7 +116,7 @@ public enum OperationType {
   ADD_USER,
   REMOVE_USER,
   GET_USER,
-  LIST_USER,
+  LIST_USERS,
   LIST_USER_NAMES,
 
   // TODO GROUP

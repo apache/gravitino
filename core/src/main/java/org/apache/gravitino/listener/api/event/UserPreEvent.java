@@ -29,10 +29,10 @@ public abstract class UserPreEvent extends PreEvent {
   /**
    * Create a new {@link UserPreEvent} instance for an access request.
    *
-   * @param user the user who triggered the event.
+   * @param initiator the user who triggered the event.
    * @param identifier the identifier of the model being operated on.
    */
-  protected UserPreEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
+  protected UserPreEvent(String initiator, NameIdentifier identifier) {
+    super(initiator, identifier);
   }
 }
