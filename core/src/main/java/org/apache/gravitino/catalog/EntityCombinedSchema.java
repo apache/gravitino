@@ -84,7 +84,7 @@ public final class EntityCombinedSchema implements Schema {
   @Override
   public Map<String, String> properties() {
     return schema.properties().entrySet().stream()
-        .filter(e -> !hiddenProperties.contains(e.getKey()))
+        .filter(e -> !hiddenProperties.contains(e.getKey()) && e.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
