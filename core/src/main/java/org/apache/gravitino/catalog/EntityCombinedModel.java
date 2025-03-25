@@ -69,6 +69,7 @@ public final class EntityCombinedModel implements Model {
         ? null
         : model.properties().entrySet().stream()
             .filter(e -> !hiddenProperties.contains(e.getKey()))
+            .filter(entry -> entry.getKey() != null && entry.getValue() != null)
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
