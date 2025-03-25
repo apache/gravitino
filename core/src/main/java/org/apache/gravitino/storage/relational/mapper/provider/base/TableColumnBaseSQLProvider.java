@@ -132,4 +132,23 @@ public class TableColumnBaseSQLProvider {
         + " WHERE column_id = #{columnId} AND deleted_at = 0"
         + " ORDER BY table_version DESC LIMIT 1";
   }
+
+  public String listColumnPOsByTableIds(@Param("columnIds") List<Long> columnIds) {
+    return "SELECT column_id AS columnId, column_name AS columnName,"
+        + " column_position AS columnPosition, metalake_id AS metalakeId, catalog_id AS catalogId,"
+        + " schema_id AS schemaId, table_id AS tableId,"
+        + " table_version AS tableVersion, column_type AS columnType,"
+        + " column_comment AS columnComment, column_nullable AS nullable,"
+        + " column_auto_increment AS autoIncrement,"
+        + " column_default_value AS defaultValue, column_op_type AS columnOpType,"
+        + " deleted_at AS deletedAt, audit_info AS auditInfo"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE column_id IN ("
+        + "<foreach collection='columnIds' item='item' separator=','>"
+        + "#{item}"
+        + "</foreach>)"
+        + " AND deleted_at = 0"
+        + " ORDER BY table_version DESC";
+  }
 }

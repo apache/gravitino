@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -387,6 +388,51 @@ public class MetadataObjectService {
         });
 
     return tableIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of column object IDs to their full names.
+   *
+   * @param columnsIds A list of column object IDs to fetch names for.
+   * @return A Map where the key is the column ID and the value is the column full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no column objects are found for the given IDs. {@code @example} value of table full name:
+   *     "catalog1.schema1.table1.column1"
+   */
+  public static Map<Long, String> getColumnObjectsFullName(List<Long> columnsIds) {
+    List<ColumnPO> columnPOs =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class, mapper -> mapper.listColumnPOsByTableIds(columnsIds));
+
+    if (columnPOs == null || columnPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> tableIds = columnPOs.stream().map(ColumnPO::getTableId).collect(Collectors.toList());
+    Map<Long, String> tableIdAndNameMap = getTableObjectsFullName(tableIds);
+
+    HashMap<Long, String> columnIdAndNameMap = new HashMap<>();
+
+    columnPOs.forEach(
+        columnPO -> {
+          // since the table can be deleted, we need to check the null value,
+          // and when the table is deleted, we will set fullName of column to
+          // null
+          String tableName = tableIdAndNameMap.getOrDefault(columnPO.getTableId(), null);
+          if (tableName == null) {
+            LOG.warn(
+                "The table '{}' of column '{}' may be deleted",
+                columnPO.getTableId(),
+                columnPO.getColumnId());
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(tableName, columnPO.getColumnName());
+          tableIdAndNameMap.put(columnPO.getColumnId(), fullName);
+        });
+
+    return columnIdAndNameMap;
   }
 
   /**
