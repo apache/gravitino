@@ -119,7 +119,12 @@ public enum OperationType {
   LIST_USERS,
   LIST_USER_NAMES,
 
-  // TODO GROUP
+  // Group
+  ADD_GROUP,
+  REMOVE_GROUP,
+  GET_GROUP,
+  LIST_GROUPS,
+  LIST_GROUP_NAMES,
 
   // TODO ROLE
 

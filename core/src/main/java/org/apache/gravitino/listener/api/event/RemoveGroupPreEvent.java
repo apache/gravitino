@@ -22,31 +22,31 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before get a user from specific metalake */
+/** Represents an event triggered before remove a group from specific metalake. */
 @DeveloperApi
-public class GetUserPreEvent extends UserPreEvent {
-  private final String userName;
+public class RemoveGroupPreEvent extends GroupPreEvent {
+  private final String groupName;
 
   /**
-   * Construct a new {@link GetUserPreEvent} instance with the specified user, identifier and user
-   * info.
+   * Construct a new {@link RemoveGroupPreEvent} instance with initiator, identifier and group name.
    *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is getting retrieved from.
-   * @param userName the username which is requested to be retrieved.
+   * @param initiator the user who initiated the remove group operation.
+   * @param identifier the identifier of the metalake where the group is removed.
+   * @param groupName the group name which is requested to be removed from the metalake.
    */
-  public GetUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+  protected RemoveGroupPreEvent(String initiator, NameIdentifier identifier, String groupName) {
     super(initiator, identifier);
-    this.userName = userName;
+
+    this.groupName = groupName;
   }
 
   /**
-   * Returns the user info for the user which is getting retrieved.
+   * Returns the group information which is being removed from the metalake.
    *
-   * @return the username which is requested to be retrieved.
+   * @return the group name which is requested to be removed from the metalake.
    */
-  public String userName() {
-    return userName;
+  public String groupName() {
+    return groupName;
   }
 
   /**
@@ -56,6 +56,6 @@ public class GetUserPreEvent extends UserPreEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.GET_USER;
+    return OperationType.REMOVE_GROUP;
   }
 }
