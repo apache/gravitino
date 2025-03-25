@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization.common;
 
+import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -26,12 +27,18 @@ public class TestPathBasedMetadataObject {
   public void PathBasedMetadataObjectEquals() {
     PathBasedMetadataObject pathBasedMetadataObject1 =
         new PathBasedMetadataObject(
-            "parent", "name", "path", PathBasedMetadataObject.PathType.FILESET_PATH);
+            "parent",
+            "name",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     pathBasedMetadataObject1.validateAuthorizationMetadataObject();
 
     PathBasedMetadataObject pathBasedMetadataObject2 =
         new PathBasedMetadataObject(
-            "parent", "name", "path", PathBasedMetadataObject.PathType.FILESET_PATH);
+            "parent",
+            "name",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     pathBasedMetadataObject2.validateAuthorizationMetadataObject();
 
     Assertions.assertEquals(pathBasedMetadataObject1, pathBasedMetadataObject2);
@@ -41,12 +48,18 @@ public class TestPathBasedMetadataObject {
   public void PathBasedMetadataObjectNotEquals() {
     PathBasedMetadataObject pathBasedMetadataObject1 =
         new PathBasedMetadataObject(
-            "parent", "name", "path", PathBasedMetadataObject.PathType.FILESET_PATH);
+            "parent",
+            "name",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     pathBasedMetadataObject1.validateAuthorizationMetadataObject();
 
     PathBasedMetadataObject pathBasedMetadataObject2 =
         new PathBasedMetadataObject(
-            "parent", "name", "path1", PathBasedMetadataObject.PathType.FILESET_PATH);
+            "parent",
+            "name",
+            "path1",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     pathBasedMetadataObject2.validateAuthorizationMetadataObject();
 
     Assertions.assertNotEquals(pathBasedMetadataObject1, pathBasedMetadataObject2);
@@ -56,29 +69,39 @@ public class TestPathBasedMetadataObject {
   void testToString() {
     PathBasedMetadataObject pathBasedMetadataObject1 =
         new PathBasedMetadataObject(
-            "parent", "name", "path", PathBasedMetadataObject.PathType.FILESET_PATH);
+            "parent",
+            "name",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     Assertions.assertEquals(
-        "MetadataObject: [fullName=parent.name],  [path=path], [type=FILESET_PATH]",
+        "MetadataObject: [fullName=parent.name],  [path=path], [type=PATH]",
         pathBasedMetadataObject1.toString());
 
     PathBasedMetadataObject pathBasedMetadataObject2 =
         new PathBasedMetadataObject(
-            "parent", "name", null, PathBasedMetadataObject.PathType.FILESET_PATH);
+            "parent",
+            "name",
+            null,
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     Assertions.assertEquals(
-        "MetadataObject: [fullName=parent.name],  [path=null], [type=FILESET_PATH]",
+        "MetadataObject: [fullName=parent.name],  [path=null], [type=PATH]",
         pathBasedMetadataObject2.toString());
 
     PathBasedMetadataObject pathBasedMetadataObject3 =
-        new PathBasedMetadataObject(null, "name", null, PathBasedMetadataObject.PathType.FILESET_PATH);
+        new PathBasedMetadataObject(
+            null, "name", null, PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     Assertions.assertEquals(
-        "MetadataObject: [fullName=name],  [path=null], [type=FILESET_PATH]",
+        "MetadataObject: [fullName=name],  [path=null], [type=PATH]",
         pathBasedMetadataObject3.toString());
 
     PathBasedMetadataObject pathBasedMetadataObject4 =
         new PathBasedMetadataObject(
-            null, "name", "path", PathBasedMetadataObject.PathType.FILESET_PATH);
+            null,
+            "name",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
     Assertions.assertEquals(
-        "MetadataObject: [fullName=name],  [path=path], [type=FILESET_PATH]",
+        "MetadataObject: [fullName=name],  [path=path], [type=PATH]",
         pathBasedMetadataObject4.toString());
   }
 }

@@ -19,8 +19,6 @@
 package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
@@ -31,8 +29,8 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
    * The type of metadata object in the underlying system. Every type will map one kind of the
    * entity of the Gravitino type system. When we store a Hive table, first, we will store the
    * metadata in the JDBC database like MySQL, and then we will store the data in the HDFS location.
-   * For Hive, there is a default location for the cluster level.
-   * We can also specify other locations for schema and table levels. So a path may not be fileset
+   * For Hive, there is a default location for the cluster level. We can also specify other
+   * locations for schema and table levels. So a path may not be fileset
    */
   public static final class PathType implements AuthorizationMetadataObject.Type {
 
@@ -65,6 +63,11 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
       }
 
       return this.metadataType.equals(((PathType) obj).metadataType);
+    }
+
+    @Override
+    public String toString() {
+      return "PATH";
     }
   }
 
@@ -115,9 +118,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     Preconditions.checkArgument(
         path != null && !path.isEmpty(), "Cannot create a path based metadata object with no path");
 
-    HashSet<AuthorizationMetadataObject.Type> typeSet =
-        Sets.newHashSet(PathType.values());
-    Preconditions.checkArgument(typeSet.contains(type), "it must be the PATH type");
+    Preconditions.checkArgument(type instanceof PathType, "it must be the PATH type");
 
     for (String name : names) {
       Preconditions.checkArgument(
@@ -139,7 +140,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     return Objects.equals(name, that.name)
         && Objects.equals(parent, that.parent)
         && Objects.equals(path, that.path)
-        && type == that.type;
+        && Objects.equals(type, that.type);
   }
 
   @Override

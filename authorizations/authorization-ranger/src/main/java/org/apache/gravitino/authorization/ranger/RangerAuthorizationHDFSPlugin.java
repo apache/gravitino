@@ -18,10 +18,6 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.PathType.FILESET_PATH;
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.PathType.SCHEMA_PATH;
-import static org.apache.gravitino.authorization.common.PathBasedMetadataObject.PathType.TABLE_PATH;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -255,11 +251,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    */
   @Override
   protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    if (authzMetadataObject.type().equals(SCHEMA_PATH)) {
+    if (authzMetadataObject
+        .type()
+        .equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA))) {
       removeSchemaMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(TABLE_PATH)) {
+    } else if (authzMetadataObject
+        .type()
+        .equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE))) {
       removeTableMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(FILESET_PATH)) {
+    } else if (authzMetadataObject
+        .type()
+        .equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET))) {
       removePolicyByMetadataObject(authzMetadataObject);
     } else {
       throw new IllegalArgumentException(
@@ -276,7 +278,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
     Preconditions.checkArgument(
-        authzMetadataObject.type() == SCHEMA_PATH, "The metadata object type must be a schema");
+        authzMetadataObject.type()
+            == PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA),
+        "The metadata object type must be a schema");
     Preconditions.checkArgument(
         authzMetadataObject.names().size() == 1, "The metadata object's size must be 1.");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
@@ -301,7 +305,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                               AuthorizationMetadataObject.getParentFullName(names),
                               AuthorizationMetadataObject.getLastName(names),
                               locationPath,
-                              SCHEMA_PATH);
+                              PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
                       removeSchemaMetadataObject(schemaMetadataObject);
                     });
               });
@@ -323,7 +327,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     locationPath -> {
                       AuthorizationMetadataObject tableMetadataObject =
                           new PathBasedMetadataObject(
-                              authzMetadataObject.name(), table.name(), locationPath, TABLE_PATH);
+                              authzMetadataObject.name(),
+                              table.name(),
+                              locationPath,
+                              PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE));
                       removeTableMetadataObject(tableMetadataObject);
                     });
               });
@@ -339,7 +346,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           locationPath -> {
             AuthorizationMetadataObject schemaMetadataObject =
                 new PathBasedMetadataObject(
-                    authzMetadataObject.name(), schema.name(), locationPath, SCHEMA_PATH);
+                    authzMetadataObject.name(),
+                    schema.name(),
+                    locationPath,
+                    PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
             removePolicyByMetadataObject(schemaMetadataObject);
           });
     }
@@ -356,7 +366,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         authzMetadataObject.names().size() == 3, "The metadata object's name size must be 3");
     Preconditions.checkArgument(
-        authzMetadataObject.type() == TABLE_PATH, "The metadata object type must be a path");
+        authzMetadataObject
+            .type()
+            .equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA)),
+        "The metadata object type must be a path");
     removePolicyByMetadataObject(authzMetadataObject);
   }
 
@@ -464,13 +477,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                         securableObject.parent(),
                                         securableObject.name(),
                                         locationPath,
-                                        getType(securableObject));
+                                        PathBasedMetadataObject.PathType.get(
+                                            securableObject.type()));
                                 pathBaseMetadataObject.validateAuthorizationMetadataObject();
                                 rangerSecurableObjects.add(
                                     generateAuthorizationSecurableObject(
                                         pathBaseMetadataObject.names(),
                                         locationPath,
-                                        getType(securableObject),
+                                        PathBasedMetadataObject.PathType.get(
+                                            securableObject.type()),
                                         rangerPrivileges));
                               });
                       break;
@@ -494,13 +509,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                         securableObject.parent(),
                                         securableObject.name(),
                                         locationPath,
-                                        getType(securableObject));
+                                        PathBasedMetadataObject.PathType.get(
+                                            securableObject.type()));
                                 pathBaseMetadataObject.validateAuthorizationMetadataObject();
                                 rangerSecurableObjects.add(
                                     generateAuthorizationSecurableObject(
                                         pathBaseMetadataObject.names(),
                                         locationPath,
-                                        getType(securableObject),
+                                        PathBasedMetadataObject.PathType.get(
+                                            securableObject.type()),
                                         rangerPrivileges));
                               });
                       break;
@@ -539,7 +556,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     generateAuthorizationSecurableObject(
                                         pathBasedMetadataObject.names(),
                                         getAuthorizationPath(pathBasedMetadataObject),
-                                        PathBasedMetadataObject.PathType.FILESET_PATH,
+                                        PathBasedMetadataObject.PathType.get(
+                                            MetadataObject.Type.FILESET),
                                         rangerPrivileges));
                               });
                       break;
@@ -582,7 +600,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       generateAuthorizationSecurableObject(
                           pathBasedMetadataObject.names(),
                           getAuthorizationPath(pathBasedMetadataObject),
-                          PathBasedMetadataObject.PathType.FILESET_PATH,
+                          PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET),
                           ownerMappingRule()));
                 });
         break;
@@ -605,7 +623,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     List<String> locations = AuthorizationUtils.getMetadataObjectLocation(identifier, entityType);
     locations.forEach(
         locationPath -> {
-          AuthorizationMetadataObject.Type type = getType(metadataObject);
+          AuthorizationMetadataObject.Type type =
+              PathBasedMetadataObject.PathType.get(metadataObject.type());
           PathBasedMetadataObject pathBaseMetadataObject =
               new PathBasedMetadataObject(
                   metadataObject.parent(), metadataObject.name(), locationPath, type);
@@ -667,7 +686,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                           changeMetadataObject.metadataObject().parent(),
                           changeMetadataObject.metadataObject().name(),
                           locationPath,
-                          PathBasedMetadataObject.PathType.FILESET_PATH);
+                          PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
                   pathBaseMetadataObject.validateAuthorizationMetadataObject();
                   authzMetadataObjects.add(pathBaseMetadataObject);
                 });
@@ -720,14 +739,5 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 RangerAuthorizationProperties.FS_DEFAULT_NAME,
                 RangerAuthorizationProperties.FS_DEFAULT_VALUE))
         .build();
-  }
-
-  private static AuthorizationMetadataObject.Type getType(MetadataObject metadataObject) {
-    for (PathBasedMetadataObject.PathType value : PathBasedMetadataObject.PathType.values()) {
-      if (value.metadataObjectType() == metadataObject.type()) {
-        return value;
-      }
-    }
-    throw new IllegalArgumentException("Doesn't support " + metadataObject);
   }
 }
