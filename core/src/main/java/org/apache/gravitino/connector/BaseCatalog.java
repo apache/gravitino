@@ -208,8 +208,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           try {
             BaseAuthorization<?> authorization =
                 BaseAuthorization.createAuthorization(classLoader, authorizationProvider);
+
             authorizationPlugin =
-                authorization.newPlugin(entity.namespace().level(0), provider(), this.conf);
+                classLoader.withClassLoader(
+                    cl ->
+                        authorization.newPlugin(
+                            entity.namespace().level(0), provider(), this.conf));
+
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
             throw new RuntimeException(e);
@@ -347,6 +352,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+
           properties = tempProperties;
         }
       }

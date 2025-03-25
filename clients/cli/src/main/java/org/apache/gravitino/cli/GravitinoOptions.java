@@ -48,6 +48,7 @@ public class GravitinoOptions {
   public static final String PRIVILEGE = "privilege";
   public static final String PROPERTIES = "properties";
   public static final String PROPERTY = "property";
+  public static final String QUIET = "quiet";
   public static final String PROVIDER = "provider";
   public static final String RENAME = "rename";
   public static final String ROLE = "role";
@@ -91,6 +92,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(null, SORTORDER, "display sortorder information"));
     options.addOption(createSimpleOption(null, ENABLE, "enable entities"));
     options.addOption(createSimpleOption(null, DISABLE, "disable entities"));
+    options.addOption(createSimpleOption(null, QUIET, "quiet mode"));
 
     // Create/update options
     options.addOption(createArgOption(RENAME, "new entity name"));
@@ -109,7 +111,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
-    options.addOption(createSimpleOption(null, ALL, "all operation for --enable"));
+    options.addOption(createSimpleOption(null, ALL, "on all entities"));
 
     // model options
     options.addOption(createArgOption(null, URI, "model version artifact"));

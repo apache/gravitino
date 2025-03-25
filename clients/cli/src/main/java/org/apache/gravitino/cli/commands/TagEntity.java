@@ -20,16 +20,20 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
+import org.apache.gravitino.cli.utils.FullNameUtil;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
 public class TagEntity extends Command {
@@ -40,15 +44,13 @@ public class TagEntity extends Command {
   /**
    * Tag an entity with existing tags.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param tags The names of the tags.
    */
-  public TagEntity(
-      String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
-    super(url, ignoreVersions);
+  public TagEntity(CommandContext context, String metalake, FullName name, String[] tags) {
+    super(context);
     this.metalake = metalake;
     this.name = name;
     this.tags = tags;
@@ -63,18 +65,42 @@ public class TagEntity extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
 
-      // TODO fileset and topic
-      if (name.hasTableName()) {
+      if (name.getLevel() == 3) {
         String catalog = name.getCatalogName();
-        String schema = name.getSchemaName();
-        String table = name.getTableName();
-        Table gTable =
-            client
-                .loadCatalog(catalog)
-                .asTableCatalog()
-                .loadTable(NameIdentifier.of(schema, table));
-        tagsToAdd = gTable.supportsTags().associateTags(tags, null);
-        entity = table;
+        Catalog catalogObject = client.loadCatalog(catalog);
+        switch (catalogObject.type()) {
+          case RELATIONAL:
+            String table = name.getTableName();
+            entity = table;
+            Table gTable = catalogObject.asTableCatalog().loadTable(FullNameUtil.toTable(name));
+            tagsToAdd = gTable.supportsTags().associateTags(tags, null);
+            break;
+
+          case MODEL:
+            String model = name.getModelName();
+            entity = model;
+            Model gModel = catalogObject.asModelCatalog().getModel(FullNameUtil.toModel(name));
+            tagsToAdd = gModel.supportsTags().associateTags(tags, null);
+            break;
+
+          case FILESET:
+            String fileset = name.getFilesetName();
+            entity = fileset;
+            Fileset gFileset =
+                catalogObject.asFilesetCatalog().loadFileset(FullNameUtil.toFileset(name));
+            gFileset.supportsTags().associateTags(tags, null);
+            break;
+
+          case MESSAGING:
+            String topic = name.getTopicName();
+            entity = topic;
+            Topic gTopic = catalogObject.asTopicCatalog().loadTopic(FullNameUtil.toTopic(name));
+            gTopic.supportsTags().associateTags(tags, null);
+            break;
+
+          default:
+            break;
+        }
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
@@ -103,7 +129,7 @@ public class TagEntity extends Command {
 
     String all = tagsToAdd.length == 0 ? "nothing" : String.join(",", tagsToAdd);
 
-    System.out.println(entity + " now tagged with " + all);
+    printInformation(entity + " now tagged with " + all);
   }
 
   @Override

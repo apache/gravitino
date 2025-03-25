@@ -29,6 +29,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.utils.CollectionUtils;
 
 public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
@@ -161,8 +162,8 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roleNames, that.roleNames)
-        && Objects.equals(roleIds, that.roleIds);
+        && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
+        && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override

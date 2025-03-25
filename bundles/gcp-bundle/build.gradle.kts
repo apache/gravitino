@@ -36,11 +36,22 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+  }
+
   // Relocate dependencies to avoid conflicts
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
-  relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
+  relocate("com.google.api", "org.apache.gravitino.gcp.shaded.com.google.api")
+  relocate("com.google.auth", "org.apache.gravitino.gcp.shaded.com.google.auth")
+  relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
+  relocate("com.google.iam", "org.apache.gravitino.gcp.shaded.com.google.iam")
+  relocate("com.google.longrunning", "org.apache.gravitino.gcp.shaded.com.google.longrunning")
+  relocate("com.google.protobuf", "org.apache.gravitino.gcp.shaded.com.google.protobuf")
+  relocate("io.grpc", "org.apache.gravitino.gcp.shaded.io.grpc")
+
+  relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
+  relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
   relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
   mergeServiceFiles()
 }

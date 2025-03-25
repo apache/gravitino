@@ -27,8 +27,7 @@ public class GroupCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private String group;
@@ -39,16 +38,18 @@ public class GroupCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public GroupCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
   }
@@ -57,7 +58,7 @@ public class GroupCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     if (CommandActions.LIST.equals(command)) {
       handleListCommand();
@@ -111,49 +112,54 @@ public class GroupCommandHandler extends CommandHandler {
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
-      gravitinoCommandLine.newGroupAudit(url, ignore, metalake, group).validate().handle();
+      gravitinoCommandLine.newGroupAudit(context, metalake, group).validate().handle();
     } else {
-      gravitinoCommandLine.newGroupDetails(url, ignore, metalake, group).validate().handle();
+      gravitinoCommandLine.newGroupDetails(context, metalake, group).validate().handle();
     }
   }
 
   /** Handles the "CREATE" command. */
   private void handleCreateCommand() {
-    gravitinoCommandLine.newCreateGroup(url, ignore, metalake, group).validate().handle();
+    gravitinoCommandLine.newCreateGroup(context, metalake, group).validate().handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine.newDeleteGroup(url, ignore, force, metalake, group).validate().handle();
+    gravitinoCommandLine.newDeleteGroup(context, metalake, group).validate().handle();
   }
 
   /** Handles the "REVOKE" command. */
   private void handleRevokeCommand() {
-    String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
-    for (String role : revokeRoles) {
+    boolean revokeAll = line.hasOption(GravitinoOptions.ALL);
+    if (revokeAll) {
       gravitinoCommandLine
-          .newRemoveRoleFromGroup(url, ignore, metalake, group, role)
+          .newRemoveAllRoles(context, metalake, group, CommandEntities.GROUP)
           .validate()
           .handle();
+      System.out.printf("Removed all roles from group %s%n", group);
+    } else {
+      String[] revokeRoles = line.getOptionValues(GravitinoOptions.ROLE);
+      for (String role : revokeRoles) {
+        gravitinoCommandLine
+            .newRemoveRoleFromGroup(context, metalake, group, role)
+            .validate()
+            .handle();
+      }
+      System.out.printf("Removed roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
     }
-    System.out.printf("Remove roles %s from group %s%n", COMMA_JOINER.join(revokeRoles), group);
   }
 
   /** Handles the "GRANT" command. */
   private void handleGrantCommand() {
     String[] grantRoles = line.getOptionValues(GravitinoOptions.ROLE);
     for (String role : grantRoles) {
-      gravitinoCommandLine
-          .newAddRoleToGroup(url, ignore, metalake, group, role)
-          .validate()
-          .handle();
+      gravitinoCommandLine.newAddRoleToGroup(context, metalake, group, role).validate().handle();
     }
     System.out.printf("Grant roles %s to group %s%n", COMMA_JOINER.join(grantRoles), group);
   }
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListGroups(url, ignore, metalake).validate().handle();
+    gravitinoCommandLine.newListGroups(context, metalake).validate().handle();
   }
 }

@@ -16,7 +16,7 @@ managing the versions for each model.
 The advantages of using model catalog are:
 
 * Centralized management of ML models with user defined namespaces. Users can better discover
-  and govern the models from sematic level, rather than managing the model files directly.
+  and govern the models from semantic level, rather than managing the model files directly.
 * Version management for each model. Users can easily track the model versions and manage the
   model lifecycle.
 

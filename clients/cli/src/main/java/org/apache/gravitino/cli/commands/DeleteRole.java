@@ -23,6 +23,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -37,17 +38,14 @@ public class DeleteRole extends Command {
   /**
    * Delete a role.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param roles The name of the role.
    */
-  public DeleteRole(
-      String url, boolean ignoreVersions, boolean force, String metalake, String[] roles) {
-    super(url, ignoreVersions);
+  public DeleteRole(CommandContext context, String metalake, String[] roles) {
+    super(context);
     this.metalake = metalake;
-    this.force = force;
+    this.force = context.force();
     this.roles = roles;
   }
 
@@ -74,9 +72,9 @@ public class DeleteRole extends Command {
     }
 
     if (failedRoles.isEmpty()) {
-      System.out.println(COMMA_JOINER.join(successRoles) + " deleted.");
+      printInformation(COMMA_JOINER.join(successRoles) + " deleted.");
     } else {
-      System.err.println(
+      printInformation(
           COMMA_JOINER.join(successRoles)
               + " deleted, "
               + "but "

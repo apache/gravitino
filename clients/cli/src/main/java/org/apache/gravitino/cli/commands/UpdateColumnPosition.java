@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.PositionConverter;
 import org.apache.gravitino.client.GravitinoClient;
@@ -43,8 +44,7 @@ public class UpdateColumnPosition extends Command {
   /**
    * Update the position of a column.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -53,15 +53,14 @@ public class UpdateColumnPosition extends Command {
    * @param position The new position of the column.
    */
   public UpdateColumnPosition(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       String position) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -97,6 +96,6 @@ public class UpdateColumnPosition extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(column + " position changed to " + position + ".");
+    printInformation(column + " position changed to " + position + ".");
   }
 }

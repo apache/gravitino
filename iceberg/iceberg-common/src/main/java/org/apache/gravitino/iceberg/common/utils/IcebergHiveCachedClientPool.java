@@ -238,7 +238,7 @@ public class IcebergHiveCachedClientPool
       if (this == o) {
         return true;
       }
-      if (o == null || !(o instanceof Key)) {
+      if (!(o instanceof Key)) {
         return false;
       }
       Key key = (Key) o;

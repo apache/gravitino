@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.flink.connector;
 
+import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.flink.table.catalog.ObjectPath;
 
 /**
  * PropertiesConverter is used to convert properties between Flink properties and Apache Gravitino
@@ -32,24 +35,81 @@ public interface PropertiesConverter {
 
   /**
    * Converts properties from application provided properties and Flink connector properties to
-   * Gravitino properties.
+   * Gravitino properties.This method processes the Flink configuration and transforms it into a
+   * format suitable for the Gravitino catalog.
    *
-   * @param flinkConf The configuration provided by Flink.
-   * @return properties for the Gravitino catalog.
+   * @param flinkConf The Flink configuration containing connector properties. This includes both
+   *     Flink-specific properties and any user-provided properties.
+   * @return A map of properties converted for use in the Gravitino catalog. The returned map
+   *     includes both directly transformed properties and bypass properties prefixed with {@link
+   *     #FLINK_PROPERTY_PREFIX}.
    */
   default Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
-    return flinkConf.toMap();
+    Map<String, String> gravitinoProperties = Maps.newHashMap();
+    for (Map.Entry<String, String> entry : flinkConf.toMap().entrySet()) {
+      String gravitinoKey = transformPropertyToGravitinoCatalog(entry.getKey());
+      if (gravitinoKey != null) {
+        gravitinoProperties.put(gravitinoKey, entry.getValue());
+      } else if (!entry.getKey().startsWith(FLINK_PROPERTY_PREFIX)) {
+        gravitinoProperties.put(FLINK_PROPERTY_PREFIX + entry.getKey(), entry.getValue());
+      } else {
+        gravitinoProperties.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return gravitinoProperties;
   }
 
   /**
-   * Converts properties from Gravitino properties to Flink connector properties.
+   * Converts properties from Gravitino catalog properties to Flink connector properties. This
+   * method processes the Gravitino properties and transforms them into a format suitable for the
+   * Flink connector.
    *
-   * @param gravitinoProperties The properties provided by Gravitino.
-   * @return properties for the Flink connector.
+   * @param gravitinoProperties The properties provided by the Gravitino catalog. This includes both
+   *     Gravitino-specific properties and any bypass properties prefixed with {@link
+   *     #FLINK_PROPERTY_PREFIX}.
+   * @return A map of properties converted for use in the Flink connector. The returned map includes
+   *     both transformed properties and the Flink catalog type.
    */
   default Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
-    return gravitinoProperties;
+    Map<String, String> allProperties = Maps.newHashMap();
+    gravitinoProperties.forEach(
+        (key, value) -> {
+          String flinkConfigKey = key;
+          if (key.startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX)) {
+            flinkConfigKey = key.substring(PropertiesConverter.FLINK_PROPERTY_PREFIX.length());
+            allProperties.put(flinkConfigKey, value);
+          } else {
+            String convertedKey = transformPropertyToFlinkCatalog(flinkConfigKey);
+            if (convertedKey != null) {
+              allProperties.put(convertedKey, value);
+            }
+          }
+        });
+    allProperties.put(CommonCatalogOptions.CATALOG_TYPE.key(), getFlinkCatalogType());
+    return allProperties;
   }
+
+  /**
+   * Transforms a Flink configuration key to a corresponding Gravitino catalog property key. This
+   * method is used to map Flink-specific configuration keys to Gravitino catalog properties.
+   *
+   * @param configKey The Flink configuration key to be transformed.
+   * @return The corresponding Gravitino catalog property key, or {@code null} if no transformation
+   *     is needed.
+   */
+  String transformPropertyToGravitinoCatalog(String configKey);
+
+  /**
+   * Transforms a specific configuration key from Gravitino catalog properties to Flink connector
+   * properties. This method is used to convert a property key that is specific to Gravitino into a
+   * format that can be understood by the Flink connector.
+   *
+   * @param configKey The configuration key from Gravitino catalog properties to be transformed.
+   * @return The transformed configuration key that is compatible with the Flink connector.
+   * @throws IllegalArgumentException If the provided configuration key cannot be transformed or is
+   *     invalid.
+   */
+  String transformPropertyToFlinkCatalog(String configKey);
 
   /**
    * Converts properties from Flink connector schema properties to Gravitino schema properties.
@@ -74,11 +134,19 @@ public interface PropertiesConverter {
   /**
    * Converts properties from Gravitino table properties to Flink connector table properties.
    *
-   * @param gravitinoProperties The table properties provided by Gravitino.
+   * @param flinkCatalogProperties The flinkCatalogProperties are either the converted properties
+   *     obtained through the toFlinkCatalogProperties method in GravitinoCatalogStore, or the
+   *     options passed when writing a CREATE CATALOG statement in Flink SQL.
+   * @param gravitinoTableProperties The table properties provided by Gravitino.
+   * @param tablePath The tablePath provides the database and table for some catalogs, such as the
+   *     {@link org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalog}.
    * @return The table properties for the Flink connector.
    */
-  default Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
-    return gravitinoProperties;
+  default Map<String, String> toFlinkTableProperties(
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoTableProperties,
+      ObjectPath tablePath) {
+    return gravitinoTableProperties;
   }
 
   /**
@@ -90,4 +158,12 @@ public interface PropertiesConverter {
   default Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
     return flinkProperties;
   }
+
+  /**
+   * Retrieves the Flink catalog type associated with this converter. This method is used to
+   * determine the type of Flink catalog that this converter is designed for.
+   *
+   * @return The Flink catalog type.
+   */
+  String getFlinkCatalogType();
 }

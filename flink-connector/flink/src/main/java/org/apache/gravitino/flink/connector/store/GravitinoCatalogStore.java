@@ -54,7 +54,8 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   public void storeCatalog(String catalogName, CatalogDescriptor descriptor)
       throws CatalogException {
     Configuration configuration = descriptor.getConfiguration();
-    BaseCatalogFactory catalogFactory = getCatalogFactory(configuration.toMap());
+    Map<String, String> gravitino = configuration.toMap();
+    BaseCatalogFactory catalogFactory = getCatalogFactory(gravitino);
     Map<String, String> gravitinoProperties =
         catalogFactory.propertiesConverter().toGravitinoCatalogProperties(configuration);
     gravitinoCatalogManager.createCatalog(

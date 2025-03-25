@@ -75,7 +75,7 @@ Catalog catalog = gravitinoClient.createCatalog(
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
 catalog = gravitino_client.create_catalog(name="model_catalog",
-                                          type=Catalog.Type.MODEL,
+                                          catalog_type=Catalog.Type.MODEL,
                                           provider=None,
                                           comment="This is a model catalog",
                                           properties={"k1": "v1"})

@@ -21,6 +21,7 @@ package org.apache.gravitino.cli.commands;
 
 import com.google.common.base.Joiner;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -34,21 +35,15 @@ public class ListColumns extends TableCommand {
   /**
    * Displays the details of a table's columns.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    * @param table The name of the table.
    */
   public ListColumns(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
+      CommandContext context, String metalake, String catalog, String schema, String table) {
+    super(context, metalake, catalog);
     this.schema = schema;
     this.table = table;
   }
@@ -62,38 +57,12 @@ public class ListColumns extends TableCommand {
       NameIdentifier name = NameIdentifier.of(schema, table);
       columns = tableCatalog().loadTable(name).columns();
     } catch (NoSuchTableException noSuchTableException) {
-      System.err.println(
+      exitWithError(
           ErrorMessages.UNKNOWN_TABLE + Joiner.on(".").join(metalake, catalog, schema, table));
-      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < columns.length; i++) {
-      String name = columns[i].name();
-      String dataType = columns[i].dataType().simpleString();
-      String comment = columns[i].comment();
-      String nullable = columns[i].nullable() ? "true" : "false";
-      String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
-
-      if (i == 0) {
-        all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
-      }
-      // TODO default values
-      all.append(
-          name
-              + ","
-              + dataType
-              + ","
-              + comment
-              + ","
-              + nullable
-              + ","
-              + autoIncrement
-              + System.lineSeparator());
-    }
-
-    System.out.print(all.toString());
+    printResults(columns);
   }
 }

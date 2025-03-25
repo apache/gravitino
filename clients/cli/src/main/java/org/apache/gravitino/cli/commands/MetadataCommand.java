@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.client.GravitinoClient;
 
@@ -30,11 +31,10 @@ public class MetadataCommand extends Command {
   /**
    * MetadataCommand constructor.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    */
-  public MetadataCommand(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
+  public MetadataCommand(CommandContext context) {
+    super(context);
   }
 
   /**

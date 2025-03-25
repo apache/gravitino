@@ -64,15 +64,12 @@ const schema = yup.object().shape({
     .array()
     .of(
       yup.object().shape({
-        name: yup
-          .string()
-          .required('This aliase is required')
-          .test('not-number', 'Aliase cannot be a number or numeric string', value => {
-            return value === undefined || isNaN(Number(value))
-          })
+        name: yup.string().test('not-number', 'Alias cannot be a number or a numeric string', value => {
+          return (value && isNaN(Number(value))) || !value
+        })
       })
     )
-    .test('unique', 'Aliase must be unique', (aliases, ctx) => {
+    .test('unique', 'Alias must be unique', (aliases, ctx) => {
       const values = aliases?.filter(a => !!a.name).map(a => a.name)
       const duplicates = values.filter((value, index, self) => self.indexOf(value) !== index)
 
@@ -81,7 +78,7 @@ const schema = yup.object().shape({
 
         return ctx.createError({
           path: `aliases.${duplicateIndex}.name`,
-          message: 'This aliase is duplicated'
+          message: 'This alias is duplicated'
         })
       }
 
@@ -214,7 +211,7 @@ const LinkVersionDialog = props => {
 
         const schemaData = {
           uri: data.uri,
-          aliases: data.aliases.map(alias => alias.name),
+          aliases: data.aliases.map(alias => alias.name).filter(aliasName => aliasName),
           comment: data.comment,
           properties
         }
@@ -326,7 +323,7 @@ const LinkVersionDialog = props => {
                                   field.onChange(event)
                                   trigger('aliases')
                                 }}
-                                label={`Aliase ${index + 1}`}
+                                label={`Alias ${index + 1}`}
                                 error={!!errors.aliases?.[index]?.name || !!errors.aliases?.message}
                                 helperText={errors.aliases?.[index]?.name?.message || errors.aliases?.message}
                                 fullWidth

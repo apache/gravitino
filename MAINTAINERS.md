@@ -115,7 +115,7 @@ All contributions from the people listed are licensed under the Apache License v
 |----------------|---------------------|------------------|
 | Kuan-Po Tseng  | brandboat           | SUSE             |
 | Nicholas Jiang | SteNicholas         | Bilibili         |
-| Eric Chang     | unknowntpo          | Lawsnote         |
+| Eric Chang     | unknowntpo          | opensource4you   |
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
 | Xing Yong      | YxAc                | Xiaomi           |
 | Liwei Yang     | lw-yang             | Xiaomi           |

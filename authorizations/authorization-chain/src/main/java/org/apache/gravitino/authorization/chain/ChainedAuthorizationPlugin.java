@@ -33,7 +33,6 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.common.AuthorizationProperties;
 import org.apache.gravitino.authorization.common.ChainedAuthorizationProperties;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
@@ -55,16 +54,6 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
     ChainedAuthorizationProperties chainedAuthzProperties =
         new ChainedAuthorizationProperties(properties);
     chainedAuthzProperties.validate();
-    // Validate the properties for each plugin
-    chainedAuthzProperties
-        .plugins()
-        .forEach(
-            pluginName -> {
-              Map<String, String> pluginProperties =
-                  chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
-              String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
-              AuthorizationProperties.validate(authzProvider, pluginProperties);
-            });
     // Create the plugins
     chainedAuthzProperties
         .plugins()
@@ -83,8 +72,13 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
               try {
                 BaseAuthorization<?> authorization =
                     BaseAuthorization.createAuthorization(classLoader, authzProvider);
+
+                // Load the authorization plugin with the class loader of the catalog.
+                // Because the JDBC authorization plugin may load JDBC driver using the class
+                // loader.
                 AuthorizationPlugin authorizationPlugin =
-                    authorization.newPlugin(metalake, catalogProvider, pluginConfig);
+                    classLoader.withClassLoader(
+                        cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
                 plugins.add(authorizationPlugin);
               } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -117,6 +111,11 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onRoleDeleted(Role role) throws AuthorizationPluginException {
+    onRoleUpdated(
+        role,
+        role.securableObjects().stream()
+            .map(securableObject -> RoleChange.removeSecurableObject(role.name(), securableObject))
+            .toArray(RoleChange[]::new));
     return chainedAction(plugin -> plugin.onRoleDeleted(role));
   }
 

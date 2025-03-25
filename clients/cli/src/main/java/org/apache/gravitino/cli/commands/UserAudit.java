@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -33,13 +34,12 @@ public class UserAudit extends AuditCommand {
   /**
    * Displays the audit information of a user.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public UserAudit(String url, boolean ignoreVersions, String metalake, String user) {
-    super(url, ignoreVersions);
+  public UserAudit(CommandContext context, String metalake, String user) {
+    super(context);
     this.metalake = metalake;
     this.user = user;
   }
@@ -47,19 +47,16 @@ public class UserAudit extends AuditCommand {
   /** Displays the audit information of a specified user. */
   @Override
   public void handle() {
-    User result;
+    User result = null;
 
     try (GravitinoClient client = buildClient(metalake)) {
       result = client.getUser(this.user);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
-      return;
+      exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+      exitWithError(exp.getMessage());
     }
 
     if (result != null) {

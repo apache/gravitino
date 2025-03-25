@@ -21,6 +21,10 @@ package org.apache.gravitino.cli;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -92,7 +96,11 @@ class TestColumnCommands {
     doReturn(mockList)
         .when(commandLine)
         .newListColumns(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", "users");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -114,13 +122,12 @@ class TestColumnCommands {
     doReturn(mockAudit)
         .when(commandLine)
         .newColumnAudit(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"));
     doReturn(mockAudit).when(mockAudit).validate();
     commandLine.handleCommandLine();
     verify(mockAudit).handle();
@@ -142,14 +149,12 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newColumnAudit(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name");
-
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"));
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.UNSUPPORTED_ACTION);
   }
@@ -176,19 +181,18 @@ class TestColumnCommands {
     doReturn(mockAddColumn)
         .when(commandLine)
         .newAddColumn(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            "varchar(100)",
-            "comment",
-            null,
-            true,
-            false,
-            null);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            eq("varchar(100)"),
+            eq("comment"),
+            isNull(),
+            anyBoolean(),
+            anyBoolean(),
+            isNull());
     doReturn(mockAddColumn).when(mockAddColumn).validate();
     commandLine.handleCommandLine();
     verify(mockAddColumn).handle();
@@ -210,13 +214,12 @@ class TestColumnCommands {
     doReturn(mockDelete)
         .when(commandLine)
         .newDeleteColumn(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"));
     doReturn(mockDelete).when(mockDelete).validate();
     commandLine.handleCommandLine();
     verify(mockDelete).handle();
@@ -242,14 +245,13 @@ class TestColumnCommands {
     doReturn(mockUpdateColumn)
         .when(commandLine)
         .newUpdateColumnComment(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            "new comment");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            eq("new comment"));
     doReturn(mockUpdateColumn).when(mockUpdateColumn).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateColumn).handle();
@@ -275,14 +277,13 @@ class TestColumnCommands {
     doReturn(mockUpdateName)
         .when(commandLine)
         .newUpdateColumnName(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            "renamed");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            eq("renamed"));
     doReturn(mockUpdateName).when(mockUpdateName).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateName).handle();
@@ -308,14 +309,13 @@ class TestColumnCommands {
     doReturn(mockUpdateDatatype)
         .when(commandLine)
         .newUpdateColumnDatatype(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            "varchar(250)");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            eq("varchar(250)"));
     doReturn(mockUpdateDatatype).when(mockUpdateDatatype).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateDatatype).handle();
@@ -341,14 +341,13 @@ class TestColumnCommands {
     doReturn(mockUpdatePosition)
         .when(commandLine)
         .newUpdateColumnPosition(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            "first");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            eq("first"));
     doReturn(mockUpdatePosition).when(mockUpdatePosition).validate();
     commandLine.handleCommandLine();
     verify(mockUpdatePosition).handle();
@@ -373,14 +372,13 @@ class TestColumnCommands {
     doReturn(mockUpdateNull)
         .when(commandLine)
         .newUpdateColumnNullability(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            true);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            anyBoolean());
     doReturn(mockUpdateNull).when(mockUpdateNull).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateNull).handle();
@@ -405,14 +403,13 @@ class TestColumnCommands {
     doReturn(mockUpdateAuto)
         .when(commandLine)
         .newUpdateColumnAutoIncrement(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            true);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            anyBoolean());
     doReturn(mockUpdateAuto).when(mockUpdateAuto).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateAuto).handle();
@@ -440,15 +437,14 @@ class TestColumnCommands {
     doReturn(mockUpdateDefault)
         .when(commandLine)
         .newUpdateColumnDefault(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            "name",
-            "Fred Smith",
-            "varchar(100)");
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            eq("name"),
+            eq("Fred Smith"),
+            eq("varchar(100)"));
     doReturn(mockUpdateDefault).when(mockUpdateDefault).validate();
     commandLine.handleCommandLine();
     verify(mockUpdateDefault).handle();
@@ -457,18 +453,12 @@ class TestColumnCommands {
   @Test
   void testUpdateColumnDefaultWithoutDataType() {
     Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
     UpdateColumnDefault spyUpdate =
         spy(
             new UpdateColumnDefault(
-                GravitinoCommandLine.DEFAULT_URL,
-                false,
-                "metalake_demo",
-                "catalog",
-                "schema",
-                "user",
-                "name",
-                "",
-                null));
+                mockContext, "metalake_demo", "catalog", "schema", "user", "name", "", null));
 
     assertThrows(RuntimeException.class, spyUpdate::validate);
     verify(spyUpdate, never()).handle();
@@ -491,7 +481,7 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newDeleteColumn(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null, null, null, null);
+            any(CommandContext.class), eq("metalake_demo"), isNull(), isNull(), isNull(), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -523,7 +513,12 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newDeleteColumn(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null, null, null);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            isNull(),
+            isNull(),
+            isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -552,13 +547,12 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newDeleteColumn(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            null,
-            null);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            isNull(),
+            isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -584,13 +578,12 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newDeleteColumn(
-            GravitinoCommandLine.DEFAULT_URL,
-            false,
-            "metalake_demo",
-            "catalog",
-            "schema",
-            "users",
-            null);
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("users"),
+            isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -615,7 +608,7 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListColumns(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -644,7 +637,7 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListColumns(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,
@@ -670,7 +663,7 @@ class TestColumnCommands {
     assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     verify(commandLine, never())
         .newListColumns(
-            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", "schema", null);
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"), isNull());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(
         output,

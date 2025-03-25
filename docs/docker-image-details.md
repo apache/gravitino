@@ -19,6 +19,10 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Changelog
 
+
+- apache/gravitino:0.8.0-incubating
+  - Based on Gravitino 0.8.0-incubating, you can know more information from 0.8.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.8.0-incubating).
+
 - apache/gravitino:0.7.0-incubating
   - Based on Gravitino 0.7.0-incubating, you can know more information from 0.7.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.7.0-incubating).
   - Place bundle jars (gravitino-aws-bundle.jar, gravitino-gcp-bundle.jar, gravitino-aliyun-bundle.jar) in the `${GRAVITINO_HOME}/catalogs/hadoop/libs` folder to support the cloud storage catalog without manually adding the jars to the classpath.
@@ -62,6 +66,12 @@ Changelog
 - apache/gravitino-iceberg-rest:0.8.0-incubating
   - Supports OSS and ADLS storage.
 
+
+- apache/gravitino-iceberg-rest:0.8.0-incubating
+  - Supports OSS and ADLS storage.
+  - Supports event listener.
+  - Supports audit log.
+
 - apache/gravitino-iceberg-rest:0.7.0-incubating
   - Using JDBC catalog backend.
   - Supports S3 and GCS storage.
@@ -100,10 +110,14 @@ Changelog
 ### Trino image
 
 Changelog
+
+
+- apache/gravitino-playground:trino-435-gravitino-0.8.0-incubating
+  - Use Gravitino release 0.8.0-incubating Dockerfile to build the image.
+
 - apache/gravitino-playground:trino-435-gravitino-0.7.0-incubating
   - Use Gravitino release 0.7.0-incubating Dockerfile to build the image.
 
-Changelog
 - apache/gravitino-playground:trino-435-gravitino-0.6.1-incubating
   - Use Gravitino release 0.6.1-incubating Dockerfile to build the image.
 
@@ -170,6 +184,12 @@ Changelog
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+
+- apache/gravitino-ci:hive-0.1.18
+  - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
+    For more information, please see [PR](https://github.com/apache/gravitino/pull/6625)
+  - Change ranger-hive-plugin and ranger-hdfs-plugin download URL. 
 
 - apache/gravitino-ci:hive-0.1.17
   - Add support for JDBC SQL standard authorization

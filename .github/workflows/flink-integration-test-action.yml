@@ -21,7 +21,7 @@ jobs:
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
@@ -30,7 +30,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Check required command
         run: |
@@ -52,7 +52,7 @@ jobs:
           ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: flink-connector-integrate-test-reports-${{ inputs.java-version }}

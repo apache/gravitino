@@ -355,7 +355,8 @@ components:
           enum:
             - relational
             - fileset
-            - stream
+            - messaging
+            - model
         provider:
           type: string
           description: The provider of the catalog

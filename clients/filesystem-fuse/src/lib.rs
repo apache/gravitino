@@ -24,6 +24,7 @@ mod default_raw_filesystem;
 mod error;
 mod filesystem;
 mod fuse_api_handle;
+mod fuse_api_handle_debug;
 mod fuse_server;
 mod gravitino_client;
 mod gravitino_fileset_filesystem;
@@ -35,6 +36,22 @@ mod opened_file;
 mod opened_file_manager;
 mod s3_filesystem;
 mod utils;
+
+#[macro_export]
+macro_rules! test_enable_with {
+    ($env_var:expr) => {
+        if std::env::var($env_var).is_err() {
+            println!("Test skipped because {} is not set", $env_var);
+            return;
+        }
+    };
+}
+
+pub const RUN_TEST_WITH_S3: &str = "RUN_TEST_WITH_S3";
+pub const RUN_TEST_WITH_FUSE: &str = "RUN_TEST_WITH_FUSE";
+
+pub const LOG_FILE_NAME: &str = "gvfs-fuse.log";
+pub const PID_FILE_NAME: &str = "gvfs-fuse.pid";
 
 pub async fn gvfs_mount(mount_to: &str, mount_from: &str, config: &AppConfig) -> GvfsResult<()> {
     gvfs_fuse::mount(mount_to, mount_from, config).await

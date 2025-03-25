@@ -68,16 +68,17 @@ public final class RelationalGarbageCollector implements Closeable {
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
-  private void collectAndClean() {
+  @VisibleForTesting
+  public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
-    LOG.info("Thread {} start to collect garbage...", threadId);
+    LOG.debug("Thread {} start to collect garbage...", threadId);
 
     try {
-      LOG.info("Start to collect and delete legacy data by thread {}", threadId);
+      LOG.debug("Start to collect and delete legacy data by thread {}", threadId);
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
-        LOG.info(
+        LOG.debug(
             "Try to physically delete {} legacy data that has been marked deleted before {}",
             entityType,
             legacyTimeline);
@@ -93,7 +94,7 @@ public final class RelationalGarbageCollector implements Closeable {
       LOG.info("Start to collect and delete old version data by thread {}", threadId);
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
-        LOG.info(
+        LOG.debug(
             "Try to softly delete {} old version data that has been over retention count {}",
             entityType,
             versionRetentionCount);
@@ -108,7 +109,7 @@ public final class RelationalGarbageCollector implements Closeable {
     } catch (Exception e) {
       LOG.error("Thread {} failed to collect and clean garbage.", threadId, e);
     } finally {
-      LOG.info("Thread {} finish to collect garbage.", threadId);
+      LOG.debug("Thread {} finish to collect garbage.", threadId);
     }
   }
 

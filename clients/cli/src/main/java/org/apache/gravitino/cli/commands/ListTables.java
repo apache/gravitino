@@ -19,11 +19,12 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
@@ -33,15 +34,13 @@ public class ListTables extends TableCommand {
   /**
    * List the names of all tables in a schema.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    */
-  public ListTables(
-      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
-    super(url, ignoreVersions, metalake, catalog);
+  public ListTables(CommandContext context, String metalake, String catalog, String schema) {
+    super(context, metalake, catalog);
     this.schema = schema;
   }
 
@@ -50,22 +49,41 @@ public class ListTables extends TableCommand {
   public void handle() {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
+
     try {
       tables = tableCatalog().listTables(name);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    List<String> tableNames = new ArrayList<>();
-    for (int i = 0; i < tables.length; i++) {
-      tableNames.add(tables[i].name());
+    if (tables.length == 0) {
+      printInformation("No tables exist.");
+      return;
     }
 
-    String all =
-        tableNames.isEmpty()
-            ? "No tables exist."
-            : Joiner.on(System.lineSeparator()).join(tableNames);
+    Table[] gTables = new Table[tables.length];
+    for (int i = 0; i < tables.length; i++) {
+      String tableName = tables[i].name();
+      gTables[i] =
+          new Table() {
 
-    System.out.println(all.toString());
+            @Override
+            public String name() {
+              return tableName;
+            }
+
+            @Override
+            public Column[] columns() {
+              return new Column[0];
+            }
+
+            @Override
+            public Audit auditInfo() {
+              return null;
+            }
+          };
+    }
+
+    printResults(gTables);
   }
 }

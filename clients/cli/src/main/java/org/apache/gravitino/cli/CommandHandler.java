@@ -21,93 +21,9 @@ package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
 import java.util.List;
-import org.apache.commons.cli.CommandLine;
 
 public abstract class CommandHandler {
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
-
-  public static final String DEFAULT_URL = "http://localhost:8090";
-
-  private String urlEnv;
-  private boolean urlSet = false;
-  private String authEnv;
-  private boolean authSet = false;
-
-  /**
-   * Retrieves the Gravitino URL from the command line options or the GRAVITINO_URL environment
-   * variable or the Gravitino config file.
-   *
-   * @param line The command line instance.
-   * @return The Gravitino URL, or null if not found.
-   */
-  public String getUrl(CommandLine line) {
-    GravitinoConfig config = new GravitinoConfig(null);
-
-    // If specified on the command line use that
-    if (line.hasOption(GravitinoOptions.URL)) {
-      return line.getOptionValue(GravitinoOptions.URL);
-    }
-
-    // Cache the Gravitino URL environment variable
-    if (urlEnv == null && !urlSet) {
-      urlEnv = System.getenv("GRAVITINO_URL");
-      urlSet = true;
-    }
-
-    // If set return the Gravitino URL environment variable
-    if (urlEnv != null) {
-      return urlEnv;
-    }
-
-    // Check if the Gravitino URL is specified in the configuration file
-    if (config.fileExists()) {
-      config.read();
-      String configURL = config.getGravitinoURL();
-      if (configURL != null) {
-        return configURL;
-      }
-    }
-
-    // Return the default localhost URL
-    return DEFAULT_URL;
-  }
-
-  /**
-   * Retrieves the Gravitino authentication from the command line options or the GRAVITINO_AUTH
-   * environment variable or the Gravitino config file.
-   *
-   * @param line The command line instance.
-   * @return The Gravitino authentication, or null if not found.
-   */
-  public String getAuth(CommandLine line) {
-    // If specified on the command line use that
-    if (line.hasOption(GravitinoOptions.SIMPLE)) {
-      return GravitinoOptions.SIMPLE;
-    }
-
-    // Cache the Gravitino authentication type environment variable
-    if (authEnv == null && !authSet) {
-      authEnv = System.getenv("GRAVITINO_AUTH");
-      authSet = true;
-    }
-
-    // If set return the Gravitino authentication type environment variable
-    if (authEnv != null) {
-      return authEnv;
-    }
-
-    // Check if the authentication type is specified in the configuration file
-    GravitinoConfig config = new GravitinoConfig(null);
-    if (config.fileExists()) {
-      config.read();
-      String configAuthType = config.getGravitinoAuthType();
-      if (configAuthType != null) {
-        return configAuthType;
-      }
-    }
-
-    return null;
-  }
 
   protected abstract void handle();
 

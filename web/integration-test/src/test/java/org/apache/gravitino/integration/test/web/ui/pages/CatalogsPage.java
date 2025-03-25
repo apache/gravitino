@@ -593,7 +593,8 @@ public class CatalogsPage extends BaseWebIT {
           waitShowText(
               "false",
               By.xpath(
-                  ".//*[@data-prev-refer='details-props-key-gravitino.bypass.hive.metastore.client.capability.check']"));
+                  ".//*[@data-prev-refer='details-props-key-gravitino."
+                      + "bypass.hive.metastore.client.capability.check']"));
 
       boolean verifyAll = isVisible && isText && isHiveURIS && isShowCheck;
       if (!verifyAll) {
@@ -683,79 +684,83 @@ public class CatalogsPage extends BaseWebIT {
    */
   public boolean verifyShowPropertiesItemInList(
       String item, String key, String value, Boolean isHighlight) {
-    try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      String xpath;
-      if (isHighlight) {
-        xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
-      } else {
-        xpath = "//div[@data-refer='props-" + item + "-" + key + "']";
-      }
-      WebElement propertyElement = driver.findElement(By.xpath(xpath));
-      boolean match = Objects.equals(propertyElement.getText(), value);
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    String xpath;
+    if (isHighlight) {
+      xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
+    } else {
+      xpath = "//div[@data-refer='props-" + item + "-" + key + "']";
+    }
+    WebElement propertyElement =
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
 
-      if (!match) {
-        LOG.error("Prop: does not include itemName: {}", value);
-        return false;
-      }
+    boolean match = Objects.equals(propertyElement.getText(), value);
 
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    if (!match) {
+      LOG.error("Prop: does not include itemName: {}", value);
       return false;
     }
+    return true;
   }
 
   public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      String xpath =
-          "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
-      if (isColumnLevel) {
-        xpath = xpath + "//p";
-      }
-      List<WebElement> list = driver.findElements(By.xpath(xpath));
-      List<String> texts = new ArrayList<>();
-      for (WebElement element : list) {
-        texts.add(element.getText());
-      }
-
-      if (!texts.contains(itemName)) {
-        LOG.error("table list: {} does not include itemName: {}", texts, itemName);
-        return false;
-      }
-
-      return true;
+      Thread.sleep(ACTION_SLEEP * 1000);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+    }
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    String xpath =
+        "//div[@data-refer='table-grid']"
+            + "//div[contains(@class, 'MuiDataGrid-main')]"
+            + "/div[contains(@class, 'MuiDataGrid-virtualScroller')]"
+            + "/div/div[@role='rowgroup']//div[@data-field='name']";
+    if (isColumnLevel) {
+      xpath = xpath + "//p";
+    }
+    List<WebElement> list =
+        wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
+    List<String> texts = new ArrayList<>();
+    for (WebElement element : list) {
+      texts.add(element.getText());
+    }
+
+    if (!texts.contains(itemName)) {
+      LOG.error("table list: {} does not include itemName: {}", texts, itemName);
       return false;
     }
+
+    return true;
   }
 
   public boolean verifyNoDataItemInList(String itemName, Boolean isColumnLevel) {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      String xpath =
-          "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
-      if (isColumnLevel) {
-        xpath = xpath + "//p";
-      }
-      List<WebElement> list = driver.findElements(By.xpath(xpath));
-      List<String> texts = new ArrayList<>();
-      for (WebElement element : list) {
-        texts.add(element.getText());
-      }
-
-      if (texts.contains(itemName)) {
-        LOG.error("table list: {} does not include itemName: {}", texts, itemName);
-        return false;
-      }
-
-      return true;
+      Thread.sleep(ACTION_SLEEP * 1000);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+    }
+    String xpath =
+        "//div[@data-refer='table-grid']"
+            + "//div[contains(@class, 'MuiDataGrid-main')]"
+            + "/div[contains(@class, 'MuiDataGrid-virtualScroller')]"
+            + "/div/div[@role='rowgroup']//div[@data-field='name']";
+    if (isColumnLevel) {
+      xpath = xpath + "//p";
+    }
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    List<WebElement> list =
+        wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
+    List<String> texts = new ArrayList<>();
+    for (WebElement element : list) {
+      texts.add(element.getText());
+    }
+
+    if (texts.contains(itemName)) {
+      LOG.error("table list: {} does not include itemName: {}", texts, itemName);
       return false;
     }
+
+    return true;
   }
 
   public boolean verifyTableColumns() {
@@ -840,106 +845,90 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyBackHomePage() {
-    try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
-      boolean matchTitle = Objects.equals(metalakePageTitle.getText(), "Metalakes");
-      if (!matchTitle) {
-        LOG.error(
-            "metalakePageTitle: {} does not match with Metalakes", metalakePageTitle.getText());
-        return false;
-      }
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
+    boolean matchTitle = Objects.equals(metalakePageTitle.getText(), "Metalakes");
+    if (!matchTitle) {
+      LOG.error("metalakePageTitle: {} does not match with Metalakes", metalakePageTitle.getText());
       return false;
     }
+    return true;
   }
 
   public boolean verifyRefreshPage() {
-    try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(
-          webDriver ->
-              ((JavascriptExecutor) webDriver)
-                  .executeScript("return document.readyState")
-                  .equals("complete"));
-      wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
-      boolean isDisplayed = metalakeNameLink.isDisplayed();
-      if (!isDisplayed) {
-        LOG.error("No match with link, get {}", metalakeNameLink.getText());
-        return false;
-      }
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    wait.until(
+        webDriver ->
+            ((JavascriptExecutor) webDriver)
+                .executeScript("return document.readyState")
+                .equals("complete"));
+    wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
+    boolean isDisplayed = metalakeNameLink.isDisplayed();
+    if (!isDisplayed) {
+      LOG.error("No match with link, get {}", metalakeNameLink.getText());
       return false;
     }
+    return true;
   }
 
   public boolean verifyCreatedCatalogs(List<String> catalogNames) {
-    try {
-      List<WebElement> list =
-          tableGrid.findElements(
-              By.xpath(
-                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
-      List<String> texts = new ArrayList<>();
-      for (WebElement webElement : list) {
-        String rowItemColName = webElement.getText();
-        texts.add(rowItemColName);
-      }
-      if (!texts.containsAll(catalogNames)) {
-        LOG.error("table list: {} does not containsAll catalogNames: {}", texts, catalogNames);
-        return false;
-      }
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    List<WebElement> list =
+        tableGrid.findElements(
+            By.xpath(
+                "./div[contains(@class, 'MuiDataGrid-main')]"
+                    + "/div[contains(@class, 'MuiDataGrid-virtualScroller')]"
+                    + "/div/div[@role='rowgroup']//div[@data-field='name']"));
+    List<String> texts = new ArrayList<>();
+    for (WebElement webElement : list) {
+      String rowItemColName = webElement.getText();
+      texts.add(rowItemColName);
+    }
+    if (!texts.containsAll(catalogNames)) {
+      LOG.error("table list: {} does not containsAll catalogNames: {}", texts, catalogNames);
       return false;
     }
+    return true;
   }
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
-    try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      List<WebElement> list =
-          driver.findElements(
-              By.xpath(
-                  "//div[@data-refer='tree-view']//div[@class='ant-tree-list-holder']/div/div[@class='ant-tree-list-holder-inner']/div[contains(@class, 'ant-tree-treenode')]"));
-      List<String> texts = new ArrayList<>();
-      for (WebElement webElement : list) {
-        String nodeName =
-            webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
-        texts.add(nodeName);
-      }
-      if (!treeNodes.containsAll(texts)) {
-        LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
-        return false;
-      }
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    List<WebElement> list =
+        wait.until(
+            ExpectedConditions.visibilityOfAllElementsLocatedBy(
+                By.xpath(
+                    "//div[@data-refer='tree-view']"
+                        + "//div[@class='ant-tree-list-holder']"
+                        + "/div/div[@class='ant-tree-list-holder-inner']"
+                        + "/div[contains(@class, 'ant-tree-treenode')]")));
+    List<String> texts = new ArrayList<>();
+    for (WebElement webElement : list) {
+      String nodeName =
+          webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
+      texts.add(nodeName);
+    }
+    if (!treeNodes.containsAll(texts)) {
+      LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
       return false;
     }
+    return true;
   }
 
   public boolean verifySelectedNode(String nodeName) {
-    try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      WebElement selectedNode =
-          driver.findElement(
-              By.xpath(
-                  "//div[@data-refer='tree-view']//div[contains(@class, 'ant-tree-treenode-selected')]//span[@class='ant-tree-title']"));
-      waitShowText(nodeName, selectedNode);
-      if (!selectedNode.getText().equals(nodeName)) {
-        LOG.error(
-            "selectedNode: {} does not match with nodeName: {}", selectedNode.getText(), nodeName);
-        return false;
-      }
-      return true;
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+
+    WebElement selectedNode =
+        wait.until(
+            ExpectedConditions.visibilityOfElementLocated(
+                By.xpath(
+                    "//div[@data-refer='tree-view']"
+                        + "//div[contains(@class, 'ant-tree-treenode-selected')]"
+                        + "//span[@class='ant-tree-title']")));
+    if (!selectedNode.getText().equals(nodeName)) {
+      LOG.error(
+          "selectedNode: {} does not match with nodeName: {}", selectedNode.getText(), nodeName);
       return false;
     }
+    return true;
   }
 }

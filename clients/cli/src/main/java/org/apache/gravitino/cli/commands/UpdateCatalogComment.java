@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -35,15 +36,14 @@ public class UpdateCatalogComment extends Command {
   /**
    * Update the comment of a catalog.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param comment New metalake comment.
    */
   public UpdateCatalogComment(
-      String url, boolean ignoreVersions, String metalake, String catalog, String comment) {
-    super(url, ignoreVersions);
+      CommandContext context, String metalake, String catalog, String comment) {
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.comment = comment;
@@ -64,6 +64,6 @@ public class UpdateCatalogComment extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(catalog + " comment changed.");
+    printInformation(catalog + " comment changed.");
   }
 }

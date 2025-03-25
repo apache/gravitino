@@ -43,7 +43,7 @@ check-cargo-sort: install-cargo-sort
 	cargo sort -c
 
 install-cargo-machete:
-	cargo install cargo-machete
+	cargo install cargo-machete@0.7.0
 
 cargo-machete: install-cargo-machete
 	cargo machete
@@ -62,8 +62,16 @@ doc-test:
 unit-test: doc-test
 	cargo test --no-fail-fast --lib --all-features --workspace
 
+test-fuse-it:
+	@bash ./tests/bin/run_fuse_testers.sh test
+
+test-s3:
+	@bash ./tests/bin/run_s3fs_testers.sh test
+
 test: doc-test
 	cargo test --no-fail-fast --all-targets --all-features --workspace
+
+test-all: test test-s3 test-fuse-it	
 
 clean:
 	cargo clean

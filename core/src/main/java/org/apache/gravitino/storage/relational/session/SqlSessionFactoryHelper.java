@@ -26,6 +26,9 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.RelationDatasourceMetricsSource;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -86,8 +89,9 @@ public class SqlSessionFactoryHelper {
     dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
     // Close the auto commit, so that we can control the transaction manual commit
     dataSource.setDefaultAutoCommit(false);
-    dataSource.setMaxWaitMillis(1000L);
-    dataSource.setMaxTotal(20);
+    dataSource.setMaxWaitMillis(
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
+    dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
     dataSource.setMaxIdle(5);
     dataSource.setMinIdle(0);
     dataSource.setLogAbandoned(true);
@@ -102,7 +106,12 @@ public class SqlSessionFactoryHelper {
     dataSource.setSoftMinEvictableIdleTimeMillis(
         BaseObjectPoolConfig.DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME.toMillis());
     dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
-
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Add null check to avoid NPE when metrics system is not initialized in test environments
+    if (metricsSystem != null) {
+      // Register connection pool metrics when metrics system is available
+      metricsSystem.register(new RelationDatasourceMetricsSource(dataSource));
+    }
     // Create the transaction factory and env
     TransactionFactory transactionFactory = new JdbcTransactionFactory();
     Environment environment = new Environment("development", transactionFactory, dataSource);

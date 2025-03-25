@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.6.1`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -76,6 +76,8 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 | `s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)        | No       | 0.6.0-incubating |
 | `s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0-incubating |
 | `s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No       | 0.6.0-incubating |
+| `s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false         | No       | 0.9.0-incubating |
+
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
@@ -220,79 +222,12 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 
 ### Table distributions
 
-- Gravitino used by default `NoneDistribution`.
-
-<Tabs groupId='language' queryString>
-<TabItem value="json" label="JSON">
-
-```json
-{
-  "strategy": "none",
-  "number": 0,
-  "expressions": []
-}
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Distributions.NONE;
-```
-
-</TabItem>
-</Tabs>
-
-- Support `HashDistribution`, Hash distribute by partition key.
-
-<Tabs groupId='language' queryString>
-<TabItem value="json" label="JSON">
-
-```json
-{
-  "strategy": "hash",
-  "number": 0,
-  "expressions": []
-}
-```
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Distributions.HASH;
-```
-
-</TabItem>
-</Tabs>
-
-- Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
-
-<Tabs groupId='language' queryString>
-<TabItem value="json" label="JSON">
-
-```json
-{
-  "strategy": "range",
-  "number": 0,
-  "expressions": []
-}
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Distributions.RANGE;
-```
-
-</TabItem>
-</Tabs>
+- Support `HashDistribution`, which distribute data by partition key.
+- Support `RangeDistribution`, which distribute data by partition key or sort key for a SortOrder table.
+- Doesn't support `EvenDistribution`.
 
 :::info
-Iceberg automatically distributes the data according to the partition or table sort order. It is forbidden to specify distribution expressions.
-:::
-:::info
-Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
+If you doesn't specify distribution expressions, the table distribution will be adjusted to `RangeDistribution` for a sort order table, to `HashDistribution` for a partition table.
 :::
 
 ### Table column types

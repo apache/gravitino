@@ -17,12 +17,12 @@
 
 
 # the tools to publish the python client to Pypi
-requests==2.32.2
-dataclasses-json==0.6.6
+requests==2.32.3
+dataclasses-json==0.6.7
 readerwriterlock==1.0.9
 fsspec==2024.3.1
 pyarrow==15.0.2
-cachetools==5.3.3
+cachetools==5.5.2
 gcsfs==2024.3.1
 s3fs==2024.3.1
 ossfs==2023.12.0

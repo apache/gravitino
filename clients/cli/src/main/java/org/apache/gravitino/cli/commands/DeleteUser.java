@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -34,16 +36,13 @@ public class DeleteUser extends Command {
   /**
    * Delete a user.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public DeleteUser(
-      String url, boolean ignoreVersions, boolean force, String metalake, String user) {
-    super(url, ignoreVersions);
-    this.force = force;
+  public DeleteUser(CommandContext context, String metalake, String user) {
+    super(context);
+    this.force = context.force();
     this.metalake = metalake;
     this.user = user;
   }
@@ -52,6 +51,10 @@ public class DeleteUser extends Command {
   @Override
   public void handle() {
     boolean deleted = false;
+
+    if (AuthConstants.ANONYMOUS_USER.equalsIgnoreCase(user)) {
+      exitWithError(ErrorMessages.DELETE_ANONYMOUS_USER);
+    }
 
     if (!AreYouSure.really(force)) {
       return;
@@ -69,9 +72,9 @@ public class DeleteUser extends Command {
     }
 
     if (deleted) {
-      System.out.println(user + " deleted.");
+      printInformation(user + " deleted.");
     } else {
-      System.out.println(user + " not deleted.");
+      printInformation(user + " not deleted.");
     }
   }
 }

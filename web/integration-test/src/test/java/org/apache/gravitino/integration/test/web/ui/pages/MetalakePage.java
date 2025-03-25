@@ -132,14 +132,11 @@ public class MetalakePage extends BaseWebIT {
   }
 
   public void setQueryParams(String queryParams) {
-    try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      clearQueryInput();
-      queryMetalakeInput.sendKeys(queryParams);
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    }
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebElement queryInputElement =
+        wait.until(ExpectedConditions.elementToBeClickable(queryMetalakeInput));
+    clearQueryInput();
+    queryInputElement.sendKeys(queryParams);
   }
 
   public void clearQueryInput() {
@@ -187,9 +184,10 @@ public class MetalakePage extends BaseWebIT {
   public void clickMetalakeLink(String name) {
     try {
       setQueryParams(name);
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
       String xpath = "//a[@data-refer='metalake-link-" + name + "']";
-      WebElement metalakeLink = metalakeTableGrid.findElement(By.xpath(xpath));
+      WebElement metalakeLink =
+          wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(metalakeLink);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);

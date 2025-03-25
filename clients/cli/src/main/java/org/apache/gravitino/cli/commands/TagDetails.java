@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -33,13 +34,12 @@ public class TagDetails extends Command {
   /**
    * Displays the name and comment of a catalog.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    */
-  public TagDetails(String url, boolean ignoreVersions, String metalake, String tag) {
-    super(url, ignoreVersions);
+  public TagDetails(CommandContext context, String metalake, String tag) {
+    super(context);
     this.metalake = metalake;
     this.tag = tag;
   }
@@ -61,7 +61,7 @@ public class TagDetails extends Command {
     }
 
     if (result != null) {
-      System.out.println(result.name() + "," + result.comment());
+      printResults(result.name() + "," + result.comment());
     }
   }
 }

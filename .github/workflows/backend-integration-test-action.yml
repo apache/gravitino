@@ -29,7 +29,7 @@ jobs:
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
@@ -38,7 +38,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Check required command
         run: |
@@ -64,7 +64,7 @@ jobs:
           -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test 
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}

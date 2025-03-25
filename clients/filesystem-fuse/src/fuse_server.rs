@@ -19,11 +19,12 @@
 use crate::utils::GvfsResult;
 use fuse3::raw::{Filesystem, Session};
 use fuse3::MountOptions;
-use log::{error, info};
+use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Notify;
+use tracing::{error, info};
 
 /// Represents a FUSE server capable of starting and stopping the FUSE filesystem.
 pub struct FuseServer {
@@ -46,7 +47,7 @@ impl FuseServer {
     /// Starts the FUSE filesystem and blocks until it is stopped.
     pub async fn start(&self, fuse_fs: impl Filesystem + Sync + 'static) -> GvfsResult<()> {
         //check if the mount point exists
-        if !std::path::Path::new(&self.mount_point).exists() {
+        if !Path::new(&self.mount_point).exists() {
             error!("Mount point {} does not exist", self.mount_point);
             exit(libc::ENOENT);
         }

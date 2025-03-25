@@ -23,11 +23,13 @@ import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
 import com.google.common.base.Joiner;
 import java.io.File;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.GravitinoConfig;
 import org.apache.gravitino.cli.KerberosData;
 import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.cli.OAuthData;
+import org.apache.gravitino.cli.outputs.BaseOutputFormat;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.cli.outputs.TableFormat;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -49,33 +51,23 @@ public abstract class Command {
   private static final String SIMPLE_AUTH = "simple";
   private static final String OAUTH_AUTH = "oauth";
   private static final String KERBEROS_AUTH = "kerberos";
+
   private final String url;
   private final boolean ignoreVersions;
   private final String outputFormat;
 
-  /**
-   * Command constructor.
-   *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   */
-  public Command(String url, boolean ignoreVersions) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.outputFormat = OUTPUT_FORMAT_PLAIN;
-  }
+  protected final CommandContext context;
 
   /**
    * Command constructor.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param outputFormat output format used in some commands
+   * @param context The command context.
    */
-  public Command(String url, boolean ignoreVersions, String outputFormat) {
-    this.url = url;
-    this.ignoreVersions = ignoreVersions;
-    this.outputFormat = outputFormat;
+  public Command(CommandContext context) {
+    this.context = context;
+    this.url = context.url();
+    this.ignoreVersions = context.ignoreVersions();
+    this.outputFormat = context.outputFormat();
   }
 
   /**
@@ -86,6 +78,38 @@ public abstract class Command {
   public void exitWithError(String error) {
     System.err.println(error);
     Main.exit(-1);
+  }
+
+  /**
+   * Prints out an informational message, often to indicate a command has finished.
+   *
+   * @param message The message to display.
+   */
+  public void printInformation(String message) {
+    if (context.quiet()) {
+      return;
+    }
+
+    printResults(message);
+  }
+
+  /**
+   * Outputs the entity result to the console.
+   *
+   * @param entity The entity to output.
+   * @param <T> The type of entity.
+   */
+  public <T> void printResults(T entity) {
+    output(entity);
+  }
+
+  /**
+   * Prints out the string result of a command.
+   *
+   * @param results The results to display.
+   */
+  public void printResults(String results) {
+    BaseOutputFormat.output(results, System.out);
   }
 
   /**
@@ -211,16 +235,16 @@ public abstract class Command {
    * @param entity The entity to output.
    * @param <T> The type of entity.
    */
-  protected <T> void output(T entity) {
+  private <T> void output(T entity) {
     if (outputFormat == null) {
-      PlainFormat.output(entity);
+      PlainFormat.output(entity, context);
       return;
     }
 
     if (outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
-      TableFormat.output(entity);
+      TableFormat.output(entity, context);
     } else if (outputFormat.equals(OUTPUT_FORMAT_PLAIN)) {
-      PlainFormat.output(entity);
+      PlainFormat.output(entity, context);
     } else {
       throw new IllegalArgumentException("Unsupported output format");
     }

@@ -1,8 +1,8 @@
 ---
-title: "Hive catalog with s3 and adls"
+title: "Hive catalog with S3, ADLS and GCS"
 slug: /hive-catalog
 date: 2024-9-24
-keyword: Hive catalog cloud storage S3 ADLS
+keyword: Hive catalog cloud storage S3 ADLS GCS
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -44,7 +44,7 @@ Below are the essential properties to add or modify in the `hive-site.xml` file 
 definition and table definition, as shown in the examples below. After explicitly setting this
 property, you can omit the location property in the schema and table definitions.
 
-It's also applicable for Azure Blob Storage(ADSL) and GCS.
+It's also applicable for Azure Blob Storage(ADLS) and GCS.
 -->
 <property>
   <name>hive.metastore.warehouse.dir</name>
@@ -84,7 +84,12 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
 
 # For Azure Blob Storage(ADLS)
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
+
+# For Google Cloud Storage(GCS)
+cp gcs-connector-hadoop3-2.2.22-shaded.jar ${HIVE_HOME}/lib
 ```
+
+[`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop2-2.2.22-shaded.jar) is the bundle jar that contains Hadoop GCS connector, you need to choose the corresponding gcs connector jar for the version of Hadoop you are using.
 
 Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath. It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
 
@@ -265,7 +270,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
     sparkSession.sql("...");
 ```
 
-:::Note
+:::note
 Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
 Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure), [Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob) to be placed in the classpath of the Spark.
 for Google Cloud Storage(GCS), you need to download the [Hadoop GCS jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and place it in the classpath of the Spark.

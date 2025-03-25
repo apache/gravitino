@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.ArrayList;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -34,23 +35,21 @@ public class RemoveRoleFromGroup extends Command {
   protected String role;
 
   /**
-   * Removes a role from a group.
+   * Remove a role from a group.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    * @param role The name of the role.
    */
-  public RemoveRoleFromGroup(
-      String url, boolean ignoreVersions, String metalake, String group, String role) {
-    super(url, ignoreVersions);
+  public RemoveRoleFromGroup(CommandContext context, String metalake, String group, String role) {
+    super(context);
     this.metalake = metalake;
     this.group = group;
     this.role = role;
   }
 
-  /** Adds a role to a group. */
+  /** Remove a role from a group. */
   @Override
   public void handle() {
     try {
@@ -68,6 +67,6 @@ public class RemoveRoleFromGroup extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(role + " removed from " + group);
+    printInformation(role + " removed from " + group);
   }
 }

@@ -20,15 +20,19 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
+import org.apache.gravitino.cli.utils.FullNameUtil;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
 /* Lists all tags in a metalake. */
@@ -40,13 +44,12 @@ public class ListEntityTags extends Command {
   /**
    * Lists all tags in a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    */
-  public ListEntityTags(String url, boolean ignoreVersions, String metalake, FullName name) {
-    super(url, ignoreVersions);
+  public ListEntityTags(CommandContext context, String metalake, FullName name) {
+    super(context);
     this.metalake = metalake;
     this.name = name;
   }
@@ -58,17 +61,34 @@ public class ListEntityTags extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
 
-      // TODO fileset and topic
-      if (name.hasTableName()) {
+      if (name.getLevel() == 3) {
         String catalog = name.getCatalogName();
-        String schema = name.getSchemaName();
-        String table = name.getTableName();
-        Table gTable =
-            client
-                .loadCatalog(catalog)
-                .asTableCatalog()
-                .loadTable(NameIdentifier.of(schema, table));
-        tags = gTable.supportsTags().listTags();
+        Catalog catalogObject = client.loadCatalog(catalog);
+        switch (catalogObject.type()) {
+          case RELATIONAL:
+            Table gTable = catalogObject.asTableCatalog().loadTable(FullNameUtil.toTable(name));
+            tags = gTable.supportsTags().listTags();
+            break;
+
+          case MODEL:
+            Model gModel = catalogObject.asModelCatalog().getModel(FullNameUtil.toModel(name));
+            tags = gModel.supportsTags().listTags();
+            break;
+
+          case FILESET:
+            Fileset fileset =
+                catalogObject.asFilesetCatalog().loadFileset(FullNameUtil.toFileset(name));
+            tags = fileset.supportsTags().listTags();
+            break;
+
+          case MESSAGING:
+            Topic topic = catalogObject.asTopicCatalog().loadTopic(FullNameUtil.toTopic(name));
+            tags = topic.supportsTags().listTags();
+            break;
+
+          default:
+            break;
+        }
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
@@ -93,6 +113,6 @@ public class ListEntityTags extends Command {
 
     String all = String.join(",", tags);
 
-    System.out.println(all.toString());
+    printResults(all);
   }
 }

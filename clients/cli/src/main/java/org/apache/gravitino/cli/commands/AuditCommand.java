@@ -20,14 +20,13 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.cli.CommandContext;
 
 public abstract class AuditCommand extends Command {
-  /**
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   */
-  public AuditCommand(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
+
+  /** @param context The command context. */
+  public AuditCommand(CommandContext context) {
+    super(context);
   }
 
   /* Overridden in parent - do nothing  */
@@ -40,17 +39,10 @@ public abstract class AuditCommand extends Command {
    * @param audit from a class that implements the Auditable interface.
    */
   public void displayAuditInfo(Audit audit) {
-    String auditInfo =
-        "creator,create_time,modified,modified_time"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
+    if (audit == null) {
+      return;
+    }
 
-    System.out.println(auditInfo);
+    printResults(audit);
   }
 }

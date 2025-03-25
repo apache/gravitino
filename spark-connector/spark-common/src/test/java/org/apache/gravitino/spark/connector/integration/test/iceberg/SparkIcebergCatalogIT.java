@@ -110,6 +110,16 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Override
+  protected boolean supportsSchemaAndTableProperties() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportsComplexType() {
+    return true;
+  }
+
+  @Override
   protected String getTableLocation(SparkTableInfo table) {
     return String.join(File.separator, table.getTableLocation(), "data");
   }

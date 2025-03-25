@@ -24,12 +24,13 @@ use crate::open_dal_filesystem::OpenDalFileSystem;
 use crate::opened_file::{OpenFileFlags, OpenedFile};
 use crate::utils::{parse_location, GvfsResult};
 use async_trait::async_trait;
-use log::error;
+use fuse3::FileType;
 use opendal::layers::LoggingLayer;
 use opendal::services::S3;
 use opendal::{Builder, Operator};
 use std::collections::HashMap;
 use std::path::Path;
+use tracing::error;
 
 pub(crate) struct S3FileSystem {
     open_dal_fs: OpenDalFileSystem,
@@ -40,7 +41,7 @@ impl S3FileSystem {}
 impl S3FileSystem {
     const S3_CONFIG_PREFIX: &'static str = "s3-";
 
-    pub(crate) fn new(
+    pub(crate) async fn new(
         catalog: &Catalog,
         fileset: &Fileset,
         config: &AppConfig,
@@ -48,10 +49,20 @@ impl S3FileSystem {
     ) -> GvfsResult<Self> {
         let mut opendal_config = extract_s3_config(config);
         let bucket = extract_bucket(&fileset.storage_location)?;
-        opendal_config.insert("bucket".to_string(), bucket);
+        opendal_config.insert("bucket".to_string(), bucket.to_string());
 
-        let region = Self::get_s3_region(catalog)?;
-        opendal_config.insert("region".to_string(), region);
+        let endpoint = catalog.properties.get("s3-endpoint");
+        if endpoint.is_none() {
+            return Err(InvalidConfig.to_error("s3-endpoint is required".to_string()));
+        }
+        let endpoint = endpoint.unwrap();
+        opendal_config.insert("endpoint".to_string(), endpoint.clone());
+
+        let region = Self::get_s3_region(catalog, &bucket).await;
+        if region.is_none() {
+            return Err(InvalidConfig.to_error("s3-region is required".to_string()));
+        }
+        opendal_config.insert("region".to_string(), region.unwrap());
 
         let builder = S3::from_map(opendal_config);
 
@@ -67,16 +78,13 @@ impl S3FileSystem {
         })
     }
 
-    fn get_s3_region(catalog: &Catalog) -> GvfsResult<String> {
+    async fn get_s3_region(catalog: &Catalog, bucket: &str) -> Option<String> {
         if let Some(region) = catalog.properties.get("s3-region") {
-            Ok(region.clone())
+            Some(region.clone())
         } else if let Some(endpoint) = catalog.properties.get("s3-endpoint") {
-            extract_region(endpoint)
+            S3::detect_region(endpoint, bucket).await
         } else {
-            Err(InvalidConfig.to_error(format!(
-                "Cant not retrieve region in the Catalog {}",
-                catalog.name
-            )))
+            None
         }
     }
 }
@@ -87,8 +95,12 @@ impl PathFileSystem for S3FileSystem {
         Ok(())
     }
 
-    async fn stat(&self, path: &Path) -> Result<FileStat> {
-        self.open_dal_fs.stat(path).await
+    async fn stat(&self, path: &Path, kind: FileType) -> Result<FileStat> {
+        self.open_dal_fs.stat(path, kind).await
+    }
+
+    async fn lookup(&self, path: &Path) -> Result<FileStat> {
+        self.open_dal_fs.lookup(path).await
     }
 
     async fn read_dir(&self, path: &Path) -> Result<Vec<FileStat>> {
@@ -139,25 +151,11 @@ pub(crate) fn extract_bucket(location: &str) -> GvfsResult<String> {
     }
 }
 
-pub(crate) fn extract_region(location: &str) -> GvfsResult<String> {
-    let url = parse_location(location)?;
-    match url.host_str() {
-        Some(host) => {
-            let parts: Vec<&str> = host.split('.').collect();
-            if parts.len() > 1 {
-                Ok(parts[1].to_string())
-            } else {
-                Err(InvalidConfig.to_error(format!(
-                    "Invalid location: expected region in host, got {}",
-                    location
-                )))
-            }
-        }
-        None => Err(InvalidConfig.to_error(format!(
-            "Invalid fileset location without bucket: {}",
-            location
-        ))),
-    }
+pub(crate) fn extract_region(location: &str) -> Option<String> {
+    parse_location(location).ok().and_then(|url| {
+        url.host_str()
+            .and_then(|host| host.split('.').nth(1).map(|part| part.to_string()))
+    })
 }
 
 pub fn extract_s3_config(config: &AppConfig) -> HashMap<String, String> {
@@ -181,11 +179,13 @@ pub fn extract_s3_config(config: &AppConfig) -> HashMap<String, String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::default_raw_filesystem::DefaultRawFileSystem;
     use crate::filesystem::tests::{TestPathFileSystem, TestRawFileSystem};
     use crate::filesystem::RawFileSystem;
+    use crate::test_enable_with;
+    use crate::RUN_TEST_WITH_S3;
     use opendal::layers::TimeoutLayer;
     use std::time::Duration;
 
@@ -201,11 +201,11 @@ mod tests {
     fn test_extract_region() {
         let location = "http://s3.ap-southeast-2.amazonaws.com";
         let result = extract_region(location);
-        assert!(result.is_ok());
+        assert!(result.is_some());
         assert_eq!(result.unwrap(), "ap-southeast-2");
     }
 
-    async fn delete_dir(op: &Operator, dir_name: &str) {
+    pub(crate) async fn delete_dir(op: &Operator, dir_name: &str) {
         let childs = op.list(dir_name).await.expect("list dir failed");
         for child in childs {
             let child_name = dir_name.to_string() + child.name();
@@ -218,13 +218,11 @@ mod tests {
         op.delete(dir_name).await.expect("delete dir failed");
     }
 
-    async fn create_s3_fs(cwd: &Path) -> S3FileSystem {
-        let config = AppConfig::from_file(Some("tests/conf/gvfs_fuse_s3.toml")).unwrap();
-        let opendal_config = extract_s3_config(&config);
-
-        let fs_context = FileSystemContext::default();
-
-        let builder = S3::from_map(opendal_config);
+    pub(crate) async fn cleanup_s3_fs(
+        cwd: &Path,
+        opendal_config: &HashMap<String, String>,
+    ) -> Operator {
+        let builder = S3::from_map(opendal_config.clone());
         let op = Operator::new(builder)
             .expect("opendal create failed")
             .layer(LoggingLayer::default())
@@ -241,18 +239,37 @@ mod tests {
         op.create_dir(&file_name)
             .await
             .expect("create test dir failed");
+        op
+    }
 
-        let open_dal_fs = OpenDalFileSystem::new(op, &config, &fs_context);
+    async fn create_s3_fs(cwd: &Path, config: &AppConfig) -> S3FileSystem {
+        let opendal_config = extract_s3_config(config);
+        let op = cleanup_s3_fs(cwd, &opendal_config).await;
+
+        let fs_context = FileSystemContext::default();
+        let open_dal_fs = OpenDalFileSystem::new(op, config, &fs_context);
+
         S3FileSystem { open_dal_fs }
     }
 
-    #[tokio::test]
-    async fn test_s3_file_system() {
-        if std::env::var("RUN_S3_TESTS").is_err() {
-            return;
+    pub(crate) fn s3_test_config() -> AppConfig {
+        let mut config_file_name = "target/conf/gvfs_fuse_s3.toml";
+        let source_file_name = "tests/conf/gvfs_fuse_s3.toml";
+
+        if !Path::new(config_file_name).exists() {
+            config_file_name = source_file_name;
         }
+
+        AppConfig::from_file(Some(config_file_name.to_string())).unwrap()
+    }
+
+    #[tokio::test]
+    async fn s3_ut_test_s3_file_system() {
+        test_enable_with!(RUN_TEST_WITH_S3);
+
+        let config = s3_test_config();
         let cwd = Path::new("/gvfs_test1");
-        let fs = create_s3_fs(cwd).await;
+        let fs = create_s3_fs(cwd, &config).await;
 
         let _ = fs.init().await;
         let mut tester = TestPathFileSystem::new(cwd, fs);
@@ -260,13 +277,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_s3_file_system_with_raw_file_system() {
-        if std::env::var("RUN_S3_TESTS").is_err() {
-            return;
-        }
+    async fn s3_ut_test_s3_file_system_with_raw_file_system() {
+        test_enable_with!(RUN_TEST_WITH_S3);
 
+        let config = s3_test_config();
         let cwd = Path::new("/gvfs_test2");
-        let s3_fs = create_s3_fs(cwd).await;
+        let s3_fs = create_s3_fs(cwd, &config).await;
         let raw_fs =
             DefaultRawFileSystem::new(s3_fs, &AppConfig::default(), &FileSystemContext::default());
         let _ = raw_fs.init().await;

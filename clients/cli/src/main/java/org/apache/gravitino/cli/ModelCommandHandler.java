@@ -30,8 +30,7 @@ public class ModelCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String catalog;
@@ -44,16 +43,18 @@ public class ModelCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public ModelCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
 
-    this.url = getUrl(line);
+    this.context = context;
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -64,7 +65,7 @@ public class ModelCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     List<String> missingEntities = Lists.newArrayList();
     if (catalog == null) missingEntities.add(CommandEntities.CATALOG);
@@ -119,12 +120,12 @@ public class ModelCommandHandler extends CommandHandler {
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
       gravitinoCommandLine
-          .newModelAudit(url, ignore, metalake, catalog, schema, model)
+          .newModelAudit(context, metalake, catalog, schema, model)
           .validate()
           .handle();
     } else {
       gravitinoCommandLine
-          .newModelDetails(url, ignore, metalake, catalog, schema, model)
+          .newModelDetails(context, metalake, catalog, schema, model)
           .validate()
           .handle();
     }
@@ -136,17 +137,15 @@ public class ModelCommandHandler extends CommandHandler {
     String[] createProperties = line.getOptionValues(GravitinoOptions.PROPERTIES);
     Map<String, String> createPropertyMap = new Properties().parse(createProperties);
     gravitinoCommandLine
-        .newCreateModel(
-            url, ignore, metalake, catalog, schema, model, createComment, createPropertyMap)
+        .newCreateModel(context, metalake, catalog, schema, model, createComment, createPropertyMap)
         .validate()
         .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
     gravitinoCommandLine
-        .newDeleteModel(url, ignore, force, metalake, catalog, schema, model)
+        .newDeleteModel(context, metalake, catalog, schema, model)
         .validate()
         .handle();
   }
@@ -160,22 +159,13 @@ public class ModelCommandHandler extends CommandHandler {
     Map<String, String> linkPropertityMap = new Properties().parse(linkProperties);
     gravitinoCommandLine
         .newLinkModel(
-            url,
-            ignore,
-            metalake,
-            catalog,
-            schema,
-            model,
-            uri,
-            alias,
-            linkComment,
-            linkPropertityMap)
+            context, metalake, catalog, schema, model, uri, alias, linkComment, linkPropertityMap)
         .validate()
         .handle();
   }
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListModel(url, ignore, metalake, catalog, schema).validate().handle();
+    gravitinoCommandLine.newListModel(context, metalake, catalog, schema).validate().handle();
   }
 }

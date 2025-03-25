@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.AreYouSure;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
@@ -32,14 +33,12 @@ public class DeleteMetalake extends Command {
   /**
    * Delete a metalake.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    */
-  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
-    super(url, ignoreVersions);
-    this.force = force;
+  public DeleteMetalake(CommandContext context, String metalake) {
+    super(context);
+    this.force = context.force();
     this.metalake = metalake;
   }
 
@@ -64,9 +63,9 @@ public class DeleteMetalake extends Command {
     }
 
     if (deleted) {
-      System.out.println(metalake + " deleted.");
+      printInformation(metalake + " deleted.");
     } else {
-      System.out.println(metalake + " not deleted.");
+      printInformation(metalake + " not deleted.");
     }
   }
 }

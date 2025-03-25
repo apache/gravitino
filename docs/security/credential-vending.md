@@ -53,6 +53,7 @@ An S3 token is a token credential with scoped privileges, by leveraging STS [Ass
 | `s3-access-key-id`                  | `gravitino.iceberg-rest.s3-access-key-id`          | The static access key ID used to access S3 data.                                                                                                            | (none)        | Yes      | 0.6.0-incubating |
 | `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key`      | The static secret access key used to access S3 data.                                                                                                        | (none)        | Yes      | 0.6.0-incubating |
 | `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the role to access the S3 data.                                                                                                                  | (none)        | Yes      | 0.7.0-incubating |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The region of the S3 service, like `us-west-2`.                                                                                                             | (none)        | No       | 0.6.0-incubating |
 | `s3-external-id`                    | `gravitino.iceberg-rest.s3-external-id`            | The S3 external id to generate token.                                                                                                                       | (none)        | No       | 0.7.0-incubating |
 | `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role.                                                      | 3600          | No       | 0.7.0-incubating |
 | `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | An alternative endpoint of the S3 token service, This could be used with s3-compatible object storage service like MINIO that has a different STS endpoint. | (none)        | No       | 0.8.0-incubating |
@@ -73,14 +74,15 @@ A credential with static OSS access key id and secret access key.
 
 An OSS token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://www.alibabacloud.com/help/en/oss/developer-reference/use-temporary-access-credentials-provided-by-sts-to-access-oss). To use an OSS token credential, you should create a role and grant it proper privileges.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                   | Default value | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|-------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-token` for s3 token credential.                                          | (none)        | Yes      | 0.8.0-incubating |
-| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                             | (none)        | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                         | (none)        | Yes      | 0.7.0-incubating |
-| `oss-role-arn`                      | `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data.                                   | (none)        | Yes      | 0.8.0-incubating |
-| `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                        | (none)        | No       | 0.8.0-incubating |
-| `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                   | 3600          | No       | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                                                  | Default value | Required | Since Version    |
+|-------------------------------------|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-token` for s3 token credential.                                                                         | (none)        | Yes      | 0.8.0-incubating |
+| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                            | (none)        | Yes      | 0.7.0-incubating |
+| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                        | (none)        | Yes      | 0.7.0-incubating |
+| `oss-role-arn`                      | `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data.                                                                  | (none)        | Yes      | 0.8.0-incubating |
+| `oss-region`                        | `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-providers` is `oss-token`. | (none)        | No       | 0.8.0-incubating |
+| `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                                                       | (none)        | No       | 0.8.0-incubating |
+| `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                                                  | 3600          | No       | 0.8.0-incubating |
 
 ### ADLS credentials
 
@@ -161,7 +163,7 @@ The classpath of the server:
 
 Suppose the Iceberg table data is stored in S3, follow the steps below:
 
-1. Download the [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), and place it to the classpath of Iceberg REST server.
+1. Download the [Gravitino AWS bundle jar without hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws), and place it to the classpath of Iceberg REST server.
 
 2. Add s3 token credential configurations.
 

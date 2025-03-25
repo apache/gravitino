@@ -62,6 +62,7 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " deleted_at = #{metalakeMeta.deletedAt}";
   }
 
+  @Override
   public String updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO) {
@@ -85,5 +86,15 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
         + " AND last_version = #{oldMetalakeMeta.lastVersion}"
         + " AND deleted_at = 0";
+  }
+
+  @Override
+  public String deleteMetalakeMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE metalake_id IN (SELECT metalake_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

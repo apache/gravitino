@@ -13,7 +13,7 @@ license: "This software is licensed under the Apache License version 2."
 + Linux or macOS operating system
 + Git
 + A Java Development Kit, version 8 to 17, installed in your environment to launch Gradle
-+ Python 3.8, 3.9, 3.10, or 3.11 to build the Gravitino Python client
++ Python 3.8, 3.9, 3.10, 3.11, or 3.12 to build the Gravitino Python client
 + Optionally, Docker to run integration tests
 
 :::info Please read the following notes before trying to build Gravitino.
@@ -25,6 +25,7 @@ license: "This software is licensed under the Apache License version 2."
 + Gravitino excludes all Docker-related tests by default. To run Docker-related tests, make sure you have installed Docker in your environment and either (1) set `skipDockerTests=false` in the `gradle.properties` file (or use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in the shell. Otherwise, all tests requiring Docker will be skipped.
 + macOS uses `docker-connector` to make the Gravitino Trino connector work with Docker for macOS. See [docker-connector](https://github.com/wenjunxiao/mac-docker-connector), `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
 + You can use OrbStack as a replacement for Docker for macOS. See [OrbStack](https://orbstack.dev/). With OrbStack, you can run Gravitino integration tests without needing to install `docker-connector`.
++ Depending on how you deploy Gravitino, other software used in conjunction with Gravitino may contain known security vulnerabilities.
 :::
 
 ## Quick start
@@ -58,7 +59,7 @@ license: "This software is licensed under the Apache License version 2."
 
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
 
-  For the Python client, the `./gradlew build` command builds the Python client with Python 3.8 by default. If you want to use Python 3.9, 3.10, or 3.11 to build, please modify the property `pythonVersion` to 3.9, 3.10, or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
+  For the Python client, the `./gradlew build` command builds the Python client with Python 3.8 by default. If you want to use Python 3.9, 3.10, 3.11, or 3.12 to build, please modify the property `pythonVersion` to 3.9, 3.10, 3.11, or 3.12 in the `gradle.properties` file, or specify the version with `-P` like:
 
    ```shell
    ./gradlew build -PpythonVersion=3.9
@@ -74,6 +75,12 @@ license: "This software is licensed under the Apache License version 2."
 
    ```shell
    ./gradlew build -PpythonVersion=3.11
+   ```
+
+  Or:
+    
+   ```shell
+   ./gradlew build -PpythonVersion=3.12
    ```
 
   If you want to build a module on its own, like the Spark connector, you can use Gradle to build a module with a specific name, like so:

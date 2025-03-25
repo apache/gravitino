@@ -41,6 +41,8 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("com.github.benmanes.caffeine", "org.apache.gravitino.shaded.com.github.benmanes.caffeine")
   // relocate common lang3 package
   relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {

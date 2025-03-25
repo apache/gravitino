@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -42,8 +43,7 @@ public class UpdateColumnAutoIncrement extends Command {
   /**
    * Update the auto increment of a column.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -52,15 +52,14 @@ public class UpdateColumnAutoIncrement extends Command {
    * @param autoincrement True if the column can be null, false if it must have non-null values.
    */
   public UpdateColumnAutoIncrement(
-      String url,
-      boolean ignoreVersions,
+      CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String table,
       String column,
       boolean autoincrement) {
-    super(url, ignoreVersions);
+    super(context);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -94,6 +93,6 @@ public class UpdateColumnAutoIncrement extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(column + " auto increment changed to " + autoincrement + ".");
+    printInformation(column + " auto increment changed to " + autoincrement + ".");
   }
 }

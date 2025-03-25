@@ -39,6 +39,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -67,7 +69,10 @@ class PermissionManager {
     try {
       List<RoleEntity> roleEntitiesToGrant = Lists.newArrayList();
       for (String role : roles) {
-        roleEntitiesToGrant.add(roleManager.getRole(metalake, role));
+        TreeLockUtils.doWithTreeLock(
+            AuthorizationUtils.ofRole(metalake, role),
+            LockType.READ,
+            () -> roleEntitiesToGrant.add(roleManager.getRole(metalake, role)));
       }
 
       User updatedUser =
@@ -153,7 +158,10 @@ class PermissionManager {
     try {
       List<RoleEntity> roleEntitiesToGrant = Lists.newArrayList();
       for (String role : roles) {
-        roleEntitiesToGrant.add(roleManager.getRole(metalake, role));
+        TreeLockUtils.doWithTreeLock(
+            AuthorizationUtils.ofRole(metalake, role),
+            LockType.READ,
+            () -> roleEntitiesToGrant.add(roleManager.getRole(metalake, role)));
       }
 
       Group updatedGroup =
@@ -239,7 +247,10 @@ class PermissionManager {
     try {
       List<RoleEntity> roleEntitiesToRevoke = Lists.newArrayList();
       for (String role : roles) {
-        roleEntitiesToRevoke.add(roleManager.getRole(metalake, role));
+        TreeLockUtils.doWithTreeLock(
+            AuthorizationUtils.ofRole(metalake, role),
+            LockType.READ,
+            () -> roleEntitiesToRevoke.add(roleManager.getRole(metalake, role)));
       }
 
       Group updatedGroup =
@@ -325,7 +336,10 @@ class PermissionManager {
     try {
       List<RoleEntity> roleEntitiesToRevoke = Lists.newArrayList();
       for (String role : roles) {
-        roleEntitiesToRevoke.add(roleManager.getRole(metalake, role));
+        TreeLockUtils.doWithTreeLock(
+            AuthorizationUtils.ofRole(metalake, role),
+            LockType.READ,
+            () -> roleEntitiesToRevoke.add(roleManager.getRole(metalake, role)));
       }
 
       User updatedUser =

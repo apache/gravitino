@@ -40,6 +40,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code CatalogHookDispatcher} is a decorator for {@link CatalogDispatcher} that not only
@@ -47,6 +49,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * operations before or after the underlying operations.
  */
 public class CatalogHookDispatcher implements CatalogDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogHookDispatcher.class);
   private final CatalogDispatcher dispatcher;
 
   public CatalogHookDispatcher(CatalogDispatcher dispatcher) {
@@ -82,21 +85,26 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
     Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
 
-    // Set the creator as the owner of the catalog.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.CATALOG),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
-    }
+    try {
+      // Set the creator as the owner of the catalog.
+      OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
+      if (ownerManager != null) {
+        ownerManager.setOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.CATALOG),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
 
-    // Apply the metalake securable object privileges to authorization plugin
-    FutureGrantManager futureGrantManager = GravitinoEnv.getInstance().futureGrantManager();
-    if (futureGrantManager != null && catalog instanceof BaseCatalog) {
-      futureGrantManager.grantNewlyCreatedCatalog(
-          ident.namespace().level(0), (BaseCatalog) catalog);
+      // Apply the metalake securable object privileges to authorization plugin
+      FutureGrantManager futureGrantManager = GravitinoEnv.getInstance().futureGrantManager();
+      if (futureGrantManager != null && catalog instanceof BaseCatalog) {
+        futureGrantManager.grantNewlyCreatedCatalog(
+            ident.namespace().level(0), (BaseCatalog) catalog);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to execute the post hook operations, rollback the catalog " + ident, e);
+      dispatcher.dropCatalog(ident, true);
     }
 
     return catalog;
@@ -131,18 +139,17 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       return false;
     }
 
-    // If we call the authorization plugin after dropping catalog, we can't load the plugin of the
-    // catalog
     Catalog catalog = dispatcher.loadCatalog(ident);
-    boolean dropped = dispatcher.dropCatalog(ident, force);
 
-    if (dropped && catalog != null) {
+    if (catalog != null) {
       List<String> locations =
           AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
       AuthorizationUtils.removeCatalogPrivileges(catalog, locations);
     }
 
-    return dropped;
+    // We should call the authorization plugin before dropping the catalog, because the dropping
+    // catalog will close the authorization plugin.
+    return dispatcher.dropCatalog(ident, force);
   }
 
   @Override

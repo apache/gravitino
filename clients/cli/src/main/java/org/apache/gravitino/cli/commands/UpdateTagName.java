@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,15 +36,13 @@ public class UpdateTagName extends Command {
   /**
    * Update the name of a tag.
    *
-   * @param url The URL of the Gravitino server.
-   * @param ignoreVersions If true don't check the client/server versions match.
+   * @param context The command context.
    * @param metalake The name of the tag.
    * @param tag The name of the catalog.
    * @param name The new tag name.
    */
-  public UpdateTagName(
-      String url, boolean ignoreVersions, String metalake, String tag, String name) {
-    super(url, ignoreVersions);
+  public UpdateTagName(CommandContext context, String metalake, String tag, String name) {
+    super(context);
     this.metalake = metalake;
     this.tag = tag;
     this.name = name;
@@ -64,6 +63,6 @@ public class UpdateTagName extends Command {
       exitWithError(exp.getMessage());
     }
 
-    System.out.println(tag + " name changed.");
+    printInformation(tag + " name changed.");
   }
 }

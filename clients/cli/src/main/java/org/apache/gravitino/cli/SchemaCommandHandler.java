@@ -29,8 +29,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
-  private final boolean ignore;
-  private final String url;
+  private final CommandContext context;
   private final FullName name;
   private final String metalake;
   private final String catalog;
@@ -42,16 +41,18 @@ public class SchemaCommandHandler extends CommandHandler {
    * @param gravitinoCommandLine The Gravitino command line instance.
    * @param line The command line arguments.
    * @param command The command to execute.
-   * @param ignore Ignore server version mismatch.
+   * @param context The command context.
    */
   public SchemaCommandHandler(
-      GravitinoCommandLine gravitinoCommandLine, CommandLine line, String command, boolean ignore) {
+      GravitinoCommandLine gravitinoCommandLine,
+      CommandLine line,
+      String command,
+      CommandContext context) {
     this.gravitinoCommandLine = gravitinoCommandLine;
     this.line = line;
     this.command = command;
-    this.ignore = ignore;
+    this.context = context;
 
-    this.url = getUrl(line);
     this.name = new FullName(line);
     this.metalake = name.getMetalakeName();
     this.catalog = name.getCatalogName();
@@ -60,7 +61,7 @@ public class SchemaCommandHandler extends CommandHandler {
   @Override
   protected void handle() {
     String userName = line.getOptionValue(GravitinoOptions.LOGIN);
-    Command.setAuthenticationMode(getAuth(line), userName);
+    Command.setAuthenticationMode(context.auth(), userName);
 
     List<String> missingEntities = Lists.newArrayList();
     if (metalake == null) missingEntities.add(CommandEntities.METALAKE);
@@ -120,21 +121,15 @@ public class SchemaCommandHandler extends CommandHandler {
 
   /** Handles the "LIST" command. */
   private void handleListCommand() {
-    gravitinoCommandLine.newListSchema(url, ignore, metalake, catalog).validate().handle();
+    gravitinoCommandLine.newListSchema(context, metalake, catalog).validate().handle();
   }
 
   /** Handles the "DETAILS" command. */
   private void handleDetailsCommand() {
     if (line.hasOption(GravitinoOptions.AUDIT)) {
-      gravitinoCommandLine
-          .newSchemaAudit(url, ignore, metalake, catalog, schema)
-          .validate()
-          .handle();
+      gravitinoCommandLine.newSchemaAudit(context, metalake, catalog, schema).validate().handle();
     } else {
-      gravitinoCommandLine
-          .newSchemaDetails(url, ignore, metalake, catalog, schema)
-          .validate()
-          .handle();
+      gravitinoCommandLine.newSchemaDetails(context, metalake, catalog, schema).validate().handle();
     }
   }
 
@@ -142,18 +137,14 @@ public class SchemaCommandHandler extends CommandHandler {
   private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
     gravitinoCommandLine
-        .newCreateSchema(url, ignore, metalake, catalog, schema, comment)
+        .newCreateSchema(context, metalake, catalog, schema, comment)
         .validate()
         .handle();
   }
 
   /** Handles the "DELETE" command. */
   private void handleDeleteCommand() {
-    boolean force = line.hasOption(GravitinoOptions.FORCE);
-    gravitinoCommandLine
-        .newDeleteSchema(url, ignore, force, metalake, catalog, schema)
-        .validate()
-        .handle();
+    gravitinoCommandLine.newDeleteSchema(context, metalake, catalog, schema).validate().handle();
   }
 
   /** Handles the "SET" command. */
@@ -161,7 +152,7 @@ public class SchemaCommandHandler extends CommandHandler {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
     gravitinoCommandLine
-        .newSetSchemaProperty(url, ignore, metalake, catalog, schema, property, value)
+        .newSetSchemaProperty(context, metalake, catalog, schema, property, value)
         .validate()
         .handle();
   }
@@ -170,7 +161,7 @@ public class SchemaCommandHandler extends CommandHandler {
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     gravitinoCommandLine
-        .newRemoveSchemaProperty(url, ignore, metalake, catalog, schema, property)
+        .newRemoveSchemaProperty(context, metalake, catalog, schema, property)
         .validate()
         .handle();
   }
@@ -178,7 +169,7 @@ public class SchemaCommandHandler extends CommandHandler {
   /** Handles the "PROPERTIES" command. */
   private void handlePropertiesCommand() {
     gravitinoCommandLine
-        .newListSchemaProperties(url, ignore, metalake, catalog, schema)
+        .newListSchemaProperties(context, metalake, catalog, schema)
         .validate()
         .handle();
   }

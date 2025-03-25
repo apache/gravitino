@@ -20,7 +20,7 @@ from typing import Optional, Dict, List
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.api.model_version import ModelVersion
+from gravitino.api.model.model_version import ModelVersion
 from gravitino.dto.audit_dto import AuditDTO
 
 

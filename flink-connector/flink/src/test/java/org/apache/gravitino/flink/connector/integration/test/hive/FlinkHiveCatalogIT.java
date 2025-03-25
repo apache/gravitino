@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.flink.connector.integration.test.hive;
 
-import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
@@ -71,8 +70,13 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   private static org.apache.gravitino.Catalog hiveCatalog;
 
+  @Override
+  protected boolean supportsPrimaryKey() {
+    return false;
+  }
+
   @BeforeAll
-  static void hiveStartUp() {
+  void hiveStartUp() {
     initDefaultHiveCatalog();
   }
 
@@ -82,13 +86,13 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     metalake.dropCatalog(DEFAULT_HIVE_CATALOG, true);
   }
 
-  protected static void initDefaultHiveCatalog() {
+  protected void initDefaultHiveCatalog() {
     Preconditions.checkNotNull(metalake);
     hiveCatalog =
         metalake.createCatalog(
             DEFAULT_HIVE_CATALOG,
             org.apache.gravitino.Catalog.Type.RELATIONAL,
-            "hive",
+            getProvider(),
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
   }
@@ -583,7 +587,22 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Override
+  protected Map<String, String> getCreateSchemaProps(String schemaName) {
+    return ImmutableMap.of("location", warehouse + "/" + schemaName);
+  }
+
+  @Override
   protected org.apache.gravitino.Catalog currentCatalog() {
     return hiveCatalog;
+  }
+
+  @Override
+  protected String getProvider() {
+    return "hive";
+  }
+
+  @Override
+  protected boolean supportDropCascade() {
+    return true;
   }
 }
