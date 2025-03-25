@@ -38,7 +38,7 @@ To develop the Gravitino Trino connector locally, you need to do the following s
 
 1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. The released version Trino-435 is the least version that Gravitino supports.
 2. Open the Trino project in your IDEA.
-3. Create a new module for the Gravitino Trino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../assets/trino/create-gravitino-trino-connector.jpg)
+3. Create a new module for the Gravitino Trino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../../assets/trino/create-gravitino-trino-connector.jpg)
 4. Add a soft link to the Gravitino Trino connector module in the Trino project. Assuming the src java main directory of the Gravitino Trino connector in project Gravitino is `gravitino/path/to/gravitino-trino-connector/src/main/java`, and the src java main directory of trino-gravitino in the Trino project is `trino/path/to/trino-gravitino/src/main/java`, you can use the following command to create a soft link:
 
 ```shell
@@ -46,7 +46,7 @@ ln -s gravitino/path/to/trino-connector/src/main/java trino/path/to/trino-gravit
 ```
 then you can see the `gravitino-trino-connecor` source files and directories in the `trino-gravitino` module as follows:
 
-![trino-gravitino-structure](../assets/trino/add-link.jpg)
+![trino-gravitino-structure](../../assets/trino/add-link.jpg)
 
 5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module. Ensure that the version of trino-root is identical to the version of trino.
 
@@ -207,7 +207,7 @@ If a compile error occurs due to `The following artifacts could not be resolved:
 :::
 
 7. Set up the configuration for the Gravitino Trino connector in the Trino project. You can do as the following picture shows:
-![](../assets/trino/add-config.jpg)
+![](../../assets/trino/add-config.jpg)
 
 The corresponding configuration files are here:
 
@@ -275,7 +275,7 @@ Remove the file `/etc/catalogs/xxx.properties` if the corresponding `plugin/trin
 :::
 
 8. Start the Trino server and connect to the Gravitino server.
-![](../assets/trino/start-trino.jpg)
+![](../../assets/trino/start-trino.jpg)
 9. If `DevelopmentServer` has started successfully, you can connect to the Trino server using the `trino-cli` and run the following command to see if the Gravitino Trino connector is available:
 ```shell
 java -jar trino-cli-429-executable.jar --server localhost:8180
@@ -285,4 +285,4 @@ The `trino-cli-429-executable.jar` is the Trino CLI jar file, you can download i
 :::
 
 10. If nothing goes wrong, you can start developing the Gravitino Trino connector in the Gravitino project and debug it in the Trino project.
-![](../assets/trino/show-catalogs.jpg)
+![](../../assets/trino/show-catalogs.jpg)

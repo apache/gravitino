@@ -74,7 +74,7 @@ Developers and users can custom their own HCFS file system fileset by implementi
 
 In the meantime, `FileSystemProvider` uses Java SPI to load the custom file system provider. You need to create a file named `org.apache.gravitino.catalog.fs.FileSystemProvider` in the `META-INF/services` directory of the jar file. The content of the file is the full class name of the custom file system provider. 
 For example, the content of `S3FileSystemProvider` is as follows:
-![img.png](assets/fileset/custom-filesystem-provider.png)
+![img.png](../../../assets/fileset/custom-filesystem-provider.png)
 
 After implementing the `FileSystemProvider` interface, you need to put the jar file into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory. Then you can set the `filesystem-providers` property to use your custom file system provider.
 
