@@ -19,6 +19,10 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
+import static org.apache.gravitino.file.Fileset.RESERVED_CATALOG_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.RESERVED_FILESET_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.RESERVED_SCHEMA_PLACEHOLDER;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -28,11 +32,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -83,6 +90,9 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
+
+  // location placeholder pattern format: {{placeholder}}
+  private static final Pattern LOCATION_PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.*?)\\}\\}");
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
 
   private final EntityStore store;
@@ -161,6 +171,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
+    checkPlaceholderValue(catalogLocation);
+
     this.catalogStorageLocation =
         StringUtils.isNotBlank(catalogLocation)
             ? Optional.of(catalogLocation)
@@ -250,12 +262,11 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               + ident
               + " when it's catalog and schema location are not set");
     }
+    checkPlaceholderValue(storageLocation);
 
-    // The specified storageLocation will take precedence over the calculated one.
     Path filesetPath =
-        StringUtils.isNotBlank(storageLocation)
-            ? new Path(storageLocation)
-            : new Path(schemaPath, ident.name());
+        caculateFilesetPath(
+            schemaIdent.name(), ident.name(), storageLocation, schemaPath, properties);
 
     try {
       // formalize the path to avoid path without scheme, uri, authority, etc.
@@ -469,7 +480,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     }
 
     Path schemaPath = getSchemaPath(ident.name(), properties);
-    if (schemaPath != null) {
+    if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
       try {
         FileSystem fs = getFileSystem(schemaPath, conf);
         if (!fs.exists(schemaPath)) {
@@ -707,11 +718,115 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             propertiesMetadata
                 .schemaPropertiesMetadata()
                 .getOrDefault(properties, HadoopSchemaPropertiesMetadata.LOCATION);
+    checkPlaceholderValue(schemaLocation);
 
     return Optional.ofNullable(schemaLocation)
         .map(s -> s.endsWith(SLASH) ? s : s + SLASH)
         .map(Path::new)
-        .orElse(catalogStorageLocation.map(p -> new Path(p, name)).orElse(null));
+        .orElse(
+            catalogStorageLocation
+                .map(p -> containsPlaceholder(p.toString()) ? p : new Path(p, name))
+                .orElse(null));
+  }
+
+  /**
+   * Check whether the placeholder in the location is valid. Throw an exception if the location
+   * contains a placeholder with an empty value.
+   *
+   * @param location the location to check.
+   */
+  private void checkPlaceholderValue(String location) {
+    if (StringUtils.isBlank(location)) {
+      return;
+    }
+
+    Matcher matcher = LOCATION_PLACEHOLDER_PATTERN.matcher(location);
+    while (matcher.find()) {
+      String placeholder = matcher.group(1);
+      if (placeholder.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Placeholder in location should not be empty, location: " + location);
+      }
+    }
+  }
+
+  /**
+   * Check whether the location contains a placeholder. The placeholder is in the format of
+   * {{name}}.
+   *
+   * @param location the location to check.
+   * @return true if the location contains a placeholder, false otherwise.
+   */
+  private boolean containsPlaceholder(String location) {
+    return StringUtils.isNotBlank(location)
+        && LOCATION_PLACEHOLDER_PATTERN.matcher(location).find();
+  }
+
+  private Path caculateFilesetPath(
+      String schemaName,
+      String filesetName,
+      String storageLocation,
+      Path schemaPath,
+      Map<String, String> properties) {
+    // The specified storageLocation will take precedence
+    // case 1: storageLocation is not empty and does not contain placeholder
+    if (StringUtils.isNotBlank(storageLocation) && !containsPlaceholder(storageLocation)) {
+      return new Path(storageLocation);
+    }
+
+    Map<String, String> placeholderMapping = new HashMap<>();
+    properties.forEach(
+        (k, v) -> {
+          if (k.startsWith(LOCATION_PLACEHOLDER_PREFIX)) {
+            placeholderMapping.put(k.substring(LOCATION_PLACEHOLDER_PREFIX.length()), v);
+          }
+        });
+    placeholderMapping.put(
+        RESERVED_CATALOG_PLACEHOLDER.substring(LOCATION_PLACEHOLDER_PREFIX.length()),
+        catalogInfo.name());
+    placeholderMapping.put(
+        RESERVED_SCHEMA_PLACEHOLDER.substring(LOCATION_PLACEHOLDER_PREFIX.length()), schemaName);
+    placeholderMapping.put(
+        RESERVED_FILESET_PLACEHOLDER.substring(LOCATION_PLACEHOLDER_PREFIX.length()), filesetName);
+
+    // case 2: storageLocation is not empty and contains placeholder
+    if (StringUtils.isNotBlank(storageLocation)) {
+      return new Path(replacePlaceholders(storageLocation, placeholderMapping));
+    }
+
+    // case 3: storageLocation is empty and schemaPath does not contain placeholder
+    if (!containsPlaceholder(schemaPath.toString())) {
+      return new Path(schemaPath, filesetName);
+    }
+
+    // case 4: storageLocation is empty and schemaPath contains placeholder
+    return new Path(replacePlaceholders(schemaPath.toString(), placeholderMapping));
+  }
+
+  private String replacePlaceholders(String location, Map<String, String> placeholderMapping) {
+    Matcher matcher = LOCATION_PLACEHOLDER_PATTERN.matcher(location);
+    StringBuilder result = new StringBuilder();
+    int currentPosition = 0;
+    while (matcher.find()) {
+      // Append the text before the match
+      result.append(location, currentPosition, matcher.start());
+
+      // Append the replacement
+      String key = matcher.group(1);
+      String replacement = placeholderMapping.get(key);
+      if (replacement == null) {
+        throw new IllegalArgumentException("No value found for placeholder: " + key);
+      }
+      result.append(replacement);
+
+      currentPosition = matcher.end();
+    }
+
+    // Append the rest of the text
+    if (currentPosition < location.length()) {
+      result.append(location, currentPosition, location.length());
+    }
+    return result.toString();
   }
 
   @VisibleForTesting
