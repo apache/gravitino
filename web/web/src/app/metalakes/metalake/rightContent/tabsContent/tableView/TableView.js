@@ -336,7 +336,9 @@ const TableView = () => {
               title='Delete'
               size='small'
               sx={{ color: theme => theme.palette.error.light }}
-              onClick={() => handleDelete({ name: row.name, type: row.node, catalogType: row.type, inUse: row.inUse === 'true' })}
+              onClick={() =>
+                handleDelete({ name: row.name, type: row.node, catalogType: row.type, inUse: row.inUse === 'true' })
+              }
               data-refer={`delete-entity-${row.name}`}
             >
               <DeleteIcon />
