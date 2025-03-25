@@ -27,10 +27,10 @@ import org.apache.gravitino.annotation.DeveloperApi;
 public abstract class UserPreEvent extends PreEvent {
 
   /**
-   * Create a new {@link UserPreEvent} instance for an access request.
+   * Create a new {@link UserPreEvent} instance for a user operation request.
    *
    * @param initiator the user who triggered the event.
-   * @param identifier the identifier of the model being operated on.
+   * @param identifier the identifier of the metalake which is being operated on.
    */
   protected UserPreEvent(String initiator, NameIdentifier identifier) {
     super(initiator, identifier);

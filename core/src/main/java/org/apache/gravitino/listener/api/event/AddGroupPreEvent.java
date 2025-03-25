@@ -22,40 +22,41 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before get a user from specific metalake */
+/** Represents an event triggered before add a group to a metalake. */
 @DeveloperApi
-public class GetUserPreEvent extends UserPreEvent {
-  private final String userName;
+public class AddGroupPreEvent extends GroupPreEvent {
+  private final String groupName;
 
   /**
-   * Construct a new {@link GetUserPreEvent} instance with the specified user, identifier and user
-   * info.
+   * Construct a new {@link AddGroupPreEvent} instance with the given initiator, identifier and
+   * group name.
    *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is getting retrieved from.
-   * @param userName the username which is requested to be retrieved.
+   * @param initiator the user who initiated the add-group request.
+   * @param identifier the identifier of the metalake which the group is being added to.
+   * @param groupName the group name which is requested to be added to the metalake.
    */
-  public GetUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+  protected AddGroupPreEvent(String initiator, NameIdentifier identifier, String groupName) {
     super(initiator, identifier);
-    this.userName = userName;
+
+    this.groupName = groupName;
   }
 
   /**
-   * Returns the user info for the user which is getting retrieved.
+   * Returns the group information which is being added to the metalake.
    *
-   * @return the username which is requested to be retrieved.
+   * @return the group name which is requested to be added to the metalake.
    */
-  public String userName() {
-    return userName;
+  public String groupName() {
+    return groupName;
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the operation type of this event.
    *
-   * @return the operation type for this event.
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.GET_USER;
+    return OperationType.ADD_GROUP;
   }
 }
