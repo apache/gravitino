@@ -94,7 +94,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> illegalProps = ImmutableMap.of("k1", "v1", ID_KEY, "test");
     testPropertyException(
         () -> modelOperationDispatcher.registerModel(modelIdent, "comment", illegalProps),
-        "Properties are reserved and cannot be set",
+        "Properties or properties with a fixed prefix are reserved and cannot be set",
         ID_KEY);
   }
 
@@ -190,7 +190,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
         () ->
             modelOperationDispatcher.linkModelVersion(
                 modelIdent, "path", aliases, "comment", illegalProps),
-        "Properties are reserved and cannot be set",
+        "Properties or properties with a fixed prefix are reserved and cannot be set",
         ID_KEY);
   }
 
