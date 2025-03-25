@@ -21,7 +21,6 @@ package org.apache.gravitino.lineage;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,15 +29,14 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.listener.api.EventListenerPlugin;
-import org.apache.gravitino.utils.MapUtils;
 
 public class LineageConfig extends Config {
 
   public static final String LINEAGE_CONFIG_PREFIX = "gravitino.lineage.";
   public static final String LINEAGE_CONFIG_SINKS = "sinks";
   public static final String LINEAGE_SINK_CLASS_NAME = "sink-class";
-  public static final String LINEAGE_HTTP_SOURCE_CLASS_NAME = "org.apache.gravitino.lineage.HTTPLineageSource";
+  public static final String LINEAGE_HTTP_SOURCE_CLASS_NAME =
+      "org.apache.gravitino.lineage.HTTPLineageSource";
 
   public static final String LINEAGE_LOG_SINK_NAME = "log";
 
@@ -78,17 +76,30 @@ public class LineageConfig extends Config {
     return get(PROCESSOR);
   }
 
-  public Map<String, String> getLineageConfigMap() {
+  public Map<String, String> getSinkConfigs() {
     List<String> sinks = sinks();
     String logSinkClass =
         LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME;
     Map<String, String> config = getAllConfig();
-    if ((!sinks.contains(LINEAGE_LOG_SINK_NAME)) || config.containsKey(logSinkClass)) {
-      return config;
+    Map m = new HashMap(config);
+
+    String sinkString = get(SINKS);
+    if (!m.containsKey(LINEAGE_CONFIG_SINKS)) {
+      m.put(LINEAGE_CONFIG_SINKS, sinkString);
     }
 
-    Map m = new HashMap(config);
-    m.put(logSinkClass, LineageLogSinker.class.getName());
+    if (sinks.contains(LINEAGE_LOG_SINK_NAME) && !config.containsKey(logSinkClass)) {
+      m.put(logSinkClass, LineageLogSinker.class.getName());
+    }
+
+    sinks.stream()
+        .forEach(
+            sinkName -> {
+              String sinkClassConfig = sinkName + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME;
+              Preconditions.checkArgument(
+                  m.containsKey(sinkClassConfig), sinkClassConfig + " is not set");
+            });
+
     return m;
   }
 
@@ -97,6 +108,7 @@ public class LineageConfig extends Config {
     return splitter
         .omitEmptyStrings()
         .trimResults()
-        .splitToStream(sinks).collect(Collectors.toList());
+        .splitToStream(sinks)
+        .collect(Collectors.toList());
   }
 }

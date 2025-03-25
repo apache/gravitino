@@ -36,7 +36,9 @@ public class LineageSinkEventListener implements EventListenerPlugin {
   @Override
   public void init(Map<String, String> properties) throws RuntimeException {
     String sinkClassName = properties.get(LineageConfig.LINEAGE_SINK_CLASS_NAME);
-    Preconditions.checkArgument(StringUtils.isNotBlank(sinkClassName), LineageConfig.LINEAGE_SINK_CLASS_NAME + " is not set.");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(sinkClassName),
+        LineageConfig.LINEAGE_SINK_CLASS_NAME + " is not set.");
     this.sink = ClassUtils.loadClass(sinkClassName);
     sink.initialize(properties);
   }

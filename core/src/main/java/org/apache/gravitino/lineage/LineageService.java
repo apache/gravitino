@@ -41,7 +41,7 @@ public class LineageService implements LineageDispatcher {
     String processorClassName = lineageConfig.processor();
     this.processor = ClassUtils.loadClass(processorClassName);
 
-    sinkManager.initialize(lineageConfig.sinks(), lineageConfig.getLineageConfigMap());
+    sinkManager.initialize(lineageConfig.sinks(), lineageConfig.getSinkConfigs());
     source.initialize(lineageConfig.getConfigsWithPrefix(sourceName), this);
   }
 

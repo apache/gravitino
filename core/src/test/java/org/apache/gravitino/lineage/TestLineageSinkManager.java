@@ -85,7 +85,7 @@ public class TestLineageSinkManager {
 
   private Map<String, String> getLineageSinkConfig() {
     Map<String, String> lineageSinkConfigs = new HashMap<>();
-    //lineageSinkConfigs.put(LineageConfig.LINEAGE_CONFIG_SINKS, "sink1,sink2");
+    // lineageSinkConfigs.put(LineageConfig.LINEAGE_CONFIG_SINKS, "sink1,sink2");
     lineageSinkConfigs.put(
         "sink1." + LineageConfig.LINEAGE_SINK_CLASS_NAME, LineageSinkForTest.class.getName());
     lineageSinkConfigs.put("sink1.a", "a");

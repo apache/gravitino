@@ -20,13 +20,10 @@
 package org.apache.gravitino.lineage;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.EventWrapper;
@@ -41,7 +38,8 @@ public class LineageSinkManager {
   }
 
   public void initialize(List<String> sinks, Map<String, String> LineageConfigs) {
-    Map<String, String> eventListenerConfigs = transformToEventListenerConfigs(sinks, LineageConfigs);
+    Map<String, String> eventListenerConfigs =
+        transformToEventListenerConfigs(sinks, LineageConfigs);
     eventListenerManager.init(eventListenerConfigs);
     this.eventBus = eventListenerManager.createEventBus();
     eventListenerManager.start();
@@ -51,7 +49,8 @@ public class LineageSinkManager {
     return false;
   }
 
-  private Map<String, String> transformToEventListenerConfigs(List<String> sinks, Map<String, String> lineageConfigs) {
+  private Map<String, String> transformToEventListenerConfigs(
+      List<String> sinks, Map<String, String> lineageConfigs) {
     Map<String, String> eventListenerConfigs = new HashMap<>();
     eventListenerConfigs.putAll(generateSinkConfig(sinks));
     eventListenerConfigs.putAll(lineageConfigs);
@@ -66,8 +65,7 @@ public class LineageSinkManager {
         sinkName ->
             eventListenerConfigs.put(
                 sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
-                LineageSinkEventListener.class.getName())
-    );
+                LineageSinkEventListener.class.getName()));
     return eventListenerConfigs;
   }
 
