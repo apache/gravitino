@@ -20,11 +20,14 @@
 package org.apache.gravitino.lineage;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventWrapper;
+import org.apache.gravitino.utils.ClassUtils;
 
 public class LineageSinkEventListener implements EventListenerPlugin {
 
@@ -32,7 +35,9 @@ public class LineageSinkEventListener implements EventListenerPlugin {
 
   @Override
   public void init(Map<String, String> properties) throws RuntimeException {
-    this.sink = loadLineageSinkClass(properties.get(LineageConfig.LINEAGE_SINK_CLASS_NAME));
+    String sinkClassName = properties.get(LineageConfig.LINEAGE_SINK_CLASS_NAME);
+    Preconditions.checkArgument(StringUtils.isNotBlank(sinkClassName), LineageConfig.LINEAGE_SINK_CLASS_NAME + " is not set.");
+    this.sink = ClassUtils.loadClass(sinkClassName);
     sink.initialize(properties);
   }
 
@@ -60,13 +65,5 @@ public class LineageSinkEventListener implements EventListenerPlugin {
   @VisibleForTesting
   LineageSink getSink() {
     return sink;
-  }
-
-  private LineageSink loadLineageSinkClass(String className) {
-    try {
-      return (LineageSink) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 }

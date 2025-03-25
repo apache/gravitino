@@ -20,6 +20,7 @@
 package org.apache.gravitino.lineage;
 
 import io.openlineage.server.OpenLineage.RunEvent;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,7 @@ public class TestLineageSinkManager {
   @Test
   void testLineageSinkManager() {
     LineageSinkManager lineageSinkManager = new LineageSinkManager();
-    lineageSinkManager.initialize(getLineageSinkConfig());
+    lineageSinkManager.initialize(Arrays.asList("array1", "array2"), getLineageSinkConfig());
     lineageSinkManager.sink(getRunEvent());
     EventBus eventBus = lineageSinkManager.eventBus();
     List<EventListenerPlugin> listeners = eventBus.getEventListeners();
@@ -84,7 +85,7 @@ public class TestLineageSinkManager {
 
   private Map<String, String> getLineageSinkConfig() {
     Map<String, String> lineageSinkConfigs = new HashMap<>();
-    lineageSinkConfigs.put(LineageConfig.LINEAGE_CONFIG_SINKS, "sink1,sink2");
+    //lineageSinkConfigs.put(LineageConfig.LINEAGE_CONFIG_SINKS, "sink1,sink2");
     lineageSinkConfigs.put(
         "sink1." + LineageConfig.LINEAGE_SINK_CLASS_NAME, LineageSinkForTest.class.getName());
     lineageSinkConfigs.put("sink1.a", "a");

@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.gravitino.listener.EventBus;
@@ -35,14 +36,12 @@ public class LineageSinkManager {
   private EventBus eventBus;
   private EventListenerManager eventListenerManager;
 
-  private static final Splitter splitter = Splitter.on(",");
-
   public LineageSinkManager() {
     this.eventListenerManager = new EventListenerManager();
   }
 
-  public void initialize(Map<String, String> config) {
-    Map<String, String> eventListenerConfigs = transformToEventListenerConfigs(config);
+  public void initialize(List<String> sinks, Map<String, String> LineageConfigs) {
+    Map<String, String> eventListenerConfigs = transformToEventListenerConfigs(sinks, LineageConfigs);
     eventListenerManager.init(eventListenerConfigs);
     this.eventBus = eventListenerManager.createEventBus();
     eventListenerManager.start();
@@ -52,32 +51,23 @@ public class LineageSinkManager {
     return false;
   }
 
-  private Map<String, String> transformToEventListenerConfigs(Map<String, String> lineageConfigs) {
+  private Map<String, String> transformToEventListenerConfigs(List<String> sinks, Map<String, String> lineageConfigs) {
     Map<String, String> eventListenerConfigs = new HashMap<>();
+    eventListenerConfigs.putAll(generateSinkConfig(sinks));
+    eventListenerConfigs.putAll(lineageConfigs);
+    return eventListenerConfigs;
+  }
 
-    for (Entry<String, String> entry : lineageConfigs.entrySet()) {
-      if (entry.getKey().equalsIgnoreCase(LineageConfig.LINEAGE_CONFIG_SINKS)) {
-        String sinks = entry.getValue();
-        eventListenerConfigs.put(
-            EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, entry.getValue());
-        splitter
-            .omitEmptyStrings()
-            .trimResults()
-            .splitToStream(sinks)
-            .forEach(
-                sinkName -> {
-                  Preconditions.checkArgument(
-                      lineageConfigs.containsKey(
-                          sinkName + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME),
-                      "");
-                  eventListenerConfigs.put(
-                      sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
-                      LineageSinkEventListener.class.getName());
-                });
-      } else {
-        eventListenerConfigs.put(entry.getKey(), entry.getValue());
-      }
-    }
+  private Map<String, String> generateSinkConfig(List<String> sinks) {
+    HashMap eventListenerConfigs = new HashMap();
+    eventListenerConfigs.put(
+        EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", sinks));
+    sinks.forEach(
+        sinkName ->
+            eventListenerConfigs.put(
+                sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
+                LineageSinkEventListener.class.getName())
+    );
     return eventListenerConfigs;
   }
 

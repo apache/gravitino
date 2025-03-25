@@ -50,7 +50,7 @@ public class LineageSinkForTest implements LineageSink {
     return getEvents();
   }
 
-  public List<RunEvent> getEvents() {
+  private List<RunEvent> getEvents() {
     return runEvents;
   }
 }
