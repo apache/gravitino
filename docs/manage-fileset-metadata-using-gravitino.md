@@ -327,6 +327,108 @@ the `storageLocation` is `file:///tmp/{{schema}}-{{fileset}}-{{verion}}`, and th
 named "catalog1.schema1.fileset1" contains the properties `placeholder-version=v1`, 
 the actual `storageLocation` will be `file:///tmp/schema1-fileset1-v1`.
 
+The following is an example of creating a fileset with placeholders in the `storageLocation`:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+# create a calota first
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_catalog",
+  "type": "FILESET",
+  "comment": "comment",
+  "provider": "hadoop",
+  "properties": {
+    "location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# create a schema under the catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_schema",
+  "comment": "comment",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+
+# create a fileset by placeholders
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+    "placeholder-project": "test_project",
+    "placeholder-user": "test_user"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+
+# the actual storage location of the fileset will be: file:///test_catalog/test_schema/workspace_test_project/test_user
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("metalake")
+    .build();
+// create a catalog first
+Catalog catalog = gravitinoClient.createCatalog(
+    "test_catalog",
+    Type.FILESET,
+    "hadoop", // provider
+    "comment",
+    ImmutableMap.of("location", "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"));
+FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+
+// create a schema under the catalog
+filesetCatalog.createSchema("test_schema", "comment", null);
+
+// create a fileset by placeholders
+filesetCatalog.createFileset(
+  NameIdentifier.of("test_schema", "example_fileset"),
+  "This is an example fileset",
+  Fileset.Type.MANAGED,
+  null,
+  ImmutableMap.of("placeholder-project", "test_project", "placeholder-user", "test_user")
+);
+
+// the actual storage location of the fileset will be: file:///test_catalog/test_schema/workspace_test_project/test_user
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+# create a catalog first
+catalog: Catalog = gravitino_client.create_catalog(name="test_catalog",
+                                                   catalog_type=Catalog.Type.FILESET,
+                                                   provider="hadoop",
+                                                   comment="comment",
+                                                   properties={"location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"})
+
+# create a schema under the catalog
+catalog.as_schemas().create_schema(name="test_schema", comment="comment", properties={})
+
+# create a fileset by placeholders
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
+                                            type=Fileset.Type.MANAGED,
+                                            comment="This is an example fileset",
+                                            storage_location=None,
+                                            properties={"placeholder-project": "test_project", "placeholder-user": "test_user"})
+
+# the actual storage location of the fileset will be: file:///test_catalog/test_schema/workspace_test_project/test_user
+```
+
+</TabItem>
+</Tabs>
+
 The value of `storageLocation` depends on the configuration settings of the catalog:
 - If this is a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
 - If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
