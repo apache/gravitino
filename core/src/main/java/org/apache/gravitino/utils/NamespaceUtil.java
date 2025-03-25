@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.utils;
 
-import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import org.apache.gravitino.Entity;
@@ -106,17 +105,6 @@ public class NamespaceUtil {
    */
   public static Namespace ofFileset(String metalake, String catalog, String schema) {
     return Namespace.of(metalake, catalog, schema);
-  }
-
-  /**
-   * Create a namespace for fileset from a schema name identifier.
-   *
-   * @param ident The schema name identifier.
-   * @return A namespace for fileset.
-   */
-  public static Namespace toFileset(NameIdentifier ident) {
-    Preconditions.checkArgument(ident.namespace().length() == 2, "Invalid namespace length");
-    return ofFileset(ident.namespace().level(0), ident.namespace().level(1), ident.name());
   }
 
   /**
