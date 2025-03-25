@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -71,8 +72,11 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new AddUserPreEvent(initiator, NameIdentifier.of(metalake), user));
     try {
-      // TODO add Event
-      return dispatcher.addUser(metalake, user);
+      User userObject = dispatcher.addUser(metalake, user);
+      eventBus.dispatchEvent(
+          new AddUserEvent(initiator, NameIdentifier.of(metalake), new UserInfo(userObject)));
+
+      return userObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -86,8 +90,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, NameIdentifier.of(metalake), user));
     try {
-      // TODO: add Event
-      return dispatcher.removeUser(metalake, user);
+      boolean isExists = dispatcher.removeUser(metalake, user);
+      eventBus.dispatchEvent(
+          new RemoveUserEvent(
+              initiator, NameIdentifier.of(metalake), new UserInfo(user), isExists));
+
+      return isExists;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -102,7 +110,11 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new GetUserPreEvent(initiator, NameIdentifier.of(metalake), user));
     try {
-      return dispatcher.getUser(metalake, user);
+      User userObject = dispatcher.getUser(metalake, user);
+      eventBus.dispatchEvent(
+          new GetUserEvent(initiator, NameIdentifier.of(metalake), new UserInfo(userObject)));
+
+      return userObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -116,8 +128,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new ListUsersPreEvent(initiator, NameIdentifier.of(metalake)));
     try {
-      // TODO: add Event
-      return dispatcher.listUsers(metalake);
+      User[] users = dispatcher.listUsers(metalake);
+      eventBus.dispatchEvent(new ListUsersEvent(initiator, NameIdentifier.of(metalake)));
+
+      return users;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -131,8 +145,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new ListUserNamesPreEvent(initiator, NameIdentifier.of(metalake)));
     try {
-      // TODO: add Event
-      return dispatcher.listUserNames(metalake);
+      String[] userNames = dispatcher.listUserNames(metalake);
+      eventBus.dispatchEvent(new ListUserNamesEvent(initiator, NameIdentifier.of(metalake)));
+
+      return userNames;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
