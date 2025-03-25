@@ -22,40 +22,16 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before add a user to a metalake. */
+/** Represent a pre-event for a group operation request. */
 @DeveloperApi
-public class AddUserPreEvent extends UserPreEvent {
-  private final String userName;
-
+public class GroupPreEvent extends PreEvent {
   /**
-   * Construct a new {@link AddUserPreEvent} instance with initiator, identifier and username.
+   * Construct a new {@link GroupPreEvent} instance for a group operation request.
    *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is being added to.
-   * @param userName the username which is requested to be added to the metalake.
+   * @param initiator the user who triggered the event.
+   * @param identifier the identifier of the metalake which is being operated on.
    */
-  public AddUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+  protected GroupPreEvent(String initiator, NameIdentifier identifier) {
     super(initiator, identifier);
-
-    this.userName = userName;
-  }
-
-  /**
-   * Returns the user information which is being added to the metalake.
-   *
-   * @return the username which is requested to be added to the metalake.
-   */
-  public String userName() {
-    return userName;
-  }
-
-  /**
-   * Returns the operation type of this event.
-   *
-   * @return the operation type.
-   */
-  @Override
-  public OperationType operationType() {
-    return OperationType.ADD_USER;
   }
 }

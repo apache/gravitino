@@ -144,7 +144,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
     try {
-      // TODO: add Event
+      String initiator = PrincipalUtils.getCurrentUserName();
+
+      eventBus.dispatchEvent(new AddGroupPreEvent(initiator, NameIdentifier.of(metalake), group));
       return dispatcher.addGroup(metalake, group);
     } catch (Exception e) {
       // TODO: add failure event
@@ -156,7 +158,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     try {
-      // TODO: add Event
+      String initiator = PrincipalUtils.getCurrentUserName();
+
+      eventBus.dispatchEvent(
+          new RemoveGroupPreEvent(initiator, NameIdentifier.of(metalake), group));
       return dispatcher.removeGroup(metalake, group);
     } catch (Exception e) {
       // TODO: add failure event
@@ -168,6 +173,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetGroupPreEvent(initiator, NameIdentifier.of(metalake), group));
     try {
       return dispatcher.getGroup(metalake, group);
     } catch (Exception e) {
@@ -179,6 +187,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public Group[] listGroups(String metalake) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListGroupsPreEvent(initiator, NameIdentifier.of(metalake)));
     try {
       // TODO: add Event
       return dispatcher.listGroups(metalake);
@@ -191,6 +202,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public String[] listGroupNames(String metalake) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListGroupNamesPreEvent(initiator, NameIdentifier.of(metalake)));
     try {
       // TODO: add Event
       return dispatcher.listGroupNames(metalake);

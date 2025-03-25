@@ -28,6 +28,7 @@ import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestUserEvent {
   private static final String METALAKE = "demo_metalake";
+  private static final String INEXIST_METALAKE = "inexist_metalake";
   private AccessControlEventDispatcher dispatcher;
   private AccessControlEventDispatcher failureDispatcher;
   private DummyEventListener dummyEventListener;
@@ -48,7 +50,6 @@ public class TestUserEvent {
   private User user;
   private User otherUser;
   private NameIdentifier identifier;
-  private NameIdentifier otherIdentifier;
 
   @BeforeAll
   void init() {
@@ -58,7 +59,6 @@ public class TestUserEvent {
     this.user = getMockUser(userName, ImmutableList.of("test", "engineer"));
     this.otherUser = getMockUser(otherUserName, null);
     this.identifier = NameIdentifier.of(METALAKE);
-    this.otherIdentifier = NameIdentifier.of(otherUserName);
 
     this.dummyEventListener = new DummyEventListener();
     EventBus eventBus = new EventBus(Collections.singletonList(dummyEventListener));
@@ -66,9 +66,7 @@ public class TestUserEvent {
     this.failureDispatcher =
         new AccessControlEventDispatcher(eventBus, mockExceptionUserDispatcher());
 
-    System.out.println(dispatcher);
     System.out.println(failureDispatcher);
-    System.out.println(otherIdentifier);
   }
 
   @Test
@@ -107,6 +105,12 @@ public class TestUserEvent {
   void testGetUserPreEventWithNonExistingUser() {
     Assertions.assertThrows(
         NoSuchUserException.class, () -> dispatcher.getUser(METALAKE, inExistUserName));
+  }
+
+  @Test
+  void testGetUserPreEventWithNonExistingMetalake() {
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> dispatcher.getUser(INEXIST_METALAKE, userName));
   }
 
   @Test
@@ -165,6 +169,8 @@ public class TestUserEvent {
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.getUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
+    when(dispatcher.getUser(INEXIST_METALAKE, userName))
+        .thenThrow(new NoSuchMetalakeException("user not found"));
 
     return dispatcher;
   }
