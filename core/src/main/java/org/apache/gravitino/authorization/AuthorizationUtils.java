@@ -21,15 +21,14 @@ package org.apache.gravitino.authorization;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -432,30 +431,15 @@ public class AuthorizationUtils {
   public static List<String> getMetadataObjectLocation(
       NameIdentifier ident, Entity.EntityType type) {
     List<String> locations = new ArrayList<>();
+
+    // If we don't enable authorization, the location should return empty collection.
+    if (GravitinoEnv.getInstance().accessControlDispatcher() == null) {
+      return locations;
+    }
+
     try {
       switch (type) {
         case METALAKE:
-          {
-            NameIdentifier[] identifiers =
-                GravitinoEnv.getInstance()
-                    .catalogDispatcher()
-                    .listCatalogs(Namespace.of(ident.name()));
-            Arrays.stream(identifiers)
-                .collect(Collectors.toList())
-                .forEach(
-                    identifier -> {
-                      Catalog catalogObj =
-                          GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(identifier);
-                      if (catalogObj.provider().equals("hive")) {
-                        // The Hive default schema location is Hive warehouse directory
-                        String defaultSchemaLocation =
-                            getHiveDefaultLocation(ident.name(), catalogObj.name());
-                        if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
-                          locations.add(defaultSchemaLocation);
-                        }
-                      }
-                    });
-          }
           break;
         case CATALOG:
           {
@@ -564,6 +548,9 @@ public class AuthorizationUtils {
               filesetLocation != null, String.format("Fileset %s location is not found", ident));
           locations.add(filesetLocation);
           break;
+        case TOPIC:
+          // Topic doesn't have locations now.
+          break;
         default:
           throw new AuthorizationPluginException(
               "Failed to get location paths for metadata object %s type %s", ident, type);
@@ -573,11 +560,6 @@ public class AuthorizationUtils {
     }
 
     return locations;
-  }
-
-  private static NameIdentifier getObjectNameIdentifier(
-      String metalake, MetadataObject metadataObject) {
-    return NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
   }
 
   /**
