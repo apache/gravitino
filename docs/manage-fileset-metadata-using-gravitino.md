@@ -16,7 +16,7 @@ filesets to manage non-tabular data like training datasets and other raw data.
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
 tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
-HCFS like S3, OSS, GCS, etc. Please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
+HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
 [hadoop-with-adls](./hadoop-catalog-with-adls.md).
 
 After a fileset is created, users can easily access, manage the files/directories through
