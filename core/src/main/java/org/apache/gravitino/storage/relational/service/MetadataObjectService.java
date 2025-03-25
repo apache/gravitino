@@ -429,7 +429,7 @@ public class MetadataObjectService {
           }
 
           String fullName = DOT_JOINER.join(tableName, columnPO.getColumnName());
-          tableIdAndNameMap.put(columnPO.getColumnId(), fullName);
+          columnIdAndNameMap.put(columnPO.getColumnId(), fullName);
         });
 
     return columnIdAndNameMap;
