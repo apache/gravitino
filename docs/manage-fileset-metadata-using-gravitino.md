@@ -16,7 +16,7 @@ filesets to manage non-tabular data like training datasets and other raw data.
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
 tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
-HCFS like S3, OSS, GCS, etc, please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
+HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
 [hadoop-with-adls](./hadoop-catalog-with-adls.md).
 
 After a fileset is created, users can easily access, manage the files/directories through
@@ -320,24 +320,143 @@ Currently, Gravitino supports two **types** of filesets:
 The `storageLocation` is the physical location of the fileset. Users can specify this location
 when creating a fileset, or follow the rules of the catalog/schema location if not specified.
 
+The `storageLocation` in each level can contain **placeholders**, format as `{{name}}`, which will
+be replaced by the corresponding fileset property value when the fileset object is created. The
+placeholder property in the fileset object is formed as "placeholder-{{name}}". For example, if
+the `storageLocation` is `file:///tmp/{{schema}}-{{fileset}}-{{verion}}`, and the fileset object 
+named "catalog1.schema1.fileset1" contains the properties `placeholder-version=v1`, 
+the actual `storageLocation` will be `file:///tmp/schema1-fileset1-v1`.
+
+The following is an example of creating a fileset with placeholders in the `storageLocation`:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+# create a calota first
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_catalog",
+  "type": "FILESET",
+  "comment": "comment",
+  "provider": "hadoop",
+  "properties": {
+    "location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# create a schema under the catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_schema",
+  "comment": "comment",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+
+# create a fileset by placeholders
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+    "placeholder-project": "test_project",
+    "placeholder-user": "test_user"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+
+# the actual storage location of the fileset will be: file:///test_catalog/test_schema/workspace_test_project/test_user
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("metalake")
+    .build();
+// create a catalog first
+Catalog catalog = gravitinoClient.createCatalog(
+    "test_catalog",
+    Type.FILESET,
+    "hadoop", // provider
+    "comment",
+    ImmutableMap.of("location", "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"));
+FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+
+// create a schema under the catalog
+filesetCatalog.createSchema("test_schema", "comment", null);
+
+// create a fileset by placeholders
+filesetCatalog.createFileset(
+  NameIdentifier.of("test_schema", "example_fileset"),
+  "This is an example fileset",
+  Fileset.Type.MANAGED,
+  null,
+  ImmutableMap.of("placeholder-project", "test_project", "placeholder-user", "test_user")
+);
+
+// the actual storage location of the fileset will be: file:///test_catalog/test_schema/workspace_test_project/test_user
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+# create a catalog first
+catalog: Catalog = gravitino_client.create_catalog(name="test_catalog",
+                                                   catalog_type=Catalog.Type.FILESET,
+                                                   provider="hadoop",
+                                                   comment="comment",
+                                                   properties={"location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"})
+
+# create a schema under the catalog
+catalog.as_schemas().create_schema(name="test_schema", comment="comment", properties={})
+
+# create a fileset by placeholders
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
+                                            type=Fileset.Type.MANAGED,
+                                            comment="This is an example fileset",
+                                            storage_location=None,
+                                            properties={"placeholder-project": "test_project", "placeholder-user": "test_user"})
+
+# the actual storage location of the fileset will be: file:///test_catalog/test_schema/workspace_test_project/test_user
+```
+
+</TabItem>
+</Tabs>
+
 The value of `storageLocation` depends on the configuration settings of the catalog:
 - If this is a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
 - If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
 
 For a `MANAGED` fileset, the storage location is:
 
-1. The one specified by the user during the fileset creation.
-2. When the catalog property `location` is specified but the schema property `location` isn't specified,
-   the storage location is `catalog location/schema name/fileset name`.
+1. The one specified by the user during the fileset creation, and the placeholder will be replaced by the
+   corresponding fileset property value.
+2. When the catalog property `location` is specified but the schema property `location` isn't specified, the storage location is:
+   1. `catalog location/schema name/fileset name` if `catalog location` does not contain any placeholder. 
+   2. `catalog location` - placeholders in the catalog location will be replaced by the corresponding fileset property value.
+
 3. When the catalog property `location` isn't specified but the schema property `location` is specified,
-   the storage location is `schema location/fileset name`.
+   the storage location is:
+   1. `schema location/fileset name` if `schema location` does not contain any placeholder.
+   2. `schema location` - placeholders in the schema location will be replaced by the corresponding fileset property value.
+   
 4. When both the catalog property `location` and the schema property `location` are specified, the storage
-   location is `schema location/fileset name`.
+   location is:
+   1. `schema location/fileset name` if `schema location` does not contain any placeholder.
+   2. `schema location` - placeholders in the schema location will be replaced by the corresponding fileset property value.
+
 5. When both the catalog property `location` and schema property `location` isn't specified, the user
    should specify the `storageLocation` in the fileset creation.
 
 For `EXTERNAL` fileset, users should specify `storageLocation` during the fileset creation,
-otherwise, Gravitino will throw an exception.
+otherwise, Gravitino will throw an exception. If the `storageLocation` contains placeholders, the
+placeholder will be replaced by the corresponding fileset property value.
 
 ### Alter a fileset
 

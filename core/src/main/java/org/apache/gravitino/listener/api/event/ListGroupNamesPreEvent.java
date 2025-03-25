@@ -22,31 +22,16 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before get a user from specific metalake */
+/** Represents an event triggered before list group name from specific metalake */
 @DeveloperApi
-public class GetUserPreEvent extends UserPreEvent {
-  private final String userName;
+public class ListGroupNamesPreEvent extends GroupPreEvent {
 
   /**
-   * Construct a new {@link GetUserPreEvent} instance with the specified user, identifier and user
-   * info.
-   *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is getting retrieved from.
-   * @param userName the username which is requested to be retrieved.
+   * @param initiator the user who initiated the list-group-names request.
+   * @param identifier the identifier of the metalake which is being listed.
    */
-  public GetUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
+  protected ListGroupNamesPreEvent(String initiator, NameIdentifier identifier) {
     super(initiator, identifier);
-    this.userName = userName;
-  }
-
-  /**
-   * Returns the user info for the user which is getting retrieved.
-   *
-   * @return the username which is requested to be retrieved.
-   */
-  public String userName() {
-    return userName;
   }
 
   /**
@@ -56,6 +41,6 @@ public class GetUserPreEvent extends UserPreEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.GET_USER;
+    return OperationType.LIST_GROUP_NAMES;
   }
 }
