@@ -33,9 +33,9 @@ for data and AI assets.
 
 ## Maintainers
 
-| Name      | Email                    | Url                          |
-|-----------|--------------------------|------------------------------|
-| Gravitino | dev@gravitino.apache.org | https://gravitino.apache.org |
+| Name             | Email                    | Url                          |
+|------------------|--------------------------|------------------------------|
+| Apache Gravitino | dev@gravitino.apache.org | https://gravitino.apache.org |
 
 ## Source Code
 
@@ -82,7 +82,13 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
   --set key1=val1,key2=val2,...
 ```
 
-## Deploying Gravitino with MySQL as the Storage Backend
+Alternatively, you can provide a custom values.yaml file:
+
+```console
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace -f /path/to/chart/resources/scenarios/ci-values.yaml
+```
+
+### Deploying Gravitino with MySQL as the Storage Backend
 
 To deploy both Gravitino and MySQL, where MySQL is used as the storage backend, enable the built-in MySQL instance:
 
@@ -91,7 +97,7 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
   --set mysql.enabled=true
 ```
 
-## Disable Dynamic Storage Provisioning
+### Disable Dynamic Storage Provisioning
 
 By default, the storage class is local-path. To disable dynamic provisioning, set the storage class to "-":
 
@@ -101,17 +107,19 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
   --set global.defaultStorageClass="-"
 ```
 
-## Deploy Gravitino using an existed MySQL Database
+You must then manually create a PersistentVolume (PV).
 
-Ensure you have the following MySQL credentials ready: Username, Password, Database Name
+### Deploy Gravitino using an existed MySQL Database
 
-Initialize your existing MySQL instance
+Ensure you have the following MySQL credentials ready: Username, Password, Database Name.
+
+Before deploying Gravitino, initialize your existing MySQL instance and create the necessary tables required for Gravitino to function properly.
 
 ```console
 mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
 ```
 
-Use Helm to install or upgrade Gravitino,specifying the MySQL connection details
+Use Helm to install or upgrade Gravitino,specifying the MySQL connection details.
 
 ```console
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \

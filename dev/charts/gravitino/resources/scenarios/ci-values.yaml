@@ -63,7 +63,7 @@ log:
 
 log4j2Properties:
   rootLoggerLevel: warn
-  strategyDeleteIfLastModifiedAge: 2d
+  rollingAppenderStrategyDeleteIfLastModifiedAge: 2d
 
 additionalLog4j2Properties:
   appender.console.type: Console

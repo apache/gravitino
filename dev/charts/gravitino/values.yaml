@@ -151,8 +151,38 @@ log:
 
 log4j2Properties: {}
   # status: warn
-  # strategyDeleteIfLastModifiedAge: 30d
+
+  ## Log files location
+  # basePath: "${sys:gravitino.log.path}"
+  # serverName: "${sys:gravitino.server.name}"
+
+  ## RollingFileAppender name, pattern, path and rollover policy
+  # rollingAppenderType: RollingFile
+  # rollingAppenderName: fileLogger
+  # rollingAppenderFileName: "${basePath}/${serverName}.log"
+  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.log.gz"
+  # rollingAppenderLayoutType: PatternLayout
+  # rollingAppenderLayoutPattern: "%d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n"
+  # rollingAppenderPoliciesType: Policies
+
+  ## RollingFileAppender rotation policy
+  # rollingAppenderPoliciesSizeType: SizeBasedTriggeringPolicy
+  # rollingAppenderPoliciesSizeSize: 10MB
+  # rollingAppenderPoliciesTimeType: TimeBasedTriggeringPolicy
+  # rollingAppenderPoliciesTimeInterval: 1
+  # rollingAppenderPoliciesTimeModulate: true
+  # rollingAppenderStrategyType: DefaultRolloverStrategy
+  # rollingAppenderStrategyDeleteType: Delete
+  # rollingAppenderStrategyDeleteBasePath: "${basePath}"
+  # rollingAppenderStrategyDeleteMaxDepth: 10
+  # rollingAppenderStrategyDeleteIfLastModifiedType: IfLastModified
+
+  ## Delete all files older than 30 days
+  # rollingAppenderStrategyDeleteIfLastModifiedAge: 30d
+
+  ## Configure root logger
   # rootLoggerLevel: info
+  # rootLoggerAppenderRefRollingRef: fileLogger
 
 additionalLog4j2Properties: {}
 
@@ -174,7 +204,7 @@ service:
 extraExposePorts:
   - port: 9001
     protocol: TCP
-    name: http2
+    name: http1
     targetPort: 9001
 
 ## Deployment annotations
